@@ -1,5 +1,21 @@
 # MASTER ORCHESTRATOR: Spec → Contracts → Implementation
 
+> **📌 STATUS: Legacy Orchestration Guide**
+>
+> This document describes a comprehensive, monolithic approach to contract-based development.
+>
+> **For most users, start with the simpler core docs instead:**
+> - **[CONTRACTS-README.md](CONTRACTS-README.md)** - System overview
+> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - How to write specs
+> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - YAML format
+> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - LLM workflow
+>
+> **Use this doc when:** You want complete end-to-end automation from spec → deployed app in one session.
+>
+> **Prefer the core docs when:** You're working incrementally (most common workflow).
+>
+> ---
+
 ## Purpose
 
 This is a **complete, executable orchestration prompt** that takes a product spec as input and produces a fully-implemented, contract-verified application as output.

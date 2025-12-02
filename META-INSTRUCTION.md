@@ -1,5 +1,21 @@
 # META-INSTRUCTION: Contract-Based Development Infrastructure Setup
 
+> **📌 STATUS: Infrastructure Setup Guide (Foundational)**
+>
+> This document focuses on setting up the infrastructure (directories, templates, scripts, CI).
+>
+> **After setup, use these docs for the actual workflow:**
+> - **[CONTRACTS-README.md](CONTRACTS-README.md)** - What contracts are, how they work
+> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - How to write specs
+> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - Contract YAML format
+> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - LLM workflow
+>
+> **Use this doc for:** Infrastructure setup only (directories, templates, CI/CD).
+>
+> **Don't use this doc for:** Understanding contract semantics or LLM workflow (see core docs above).
+>
+> ---
+
 ## FOR LLMs: How to Set Up Contract Infrastructure in Any Project
 
 This is a **complete, executable guide** for setting up architectural contracts in a codebase. Follow every step sequentially. Do not skip or skim.

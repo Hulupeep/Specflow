@@ -1,5 +1,15 @@
 # CLAUDE.md Contract Section Template
 
+> **📌 UPDATED: Now references the 4 core docs**
+>
+> This template has been updated to point to the new simpler documentation structure:
+> - CONTRACTS-README.md (system overview)
+> - SPEC-FORMAT.md (how to write specs)
+> - CONTRACT-SCHEMA.md (YAML format)
+> - LLM-MASTER-PROMPT.md (LLM workflow)
+
+---
+
 ## Instructions for LLMs:
 
 **Copy the section below and add it to the TOP of your project's CLAUDE.md file.**
@@ -89,12 +99,18 @@ Then you may proceed, but should:
 
 ##### Adding New Contracts:
 
-See `docs/contracts/templates/META-INSTRUCTION.md` for complete setup guide.
+See `META-INSTRUCTION.md` for infrastructure setup.
 
 **📖 Full Documentation:**
-- Contract System: `docs/contracts/README.md`
-- LLM Workflow: `docs/contracts/LLM-WORKFLOW.md`
-- Templates: `docs/contracts/templates/`
+- **Core Docs (Start Here)**:
+  - `CONTRACTS-README.md` - System overview
+  - `SPEC-FORMAT.md` - How to write specs
+  - `CONTRACT-SCHEMA.md` - YAML format
+  - `LLM-MASTER-PROMPT.md` - LLM workflow
+- **Reference Guides**:
+  - `MASTER-ORCHESTRATOR.md` - Complete automation (heavy)
+  - `SPEC-TO-CONTRACT.md` - Conversion examples
+  - `MID-PROJECT-ADOPTION.md` - Existing codebases
 
 ---
 
@@ -196,9 +212,15 @@ override_contract: background_auth_hydration
 - `bg_messaging_003_fire_and_forget`: Popup sends sync requests fire-and-forget
 
 **📖 Full Documentation:**
-- Contract System: `docs/contracts/README.md`
-- LLM Workflow: `docs/contracts/LLM-WORKFLOW.md`
-- Templates: `docs/contracts/templates/`
+- **Core Docs (Start Here)**:
+  - `CONTRACTS-README.md` - System overview
+  - `SPEC-FORMAT.md` - How to write specs
+  - `CONTRACT-SCHEMA.md` - YAML format
+  - `LLM-MASTER-PROMPT.md` - LLM workflow
+- **Reference Guides**:
+  - `MASTER-ORCHESTRATOR.md` - Complete automation (heavy)
+  - `SPEC-TO-CONTRACT.md` - Conversion examples
+  - `MID-PROJECT-ADOPTION.md` - Existing codebases
 ```
 
 ---

@@ -1,5 +1,22 @@
 # Contract Implementation with Claude Subagents
 
+> **📌 ALIGNED WITH NEW CORE DOCS**
+>
+> This guide uses the simplified contract system. All subagents must follow:
+> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - Canonical spec format with REQ IDs (AUTH-001)
+> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - Canonical YAML schema (rules.non_negotiable, covers_reqs)
+> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - Canonical workflow (incremental, not monolithic)
+>
+> **Key principles for subagents:**
+> - Parse specs using REQ IDs: `AUTH-001 (MUST)`, `AUTH-010 (SHOULD)`
+> - Map REQ IDs to contract rules via `covers_reqs: [AUTH-001, AUTH-002]`
+> - Use `rules.non_negotiable` for MUST, `rules.soft` for SHOULD
+> - Use `scope` glob patterns to specify which files rules apply to
+> - Reference REQ IDs in test descriptions: `it('AUTH-001: ...')`
+> - Follow incremental workflow: one REQ → contract → test → verify (not all at once)
+>
+> ---
+
 ## Overview
 
 This guide shows how to leverage **Claude Code's subagent system** to implement and enforce architectural contracts through specialized AI assistants that handle different phases of contract-based development.
@@ -78,58 +95,73 @@ You are a contract generation specialist. Your job is to convert product specifi
 
 ## Your Process
 
+**CRITICAL: Before starting, read SPEC-FORMAT.md and CONTRACT-SCHEMA.md**
+
 When invoked:
 
-1. **Read the specification**
-   - Load the spec file completely
-   - Parse for MUST, SHALL, REQUIRED, NEVER, ALWAYS keywords
-   - Identify SHOULD (soft rules) and MAY (optional)
+1. **Read the specification (SPEC-FORMAT.md format)**
+   - Load spec file with REQ IDs: `AUTH-001 (MUST)`, `AUTH-010 (SHOULD)`
+   - Parse JOURNEY IDs: `J-AUTH-REGISTER`
+   - Note: Specs use normalized format, not arbitrary prose
 
-2. **Extract requirements**
-   - MUST requirements → `non_negotiable_rules`
-   - SHOULD requirements → `soft_rules`
-   - MAY requirements → document but don't enforce
+2. **Extract requirements by REQ ID**
+   - REQ (MUST) → `rules.non_negotiable` entry with matching ID
+   - REQ (SHOULD) → `rules.soft` entry with matching ID
+   - MAY requirements → don't enforce
 
-3. **Generate contract YAML**
-   - Use template: `docs/contracts/contract_template.yml`
-   - One contract per feature or architectural constraint
-   - Include forbidden_patterns and required_patterns
-   - Add example_violation and example_compliant code
-   - Create compliance_checklist
+3. **Generate contract YAML (CONTRACT-SCHEMA.md format)**
+   - Follow CONTRACT-SCHEMA.md structure exactly
+   - Use `contract_meta.covers_reqs: [AUTH-001, AUTH-002]` to map back to spec
+   - Each rule must have `id` matching spec REQ ID
+   - Use `scope` glob patterns for file selection
+   - Include `behavior.forbidden_patterns` and `behavior.required_patterns`
+   - Create `compliance_checklist` for LLMs
 
 4. **Cross-reference**
    - Link contract to original spec section
    - Add rationale from spec
    - Reference related contracts
 
-## Contract Structure
+## Contract Structure (from CONTRACT-SCHEMA.md)
 
 ```yaml
 contract_meta:
-  id: [feature]_[number]
+  id: feature_authentication  # feature_<name>
   version: 1
-  created_from: "[Spec name, section]"
-  owner: "Generated from spec"
+  created_from_spec: "docs/specs/authentication.md"
+  covers_reqs:  # Maps back to spec REQ IDs
+    - AUTH-001
+    - AUTH-002
+  owner: "team-name"
 
-non_negotiable_rules:
-  - id: [feature]_001
-    title: "[Requirement summary]"
-    behavior_spec:
-      forbidden_patterns:
-        - pattern: /regex/
-          message: "Why forbidden"
-      required_patterns:
-        - pattern: /regex/
-          message: "Why required"
-      example_violation: |
-        // ❌ Code that violates
-      example_compliant: |
-        // ✅ Code that satisfies
+rules:
+  non_negotiable:
+    - id: AUTH-001  # EXACT ID from spec
+      title: "API endpoints require authMiddleware"
+      scope:  # Glob patterns for files
+        - "src/routes/**/*.ts"
+        - "!src/routes/health.ts"  # Exclusions
+      behavior:
+        forbidden_patterns:
+          - pattern: /router\.(get|post).*\/api\//
+            message: "Route missing authMiddleware"
+        required_patterns:
+          - pattern: /authMiddleware/
+            message: "Must import authMiddleware"
+        example_violation: |
+          router.get('/api/users', async (req, res) => { ... })
+        example_compliant: |
+          router.get('/api/users', authMiddleware, async (req, res) => { ... })
+
+  soft:
+    - id: AUTH-010  # SHOULD requirements
+      title: "Session timeout configurable"
+      suggestion: "Expose SESSION_TIMEOUT env var"
 
 compliance_checklist:
-  before_modifying_file:
-    - question: "Does this change [X]?"
-      if_yes: "Action required"
+  before_editing_files:
+    - question: "Adding/modifying API route?"
+      if_yes: "Add authMiddleware per AUTH-001"
 ```
 
 ## Pattern Detection
@@ -178,13 +210,16 @@ You are a test generation specialist. Your job is to create comprehensive contra
 
 ## Your Process
 
+**CRITICAL: Before starting, read CONTRACT-SCHEMA.md**
+
 When invoked:
 
-1. **Read the contract**
-   - Load contract YAML completely
-   - Parse all non_negotiable_rules
-   - Identify forbidden_patterns and required_patterns
-   - Note scope (which files to test)
+1. **Read the contract (CONTRACT-SCHEMA.md format)**
+   - Load contract YAML following CONTRACT-SCHEMA.md structure
+   - Note `contract_meta.covers_reqs` (e.g., [AUTH-001, AUTH-002])
+   - Parse `rules.non_negotiable` entries
+   - For each rule: extract `id`, `scope`, `behavior.forbidden_patterns`, `behavior.required_patterns`
+   - Use `scope` patterns to determine which files to scan
 
 2. **Generate test file**
    - Use template: `src/__tests__/contracts/contractTemplate.test.ts`
@@ -199,20 +234,31 @@ When invoked:
 
 ## Test Patterns
 
-### Pattern 1: Forbidden Pattern Detection
+### Pattern 1: Forbidden Pattern Detection (with REQ ID)
 ```typescript
-it('LLM CHECK: [file] does NOT contain [pattern]', () => {
+it('AUTH-001: API routes have authMiddleware', () => {
   const fs = require('fs')
-  const content = fs.readFileSync('[file]', 'utf-8')
+  const glob = require('glob')
 
-  const forbiddenPattern = /pattern_to_detect/
+  // Use scope from contract
+  const files = glob.sync('src/routes/**/*.ts', {
+    ignore: ['**/health.ts']  // From contract scope exceptions
+  })
 
-  if (forbiddenPattern.test(content)) {
-    throw new Error(
-      `CONTRACT VIOLATION: [contract_id]\n` +
-      `File contains forbidden pattern: ${forbiddenPattern}\n` +
-      `See: docs/contracts/[contract_file].yml`
-    )
+  for (const file of files) {
+    const content = fs.readFileSync(file, 'utf-8')
+
+    // Check forbidden pattern from contract.behavior
+    if (/router\.(get|post).*\/api\//.test(content)) {
+      if (!/authMiddleware/.test(content)) {
+        throw new Error(
+          `CONTRACT VIOLATION: AUTH-001\n` +  // REQ ID from spec
+          `File: ${file}\n` +
+          `Issue: API route missing authMiddleware\n` +
+          `See: docs/contracts/feature_authentication.yml`
+        )
+      }
+    }
   }
 })
 ```
@@ -397,106 +443,124 @@ model: sonnet
 
 You are the contract orchestration specialist. Your job is to coordinate the complete contract-based development workflow using specialized subagents.
 
+**CRITICAL: Use the incremental workflow from LLM-MASTER-PROMPT.md, NOT the old 9-phase MASTER-ORCHESTRATOR.**
+
 ## Your Process
 
 When invoked with a spec:
 
-### Phase 1: Analysis
-1. Read the provided specification
-2. Parse into sections:
-   - MUST requirements (non-negotiable)
-   - SHOULD requirements (soft rules)
-   - MAY requirements (optional)
-   - User journeys
+### Phase 0: Understand Spec (from LLM-MASTER-PROMPT.md)
+1. Read spec following SPEC-FORMAT.md
+2. Parse REQ IDs:
+   - AUTH-001 (MUST), AUTH-002 (MUST), AUTH-010 (SHOULD)
+3. Parse JOURNEY IDs:
+   - J-AUTH-REGISTER, J-AUTH-LOGIN
+4. Summarize back to user: "Found 3 MUST REQs, 1 SHOULD REQ, 2 JOURNEYs"
 
-### Phase 2: Contract Generation
-**Delegate to contract-generator subagent:**
+### Phase 1: Contract Generation (Incremental)
+**Work incrementally, ONE REQ at a time:**
 ```
-Use contract-generator subagent to create contracts from:
-[paste requirements]
-```
-
-Wait for contracts to be generated.
-
-### Phase 3: Test Generation
-**Delegate to test-generator subagent:**
-```
-Use test-generator subagent to create tests for:
-[list contract files]
+Use contract-generator subagent to create contract for AUTH-001:
+- Follow CONTRACT-SCHEMA.md structure
+- Map REQ ID to rule ID
+- Use covers_reqs: [AUTH-001]
+- Define scope patterns
 ```
 
-Wait for tests to be generated.
+Wait for contract. Verify it follows CONTRACT-SCHEMA.md. Repeat for next REQ.
 
-### Phase 4: Verification Setup
-**Set up verification infrastructure:**
-1. Verify `scripts/check-contracts.js` exists
-2. Add contracts to CONTRACT_REGISTRY
-3. Add patterns to FORBIDDEN_PATTERNS
-4. Update package.json scripts if needed
+### Phase 2: Test Generation (Incremental)
+**Work incrementally, ONE contract at a time:**
+```
+Use test-generator subagent to create tests for feature_authentication.yml:
+- Reference REQ IDs in test descriptions (AUTH-001)
+- Use scope patterns from contract for file selection
+- Follow test patterns from CONTRACT-SCHEMA.md test_hooks
+```
 
-### Phase 5: Implementation Planning
-**Create TodoWrite with all implementation tasks:**
+Wait for tests. Verify they reference REQ IDs. Repeat for next contract.
+
+### Phase 3: Verification (after each REQ)
+**Run tests immediately after implementing each REQ:**
+```
+Use contract-verifier subagent to verify AUTH-001
+```
+
+Report: "AUTH-001: PASS ✅" or "AUTH-001: FAIL ❌ - [details]"
+
+### Phase 4: Implementation Planning (Incremental TodoWrite)
+**Create TodoWrite with incremental tasks (NOT all at once):**
 ```javascript
 TodoWrite({
   todos: [
-    // Infrastructure
-    { content: "Set up contract infrastructure", status: "completed", priority: "critical" },
-    { content: "Generate [N] contracts", status: "completed", priority: "critical" },
-    { content: "Generate [N] test suites", status: "completed", priority: "critical" },
+    // Incremental: One REQ at a time
+    { content: "Generate contract for AUTH-001", status: "completed" },
+    { content: "Generate test for AUTH-001", status: "completed" },
+    { content: "Implement AUTH-001 (authMiddleware on routes)", status: "in_progress" },
+    { content: "Verify AUTH-001 passes", status: "pending" },
 
-    // Implementation (based on contracts)
-    { content: "Implement [feature 1] (satisfies [contract_id])", status: "pending", priority: "high" },
-    { content: "Implement [feature 2] (satisfies [contract_id])", status: "pending", priority: "high" },
-
-    // Verification
-    { content: "Run contract verification tests", status: "pending", priority: "high" },
-    { content: "Fix any contract violations", status: "pending", priority: "high" },
+    // Next REQ (don't start until AUTH-001 verified)
+    { content: "Generate contract for AUTH-002", status: "pending" },
+    { content: "Generate test for AUTH-002", status: "pending" },
+    { content: "Implement AUTH-002 (httpOnly cookies)", status: "pending" },
+    { content: "Verify AUTH-002 passes", status: "pending" },
   ]
 })
 ```
 
-### Phase 6: Implementation Monitoring
-As implementation proceeds:
-1. Periodically invoke contract-verifier subagent
-2. Report violations immediately
-3. Help fix violations by referencing contracts
+### Phase 5: Continuous Verification
+After each implementation step:
+1. Run contract-verifier for that specific REQ
+2. Report: "AUTH-001: PASS ✅" or "AUTH-001: FAIL ❌"
+3. Fix violations before moving to next REQ
+4. Update TodoWrite to mark REQ as completed
 
-### Phase 7: Final Verification
-**Delegate to contract-verifier subagent:**
+### Phase 6: Coverage Report
+Track which REQ IDs are covered:
 ```
-Use contract-verifier subagent to validate all contracts
+✅ Covered: AUTH-001, AUTH-002 (2/4)
+⏳ In progress: AUTH-003
+❌ Pending: AUTH-004
+📊 Overall: 50% complete
 ```
-
-Generate final report.
 
 ## Coordination Patterns
 
-**Sequential delegation:**
+**Incremental (from LLM-MASTER-PROMPT.md):**
 ```
-Main → contract-generator → wait for completion
-Main → test-generator → wait for completion
-Main → contract-verifier → report results
-```
-
-**Parallel delegation (when possible):**
-```
-Main → [contract-generator for spec section 1]
-     → [contract-generator for spec section 2]
-     → [contract-generator for spec section 3]
-
-Wait for all → proceed to test generation
+Main → contract-generator for AUTH-001 → wait
+Main → test-generator for AUTH-001 → wait
+Main → implement AUTH-001 → wait
+Main → contract-verifier for AUTH-001 → report
+[Repeat for AUTH-002, AUTH-003, etc.]
 ```
 
-## Output Format
+**NOT monolithic (avoid this):**
+```
+❌ Main → generate ALL contracts → generate ALL tests → implement EVERYTHING → verify ALL
+[This is the old MASTER-ORCHESTRATOR approach - don't use]
+```
+
+**Parallel when REQs are independent:**
+```
+Main → [contract-generator for AUTH-001]
+     → [contract-generator for AUTH-002]
+     → [contract-generator for AUTH-003]
+
+Wait for all → proceed incrementally with tests
+```
+
+## Output Format (with REQ ID traceability)
 
 ```markdown
 # Contract Implementation Report
 
-## Phase 1: Analysis ✅
-- Requirements extracted: [N] MUST, [N] SHOULD
-- User journeys identified: [N]
+## Phase 0: Spec Analysis ✅
+- REQ IDs found: AUTH-001 (MUST), AUTH-002 (MUST), AUTH-010 (SHOULD)
+- JOURNEY IDs found: J-AUTH-REGISTER, J-AUTH-LOGIN
+- Ready for incremental implementation
 
-## Phase 2: Contract Generation ✅
+## Phase 1: Contract Generation ✅
 - Contracts created: [N]
 - Files: [list files]
 

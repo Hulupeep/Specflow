@@ -1,5 +1,20 @@
 # Spec → Contract Workflow
 
+> **📌 STATUS: Reference Guide (Secondary)**
+>
+> This document provides detailed conversion examples and patterns.
+>
+> **For most users, start with these docs instead:**
+> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - Normalized spec format with REQ IDs (simpler, more deterministic)
+> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - Lean YAML schema
+> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - Incremental workflow
+>
+> **Use this doc when:** You need deep-dive examples of converting arbitrary prose specs into contracts.
+>
+> **Prefer SPEC-FORMAT.md when:** You're writing new specs (use the normalized format from the start).
+>
+> ---
+
 ## Converting Product Specs into Enforceable Contracts
 
 This guide shows how to transform product requirements, user stories, and specifications into machine-readable architectural contracts that LLMs cannot violate.
