@@ -283,8 +283,8 @@ J-CHECKOUT: User adds to cart → payment → confirmation
 
 ```bash
 # Clone templates
-git clone https://github.com/yourusername/contractee.git
-cd contractee
+git clone https://github.com/Hulupeep/Specflow.git
+cd Specflow
 
 # Copy to your project
 cp -r * /your-project/docs/contracts/templates/
@@ -293,7 +293,7 @@ cp -r * /your-project/docs/contracts/templates/
 cat CONTRACTS-README.md
 ```
 
-Or browse online: [github.com/yourusername/contractee](https://github.com/yourusername/contractee)
+Or browse online: [github.com/Hulupeep/Specflow](https://github.com/Hulupeep/Specflow)
 
 ---
 
@@ -336,7 +336,7 @@ Both are valuable. Contracts enforce higher-level invariants.
 ## Community
 
 - 📖 **Documentation**: Core docs above
-- 🐛 **Issues**: [github.com/yourusername/contractee/issues](https://github.com/yourusername/contractee/issues)
+- 🐛 **Issues**: [github.com/Hulupeep/Specflow/issues](https://github.com/Hulupeep/Specflow/issues)
 - 💬 **Discussions**: Share your contracts and patterns
 - ⭐ **Star this repo** if it helps you!
 
@@ -364,7 +364,7 @@ MIT - Use freely, commercially, anywhere.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Contractee Quick Reference                              │
+│ Specflow Quick Reference                                │
 ├─────────────────────────────────────────────────────────┤
 │ Core Docs (Read These First):                          │
 │   CONTRACTS-README.md    System overview                │
