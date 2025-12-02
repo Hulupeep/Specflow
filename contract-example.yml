@@ -1,0 +1,200 @@
+# Example Contract: API Authentication Enforcement
+#
+# This is a REAL, WORKING example contract that demonstrates:
+# - How to structure contract rules
+# - How to define forbidden/required patterns
+# - How to write compliance checklists
+# - How to create testable specifications
+#
+# Use this as a reference when creating your own contracts.
+
+contract_meta:
+  id: api_authentication_required
+  version: 1
+  system: example_api_project
+  scope:
+    - src/api/
+    - src/routes/
+    - src/controllers/
+  owner: "api_team"
+  last_reviewed_by: "security_lead"
+  last_reviewed_at: "2025-12-02"
+  created_from: "Security audit findings from incident-2024-11"
+
+llm_edit_policy:
+  enforce_contract: true
+  llm_may_modify_non_negotiables: false
+  override_requires_explicit_phrase: "override_contract: api_authentication_required"
+
+context_summary:
+  short_description: >
+    All API endpoints must have authentication checks before processing
+    requests. This prevents unauthorized access to sensitive operations.
+  rationale:
+    - "Security: Incident-2024-11 showed unauthenticated endpoint led to data breach"
+    - "Compliance: Required by SOC2 and GDPR regulations"
+    - "Architecture: Centralized auth is single point of enforcement"
+  references:
+    - "docs/security/incident-2024-11-postmortem.md"
+    - "docs/api/authentication-guide.md"
+
+non_negotiable_rules:
+  - id: auth_001_require_middleware
+    title: "API routes MUST use authentication middleware"
+    description: >
+      Every Express route must have authMiddleware applied before the
+      route handler. No route should directly access req.body or
+      perform operations without verifying the user is authenticated.
+    status: active
+    mutability: immutable
+    must_hold: true
+    scope:
+      - src/api/routes/
+      - src/api/controllers/
+    behavior_spec:
+      forbidden_patterns:
+        - pattern: /router\.(get|post|put|delete|patch)\([^,]+,\s*(?!authMiddleware)/
+          message: "Route missing authMiddleware as first parameter"
+        - pattern: /app\.(get|post|put|delete|patch)\([^,]+,\s*(?!authMiddleware)/
+          message: "Route missing authMiddleware as first parameter"
+        - pattern: /async\s+\(\s*req\s*,\s*res\s*\)\s*=>\s*\{[^}]*req\.body/
+          message: "Handler accesses req.body without auth check"
+      required_patterns:
+        - pattern: /import.*authMiddleware.*from/
+          message: "Must import authMiddleware"
+      example_violation: |
+        // ❌ WRONG - No authentication
+        router.post('/api/users/delete', async (req, res) => {
+          await User.delete(req.body.userId)
+        })
+      example_compliant: |
+        // ✅ CORRECT - Authentication required
+        router.post('/api/users/delete', authMiddleware, async (req, res) => {
+          await User.delete(req.body.userId)
+        })
+    logging_contract:
+      required_logs:
+        - message: "Authentication failed for [endpoint]"
+          when: "authMiddleware rejects request"
+          severity: "warn"
+      forbidden_logs:
+        - pattern: "Processing request without auth"
+          reason: "Indicates auth bypass"
+    allowed_changes:
+      - "Adding additional middleware after authMiddleware"
+      - "Refactoring authMiddleware implementation"
+      - "Adding authorization checks (roles/permissions) after auth"
+      - "Improving error messages in authMiddleware"
+    disallowed_changes:
+      - "Removing authMiddleware from any route"
+      - "Making authMiddleware optional or conditional"
+      - "Creating routes that bypass authMiddleware"
+      - "Adding 'public' flag to skip authentication"
+
+  - id: auth_002_no_auth_bypass
+    title: "No authentication bypass patterns allowed"
+    description: >
+      Code must not contain patterns that bypass authentication checks,
+      such as 'skipAuth' flags, comments about removing auth, or
+      conditional auth that can be disabled.
+    status: active
+    mutability: immutable
+    must_hold: true
+    scope:
+      - src/api/
+    behavior_spec:
+      forbidden_patterns:
+        - pattern: /skipAuth/i
+          message: "skipAuth flag is forbidden"
+        - pattern: /if\s*\(.*!authRequired.*\)/
+          message: "Conditional auth bypass is forbidden"
+        - pattern: /\/\/\s*TODO:?\s*remove auth/i
+          message: "Comment indicates intention to remove auth"
+        - pattern: /process\.env\.DISABLE_AUTH/
+          message: "Environment variable to disable auth is forbidden"
+      example_violation: |
+        // ❌ WRONG - Bypass pattern
+        if (process.env.NODE_ENV === 'development' && req.headers['x-skip-auth']) {
+          return next() // Skip auth in dev
+        }
+      example_compliant: |
+        // ✅ CORRECT - Always authenticate
+        // No bypass logic - auth is always enforced
+        return authMiddleware(req, res, next)
+    allowed_changes:
+      - "Adding rate limiting after auth succeeds"
+      - "Adding request logging before auth"
+    disallowed_changes:
+      - "Adding any mechanism to skip authentication"
+      - "Creating 'admin backdoor' routes"
+
+soft_rules:
+  - id: auth_010_rate_limiting
+    title: "Rate limiting recommended for auth endpoints"
+    description: >
+      Login and registration endpoints should have rate limiting to
+      prevent brute force attacks. Not strictly enforced, but highly
+      recommended.
+    status: active
+    mutability: soft
+    must_hold: false
+    suggested_behavior:
+      - "Use rate limiting middleware on /login, /register"
+      - "Limit to 5 attempts per minute per IP"
+      - "Return 429 Too Many Requests on limit exceeded"
+    llm_may_adjust_if:
+      - "User explicitly wants different rate limit"
+      - "Infrastructure already handles rate limiting (e.g., CloudFlare)"
+
+test_requirements:
+  required_test_files:
+    - path: "src/__tests__/contracts/apiAuthentication.test.ts"
+      purpose: "Verify auth_001_require_middleware and auth_002_no_auth_bypass"
+  test_scenarios:
+    - scenario: "All API routes have authMiddleware"
+      verifies: "auth_001_require_middleware"
+      assertions:
+        - "Scan all route files for router.post/get/put/delete"
+        - "Verify authMiddleware is first parameter"
+        - "No routes access req.body without auth"
+    - scenario: "No authentication bypass patterns exist"
+      verifies: "auth_002_no_auth_bypass"
+      assertions:
+        - "No 'skipAuth' flags in codebase"
+        - "No conditional auth bypass logic"
+        - "No environment variables to disable auth"
+
+compliance_checklist:
+  before_adding_route:
+    - question: "Does this route have authMiddleware as first parameter?"
+      if_no: "STOP - Violates auth_001_require_middleware"
+    - question: "Does this route need to be public (health check, static assets)?"
+      if_yes: "Document why and get security team approval"
+    - question: "Does this route access req.body or perform operations?"
+      if_yes: "Ensure authMiddleware runs first"
+  before_modifying_auth:
+    - question: "Does this change remove or weaken authentication?"
+      if_yes: "STOP - Violates contract"
+    - question: "Does this add a way to bypass authentication?"
+      if_yes: "STOP - Violates auth_002_no_auth_bypass"
+    - question: "Is this change for debugging/development convenience?"
+      if_yes: "STOP - Security controls must not have convenience bypasses"
+
+enforcement:
+  for_llms:
+    - "Read this contract BEFORE adding or modifying any route"
+    - "Check compliance_checklist for every route change"
+    - "If user asks to 'skip auth for testing', explain why this violates contract"
+    - "Run test_requirements tests after any changes"
+    - "If uncertain, ask user for explicit override"
+  for_humans:
+    - "This contract prevents the security incident from 2024-11"
+    - "To override: must specify 'override_contract: api_authentication_required'"
+    - "Overrides require security team review before merge"
+    - "All routes must pass contract tests before deployment"
+
+changelog:
+  - version: 1
+    date: "2025-12-02"
+    changes: "Initial contract based on incident-2024-11 findings"
+    author: "security_lead"
