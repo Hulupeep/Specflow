@@ -61,10 +61,26 @@ npm test -- contracts
 
 ```bash
 # 1. Document what works today
-"Auth tokens stored in Redis, 7-day expiry, no localStorage"
+cat > current-behavior.md <<EOF
+Our auth system currently works like this:
+- Sessions stored in Redis with key pattern: session:{userId}
+- 7-day expiry on all sessions
+- Auth middleware on all /api/* routes
+- Tokens in httpOnly cookies (never localStorage)
+EOF
 
-# 2. Create contract freezing this behavior
-# 3. Generate tests
+# 2. Give LLM this prompt
+Give Claude: "Use LLM-MASTER-PROMPT.md to create a 'freeze contract'
+that prevents breaking this working behavior:
+
+$(cat current-behavior.md)
+
+Generate contracts that will fail if someone:
+- Changes Redis key patterns
+- Removes auth middleware from routes
+- Tries to use localStorage for tokens"
+
+# 3. LLM creates contracts + tests that lock current behavior
 # 4. Now you can refactor safely—tests catch regressions
 ```
 
