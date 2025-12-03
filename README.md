@@ -60,7 +60,7 @@ npm test -- contracts
 ### Day 1: Existing Project
 
 ```bash
-# 1. Document what works today
+# 1. Document what works today (plain English is fine!)
 cat > current-behavior.md <<EOF
 Our auth system currently works like this:
 - Sessions stored in Redis with key pattern: session:{userId}
@@ -69,18 +69,22 @@ Our auth system currently works like this:
 - Tokens in httpOnly cookies (never localStorage)
 EOF
 
-# 2. Give LLM this prompt
-Give Claude: "Use LLM-MASTER-PROMPT.md to create a 'freeze contract'
-that prevents breaking this working behavior:
+# 2. Give LLM this prompt (it will create REQ IDs for you)
+Give Claude: "Read current-behavior.md and use LLM-MASTER-PROMPT.md to:
 
-$(cat current-behavior.md)
+1. Convert this working behavior into SPEC-FORMAT.md with REQ IDs
+2. Create 'freeze contracts' using CONTRACT-SCHEMA.md
+3. Generate tests that will fail if someone breaks this
 
-Generate contracts that will fail if someone:
-- Changes Redis key patterns
-- Removes auth middleware from routes
-- Tries to use localStorage for tokens"
+The LLM should create contracts that prevent:
+- Changing Redis key patterns
+- Removing auth middleware from routes
+- Using localStorage for tokens"
 
-# 3. LLM creates contracts + tests that lock current behavior
+# 3. LLM generates:
+#    - Spec with REQ IDs (AUTH-001, AUTH-002, etc.)
+#    - Contracts mapping to those IDs
+#    - Tests that lock current behavior
 # 4. Now you can refactor safely—tests catch regressions
 ```
 
