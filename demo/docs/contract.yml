@@ -1,0 +1,40 @@
+contract_meta:
+  id: feature_auth
+  version: 1
+  created_from_spec: "docs/spec.md"
+  covers_reqs:
+    - AUTH-001
+  owner: "demo-team"
+  created_at: "2025-12-03"
+
+rules:
+  non_negotiable:
+    - id: AUTH-001
+      title: "Session storage must use Redis-like storage with TTL, not localStorage"
+      scope:
+        - "src/auth.js"
+      behavior:
+        forbidden_patterns:
+          - pattern: /localStorage\.(get|set)Item/
+            message: "localStorage not allowed for sessions (see AUTH-001)"
+          - pattern: /sessionStorage\.(get|set)Item/
+            message: "sessionStorage not allowed for sessions (see AUTH-001)"
+        required_patterns:
+          - pattern: /(store\.set|store\.get)/
+            message: "Must use store with TTL for session storage (see AUTH-001)"
+      rationale: |
+        localStorage can be disabled by browser policies and isn't
+        available in service workers (Chrome MV3). Using a store with
+        automatic TTL expiry provides:
+        - Automatic session expiration (security)
+        - Cross-environment consistency
+        - Works in all runtime contexts (including service workers)
+
+      examples:
+        compliant:
+          - "await store.set('session:123', userId, { ttl: 86400 })"
+          - "const userId = await store.get('session:123')"
+
+        violations:
+          - "localStorage.setItem('session:123', userId)"
+          - "sessionStorage.getItem('session:123')"

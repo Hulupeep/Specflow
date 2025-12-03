@@ -1,0 +1,28 @@
+{
+  "name": "specflow-demo",
+  "version": "1.0.0",
+  "description": "Minimal demo showing how Specflow contracts catch violations that tests miss",
+  "main": "demo.js",
+  "scripts": {
+    "demo": "node demo.js",
+    "demo:working": "node demo.js --step=working",
+    "demo:broken": "node demo.js --step=broken",
+    "demo:compare": "node demo.js --step=compare",
+    "demo:reset": "node demo.js --step=reset",
+    "test": "jest --no-coverage",
+    "test:unit": "jest src/__tests__/auth.test.js --no-coverage",
+    "test:contracts": "jest src/__tests__/contracts.test.js --no-coverage"
+  },
+  "keywords": ["contracts", "testing", "spec", "llm", "demo"],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "jest": "^29.7.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": [
+      "**/__tests__/**/*.test.js"
+    ]
+  }
+}
