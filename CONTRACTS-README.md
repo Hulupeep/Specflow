@@ -4,7 +4,8 @@ This repo uses **contracts** to turn your product spec into executable rules.
 
 You write a simple spec.
 We convert it into:
-- YAML **contracts**
+- YAML **feature contracts** (pattern-based rules)
+- YAML **journey contracts** (Definition of Done)
 - Automated **tests**
 - A **master LLM prompt** that keeps the app aligned with those contracts.
 
@@ -15,45 +16,93 @@ If a contract is violated:
 
 ---
 
+## Two Contract Primitives
+
+This system has exactly **two types of contracts**:
+
+### 1. Feature Contracts (Code Patterns)
+**What they enforce:** Architectural rules at the code level
+**Location:** `docs/contracts/feature_*.yml`
+
+```yaml
+rules:
+  non_negotiable:
+    - id: AUTH-001
+      forbidden_patterns:
+        - pattern: /localStorage/
+          message: "Not available in service workers"
+```
+
+Feature contracts scan source files for patterns that must exist or must never appear. They catch bad code before it ships.
+
+### 2. Journey Contracts (User Flows = Definition of Done)
+**What they enforce:** Complete user experiences work end-to-end
+**Location:** `docs/contracts/journey_*.yml`
+
+```yaml
+dod:
+  criticality: critical    # critical | important | future
+  status: passing          # passing | failing | not_tested
+  blocks_release: true
+
+journey_definition:
+  name: "Complete Purchase"
+  steps:
+    - step_name: "Add to Cart"
+      required_elements:
+        - selector: "[data-testid='add-to-cart']"
+```
+
+**Journey contracts ARE your Definition of Done.** A feature isn't complete when code compiles—it's complete when users can accomplish their goals. Critical journeys block release if failing.
+
+See `USER-JOURNEY-CONTRACTS.md` for the complete template and examples.
+
+---
+
 ## 🔁 Core Loop
 
 1. **Write or update spec**
    - Edit `docs/specs/<feature>.md` in a simple, constrained format (see `SPEC-FORMAT.md`).
+   - Define REQS (requirements) and JOURNEYS (user flows).
+   - Mark journeys as **Critical**, **Important**, or **Future** in your Definition of Done.
 
 2. **Generate / update contracts**
    - Use the LLM with `LLM-MASTER-PROMPT.md` or run `npm run contracts:generate <feature>`.
+   - Feature contracts enforce code patterns (forbidden/required).
+   - Journey contracts define DOD with `dod_criticality` field.
 
 3. **Run tests**
-   - `npm test -- contracts`
+   - `npm test -- contracts` (pattern tests)
+   - `npm test -- journeys` (E2E journey tests)
    - Fix any violations.
 
-4. **Implement or refactor**
+4. **Verify Definition of Done**
+   - All **Critical** journeys must be `passing`.
+   - **Important** journeys should be `passing`.
+   - **Future** journeys can remain `not_tested`.
+
+5. **Implement or refactor**
    - LLMs AND humans read contracts before touching protected files.
 
 ---
 
 ## 🧩 Key Pieces
 
-- **`SPEC-FORMAT.md`**
-  → How to write specs that are easy to turn into contracts.
+### Specification
+- **`SPEC-FORMAT.md`** → How to write specs with REQS, JOURNEYS, and DEFINITION OF DONE
 
-- **`CONTRACT-SCHEMA.md`**
-  → The exact YAML shape for all contracts (lean and consistent).
+### Contract Primitives
+- **`docs/contracts/feature_*.yml`** → Feature contracts (code patterns)
+- **`docs/contracts/journey_*.yml`** → Journey contracts (user flows = DOD)
+- **`CONTRACT-SCHEMA.md`** → YAML schema for both contract types
+- **`USER-JOURNEY-CONTRACTS.md`** → Complete guide to journey contracts
 
-- **`docs/contracts/*.yml`**
-  → Actual contracts, each tied to one or more spec requirements.
+### Tests
+- **`src/__tests__/contracts/*.test.ts`** → Pattern tests for feature contracts
+- **`tests/e2e/journey_*.spec.ts`** → E2E tests for journey contracts (release gates)
 
-- **`src/__tests__/contracts/*.test.ts`**
-  → Tests generated from contracts. They:
-    - Scan for forbidden patterns (e.g. `localStorage` in a service worker)
-    - Check required patterns (e.g. `authMiddleware` on API routes)
-    - Optionally run behavioural checks for critical flows.
-
-- **`LLM-MASTER-PROMPT.md`**
-  → The prompt you give to Claude/Cursor/etc. to:
-    - Convert spec → contracts
-    - Generate / update tests
-    - Implement features respecting contracts.
+### LLM Integration
+- **`LLM-MASTER-PROMPT.md`** → Prompt that enforces contracts during development
 
 ---
 
@@ -191,6 +240,23 @@ project/
 
 ---
 
+## Why Contracts? The Attention Problem
+
+**Models don't read, they pay attention.**
+
+When you tell an LLM "No shortcuts. Do it properly," it doesn't create a hard constraint—it creates a weighted influence that competes with the model's learned priors. Three hours into a session, it starts to drift and make mistakes while simultaneously presenting itself as knowing exactly what you're working on.
+
+This appearance of continuity is entirely aesthetic—an optimization artifact of how LLMs work. It's not real. And it causes cognitive dissonance because we mistake fluency for understanding.
+
+This isn't laziness. It's entropy from competing signals: do this, don't do that, follow the spec, optimize for tokens, match the user's style... The model attends to all of it, and your carefully-worded instructions are just one voice in the crowd.
+
+**That's why contracts exist.**
+
+> Prompting expresses intent. Contracts enforce behaviour.
+> If you don't turn continuity into code, you'll mistake fluency for truth.
+
+---
+
 ## Why Contracts vs. Just Tests?
 
 **Traditional tests**: Check implementation details (units, functions)
@@ -205,22 +271,77 @@ project/
 
 Contracts test **what must stay true**, not **how it's built**.
 
+The difference matters most with LLMs. A unit test checks code correctness. A contract catches the moment an LLM "optimizes" your auth flow into something that passes all tests but violates your security requirements.
+
+---
+
+## 🎯 Journeys as Definition of Done
+
+**The core insight:** Unit tests passing ≠ feature complete. Users don't care about your unit tests—they care about completing their goals.
+
+### Traditional vs. DOD Approach
+
+| Traditional | Definition of Done |
+|-------------|-------------------|
+| "Tests pass" = done | "User journeys pass" = done |
+| Check functions work | Check flows work |
+| Developer-centric | User-centric |
+| Build breaks on unit failure | Build breaks on journey failure |
+
+### DOD Criticality Levels
+
+```
+Critical (MUST PASS)     → Blocks release if failing
+Important (SHOULD PASS)  → Should fix before release
+Future (NOT BLOCKING)    → Can release without
+```
+
+### Example: Authentication Feature
+
+```markdown
+## DEFINITION OF DONE
+
+### Critical (MUST PASS)
+- J-AUTH-REGISTER → User can create account
+- J-AUTH-LOGIN → User can sign in
+
+### Important (SHOULD PASS)
+- J-AUTH-LOGOUT → User can sign out
+
+### Future (NOT BLOCKING)
+- J-AUTH-2FA → Two-factor authentication
+```
+
+**Release gate logic:**
+- All Critical journeys `status: passing`? ✅ Can release
+- Any Critical journey `status: failing`? ❌ Cannot release
+- Any Critical journey `status: not_tested`? ❌ Cannot release
+
 ---
 
 ## Integration with CI/CD
 
-Contracts run automatically in CI:
+Contracts and journeys run automatically in CI:
 
 ```yaml
 # .github/workflows/ci.yml
-- name: Run Tests
+- name: Run Unit Tests
   run: npm test
 
-- name: Verify Contracts
+- name: Verify Feature Contracts
   run: npm test -- contracts
+
+- name: Verify Journey DOD (Critical)
+  run: npm test -- journeys --grep "critical"
+
+- name: Check DOD Status
+  run: node scripts/check-dod-status.js
 ```
 
-If contracts fail → build fails → PR blocked.
+**Release gates:**
+- Feature contracts fail → PR blocked
+- Critical journey fails → Release blocked
+- DOD check shows `not_tested` critical journey → Release blocked
 
 ---
 
@@ -229,6 +350,7 @@ If contracts fail → build fails → PR blocked.
 **Core Docs:**
 - `SPEC-FORMAT.md` - How to write specs
 - `CONTRACT-SCHEMA.md` - YAML contract format
+- `USER-JOURNEY-CONTRACTS.md` - Journey contracts and Definition of Done
 - `LLM-MASTER-PROMPT.md` - LLM workflow
 
 **Legacy Guides (for reference):**
@@ -246,11 +368,13 @@ If contracts fail → build fails → PR blocked.
 
 You're doing it right when:
 
-1. ✅ Contract exists - YAML file with clear rules
-2. ✅ Test enforces it - Test scans source code
-3. ✅ Intentional violation fails - Test catches it
-4. ✅ Fix makes it pass - Test verifies fix
-5. ✅ CI runs automatically - Every PR tested
+1. ✅ Feature contract exists - YAML file with pattern rules
+2. ✅ Journey contract exists - YAML file with DOD criticality
+3. ✅ Pattern tests enforce feature contracts
+4. ✅ E2E tests enforce journey contracts
+5. ✅ Intentional violation fails - Tests catch it
+6. ✅ Critical journeys pass - DOD verified
+7. ✅ CI gates releases - No shipping with broken journeys
 
 ---
 

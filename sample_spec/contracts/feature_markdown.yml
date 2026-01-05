@@ -1,0 +1,123 @@
+contract_meta:
+  id: feature_markdown
+  version: 1
+  created_from_spec: "sample_spec/spec.md"
+  covers_reqs:
+    - MD-001
+    - MD-002
+    - MD-003
+  owner: "chat2repo-team"
+  created_at: "2025-12-03"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_markdown"
+
+rules:
+  non_negotiable:
+    - id: MD-001
+      title: "Notes must have required YAML front-matter fields"
+      scope:
+        - "packages/core/src/markdownBuilder.ts"
+      behavior:
+        required_patterns:
+          - pattern: /source:/
+            message: "Front-matter must include 'source' field (MD-001)"
+          - pattern: /captured_at:/
+            message: "Front-matter must include 'captured_at' field (MD-001)"
+          - pattern: /tags:/
+            message: "Front-matter must include 'tags' field (MD-001)"
+        schema:
+          source:
+            type: "enum"
+            values: ["chatgpt", "web", "other"]
+          captured_at:
+            type: "string"
+            format: "ISO8601 UTC"
+          tags:
+            type: "array"
+            items: "string"
+        example_violation: |
+          ---
+          title: My Note
+          ---
+          Content here
+        example_compliant: |
+          ---
+          source: chatgpt
+          captured_at: 2025-12-03T10:30:00Z
+          tags:
+            - chatgpt
+            - research
+          ---
+          Content here
+
+    - id: MD-002
+      title: "Front-matter schema is stable - additive changes only"
+      scope:
+        - "packages/core/src/markdownBuilder.ts"
+        - "packages/core/src/types.ts"
+      behavior:
+        stable_fields:
+          - source
+          - captured_at
+          - url
+          - page_title
+          - page_context
+          - repo_label
+          - topic
+          - tags
+        rules:
+          - "Required fields (source, captured_at, tags) cannot be removed"
+          - "Field types cannot change (tags must remain array)"
+          - "New fields must be optional"
+        example_violation: |
+          // Changing tags from array to string
+          tags: "chatgpt,research"
+        example_compliant: |
+          // Adding new optional field
+          captured_by?: string  // Optional, doesn't break existing notes
+
+    - id: MD-003
+      title: "tags field must always be present as array"
+      scope:
+        - "packages/core/src/markdownBuilder.ts"
+      behavior:
+        required_patterns:
+          - pattern: /tags:\s*\[/
+            message: "tags must be output as YAML array (MD-003)"
+        forbidden_patterns:
+          - pattern: /tags:\s*$/m
+            message: "Empty tags line not allowed - must be array or empty array (MD-003)"
+          - pattern: /tags:\s+[^-\[\n]/
+            message: "tags must be array format, not scalar (MD-003)"
+        validation:
+          - "tags field must exist in every output"
+          - "tags must be array type ([] for empty)"
+          - "tags must not be null/undefined"
+        example_violation: |
+          ---
+          source: web
+          captured_at: 2025-12-03T10:30:00Z
+          ---
+        example_compliant: |
+          ---
+          source: web
+          captured_at: 2025-12-03T10:30:00Z
+          tags: []
+          ---
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you modifying the front-matter output in markdownBuilder?"
+      if_yes: "Ensure source, captured_at, and tags are always present. tags must be array."
+    - question: "Are you removing or renaming an existing front-matter field?"
+      if_yes: "STOP. Schema is stable. Only additive changes allowed."
+    - question: "Are you changing the type of an existing field?"
+      if_yes: "STOP. Field types are frozen. This would break existing notes."
+
+test_hooks:
+  tests:
+    - file: "sample_spec/__tests__/markdown.test.js"
+      description: "Validates front-matter schema compliance"

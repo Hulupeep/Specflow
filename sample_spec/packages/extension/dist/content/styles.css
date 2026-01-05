@@ -1,0 +1,16 @@
+/* Chat2Repo Content Script Styles */
+
+.chat2repo-send-btn {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+/* Show button on message hover */
+[data-message-author-role="assistant"]:hover .chat2repo-send-btn {
+  opacity: 1;
+}
+
+/* Toast container */
+#chat2repo-toast-container {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}

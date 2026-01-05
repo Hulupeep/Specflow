@@ -1,0 +1,146 @@
+# Contract Index for chat2repo
+# Generated: 2025-12-05
+# Source: sample_spec/spec.md
+
+metadata:
+  project: chat2repo
+  version: 2
+  total_contracts: 7
+  total_requirements: 16 MUST, 3 SHOULD
+  total_journeys: 8
+
+# Definition of Done Summary
+# Journeys define when features are complete
+definition_of_done:
+  critical_journeys:
+    - J-CHATGPT-QUICKSEND    # Core happy path
+    - J-ERROR-NOCONFIG       # Error handling
+  important_journeys:
+    - J-CHATGPT-DETAILED     # Full modal flow
+    - J-WEB-QUICKSEND        # Web page capture
+  future_journeys:
+    - J-WEB-DETAILED
+    - J-ERROR-RATELIMIT
+    - J-ERROR-DOMFAIL
+    - J-PREFERENCES
+
+  release_gate: |
+    All critical journeys must have status: passing
+    before release is allowed.
+
+contracts:
+  # Feature Contracts
+  - id: feature_architecture
+    file: feature_architecture.yml
+    status: active
+    covers_reqs:
+      - ARCH-001
+      - ARCH-002
+      - ARCH-003
+    summary: "Package layering, GitHub API isolation, file size limits"
+
+  - id: feature_security
+    file: feature_security.yml
+    status: active
+    covers_reqs:
+      - SEC-001
+      - SEC-002
+      - SEC-003
+    summary: "PAT storage, secret protection, permission hygiene"
+
+  - id: feature_mv3
+    file: feature_mv3.yml
+    status: active
+    covers_reqs:
+      - MV3-001
+      - MV3-002
+    summary: "Service worker compliance, no polling"
+
+  - id: feature_markdown
+    file: feature_markdown.yml
+    status: active
+    covers_reqs:
+      - MD-001
+      - MD-002
+      - MD-003
+    summary: "Front-matter schema, required fields, stability"
+
+  - id: feature_ux
+    file: feature_ux.yml
+    status: active
+    covers_reqs:
+      - UX-001
+      - UX-002
+      - UX-003
+      - ERR-001
+      - ERR-002
+    summary: "User flows, error handling, ChatGPT integration"
+
+  # Journey Contracts (Definition of Done)
+  - id: J-CHATGPT-QUICKSEND
+    file: journey_chatgpt_quicksend.yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: not_tested
+    covers_reqs:
+      - UX-002
+      - UX-003
+      - MD-001
+      - MD-003
+    summary: "ChatGPT quick send flow for configured users"
+    e2e_test: "tests/e2e/journey-chatgpt-quicksend.spec.ts"
+
+  - id: J-ERROR-NOCONFIG
+    file: journey_error_noconfig.yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: not_tested
+    covers_reqs:
+      - UX-001
+      - SEC-001
+    summary: "Error handling when extension not configured"
+    e2e_test: "tests/e2e/journey-error-noconfig.spec.ts"
+
+# Requirements Coverage Matrix
+requirements_coverage:
+  ARCH-001: feature_architecture
+  ARCH-002: feature_architecture
+  ARCH-003: feature_architecture
+  SEC-001: [feature_security, J-ERROR-NOCONFIG]
+  SEC-002: feature_security
+  SEC-003: feature_security
+  MV3-001: feature_mv3
+  MV3-002: feature_mv3
+  MD-001: [feature_markdown, J-CHATGPT-QUICKSEND]
+  MD-002: feature_markdown
+  MD-003: [feature_markdown, J-CHATGPT-QUICKSEND]
+  UX-001: [feature_ux, J-ERROR-NOCONFIG]
+  UX-002: [feature_ux, J-CHATGPT-QUICKSEND]
+  UX-003: [feature_ux, J-CHATGPT-QUICKSEND]
+  ERR-001: feature_ux
+  ERR-002: feature_ux
+
+# Uncovered Requirements (need journey contracts)
+uncovered_journeys:
+  - J-CHATGPT-DETAILED
+  - J-WEB-QUICKSEND
+  - J-WEB-DETAILED
+  - J-ERROR-RATELIMIT
+  - J-ERROR-DOMFAIL
+  - J-PREFERENCES
+
+test_files:
+  - path: "__tests__/contracts.test.js"
+    covers:
+      - ARCH-001
+      - ARCH-002
+      - SEC-002
+      - SEC-003
+      - MV3-001
+      - MV3-002
+      - MD-001
+      - MD-003
+      - UX-003
+      - ERR-002

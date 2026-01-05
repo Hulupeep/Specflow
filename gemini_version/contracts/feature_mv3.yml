@@ -1,0 +1,82 @@
+contract_meta:
+  id: feature_mv3
+  version: 1
+  created_from_spec: "sample_spec/spec.md"
+  covers_reqs:
+    - MV3-001
+    - MV3-002
+  owner: "chat2repo-team"
+  created_at: "2025-12-03"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_mv3"
+
+rules:
+  non_negotiable:
+    - id: MV3-001
+      title: "Background must be service worker, not persistent page"
+      scope:
+        - "packages/extension/manifest.json"
+      behavior:
+        required_patterns:
+          - pattern: /"service_worker"/
+            message: "manifest.json must use service_worker for background (MV3-001)"
+          - pattern: /"type"\s*:\s*"module"/
+            message: "Background service worker should be ES module (MV3-001)"
+        forbidden_patterns:
+          - pattern: /"persistent"\s*:\s*true/
+            message: "Persistent background page not allowed in MV3 (MV3-001)"
+          - pattern: /"scripts"\s*:\s*\[/
+            message: "Background scripts array is MV2 pattern, use service_worker (MV3-001)"
+        example_violation: |
+          "background": {
+            "scripts": ["background.js"],
+            "persistent": true
+          }
+        example_compliant: |
+          "background": {
+            "service_worker": "background/index.js",
+            "type": "module"
+          }
+
+    - id: MV3-002
+      title: "No long-lived polling or global mutable state in background"
+      scope:
+        - "packages/extension/src/background/**/*.ts"
+      behavior:
+        forbidden_patterns:
+          - pattern: /setInterval\s*\(/
+            message: "setInterval not allowed in service worker - will be killed (MV3-002)"
+          - pattern: /setTimeout\s*\([^)]+,\s*\d{5,}\)/
+            message: "Long setTimeout (>10s) not reliable in service worker (MV3-002)"
+          - pattern: /^(let|var)\s+\w+\s*=\s*(?!null|undefined|false|true|0|''|""|``)/m
+            message: "Global mutable state may not persist between wake-ups (MV3-002)"
+        example_violation: |
+          // packages/extension/src/background/index.ts
+          let pendingRequests = []  // Lost on service worker restart!
+          setInterval(() => syncData(), 60000)  // Will be killed!
+        example_compliant: |
+          // Use chrome.storage for persistence
+          async function getPendingRequests() {
+            const { pending } = await chrome.storage.local.get('pending')
+            return pending || []
+          }
+
+          // Use chrome.alarms for scheduled tasks
+          chrome.alarms.create('sync', { periodInMinutes: 1 })
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you adding setInterval or long setTimeout to background?"
+      if_yes: "STOP. Use chrome.alarms API instead. Service workers are killed after ~30s idle."
+    - question: "Are you storing state in module-level variables in background?"
+      if_yes: "Move to chrome.storage. Module state is lost when service worker restarts."
+    - question: "Are you using MV2 manifest patterns?"
+      if_yes: "Update to MV3: service_worker instead of scripts, remove persistent."
+
+test_hooks:
+  tests:
+    - file: "sample_spec/__tests__/mv3.test.js"
+      description: "Validates manifest structure and background patterns"

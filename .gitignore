@@ -16,3 +16,11 @@ npm-debug.log*
 # Temporary files
 tmp/
 temp/
+
+# Node modules
+sample_spec/node_modules
+gemini_version/node_modules
+
+# Environment files with secrets
+.env.local
+*.env.local

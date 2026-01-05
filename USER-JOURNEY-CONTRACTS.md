@@ -1,4 +1,24 @@
-# User Journey Contracts: Test What Matters, Not What's Easy
+# User Journey Contracts: Your Definition of Done
+
+User journey contracts serve two critical purposes:
+1. **Test what matters** - Verify complete user flows, not just code units
+2. **Define when you're done** - Journeys ARE your Definition of Done (DOD)
+
+---
+
+## The Core Insight
+
+A feature isn't "done" when:
+- ❌ Code compiles
+- ❌ Unit tests pass
+- ❌ Developer says it works
+
+A feature IS done when:
+- ✅ Users can complete their goals (journeys pass)
+
+**Journeys = Definition of Done**
+
+---
 
 ## The Problem with Traditional Testing
 
@@ -73,6 +93,13 @@ contract_meta:
   owner: "[product_manager_name]"
   created_from: "User story / acceptance criteria"
   last_reviewed_at: "YYYY-MM-DD"
+
+# DOD (Definition of Done) fields
+dod:
+  criticality: critical       # critical | important | future
+  status: not_tested          # passing | failing | not_tested
+  last_verified: null         # ISO date when last run
+  blocks_release: true        # true for critical journeys
 
 journey_definition:
   name: "[User Journey Name]"
@@ -520,18 +547,61 @@ Specify expected behavior
 ✅ **Specs become tests** - Your user stories → enforceable contracts
 ✅ **Journey validation** - Know when flows break
 ✅ **No code required** - Write YAML, tests auto-generated
+✅ **Clear DOD** - Know exactly when a feature is "done"
 
 ### For QA
 
 ✅ **Test what matters** - User journeys, not random units
 ✅ **Comprehensive coverage** - Entire flow tested
 ✅ **Regression prevention** - Journeys stay working
+✅ **Release gates** - Critical journeys block bad releases
 
 ### For Engineers
 
 ✅ **Refactor safely** - Journey tests ensure behavior preserved
 ✅ **Clear requirements** - Journey contract = specification
 ✅ **Fast feedback** - Tests fail immediately on journey break
+✅ **Definition of Done** - No guessing when you're finished
+
+---
+
+## DOD Criticality Levels
+
+| Level | Meaning | Release Impact |
+|-------|---------|----------------|
+| `critical` | Core user flow | ❌ Cannot release if failing |
+| `important` | Key feature | ⚠️ Should fix before release |
+| `future` | Planned feature | ✅ Can release without |
+
+### Setting Criticality
+
+```yaml
+# Critical - blocks release
+dod:
+  criticality: critical
+  blocks_release: true
+
+# Important - should fix
+dod:
+  criticality: important
+  blocks_release: false
+
+# Future - can skip
+dod:
+  criticality: future
+  blocks_release: false
+```
+
+### Release Gate Logic
+
+```
+Can we release?
+
+1. Find all journeys with dod.criticality: critical
+2. Check each journey's dod.status
+3. If ANY critical journey is failing or not_tested → ❌ BLOCK
+4. If ALL critical journeys are passing → ✅ RELEASE
+```
 
 ---
 
@@ -646,8 +716,9 @@ LLM creates both contract and test.
 
 **Next Steps:**
 1. Copy user-journey-template.yml
-2. Define your first journey
-3. Generate test
-4. Run and iterate
+2. Define your first journey with DOD criticality
+3. Generate E2E test
+4. Run and update status
+5. Use critical journeys as release gates
 
-**Test what matters. Test user journeys.**
+**Test what matters. Define when you're done. Ship with confidence.**

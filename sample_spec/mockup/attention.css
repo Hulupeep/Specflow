@@ -1,0 +1,396 @@
+:root {
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    
+    /* Colors */
+    --bg-app: #F3F4F6;
+    --bg-panel: #FFFFFF;
+    
+    /* Attention Scale */
+    --color-red: #EF4444;       /* Tailwind Red 500 */
+    --color-red-dark: #DC2626;
+    --color-orange: #F97316;    /* Tailwind Orange 500 */
+    --color-orange-dark: #EA580C;
+    --color-green: #10B981;     /* Tailwind Emerald 500 */
+    --color-green-dark: #059669;
+    
+    /* Text */
+    --text-white: #FFFFFF;
+    --text-white-dim: rgba(255, 255, 255, 0.9);
+    --text-white-muted: rgba(255, 255, 255, 0.7);
+    
+    --text-dark: #1F2937;
+    --text-gray: #4B5563;
+    --text-light: #9CA3AF;
+
+    /* Spacing */
+    --gap: 24px;
+    --radius-lg: 24px;
+    --radius-md: 16px;
+    --radius-sm: 8px;
+    
+    /* Shadows */
+    --shadow-card: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-panel: -5px 0 25px rgba(0, 0, 0, 0.05);
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--font-sans);
+    background-color: var(--bg-app);
+    color: var(--text-dark);
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden; /* App-like feel */
+    display: flex;
+}
+
+/* Main Layout */
+.app-container {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    position: relative;
+    padding: 32px;
+    overflow-y: auto;
+}
+
+/* Legend */
+.legend {
+    position: absolute;
+    top: 32px;
+    right: 420px; /* Make room for panel if open, otherwise 32px */
+    display: flex;
+    gap: 16px;
+    background: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    z-index: 10;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text-gray);
+}
+
+.dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+}
+.dot.red { background-color: var(--color-red); }
+.dot.orange { background-color: var(--color-orange); }
+.dot.green { background-color: var(--color-green); }
+
+/* Grid */
+.grid-layout {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr); /* 12 col grid */
+    gap: var(--gap);
+    max-width: 1400px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* Card General */
+.card {
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-card);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    color: var(--text-white);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: pointer;
+    overflow: hidden;
+    /* 3D Transform setup for flip */
+    perspective: 1000px;
+}
+
+.card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.15), 0 10px 10px -5px rgba(0, 0, 0, 0.1);
+}
+
+/* Colors */
+.card.red { background: linear-gradient(135deg, var(--color-red), var(--color-red-dark)); }
+.card.orange { background: linear-gradient(135deg, var(--color-orange), var(--color-orange-dark)); }
+.card.green { background: linear-gradient(135deg, var(--color-green), var(--color-green-dark)); }
+
+/* Sizes */
+.card.large {
+    grid-column: span 4;
+    height: 320px;
+}
+.card.medium {
+    grid-column: span 3; /* 4 per row */
+    height: 240px;
+}
+.card.small {
+    grid-column: span 2; /* 6 per row */
+    height: 180px;
+}
+
+/* Content Layout (Front) */
+.card-front {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: space-between;
+}
+
+.card-header .subtitle {
+    font-size: 0.85rem;
+    color: var(--text-white-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    margin-bottom: 4px;
+}
+
+.card-header h2 {
+    font-size: 1.5rem; /* Larger for large cards */
+    font-weight: 700;
+    margin: 0;
+    color: var(--text-white);
+    line-height: 1.2;
+}
+
+.card.medium .card-header h2 { font-size: 1.25rem; }
+.card.small .card-header h2 { font-size: 1rem; }
+
+.last-activity {
+    font-size: 0.75rem;
+    color: var(--text-white-muted);
+    margin-top: 8px;
+    display: block;
+}
+
+.activity-list {
+    list-style: none;
+    padding: 0;
+    margin: 16px 0 0 0;
+    flex-grow: 1;
+}
+
+.activity-list li {
+    font-size: 0.85rem;
+    color: var(--text-white-dim);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.activity-list li::before {
+    content: "•";
+    color: var(--text-white-muted);
+}
+
+.attention-score {
+    align-self: flex-start;
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(4px);
+    padding: 4px 12px;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Card Back (Flipped) */
+.card.flipped .card-front {
+    display: none;
+}
+.card-back {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    color: #1F2937; /* Dark text on light back? Or keep colored? */
+    /* Design Choice: "Back of a flipped card should look like a different side of the same card". 
+       Usually the flip implies the *same* physical object. 
+       Let's allow the background to remain colored but maybe use a lighter overlay or just keep it colored. 
+       Or make it white for contrast? 
+       "Tone: a bit like an algorithm explaining its conclusion." 
+       "Focus Engine".
+       Let's make the back white/dark to contrast the front "Color Block", or keep the color but overlay a "panel".
+       User said "Solid-colored blocks". 
+       Let's try: Back is Dark Grey (Tech/Engine feel) or white. 
+       Let's go with a Dark/Glassy overlay on the color, or just plain White card for readability of long text.
+       Let's do White card for the back to make the text pop and feel like "Analysis".
+    */
+    background: #FFFFFF;
+    position: absolute;
+    inset: 0;
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    box-sizing: border-box;
+    /* Border to match the front color? */
+    border: 3px solid transparent; 
+}
+.card.red .card-back { border-color: var(--color-red); }
+.card.flipped .card-back {
+    display: flex;
+}
+
+.back-header {
+    border-bottom: 1px solid #E5E7EB;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+}
+.back-header h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: var(--text-dark);
+}
+.focus-engine-badge {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    color: var(--color-red);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 4px;
+}
+.focus-engine-badge i { font-size: 1rem; }
+
+.why-list {
+    padding: 0;
+    margin: 0;
+    list-style: none;
+    flex-grow: 1;
+}
+.why-list li {
+    font-size: 0.9rem;
+    color: var(--text-gray);
+    margin-bottom: 10px;
+    line-height: 1.4;
+    position: relative;
+    padding-left: 14px;
+}
+.why-list li::before {
+    content: "!";
+    position: absolute;
+    left: 0;
+    font-weight: bold;
+    color: var(--color-red); 
+    font-size: 0.8rem;
+    top: 2px;
+}
+
+.cta-button {
+    background: var(--text-dark);
+    color: white;
+    border: none;
+    padding: 12px;
+    border-radius: 8px;
+    width: 100%;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.2s;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+}
+.cta-button:hover {
+    background: black;
+}
+
+/* Side Panel (Next Actions) */
+.next-actions-panel {
+    width: 380px;
+    background: var(--bg-panel);
+    border-left: 1px solid #E5E7EB;
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: var(--shadow-panel);
+    z-index: 50;
+    /* Assuming slide out */
+}
+
+.panel-header {
+    margin-bottom: 32px;
+}
+.panel-header h2 {
+    font-size: 1.5rem;
+    margin: 0 0 8px 0;
+    color: var(--text-dark);
+}
+.panel-meta {
+    font-size: 0.85rem;
+    color: var(--text-light);
+}
+
+.action-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.action-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid #E5E7EB;
+    border-radius: 12px;
+    transition: all 0.2s;
+}
+.action-item:hover {
+    border-color: var(--text-gray);
+    background: #F9FAFB;
+}
+
+.checkbox-circle {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #D1D5DB;
+    border-radius: 50%;
+    flex-shrink: 0;
+    margin-top: 2px;
+    cursor: pointer;
+}
+.checkbox-circle:hover {
+    border-color: var(--color-green);
+}
+
+.action-content h4 {
+    margin: 0 0 4px 0;
+    font-size: 0.95rem;
+    color: var(--text-dark);
+}
+.action-tags {
+    display: flex;
+    gap: 8px;
+}
+.tag {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    background: #E5E7EB;
+    color: var(--text-gray);
+    border-radius: 4px;
+    font-weight: 500;
+}
+.tag.urgent {
+    background: #FEF2F2;
+    color: #EF4444;
+}
+
+/* Utilities */
+.hidden { display: none; }

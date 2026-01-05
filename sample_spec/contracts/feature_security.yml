@@ -1,0 +1,107 @@
+contract_meta:
+  id: feature_security
+  version: 1
+  created_from_spec: "sample_spec/spec.md"
+  covers_reqs:
+    - SEC-001
+    - SEC-002
+    - SEC-003
+  owner: "chat2repo-team"
+  created_at: "2025-12-03"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_security"
+
+rules:
+  non_negotiable:
+    - id: SEC-001
+      title: "PAT stored in chrome.storage.local, accessible only from background"
+      scope:
+        - "packages/extension/src/**/*.ts"
+        - "packages/extension/src/**/*.tsx"
+      behavior:
+        forbidden_patterns:
+          # Content scripts must not access PAT storage
+          - pattern: /storage\.local\.get\(['"].*(?:pat|token|github).*['"]\)/i
+            message: "PAT storage access pattern detected - only allowed in background/ (SEC-001)"
+            applies_to:
+              - "packages/extension/src/content/**/*"
+              - "packages/extension/src/popup/**/*"
+        required_patterns:
+          # Background must use chrome.storage.local for PAT
+          - pattern: /chrome\.storage\.local/
+            message: "Background must use chrome.storage.local for PAT storage (SEC-001)"
+            applies_to:
+              - "packages/extension/src/background/**/*"
+        example_violation: |
+          // packages/extension/src/content/chatgpt.ts
+          const { pat } = await chrome.storage.local.get('pat')
+        example_compliant: |
+          // packages/extension/src/background/storage.ts
+          export async function getPAT(): Promise<string | null> {
+            const { pat } = await chrome.storage.local.get('pat')
+            return pat || null
+          }
+
+    - id: SEC-002
+      title: "PAT never exposed to content scripts, pages, or logs"
+      scope:
+        - "packages/**/*.ts"
+        - "packages/**/*.tsx"
+      behavior:
+        forbidden_patterns:
+          - pattern: /console\.(log|info|debug|warn|error)\(.*(?:token|pat|secret)/i
+            message: "Logging token/PAT/secret is forbidden (SEC-002)"
+          - pattern: /sendMessage\(.*(?:pat|token)['"]\s*:/i
+            message: "Sending PAT in message payload is forbidden (SEC-002)"
+          - pattern: /postMessage\(.*(?:pat|token)/i
+            message: "Posting PAT to page is forbidden (SEC-002)"
+        example_violation: |
+          console.log('Token:', pat)
+          chrome.tabs.sendMessage(tabId, { pat: token })
+        example_compliant: |
+          console.log('Capture request received')
+          // PAT stays in background, never sent to content
+
+    - id: SEC-003
+      title: "host_permissions limited to specific domains"
+      scope:
+        - "packages/extension/manifest.json"
+      behavior:
+        required_patterns:
+          - pattern: /host_permissions/
+            message: "manifest.json must declare host_permissions (SEC-003)"
+        allowed_values:
+          host_permissions:
+            - "https://chatgpt.com/*"
+            - "https://chat.openai.com/*"
+            - "https://api.github.com/*"
+        forbidden_patterns:
+          - pattern: /<all_urls>/
+            message: "<all_urls> permission not allowed without documented justification (SEC-003)"
+          - pattern: /\*:\/\/\*\//
+            message: "Wildcard host permission not allowed (SEC-003)"
+        example_violation: |
+          "host_permissions": ["<all_urls>"]
+        example_compliant: |
+          "host_permissions": [
+            "https://chatgpt.com/*",
+            "https://chat.openai.com/*",
+            "https://api.github.com/*"
+          ]
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you passing PAT to a content script or popup?"
+      if_yes: "STOP. PAT must stay in background. Content scripts request actions via messages."
+    - question: "Are you adding console.log that might include sensitive data?"
+      if_yes: "Remove or sanitize. Never log tokens, PATs, or secrets."
+    - question: "Are you adding a new host_permission?"
+      if_yes: "Document justification. Must be specific domain, not wildcards."
+
+test_hooks:
+  tests:
+    - file: "sample_spec/__tests__/security.test.js"
+      description: "Scans for PAT leaks, logging violations, permission issues"

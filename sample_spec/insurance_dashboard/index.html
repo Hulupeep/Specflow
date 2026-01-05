@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Policy Coverage Dashboard - Lone Star Hotel</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Using Google Symbols for Icons -->
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" />
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Header -->
+        <header class="top-bar">
+            <div class="header-left">
+                <div class="logo-area">
+                    <span class="material-symbols-rounded logo-icon">shield</span>
+                    <span class="app-title">Policy Coverage Dashboard</span>
+                </div>
+            </div>
+            <div class="header-center">
+                <div class="property-selector">
+                    <span class="material-symbols-rounded">domain</span>
+                    <select>
+                        <option>Lone Star Hotel - 455 Elm St, Dallas</option>
+                    </select>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-secondary">
+                    <span class="material-symbols-rounded">download</span> Download Summary
+                </button>
+                <button class="btn btn-primary">Continue Signup</button>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main class="dashboard-grid">
+            
+            <!-- LEFT COLUMN: Coverage Panels -->
+            <section class="col-left">
+                <div class="card coverage-breakdown">
+                    <h2>Coverage Breakdown</h2>
+                    <div class="accordion" id="coverageAccordion">
+                        <!-- Wind Section -->
+                        <div class="accordion-item active" data-peril="wind">
+                            <div class="accordion-header">
+                                <div class="header-content">
+                                    <span class="material-symbols-rounded peril-icon">air</span>
+                                    <div class="header-idx">
+                                        <h3>Wind</h3>
+                                        <div class="meta-row">
+                                            <span class="pill pill-green">✅ Covered</span>
+                                            <span class="meta-text">Limit: 80% • Ded: 5%</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="material-symbols-rounded chevron">expand_more</span>
+                            </div>
+                            <div class="accordion-body">
+                                <div class="mini-grid">
+                                    <div class="col-good">
+                                        <h4>What's covered</h4>
+                                        <ul>
+                                            <li>✅ Roof structure</li>
+                                            <li>✅ Dragged debris removal</li>
+                                            <li>✅ Exterior glass (impact)</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-bad">
+                                        <h4>What's not covered</h4>
+                                        <ul>
+                                            <li>⛔ Cosmetic roof damage</li>
+                                            <li>⛔ Landscaping / trees</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="conditions-area">
+                                    <span class="chip chip-amber">⚠ Deductible applies: 5%</span>
+                                </div>
+                                <a href="#" class="policy-link">Show policy evidence</a>
+                            </div>
+                        </div>
+
+                        <!-- Hail Section -->
+                        <div class="accordion-item" data-peril="hail">
+                            <div class="accordion-header">
+                                <div class="header-content">
+                                    <span class="material-symbols-rounded peril-icon">grains</span>
+                                    <div class="header-idx">
+                                        <h3>Hail</h3>
+                                        <div class="meta-row">
+                                            <span class="pill pill-green">✅ Covered</span>
+                                            <span class="meta-text">Limit: 100% • Cond apply</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="material-symbols-rounded chevron">expand_more</span>
+                            </div>
+                            <div class="accordion-body">
+                                <div class="mini-grid">
+                                    <div class="col-good">
+                                        <h4>What's covered</h4>
+                                        <ul>
+                                            <li>✅ Roof impact damage</li>
+                                            <li>✅ HVAC units (covered)</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-bad">
+                                        <h4>What's not covered</h4>
+                                        <ul>
+                                            <li>⛔ Older cosmetic dents</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="conditions-area">
+                                    <span class="chip chip-amber">⚠ Requires roof material info</span>
+                                </div>
+                                <a href="#" class="policy-link">Show policy evidence</a>
+                            </div>
+                        </div>
+
+                        <!-- Flood Section -->
+                        <div class="accordion-item" data-peril="flood">
+                            <div class="accordion-header">
+                                <div class="header-content">
+                                    <span class="material-symbols-rounded peril-icon">flood</span>
+                                    <div class="header-idx">
+                                        <h3>Flood / Surface Water</h3>
+                                        <div class="meta-row">
+                                            <span class="pill pill-red">⛔ Excluded</span>
+                                            <span class="meta-text">Not in policy</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="material-symbols-rounded chevron">expand_more</span>
+                            </div>
+                            <div class="accordion-body">
+                                <div class="mini-grid">
+                                    <div class="col-good">
+                                        <h4>What's covered</h4>
+                                        <ul>
+                                            <li>✅ Internal pipe burst</li>
+                                        </ul>
+                                    </div>
+                                    <div class="col-bad">
+                                        <h4>What's not covered</h4>
+                                        <ul>
+                                            <li>⛔ Rising surface water</li>
+                                            <li>⛔ Storm surge</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div class="conditions-area">
+                                    <span class="chip chip-red">⛔ Excluded peril</span>
+                                </div>
+                                <a href="#" class="policy-link">Show policy evidence</a>
+                            </div>
+                        </div>
+                        
+                         <!-- Other Section -->
+                         <div class="accordion-item" data-peril="other">
+                            <div class="accordion-header">
+                                <div class="header-content">
+                                    <span class="material-symbols-rounded peril-icon">more_horiz</span>
+                                    <div class="header-idx">
+                                        <h3>Other</h3>
+                                        <div class="meta-row">
+                                            <span class="pill pill-gray">See Details</span>
+                                            <span class="meta-text">Fire, Theft, etc.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <span class="material-symbols-rounded chevron">expand_more</span>
+                            </div>
+                            <div class="accordion-body">
+                                <p>Additional coverage details...</p>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </section>
+
+            <!-- RIGHT COLUMN: Visuals & Timeline -->
+            <section class="col-right">
+                
+                <!-- Risk Now Card -->
+                <div class="card risk-card">
+                    <div class="risk-header">
+                        <h2>Risk Now</h2>
+                        <div class="weather-meta">
+                            <span>Dallas, TX</span>
+                            <span class="dot">•</span>
+                            <span>Live Outlook</span>
+                        </div>
+                    </div>
+                    <div class="risk-grid">
+                        <!-- Gauges -->
+                        <div class="risk-gauge">
+                            <div class="gauge-label">
+                                <span class="material-symbols-rounded">air</span> Wind Risk
+                            </div>
+                            <div class="gauge-value">85 mph</div>
+                            <div class="gauge-status pill pill-green">✅ Covered</div>
+                        </div>
+                        <div class="risk-gauge">
+                            <div class="gauge-label">
+                                <span class="material-symbols-rounded">grains</span> Hail Risk
+                            </div>
+                            <div class="gauge-value high-risk">High</div>
+                            <div class="gauge-status pill pill-green">✅ Covered</div>
+                        </div>
+                        <div class="risk-gauge">
+                            <div class="gauge-label">
+                                <span class="material-symbols-rounded">water_drop</span> Rain/Flood
+                            </div>
+                            <div class="gauge-value">3.2"</div>
+                            <div class="gauge-status pill pill-red">⛔ Excluded</div>
+                            <div class="sub-alert">Consider flood policy</div>
+                        </div>
+                    </div>
+                    <!-- 48h Strip -->
+                    <div class="timeline-strip-container">
+                        <span class="strip-label">Next 48h Outlook</span>
+                        <div class="timeline-strip">
+                            <!-- Visual representation of peaks -->
+                            <div class="strip-peak p-low" style="left: 10%"></div>
+                            <div class="strip-peak p-high" style="left: 40%"></div>
+                            <div class="strip-peak p-med" style="left: 80%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Coverage Map Card -->
+                <div class="card map-card">
+                    <div class="map-header">
+                        <h2>Visual Coverage Map</h2>
+                        <div class="toggle-group">
+                            <button class="toggle-btn active" data-view="wind">Wind</button>
+                            <button class="toggle-btn" data-view="hail">Hail</button>
+                            <button class="toggle-btn" data-view="flood">Flood</button>
+                            <button class="toggle-btn" data-view="all">All</button>
+                        </div>
+                    </div>
+                    
+                    <div class="map-visualization-area">
+                        <!-- Isometric House SVG -->
+                        <svg id="propertyMap" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid meet">
+                            <defs>
+                                <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+                                    <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+                                    <feMerge>
+                                        <feMergeNode in="coloredBlur"/>
+                                        <feMergeNode in="SourceGraphic"/>
+                                    </feMerge>
+                                </filter>
+                            </defs>
+                            
+                            <!-- Surrounding Area (Ground) -->
+                            <path class="zone zone-ground" id="zone-ground" d="M20 150 L200 250 L380 150 L200 50 Z" />
+                            
+                            <!-- Basement (Lower Slice) -->
+                            <path class="zone zone-basement" id="zone-basement" d="M120 180 L200 225 L280 180 L280 200 L200 245 L120 200 Z" />
+
+                            <!-- Building Walls (Left/Right) -->
+                            <path class="zone zone-walls" id="zone-walls-left" d="M120 180 L200 225 L200 130 L120 90 Z" />
+                            <path class="zone zone-walls" id="zone-walls-right" d="M200 225 L280 180 L280 90 L200 130 Z" />
+                            
+                            <!-- Windows (Overlay on walls) -->
+                            <path class="zone zone-windows" id="zone-window-1" d="M140 140 L160 150 L160 130 L140 120 Z" />
+                            <path class="zone zone-windows" id="zone-window-2" d="M220 150 L240 140 L240 120 L220 130 Z" />
+                            
+                            <!-- Roof (Top) -->
+                            <path class="zone zone-roof" id="zone-roof" d="M120 90 L200 130 L280 90 L200 50 Z" />
+
+                            <!-- Confidence Meter (Overlay in SVG or separate DOM) -->
+                            
+                        </svg>
+
+                        <!-- Tooltip (Absolute positioned) -->
+                        <div id="mapTooltip" class="map-tooltip hidden">
+                            <div class="tooltip-header">
+                                <span id="tt-icon">✅</span> <strong id="tt-title">Roof</strong>
+                            </div>
+                            <div class="tooltip-body">
+                                <span id="tt-desc">Covered up to policy limits</span>
+                                <div class="tooltip-meta">Source: Policy p. 12</div>
+                            </div>
+                        </div>
+
+                        <!-- Legend -->
+                        <div class="map-legend">
+                            <div class="legend-item"><span class="dot dot-green"></span> Covered</div>
+                            <div class="legend-item"><span class="dot dot-amber"></span> Conditional</div>
+                            <div class="legend-item"><span class="dot dot-red"></span> Excluded</div>
+                            <div class="legend-item"><span class="dot dot-gray"></span> Unknown</div>
+                        </div>
+
+                        <div class="confidence-meter">
+                            <label>Coverage Confidence</label>
+                            <div class="meter-bar">
+                                <div class="meter-fill" style="width: 85%"></div>
+                            </div>
+                            <span class="meter-val">High</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Timeline Card -->
+                <div class="card timeline-card">
+                    <div class="timeline-header">
+                        <h2>Timeline</h2>
+                        <div class="timeline-filters">
+                            <button class="filter-chip active">Policy</button>
+                            <button class="filter-chip active">Storms</button>
+                            <button class="filter-chip active">Claims</button>
+                        </div>
+                    </div>
+                    
+                    <div class="timeline-interactive">
+                        <div class="current-status-pill">
+                            <span class="material-symbols-rounded">calendar_month</span>
+                            <span id="timeline-status-text">Dragging timeline...</span>
+                        </div>
+                        
+                        <div class="timeline-track-container">
+                            <div class="timeline-line"></div>
+                            
+                            <!-- Events -->
+                            <div class="timeline-event" style="left: 20%" data-date="Mar 18, 2023" data-status="Hail - Denied">
+                                <div class="event-dot dot-red"></div>
+                                <div class="event-label">Hail (Denied)</div>
+                            </div>
+                            <div class="timeline-event" style="left: 60%" data-date="Sep 5, 2023" data-status="Wind - Under Review">
+                                <div class="event-dot dot-amber"></div>
+                                <div class="event-label">Wind (Review)</div>
+                            </div>
+                            <div class="timeline-event" style="left: 90%" data-date="Apr 12, 2024" data-status="Hail - Approved">
+                                <div class="event-dot dot-green"></div>
+                                <div class="event-label">Hail ($230k)</div>
+                            </div>
+
+                            <!-- Scrubber -->
+                            <div class="timeline-scrubber" id="scrubber" style="left: 95%">
+                                <div class="scrubber-handle">
+                                    <span class="material-symbols-rounded">drag_indicator</span>
+                                </div>
+                                <div class="scrubber-line"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="timeline-dates">
+                            <span>Jan 2023</span>
+                            <span>Jan 2024</span>
+                            <span>Jan 2025</span>
+                            <span>Jan 2026</span>
+                        </div>
+                    </div>
+                </div>
+
+            </section>
+        </main>
+
+        <!-- Side Drawer -->
+        <div class="drawer-overlay hidden" id="policyDrawer">
+            <div class="drawer">
+                <div class="drawer-header">
+                    <h2>Policy Evidence</h2>
+                    <button class="close-drawer-btn" id="closeDrawer">
+                        <span class="material-symbols-rounded">close</span>
+                    </button>
+                </div>
+                <div class="drawer-content">
+                    <div class="pdf-mock">
+                        <div class="pdf-page">
+                            <h3>COMMERCIAL PROPERTY POLICY</h3>
+                            <p class="pdf-meta">Page 12 of 45 • Section B: Coverage</p>
+                            
+                            <div class="pdf-highlight-green">
+                                <strong>A. Covered Causes of Loss</strong><br>
+                                We will pay for direct physical loss of or damage to Covered Property... caused by or resulting from any Covered Cause of Loss.
+                                <br><br>
+                                1. <strong>Windstorm or Hail</strong><br>
+                                Includes wind-driven rain if the building structure first sustains damage...
+                            </div>
+                            
+                            <div class="pdf-normal">
+                                <br>
+                                <strong>B. Exclusions</strong><br>
+                                1. Earth Movement<br>
+                                2. Governmental Action<br>
+                            </div>
+
+                            <div class="pdf-highlight-red">
+                                3. <strong>Water</strong><br>
+                                (a) Flood, surface water, waves, tides, tidal waves, overflow of any body of water...
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

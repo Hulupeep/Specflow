@@ -1,0 +1,74 @@
+journey_meta:
+  id: J-ERROR-NOCONFIG
+  from_spec: "sample_spec/spec.md"
+  covers_reqs:
+    - UX-001
+    - SEC-001
+  type: "e2e"
+  description: "Error handling when extension is not configured"
+
+preconditions:
+  - "Extension installed"
+  - "No PAT configured (fresh install or cleared data)"
+  - "No repos configured"
+
+steps:
+  - step: 1
+    name: "Attempt capture without configuration"
+    action: "User clicks 'Send to repo' on ChatGPT OR uses context menu on web page"
+    expected:
+      - type: "no_api_call"
+        to: "api.github.com"
+        description: "No GitHub API calls should be made"
+
+  - step: 2
+    name: "Error toast appears"
+    action: "System detects missing configuration"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='toast']"
+      - type: "toast_content"
+        contains: "not configured"
+      - type: "element_visible"
+        selector: "[data-testid='toast'] button, [data-testid='toast'] a"
+        text_contains: "settings"
+        description: "Open settings button/link"
+    validation:
+      - "No modal appears"
+      - "Toast is dismissible"
+
+  - step: 3
+    name: "Settings link works"
+    action: "User clicks 'Open settings'"
+    expected:
+      - type: "navigation"
+        to: "chrome-extension://*/options.html"
+        description: "Opens extension options page"
+
+  - step: 4
+    name: "No file created"
+    action: "Verify no side effects"
+    expected:
+      - type: "no_file_created"
+        description: "No file created in any repo"
+      - type: "no_network_calls"
+        to: "api.github.com"
+
+test_hooks:
+  e2e_test_file: "sample_spec/__tests__/e2e/error_noconfig.spec.ts"
+
+acceptance_criteria:
+  - "No GitHub API calls when unconfigured"
+  - "Toast shows clear message about configuration needed"
+  - "Settings link is present and functional"
+  - "No modal pretends it will work"
+  - "No partial state left behind"
+
+negative_tests:
+  - name: "Modal should not appear"
+    action: "Trigger capture when unconfigured"
+    expected: "No modal element in DOM"
+
+  - name: "No network calls"
+    action: "Trigger capture when unconfigured"
+    expected: "Network tab shows no requests to api.github.com"

@@ -1,0 +1,36 @@
+contract_meta:
+  id: arch_001_layering
+  version: 1
+  created_from: "docs/spec.md Section 2.1"
+  owner: "Gemini Architect"
+
+non_negotiable_rules:
+  - id: arch_001_pure_core
+    title: "Core package must be pure TypeScript (no browser APIs)"
+    scope:
+      - "packages/core/src/**/*.ts"
+    behavior_spec:
+      forbidden_patterns:
+        - pattern: /(window\.|document\.|chrome\.|localStorage\.|fetch\()/
+          message: "Core package must be platform-agnostic. No browser APIs allowed."
+      required_patterns: []
+
+  - id: arch_002_no_github_in_content
+    title: "No GitHub calls from content scripts or popup"
+    scope:
+      - "packages/extension/src/content/**/*.ts"
+      - "packages/extension/src/content/**/*.tsx"
+      - "packages/extension/src/popup/**/*.tsx"
+    behavior_spec:
+      forbidden_patterns:
+        - pattern: /api\.github\.com/
+          message: "Direct GitHub API calls forbidden in content/popup. Use background service."
+        - pattern: /import.*GitHubClient/
+          message: "Do not import GitHub logic in content scripts."
+
+compliance_checklist:
+  before_modifying_file:
+    - question: "Am I adding browser-specific code to core?"
+      if_yes: "STOP. Move to extension package."
+    - question: "Am I making a network request in a content script?"
+      if_yes: "STOP. Delegate to background script via message."

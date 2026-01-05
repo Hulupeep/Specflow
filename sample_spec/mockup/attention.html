@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attention Blocks Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="attention.css">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        /* Specific adjustments for the mockup presentation */
+        body { background: #E5E7EB; display: flex; align-items: center; justify-content: center; }
+        .window-frame {
+            width: 1440px;
+            height: 900px;
+            background: var(--bg-app);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border-radius: 12px;
+            overflow: hidden;
+            display: flex;
+            position: relative;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="window-frame">
+        <!-- Main Content -->
+        <div class="app-container">
+            
+            <!-- Header / Legend -->
+            <!-- Positioning logic in CSS: Legend is absolute top right relative to container -->
+            
+            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 style="font-size: 1.5rem; font-weight: 700; color: #111827; margin: 0;">My Attention Grid</h1>
+                
+                <div class="legend-container" style="display: flex; gap: 16px; background: white; padding: 8px 16px; border-radius: 99px; box-shadow: 0 1px 2px rgba(0,0,0,0.05);">
+                    <div class="legend-item"><div class="dot red"></div> Neglected</div>
+                    <div class="legend-item"><div class="dot orange"></div> Needs Focus</div>
+                    <div class="legend-item"><div class="dot green"></div> In Flow</div>
+                </div>
+            </header>
+
+            <main class="grid-layout">
+                
+                <!-- TOP ROW (Large, Red/High Priority) -->
+                
+                <!-- Card 1: Taxes 2025 -->
+                <article class="card large red">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Finance</div>
+                            <h2>Taxes 2025</h2>
+                        </div>
+                        
+                        <ul class="activity-list">
+                            <li>Uploaded Q3 Receipts</li>
+                            <li>Emailed accountant re: extensions</li>
+                        </ul>
+
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <span class="last-activity">Last action: 23 days ago</span>
+                            <div class="attention-score">
+                                <i class="ph ph-warning-circle"></i> 12%
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 2: Client Alpha (Flipped) -->
+                <article class="card large red flipped">
+                    <!-- Front (Hidden visually via pivot, but markup present) -->
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Work</div>
+                            <h2>Client Alpha – Retainer</h2>
+                        </div>
+                         <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: auto;">
+                            <span class="last-activity">Last action: 5 days ago</span>
+                            <div class="attention-score">
+                                <i class="ph ph-warning-circle"></i> 24%
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Back (Visible) -->
+                    <div class="card-back">
+                        <div class="back-header">
+                            <div class="focus-engine-badge"><i class="ph ph-lightning"></i> Focus Engine Insight</div>
+                            <h3>Why this matters</h3>
+                        </div>
+                        <ul class="why-list">
+                            <li>Contract renewal depends on Q1 deliverable velocity.</li>
+                            <li>Stakeholder review is in 3 days; silence creates risk.</li>
+                            <li>High revenue impact ($15k/mo).</li>
+                        </ul>
+                        <div style="margin-top: auto;">
+                            <button class="cta-button">
+                                Go to workspace <i class="ph ph-arrow-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 3: TabStax Launch (High Importance) -->
+                <article class="card large red">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Side Project</div>
+                            <h2>TabStax Launch</h2>
+                        </div>
+                        
+                        <ul class="activity-list">
+                            <li>Fixed authentication bug</li>
+                            <li>Updated landing page copy</li>
+                            <li>configured stripe webhooks</li>
+                        </ul>
+
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <span class="last-activity">Last action: 14 hours ago</span>
+                            <div class="attention-score">
+                                <i class="ph ph-trend-up"></i> 45%
+                            </div>
+                        </div>
+                    </div>
+                </article>
+
+
+                <!-- MIDDLE ROW (Medium, Orange) -->
+                
+                <!-- Card 4 -->
+                <article class="card medium orange">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Family</div>
+                            <h2>Mortgage Refix</h2>
+                        </div>
+                        <ul class="activity-list">
+                            <li>Compared rates bank A vs B</li>
+                        </ul>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <span class="last-activity">Last action: 3 days ago</span>
+                            <div class="attention-score">68%</div>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 5 -->
+                <article class="card medium orange">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Health</div>
+                            <h2>Fitness & Physio</h2>
+                        </div>
+                        <ul class="activity-list">
+                            <li>Booked gym sessions</li>
+                            <li>Physio appointment Tue</li>
+                        </ul>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <span class="last-activity">Last action: 1 day ago</span>
+                            <div class="attention-score">72%</div>
+                        </div>
+                    </div>
+                </article>
+                
+                <!-- Card 6 -->
+                <article class="card medium orange">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Creative</div>
+                            <h2>Write Book Proposal</h2>
+                        </div>
+                        <ul class="activity-list">
+                            <li>Outline Chapter 1-3</li>
+                        </ul>
+                        <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+                            <span class="last-activity">Last action: 6 days ago</span>
+                            <div class="attention-score">55%</div>
+                        </div>
+                    </div>
+                </article>
+
+                <!-- Card 7 -->
+                <article class="card medium orange">
+                     <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Home</div>
+                            <h2>Garden Landscaping</h2>
+                        </div>
+                         <div style="display: flex; justify-content: space-between; align-items: flex-end; height: 100%;">
+                            <span class="last-activity">Last action: 2 weeks ago</span>
+                            <div class="attention-score">60%</div>
+                        </div>
+                    </div>
+                </article>
+
+
+                <!-- BOTTOM ROW (Small, Green) -->
+
+                <article class="card small green">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Family</div>
+                            <h2>Xmas Gifts</h2>
+                        </div>
+                        <div style="margin-top:auto; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div class="attention-score">92%</div>
+                        </div>
+                    </div>
+                </article>
+
+                <article class="card small green">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Admin</div>
+                            <h2>Car Service</h2>
+                        </div>
+                        <div style="margin-top:auto; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div class="attention-score">95%</div>
+                        </div>
+                    </div>
+                </article>
+
+                 <article class="card small green">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Wealth</div>
+                            <h2>Investments</h2>
+                        </div>
+                        <div style="margin-top:auto; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div class="attention-score">88%</div>
+                        </div>
+                    </div>
+                </article>
+
+                 <article class="card small green">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Self</div>
+                            <h2>Reading List</h2>
+                        </div>
+                        <div style="margin-top:auto; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div class="attention-score">90%</div>
+                        </div>
+                    </div>
+                </article>
+                 <article class="card small green">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Social</div>
+                            <h2>Dinner Party</h2>
+                        </div>
+                        <div style="margin-top:auto; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div class="attention-score">98%</div>
+                        </div>
+                    </div>
+                </article>
+                <article class="card small green">
+                    <div class="card-front">
+                        <div class="card-header">
+                            <div class="subtitle">Admin</div>
+                            <h2>Insurance</h2>
+                        </div>
+                        <div style="margin-top:auto; display: flex; justify-content: space-between; align-items: flex-end;">
+                            <div class="attention-score">100%</div>
+                        </div>
+                    </div>
+                </article>
+
+            </main>
+        </div>
+
+        <!-- Next Actions Panel (Overlaying the right side) -->
+        <aside class="next-actions-panel">
+            <div class="panel-header">
+                <div class="panel-meta">Project Actions</div>
+                <h2>Client Alpha – Retainer</h2>
+            </div>
+            
+            <div class="action-list">
+                <!-- Action 1 -->
+                <div class="action-item">
+                    <div class="checkbox-circle"></div>
+                    <div class="action-content">
+                        <h4>Draft Q1 deliverable schedule</h4>
+                        <div class="action-tags">
+                            <span class="tag urgent">Deep Work</span>
+                            <span class="tag">priority</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action 2 -->
+                <div class="action-item">
+                    <div class="checkbox-circle"></div>
+                    <div class="action-content">
+                        <h4>Email Sarah re: feedback</h4>
+                        <div class="action-tags">
+                            <span class="tag">Comm</span>
+                            <span class="tag">< 5 min</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action 3 -->
+                <div class="action-item">
+                    <div class="checkbox-circle"></div>
+                    <div class="action-content">
+                        <h4>Review staging environment</h4>
+                        <div class="action-tags">
+                            <span class="tag">Review</span>
+                            <span class="tag">15 min</span>
+                        </div>
+                    </div>
+                </div>
+                 <!-- Action 4 -->
+                <div class="action-item">
+                    <div class="checkbox-circle"></div>
+                    <div class="action-content">
+                        <h4>Update invoicing details</h4>
+                        <div class="action-tags">
+                            <span class="tag">Admin</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: auto; padding-top: 24px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 0.85rem; text-align: center;">
+                Focus Mode Active
+            </div>
+        </aside>
+    </div>
+
+</body>
+</html>

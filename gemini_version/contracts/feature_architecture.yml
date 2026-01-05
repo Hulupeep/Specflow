@@ -1,0 +1,94 @@
+contract_meta:
+  id: feature_architecture
+  version: 1
+  created_from_spec: "sample_spec/spec.md"
+  covers_reqs:
+    - ARCH-001
+    - ARCH-002
+    - ARCH-003
+  owner: "chat2repo-team"
+  created_at: "2025-12-03"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_architecture"
+
+rules:
+  non_negotiable:
+    - id: ARCH-001
+      title: "Core package must be pure TypeScript - no browser APIs"
+      scope:
+        - "packages/core/**/*.ts"
+      behavior:
+        forbidden_patterns:
+          - pattern: /chrome\./
+            message: "chrome.* APIs not allowed in core package (ARCH-001)"
+          - pattern: /browser\./
+            message: "browser.* APIs not allowed in core package (ARCH-001)"
+          - pattern: /from ['"]webextension-polyfill['"]/
+            message: "WebExtension polyfill not allowed in core package (ARCH-001)"
+        example_violation: |
+          // packages/core/src/storage.ts
+          const data = await chrome.storage.local.get('key')
+        example_compliant: |
+          // packages/core/src/types.ts
+          export interface StorageProvider {
+            get(key: string): Promise<unknown>
+          }
+
+    - id: ARCH-002
+      title: "GitHub API calls only from background service worker"
+      scope:
+        - "packages/extension/src/content/**/*.ts"
+        - "packages/extension/src/content/**/*.tsx"
+        - "packages/extension/src/popup/**/*.ts"
+        - "packages/extension/src/popup/**/*.tsx"
+      behavior:
+        forbidden_patterns:
+          - pattern: /api\.github\.com/
+            message: "Direct GitHub API calls not allowed outside background (ARCH-002)"
+          - pattern: /GitHubClient/
+            message: "GitHubClient instantiation not allowed in content/popup (ARCH-002)"
+          - pattern: /new\s+GitHubClient/
+            message: "GitHubClient instantiation not allowed in content/popup (ARCH-002)"
+        example_violation: |
+          // packages/extension/src/content/chatgpt.ts
+          const client = new GitHubClient(token)
+          await client.createFile(...)
+        example_compliant: |
+          // packages/extension/src/content/chatgpt.ts
+          chrome.runtime.sendMessage({ type: 'perform-capture', payload })
+
+    - id: ARCH-003
+      title: "File and function size limits"
+      scope:
+        - "packages/**/*.ts"
+        - "packages/**/*.tsx"
+      behavior:
+        size_limits:
+          max_file_lines: 200
+          max_function_lines: 80
+        example_violation: |
+          // 250-line file with 100-line function
+        example_compliant: |
+          // Extract helpers:
+          // messageHandlers.ts (80 lines)
+          // messageValidation.ts (60 lines)
+          // messageTypes.ts (40 lines)
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you adding browser API usage to packages/core/?"
+      if_yes: "STOP. Core must be pure TypeScript. Move browser-specific code to packages/extension/."
+    - question: "Are you adding GitHub API calls to content scripts or popup?"
+      if_yes: "STOP. Use chrome.runtime.sendMessage to delegate to background."
+    - question: "Is this file approaching 200 lines?"
+      if_yes: "Extract helpers into separate modules before adding more code."
+
+test_hooks:
+  tests:
+    - file: "sample_spec/__tests__/architecture.test.js"
+      description: "Scans for browser API usage in core, GitHub calls in content/popup"
+  tooling:
+    checker_script: "scripts/check-contracts.js"

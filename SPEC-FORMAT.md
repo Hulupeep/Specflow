@@ -123,7 +123,54 @@ User login:
 
 ---
 
-## 5. Complete Example
+## 5. DEFINITION OF DONE (DOD)
+
+Journeys serve as your **Definition of Done**. A feature isn't complete when code is written—it's complete when users can accomplish their goals.
+
+### Format:
+
+```markdown
+## DEFINITION OF DONE
+
+### Critical (MUST PASS)
+- J-AUTH-REGISTER
+- J-AUTH-LOGIN
+
+### Important (SHOULD PASS)
+- J-AUTH-PASSWORD-RESET
+
+### Future (NOT BLOCKING)
+- J-AUTH-2FA
+```
+
+### Criticality Levels:
+
+| Level | Meaning | Release Gate |
+|-------|---------|--------------|
+| `Critical` | Core user flows | ❌ Cannot release if failing |
+| `Important` | Key features | ⚠️ Should fix before release |
+| `Future` | Planned features | ✅ Can release without |
+
+### Rules:
+
+1. **Every Critical journey must have**:
+   - A journey contract (`journey_*.yml`)
+   - An E2E test file
+   - Passing status before release
+
+2. **DOD answers**: "When is this feature done?"
+   - Unit tests pass? Not enough.
+   - Integration tests pass? Getting closer.
+   - **Critical journeys pass? NOW it's done.**
+
+3. **Journey status tracking**:
+   - `passing` - E2E tests green
+   - `failing` - E2E tests red (blocks release if Critical)
+   - `not_tested` - No E2E test yet (blocks release if Critical)
+
+---
+
+## 6. Complete Example
 
 ```markdown
 # Feature: User Authentication
@@ -201,11 +248,26 @@ User logout:
 2. System clears session cookie
 3. System redirects to /login
 4. User cannot access protected routes
+
+---
+
+## DEFINITION OF DONE
+
+### Critical (MUST PASS)
+- J-AUTH-REGISTER
+- J-AUTH-LOGIN
+
+### Important (SHOULD PASS)
+- J-AUTH-LOGOUT
+
+### Future (NOT BLOCKING)
+- J-AUTH-2FA
+- J-AUTH-PASSWORD-RESET
 ```
 
 ---
 
-## 6. What the LLM Does With This
+## 7. What the LLM Does With This
 
 Given this spec, the LLM:
 
@@ -243,7 +305,7 @@ Given this spec, the LLM:
 
 ---
 
-## 7. Writing Tips
+## 8. Writing Tips
 
 ### ✅ Good REQs:
 
@@ -291,7 +353,7 @@ Authentication tokens MUST expire after 7 days.
 
 ---
 
-## 8. Spec Maintenance
+## 9. Spec Maintenance
 
 ### When to Update:
 
@@ -320,17 +382,18 @@ Add changelog at bottom of spec:
 
 ---
 
-## 9. Spec → Contract Mapping
+## 10. Spec → Contract Mapping
 
 | Spec Element | Contract Element | Test Type |
 |--------------|------------------|-----------|
 | `AUTH-001 (MUST)` | `rules.non_negotiable[0].id: AUTH-001` | Pattern scan |
 | `AUTH-010 (SHOULD)` | `rules.soft[0].id: AUTH-010` | Guideline |
 | `J-AUTH-REGISTER` | `journey_meta.id: J-AUTH-REGISTER` | E2E test |
+| `Critical (MUST PASS)` | `journey_meta.dod_criticality: critical` | Release gate |
 
 ---
 
-## 10. Quick Reference Card
+## 11. Quick Reference Card
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -349,6 +412,10 @@ Add changelog at bottom of spec:
 │   1. Step one                                           │
 │   2. Step two                                           │
 │                                                          │
+│   ## DEFINITION OF DONE                                 │
+│   ### Critical (MUST PASS)                              │
+│   - J-[FEATURE]-[NAME]                                  │
+│                                                          │
 │ ID Format:   [FEATURE]-[NUMBER]                         │
 │              AUTH-001, EMAIL-042                        │
 │                                                          │
@@ -357,6 +424,10 @@ Add changelog at bottom of spec:
 │                                                          │
 │ Journeys:    J-[FEATURE]-[NAME]                         │
 │              J-AUTH-REGISTER                            │
+│                                                          │
+│ DOD Levels:  Critical = blocks release                  │
+│              Important = should fix                     │
+│              Future = can skip                          │
 └─────────────────────────────────────────────────────────┘
 ```
 

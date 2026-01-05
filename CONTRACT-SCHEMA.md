@@ -104,6 +104,8 @@ test_hooks:
 
 ## 3. Journey Contract Shape
 
+Journey contracts define **Definition of Done (DOD)**. A feature is complete when its critical journeys pass.
+
 ```yaml
 journey_meta:
   id: J-AUTH-REGISTER
@@ -112,6 +114,11 @@ journey_meta:
     - AUTH-001
     - AUTH-002
   type: "e2e"
+
+  # DOD fields - journeys are your Definition of Done
+  dod_criticality: critical    # critical | important | future
+  status: passing              # passing | failing | not_tested
+  last_verified: "2025-12-05"
 
 steps:
   - step: 1
@@ -280,6 +287,17 @@ scope:
 | `from_spec` | string | ✅ | Path to source spec file |
 | `covers_reqs` | string[] | ✅ | REQ IDs this journey validates |
 | `type` | string | ✅ | Test type: `e2e`, `integration`, `smoke` |
+| `dod_criticality` | string | ✅ | DOD level: `critical`, `important`, `future` |
+| `status` | string | ✅ | Test status: `passing`, `failing`, `not_tested` |
+| `last_verified` | string | ⚠️ | Date of last test run (ISO format) |
+
+### DOD Criticality Levels
+
+| Level | Meaning | Release Impact |
+|-------|---------|----------------|
+| `critical` | Core user flow | ❌ Blocks release if failing/not_tested |
+| `important` | Key feature | ⚠️ Should fix before release |
+| `future` | Planned feature | ✅ Can release without |
 
 ### steps[]
 
@@ -415,7 +433,7 @@ test_hooks:
       description: "Verifies storage API usage"
 ```
 
-### Example 3: Journey Contract
+### Example 3: Journey Contract (with DOD)
 
 ```yaml
 journey_meta:
@@ -425,6 +443,11 @@ journey_meta:
     - CART-001
     - PAY-002
   type: "e2e"
+
+  # DOD: This journey defines when checkout feature is "done"
+  dod_criticality: critical    # Cannot release without this passing
+  status: passing              # Currently green
+  last_verified: "2025-12-05"
 
 steps:
   - step: 1
@@ -506,14 +529,18 @@ test_hooks:
 │         forbidden_patterns: [...]                       │
 │         required_patterns: [...]                        │
 │                                                         │
-│ Journey Contract:                                       │
+│ Journey Contract (= Definition of Done):                │
 │   journey_meta:                                         │
 │     id: J-<FEATURE>-<NAME>                              │
 │     covers_reqs: [REQ-001]                              │
+│     dod_criticality: critical | important | future      │
+│     status: passing | failing | not_tested              │
 │   steps:                                                │
 │     - step: 1                                           │
 │       required_elements: [...]                          │
 │       expected: [...]                                   │
+│                                                         │
+│ DOD Rule: Critical journeys must pass before release    │
 └─────────────────────────────────────────────────────────┘
 ```
 

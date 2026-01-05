@@ -99,20 +99,25 @@ The LLM should create contracts that prevent:
 - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** — Lean YAML contract format (maps REQ IDs → rules → tests)
 - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** — Reusable prompt for LLMs (incremental workflow: spec → contracts → tests → code)
 
-### 📚 Reference Guides (Deep Dives)
+### 📚 Reference Guides
 
-- [MASTER-ORCHESTRATOR.md](MASTER-ORCHESTRATOR.md) — Complete spec → implementation automation (comprehensive, heavy)
-- [SPEC-TO-CONTRACT.md](SPEC-TO-CONTRACT.md) — Detailed conversion examples and patterns
-- [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md) — Journey testing vs unit testing
+- [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md) — Journey contracts + Definition of Done
 - [MID-PROJECT-ADOPTION.md](MID-PROJECT-ADOPTION.md) — Adding contracts to existing codebases
-- [META-INSTRUCTION.md](META-INSTRUCTION.md) — Infrastructure setup guide
+- [CI-INTEGRATION.md](CI-INTEGRATION.md) — GitHub Actions, GitLab, Azure, CircleCI
+- [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) — Template for project CLAUDE.md
 
-### 📋 Templates
+### 📋 Examples
 
-- [contract-example.yml](contract-example.yml) — Real working contract
-- [test-example.test.ts](test-example.test.ts) — Complete test suite
-- [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) — Add to your CLAUDE.md
-- [CI-INTEGRATION.md](CI-INTEGRATION.md) — GitHub Actions, GitLab, etc.
+- [examples/contract-example.yml](examples/contract-example.yml) — Real working contract
+- [examples/test-example.test.ts](examples/test-example.test.ts) — Complete test suite
+- [examples/user-journeys.csv](examples/user-journeys.csv) — CSV journey format
+
+### 📖 Deep Dives (in context/)
+
+- [context/MASTER-ORCHESTRATOR.md](context/MASTER-ORCHESTRATOR.md) — Full automation approach
+- [context/SPEC-TO-CONTRACT.md](context/SPEC-TO-CONTRACT.md) — Conversion examples
+- [context/META-INSTRUCTION.md](context/META-INSTRUCTION.md) — Infrastructure setup
+- [context/SUBAGENT-CONTRACTS.md](context/SUBAGENT-CONTRACTS.md) — Claude subagent patterns
 
 ---
 
@@ -226,7 +231,7 @@ router.get('/api/users', async (req, res) => { ... })
 
 ### "I want complete automation"
 
-→ Read: [MASTER-ORCHESTRATOR.md](MASTER-ORCHESTRATOR.md)
+→ Read: [context/MASTER-ORCHESTRATOR.md](context/MASTER-ORCHESTRATOR.md)
 → Give LLM: Your spec + "Execute MASTER-ORCHESTRATOR.md"
 → Result: Full implementation with contracts, tests, CI/CD
 
@@ -370,23 +375,25 @@ MIT - Use freely, commercially, anywhere.
 ┌─────────────────────────────────────────────────────────┐
 │ Specflow Quick Reference                                │
 ├─────────────────────────────────────────────────────────┤
-│ Core Docs (Read These First):                          │
-│   CONTRACTS-README.md    System overview                │
-│   SPEC-FORMAT.md         How to write specs            │
-│   CONTRACT-SCHEMA.md     YAML format                    │
-│   LLM-MASTER-PROMPT.md   LLM workflow                   │
+│ Core Docs:                                              │
+│   CONTRACTS-README.md       System overview             │
+│   SPEC-FORMAT.md            How to write invariants     │
+│   CONTRACT-SCHEMA.md        YAML schema for LLMs        │
+│   LLM-MASTER-PROMPT.md      LLM workflow                │
+│   USER-JOURNEY-CONTRACTS.md Journey format + DOD        │
 │                                                         │
-│ Reference Guides:                                       │
-│   MASTER-ORCHESTRATOR.md Complete automation           │
-│   SPEC-TO-CONTRACT.md    Conversion examples           │
-│   MID-PROJECT-ADOPTION.md Existing codebases           │
+│ Examples:                                               │
+│   examples/contract-example.yml  Contract template      │
+│   examples/test-example.test.ts  Test template          │
+│   examples/user-journeys.csv     CSV journey format     │
 │                                                         │
 │ Quick Commands:                                         │
-│   npm test -- contracts        Run all contract tests  │
-│   node scripts/check-contracts Quick check files       │
+│   npm run test:contracts    Run contract tests          │
+│   npm run test:e2e          Run journey tests           │
+│   npm run verify:contracts  Check + test                │
 │                                                         │
 │ Core Loop:                                              │
-│   Spec → Contract → Test → Code → Verify               │
+│   Invariant → Contract → Test → Code → CI Blocks        │
 └─────────────────────────────────────────────────────────┘
 ```
 

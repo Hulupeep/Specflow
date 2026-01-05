@@ -7,6 +7,7 @@ This project uses **contracts as spec**. Your job is to:
 1. Turn `docs/specs/*.md` into `docs/contracts/*.yml` using `CONTRACT-SCHEMA.md`.
 2. Generate and maintain tests in `src/__tests__/contracts/*.test.ts`.
 3. Implement and refactor code so that **all contracts pass**.
+4. **Verify Definition of Done** - Critical journeys must pass before release.
 
 ---
 
@@ -42,6 +43,7 @@ This project uses **contracts as spec**. Your job is to:
 Summarize:
 - REQs (AUTH-001, AUTH-002, …)
 - JOURNEYS (J-AUTH-REGISTER, …)
+- DEFINITION OF DONE (which journeys are Critical, Important, Future)
 
 ---
 
@@ -57,6 +59,8 @@ For a given spec file:
 
 3. For each `J-...` journey:
    - Ensure there is a `journey_*.yml` file with `steps` defined.
+   - Set `dod_criticality`: `critical`, `important`, or `future`
+   - Set initial `status`: `not_tested`
 
 Keep contracts **focused**:
 - Simple scopes,
@@ -192,6 +196,56 @@ When you implement or refactor code:
 
 Never "work around" the tests; instead, adjust the contract if the spec truly changed (with user approval).
 
+---
+
+### Phase 4 – Verify Definition of Done
+
+After implementation, verify DOD status:
+
+1. **Check Critical journeys**:
+   ```bash
+   npm test -- journeys --grep "critical"
+   ```
+
+2. **Update journey status in contracts**:
+   ```yaml
+   # journey_auth_register.yml
+   journey_meta:
+     dod_criticality: critical
+     status: passing          # Update from not_tested → passing
+     last_verified: "2025-12-05"
+   ```
+
+3. **Report DOD status**:
+   ```
+   ✅ DOD Status: Ready for release
+
+   Critical Journeys:
+   - J-AUTH-REGISTER: passing ✅
+   - J-AUTH-LOGIN: passing ✅
+
+   Important Journeys:
+   - J-AUTH-LOGOUT: passing ✅
+
+   Future Journeys (not blocking):
+   - J-AUTH-2FA: not_tested ⏳
+   ```
+
+4. **If any Critical journey fails**:
+   ```
+   ❌ DOD Status: NOT ready for release
+
+   BLOCKING:
+   - J-AUTH-LOGIN: failing ❌
+     Reason: Step 4 failed - redirect not working
+
+   Fix required before release.
+   ```
+
+**Key rule:** Never report "ready for release" if any Critical journey is failing or not_tested.
+
+---
+
 **Example:**
 
 User asks: "Add a new API endpoint for users"
@@ -315,10 +369,12 @@ For a feature (e.g., authentication), in a single session aim to:
 2. Show updated test file(s).
 3. Summarize:
    - Which REQs are now covered.
+   - Which journeys and their DOD criticality.
+   - DOD status (ready for release or not).
    - Any gaps or TODOs.
    - Commands the user should run to verify.
 
-Keep responses concise but explicit about **which contracts protect which parts of the code.**
+Keep responses concise but explicit about **which contracts protect which parts of the code** and **DOD status**.
 
 **Example output:**
 
@@ -335,14 +391,24 @@ Keep responses concise but explicit about **which contracts protect which parts 
 
 ✅ Created tests/e2e/journey_auth_register.spec.ts
    - Tests J-AUTH-REGISTER: Complete registration flow
+   - DOD Criticality: CRITICAL
+
+📋 DOD Status: NOT ready for release
+
+   Critical Journeys:
+   - J-AUTH-REGISTER: passing ✅
+   - J-AUTH-LOGIN: not_tested ❌ (blocks release)
+
+   Important Journeys:
+   - J-AUTH-LOGOUT: not_tested ⏳
 
 To verify:
   npm test -- auth_contract
   npm test -- journey_auth_register
 
-Gaps:
-  - AUTH-010 (SHOULD: configurable timeout) not enforced, just documented
-  - J-AUTH-LOGIN journey not yet implemented
+Next steps to reach DOD:
+  - Implement J-AUTH-LOGIN journey test
+  - Run all critical journey tests
 ```
 
 ---
@@ -547,14 +613,20 @@ Then you may proceed with changes that violate the contract, but you should:
 │   4. Verify: npm test -- contracts                      │
 │                                                          │
 │ When implementing:                                      │
-│   Spec → Contract → Test → Code → Verify               │
+│   Spec → Contract → Test → Code → Verify → DOD Check   │
 │                                                          │
 │ When refactoring:                                       │
-│   Baseline → Change → Test → Fix if broken             │
+│   Baseline → Change → Test → Fix if broken → DOD Check │
 │                                                          │
-│ When spec changes:                                      │
-│   Update spec → Update contract → Update test →        │
-│   Update code → Verify                                  │
+│ DOD Verification (Phase 4):                             │
+│   1. Run critical journey tests                         │
+│   2. Update status in journey contracts                 │
+│   3. Report: Ready for release? Yes/No                  │
+│                                                          │
+│ DOD Criticality:                                        │
+│   critical = blocks release if failing                  │
+│   important = should fix before release                 │
+│   future = can release without                          │
 │                                                          │
 │ Override phrase:                                        │
 │   override_contract: <contract_id>                      │
