@@ -1,410 +1,243 @@
 /**
- * Example Contract Verification Tests: API Authentication
+ * Example Contract Test: API Authentication
  *
- * This is a REAL, WORKING example test suite that demonstrates:
- * - How to scan source code for contract violations
- * - How to write clear violation messages
- * - How to structure contract tests
- * - How to document compliance for LLMs
+ * This test enforces the contract in examples/contract-example.yml
+ * Copy and modify for your own contract tests.
  *
- * Use this as a reference when creating your own contract tests.
- *
- * Contract: docs/contracts/templates/contract-example.yml
- * Contract ID: api_authentication_required
- * Status: immutable (non-negotiable)
+ * Location: src/__tests__/contracts/auth.test.ts
  */
 
 import { describe, it, expect } from '@jest/globals'
+import * as fs from 'fs'
+import * as path from 'path'
+import * as glob from 'glob'
 
-describe('Contract: api_authentication_required', () => {
-  describe('Rule: auth_001_require_middleware', () => {
-    it('LLM CHECK: all API routes have authMiddleware', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-      const glob = await import('glob')
+// Helper: Find all files matching scope patterns
+function getFilesInScope(patterns: string[], basePath: string): string[] {
+  const includes: string[] = []
+  const excludes: string[] = []
 
-      // Find all route files (adjust pattern for your project)
-      const routeFiles = glob.sync('src/api/routes/**/*.{ts,js}', {
-        cwd: path.resolve(__dirname, '../../..'),
-        absolute: true,
+  for (const pattern of patterns) {
+    if (pattern.startsWith('!')) {
+      excludes.push(pattern.slice(1))
+    } else {
+      includes.push(pattern)
+    }
+  }
+
+  const files: string[] = []
+  for (const pattern of includes) {
+    const matches = glob.sync(pattern, {
+      cwd: basePath,
+      absolute: true,
+      ignore: excludes,
+    })
+    files.push(...matches)
+  }
+
+  return [...new Set(files)]
+}
+
+// Helper: Find pattern matches with line numbers
+function findPatternViolations(
+  content: string,
+  pattern: RegExp,
+  filePath: string
+): Array<{ file: string; line: number; match: string }> {
+  const violations: Array<{ file: string; line: number; match: string }> = []
+  const lines = content.split('\n')
+
+  lines.forEach((line, index) => {
+    if (pattern.test(line)) {
+      violations.push({
+        file: filePath,
+        line: index + 1,
+        match: line.trim(),
       })
+    }
+  })
 
-      const violations: Array<{ file: string; line: number; code: string }> = []
+  return violations
+}
 
-      for (const file of routeFiles) {
+describe('Contract: feature_authentication', () => {
+  const basePath = path.resolve(__dirname, '../../..')
+
+  describe('AUTH-001: API routes require authMiddleware', () => {
+    const scope = ['src/routes/**/*.ts', 'src/api/**/*.ts']
+    const excludes = ['!src/routes/health.ts', '!src/routes/public/**']
+
+    it('No API routes without authMiddleware', () => {
+      const files = getFilesInScope([...scope, ...excludes], basePath)
+      const violations: Array<{ file: string; line: number; match: string }> = []
+
+      // Pattern: router.post('/api/...', async (req, res) => {
+      // Missing: authMiddleware before the async handler
+      const forbiddenPattern = /router\.(get|post|put|delete)\(['"]\/api\/.*['"]\s*,\s*async/
+
+      for (const file of files) {
+        if (!fs.existsSync(file)) continue
         const content = fs.readFileSync(file, 'utf-8')
-        const lines = content.split('\n')
-
-        // Check for routes without authMiddleware
-        lines.forEach((line, index) => {
-          // Match: router.post('/path', async (req, res) => {
-          // Missing: authMiddleware before handler
-          const routeWithoutAuth = /router\.(get|post|put|delete|patch)\([^,]+,\s*(?!authMiddleware)/.test(
-            line
-          )
-
-          if (routeWithoutAuth && !line.includes('authMiddleware')) {
-            violations.push({
-              file: file.replace(process.cwd(), ''),
-              line: index + 1,
-              code: line.trim(),
-            })
-          }
-        })
+        const matches = findPatternViolations(content, forbiddenPattern, file)
+        violations.push(...matches)
       }
 
       if (violations.length > 0) {
-        const errorMessage =
-          `CONTRACT VIOLATION: auth_001_require_middleware\n` +
-          `Found ${violations.length} route(s) missing authMiddleware:\n\n` +
+        const message =
+          `CONTRACT VIOLATION: AUTH-001\n` +
+          `API routes missing authMiddleware:\n\n` +
           violations
             .map(
-              ({ file, line, code }) =>
-                `  ${file}:${line}\n` + `    ${code}\n` + `    ❌ Missing authMiddleware\n`
+              (v) =>
+                `  ${v.file.replace(basePath, '')}:${v.line}\n` +
+                `    ${v.match}\n`
             )
             .join('\n') +
-          `\nFix: Add authMiddleware as first parameter:\n` +
-          `  router.post('/path', authMiddleware, async (req, res) => { ... })\n\n` +
-          `See: docs/contracts/templates/contract-example.yml`
+          `\nFix: Add authMiddleware before the handler:\n` +
+          `  router.post('/api/users', authMiddleware, async (req, res) => { ... })\n\n` +
+          `Contract: docs/contracts/feature_authentication.yml`
 
-        throw new Error(errorMessage)
+        throw new Error(message)
       }
 
-      // If we get here, all routes have authMiddleware
-      expect(violations.length).toBe(0)
+      expect(violations).toHaveLength(0)
     })
 
-    it('LLM CHECK: route files import authMiddleware', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-      const glob = await import('glob')
-
-      const routeFiles = glob.sync('src/api/routes/**/*.{ts,js}', {
-        cwd: path.resolve(__dirname, '../../..'),
-        absolute: true,
-      })
-
+    it('Route files import authMiddleware', () => {
+      const files = getFilesInScope([...scope, ...excludes], basePath)
       const violations: string[] = []
 
-      for (const file of routeFiles) {
+      for (const file of files) {
+        if (!fs.existsSync(file)) continue
         const content = fs.readFileSync(file, 'utf-8')
 
-        // Check if file uses router methods but doesn't import authMiddleware
-        const hasRoutes = /router\.(get|post|put|delete|patch)/.test(content)
-        const importsAuth = /import.*authMiddleware.*from/.test(content)
+        const hasRoutes = /router\.(get|post|put|delete)/.test(content)
+        const importsAuth = /import.*authMiddleware/.test(content)
 
         if (hasRoutes && !importsAuth) {
-          violations.push(file.replace(process.cwd(), ''))
+          violations.push(file.replace(basePath, ''))
         }
       }
 
       if (violations.length > 0) {
         throw new Error(
-          `CONTRACT VIOLATION: auth_001_require_middleware\n` +
-            `Files with routes but missing authMiddleware import:\n` +
-            violations.map(f => `  - ${f}`).join('\n') +
-            `\n\nAdd import:\n` +
-            `  import { authMiddleware } from '../middleware/auth'\n\n` +
-            `See: docs/contracts/templates/contract-example.yml`
-        )
-      }
-    })
-
-    it('LLM CHECK: no direct req.body access without auth', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-      const glob = await import('glob')
-
-      const routeFiles = glob.sync('src/api/**/*.{ts,js}', {
-        cwd: path.resolve(__dirname, '../../..'),
-        absolute: true,
-      })
-
-      const violations: Array<{ file: string; line: number; code: string }> = []
-
-      for (const file of routeFiles) {
-        const content = fs.readFileSync(file, 'utf-8')
-        const lines = content.split('\n')
-
-        lines.forEach((line, index) => {
-          // Check for handlers that access req.body without authMiddleware
-          // This is a simplified check - adjust regex for your codebase
-          const hasReqBodyAccess = /async\s*\(\s*req\s*,\s*res\s*\)\s*=>/.test(line) &&
-            content.includes('req.body') &&
-            !content.includes('authMiddleware')
-
-          if (hasReqBodyAccess) {
-            violations.push({
-              file: file.replace(process.cwd(), ''),
-              line: index + 1,
-              code: line.trim(),
-            })
-          }
-        })
-      }
-
-      if (violations.length > 0) {
-        throw new Error(
-          `CONTRACT VIOLATION: auth_001_require_middleware\n` +
-            `Found handler(s) accessing req.body without authentication:\n\n` +
-            violations
-              .map(
-                ({ file, line, code }) =>
-                  `  ${file}:${line}\n` + `    ${code}\n` + `    ❌ Accesses req.body without auth\n`
-              )
-              .join('\n') +
-            `\nSee: docs/contracts/templates/contract-example.yml`
+          `CONTRACT VIOLATION: AUTH-001\n` +
+            `Files with routes but no authMiddleware import:\n` +
+            violations.map((f) => `  - ${f}`).join('\n') +
+            `\n\nFix: import { authMiddleware } from '../middleware/auth'\n\n` +
+            `Contract: docs/contracts/feature_authentication.yml`
         )
       }
     })
   })
 
-  describe('Rule: auth_002_no_auth_bypass', () => {
-    it('LLM CHECK: no skipAuth flags exist', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-      const glob = await import('glob')
+  describe('AUTH-002: Tokens in httpOnly cookies only', () => {
+    const scope = ['src/**/*.ts', 'src/**/*.js']
 
-      const apiFiles = glob.sync('src/api/**/*.{ts,js}', {
-        cwd: path.resolve(__dirname, '../../..'),
-        absolute: true,
-      })
-
-      const violations: Array<{ file: string; line: number; code: string }> = []
-
-      for (const file of apiFiles) {
-        const content = fs.readFileSync(file, 'utf-8')
-        const lines = content.split('\n')
-
-        lines.forEach((line, index) => {
-          if (/skipAuth/i.test(line)) {
-            violations.push({
-              file: file.replace(process.cwd(), ''),
-              line: index + 1,
-              code: line.trim(),
-            })
-          }
-        })
-      }
-
-      if (violations.length > 0) {
-        throw new Error(
-          `CONTRACT VIOLATION: auth_002_no_auth_bypass\n` +
-            `Found skipAuth flag(s):\n\n` +
-            violations
-              .map(
-                ({ file, line, code }) =>
-                  `  ${file}:${line}\n` + `    ${code}\n` + `    ❌ skipAuth is forbidden\n`
-              )
-              .join('\n') +
-            `\nAuthentication cannot be skipped or made optional.\n` +
-            `See: docs/contracts/templates/contract-example.yml`
-        )
-      }
-    })
-
-    it('LLM CHECK: no conditional auth bypass', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-      const glob = await import('glob')
-
-      const apiFiles = glob.sync('src/api/**/*.{ts,js}', {
-        cwd: path.resolve(__dirname, '../../..'),
-        absolute: true,
-      })
+    it('No localStorage for tokens', () => {
+      const files = getFilesInScope(scope, basePath)
+      const violations: Array<{ file: string; line: number; match: string }> = []
 
       const forbiddenPatterns = [
-        {
-          pattern: /if\s*\(.*!authRequired.*\)/,
-          message: 'Conditional auth bypass detected',
-        },
-        {
-          pattern: /if\s*\(.*NODE_ENV.*===.*development.*\).*skip/i,
-          message: 'Development environment auth bypass detected',
-        },
-        {
-          pattern: /process\.env\.DISABLE_AUTH/,
-          message: 'Environment variable to disable auth detected',
-        },
+        { pattern: /localStorage\.setItem\([^)]*token/i, reason: 'token in localStorage' },
+        { pattern: /localStorage\.setItem\([^)]*auth/i, reason: 'auth in localStorage' },
+        { pattern: /sessionStorage\.setItem\([^)]*token/i, reason: 'token in sessionStorage' },
       ]
 
-      const violations: Array<{ file: string; line: number; code: string; reason: string }> = []
-
-      for (const file of apiFiles) {
+      for (const file of files) {
+        if (!fs.existsSync(file)) continue
         const content = fs.readFileSync(file, 'utf-8')
-        const lines = content.split('\n')
 
-        lines.forEach((line, index) => {
-          for (const { pattern, message } of forbiddenPatterns) {
-            if (pattern.test(line)) {
-              violations.push({
-                file: file.replace(process.cwd(), ''),
-                line: index + 1,
-                code: line.trim(),
-                reason: message,
-              })
-            }
-          }
-        })
+        for (const { pattern } of forbiddenPatterns) {
+          const matches = findPatternViolations(content, pattern, file)
+          violations.push(...matches)
+        }
       }
 
       if (violations.length > 0) {
-        throw new Error(
-          `CONTRACT VIOLATION: auth_002_no_auth_bypass\n` +
-            `Found authentication bypass pattern(s):\n\n` +
-            violations
-              .map(
-                ({ file, line, code, reason }) =>
-                  `  ${file}:${line}\n` +
-                  `    ${code}\n` +
-                  `    ❌ ${reason}\n`
-              )
-              .join('\n') +
-            `\nAuthentication must always be enforced - no bypasses allowed.\n` +
-            `See: docs/contracts/templates/contract-example.yml`
-        )
+        const message =
+          `CONTRACT VIOLATION: AUTH-002\n` +
+          `Tokens stored in localStorage/sessionStorage:\n\n` +
+          violations
+            .map(
+              (v) =>
+                `  ${v.file.replace(basePath, '')}:${v.line}\n` +
+                `    ${v.match}\n`
+            )
+            .join('\n') +
+          `\nFix: Use httpOnly cookies instead:\n` +
+          `  res.cookie('token', jwt, { httpOnly: true, secure: true })\n\n` +
+          `Contract: docs/contracts/feature_authentication.yml`
+
+        throw new Error(message)
       }
+
+      expect(violations).toHaveLength(0)
     })
 
-    it('LLM CHECK: no comments about removing auth', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-      const glob = await import('glob')
+    it('Auth cookies have httpOnly flag', () => {
+      const files = getFilesInScope(scope, basePath)
+      let foundHttpOnly = false
 
-      const apiFiles = glob.sync('src/api/**/*.{ts,js}', {
-        cwd: path.resolve(__dirname, '../../..'),
-        absolute: true,
-      })
-
-      const violations: Array<{ file: string; line: number; code: string }> = []
-
-      for (const file of apiFiles) {
+      // Check if httpOnly: true exists somewhere in auth-related code
+      for (const file of files) {
+        if (!fs.existsSync(file)) continue
         const content = fs.readFileSync(file, 'utf-8')
-        const lines = content.split('\n')
 
-        lines.forEach((line, index) => {
-          if (/\/\/\s*TODO:?\s*remove auth/i.test(line)) {
-            violations.push({
-              file: file.replace(process.cwd(), ''),
-              line: index + 1,
-              code: line.trim(),
-            })
-          }
-        })
-      }
-
-      if (violations.length > 0) {
-        throw new Error(
-          `CONTRACT VIOLATION: auth_002_no_auth_bypass\n` +
-            `Found comment(s) about removing authentication:\n\n` +
-            violations
-              .map(
-                ({ file, line, code }) =>
-                  `  ${file}:${line}\n` +
-                  `    ${code}\n` +
-                  `    ❌ Comments indicating intention to remove auth are forbidden\n`
-              )
-              .join('\n') +
-            `\nAuthentication is non-negotiable and cannot be removed.\n` +
-            `See: docs/contracts/templates/contract-example.yml`
-        )
-      }
-    })
-  })
-
-  describe('Logging Contract', () => {
-    it('LLM CHECK: authMiddleware logs authentication failures', async () => {
-      const fs = await import('fs')
-      const path = await import('path')
-
-      // Check authMiddleware implementation
-      const authFiles = [
-        'src/middleware/auth.ts',
-        'src/api/middleware/auth.ts',
-        'src/auth/middleware.ts',
-      ]
-
-      let authFileContent = ''
-      let authFilePath = ''
-
-      for (const file of authFiles) {
-        const fullPath = path.resolve(__dirname, '../../..', file)
-        if (fs.existsSync(fullPath)) {
-          authFileContent = fs.readFileSync(fullPath, 'utf-8')
-          authFilePath = file
+        if (/httpOnly\s*:\s*true/.test(content)) {
+          foundHttpOnly = true
           break
         }
       }
 
-      if (!authFileContent) {
-        // Auth middleware file not found - skip check or warn
-        console.warn('Auth middleware file not found - skipping logging check')
-        return
-      }
+      // This is a soft check - only fail if we find cookie-setting code without httpOnly
+      const files2 = getFilesInScope(['src/auth/**/*.ts', 'src/controllers/auth/**/*.ts'], basePath)
 
-      // Check for logging on auth failure
-      const logsOnFailure =
-        /console\.warn|logger\.warn|log\.warn/.test(authFileContent) ||
-        /Authentication failed/.test(authFileContent)
+      for (const file of files2) {
+        if (!fs.existsSync(file)) continue
+        const content = fs.readFileSync(file, 'utf-8')
 
-      if (!logsOnFailure) {
-        throw new Error(
-          `CONTRACT VIOLATION: auth logging contract\n` +
-            `authMiddleware (${authFilePath}) does not log authentication failures\n` +
-            `Required: Log "Authentication failed for [endpoint]" at warn level\n\n` +
-            `See: docs/contracts/templates/contract-example.yml`
-        )
+        const setsCookie = /res\.cookie|setCookie/.test(content)
+        const hasHttpOnly = /httpOnly\s*:\s*true/.test(content)
+
+        if (setsCookie && !hasHttpOnly) {
+          throw new Error(
+            `CONTRACT VIOLATION: AUTH-002\n` +
+              `Cookie set without httpOnly flag:\n` +
+              `  File: ${file.replace(basePath, '')}\n\n` +
+              `Fix: Add httpOnly: true to cookie options:\n` +
+              `  res.cookie('token', jwt, { httpOnly: true, secure: true })\n\n` +
+              `Contract: docs/contracts/feature_authentication.yml`
+          )
+        }
       }
     })
   })
 
   describe('Compliance Checklist', () => {
-    it('LLM CHECK: documents compliance questions for route additions', () => {
-      // This test documents the compliance checklist from contract
-      const complianceQuestions = [
+    it('Documents compliance questions', () => {
+      // This test documents the compliance checklist for LLMs
+      const checklist = [
         {
-          question: 'Does this route have authMiddleware as first parameter?',
-          expected: 'YES',
-          violation: 'auth_001_require_middleware',
+          question: 'Adding or modifying an API route?',
+          action: 'Add authMiddleware as first parameter after the path',
         },
         {
-          question: 'Does this route need to be public?',
-          if_yes: 'Document why and get security team approval',
+          question: 'Storing auth tokens or credentials?',
+          action: 'Use httpOnly cookies, never localStorage or sessionStorage',
         },
         {
-          question: 'Does this change remove or weaken authentication?',
-          expected: 'NO',
-          violation: 'contract violation',
+          question: 'Creating a public endpoint?',
+          action: 'Add to scope exclusions in contract (!src/routes/public/**)',
         },
       ]
 
       // Verify checklist is complete
-      complianceQuestions.forEach(check => {
-        expect(check.question).toBeDefined()
-        expect(check.expected || check.if_yes).toBeDefined()
+      expect(checklist.length).toBeGreaterThan(0)
+      checklist.forEach((item) => {
+        expect(item.question).toBeDefined()
+        expect(item.action).toBeDefined()
       })
-    })
-  })
-
-  describe('Example Patterns', () => {
-    it('Documents violation vs compliant patterns', () => {
-      const violation = `
-        // ❌ WRONG - No authentication
-        router.post('/api/users/delete', async (req, res) => {
-          await User.delete(req.body.userId)
-        })
-      `
-
-      const compliant = `
-        // ✅ CORRECT - Authentication required
-        router.post('/api/users/delete', authMiddleware, async (req, res) => {
-          await User.delete(req.body.userId)
-        })
-      `
-
-      expect(violation).toContain('❌ WRONG')
-      expect(compliant).toContain('✅ CORRECT')
-      expect(compliant).toContain('authMiddleware')
     })
   })
 })

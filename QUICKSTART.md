@@ -1,12 +1,52 @@
-# Contractee Quick Start
+# Specflow Quick Start
 
-## 🚀 Get Started in 3 Minutes
+## The Formula
 
-Choose your path:
+```
+Architecture + Features + Journeys = The Product
+```
+
+This is Specflow in one line:
+
+| Layer | What It Defines | Example |
+|-------|-----------------|---------|
+| **Architecture** | Structural invariants | "No payment data in localStorage" |
+| **Features** | Product capabilities | "Queue orders by FIFO" |
+| **Journeys** | User accomplishments | "User can add a commission" |
+
+**Skip any layer → ship blind.** Define all three → contracts enforce them.
 
 ---
 
-## Path 1: Complete Automation (Recommended)
+## First: See It Work
+
+**Option A: Run the demo (2 min)**
+```bash
+cd demo
+npm install
+npm run demo
+```
+
+**Option B: Read the dev blog (15 min)**
+
+See Specflow build a real product from Reddit pain point to working app:
+→ [blog/README.md](blog/README.md)
+
+The blog walks through finding a problem, writing a spec, generating contracts, implementing, and **catching a security violation that unit tests missed**.
+
+---
+
+## Choose Your Path
+
+| Your Situation | Path |
+|----------------|------|
+| New project, have a spec | Path 1: Complete Automation |
+| Existing project, want to protect it | Path 2: Mid-Project Adoption |
+| Want maximum control | Path 3: Manual Setup |
+
+---
+
+## Path 1: Complete Automation
 
 **For: New projects with a product spec**
 
@@ -252,21 +292,23 @@ You're doing it right when:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│ Contractee Quick Reference                              │
+│ Specflow Quick Reference                                │
 ├─────────────────────────────────────────────────────────┤
-│ New Project:        MASTER-ORCHESTRATOR.md              │
-│ Existing Project:   MID-PROJECT-ADOPTION.md             │
-│ With Subagents:     SUBAGENT-CONTRACTS.md               │
-│ Manual Setup:       META-INSTRUCTION.md                 │
-│                                                          │
-│ Spec → Contract:    SPEC-TO-CONTRACT.md                 │
-│ Test Journeys:      USER-JOURNEY-CONTRACTS.md           │
-│ CI/CD Setup:        CI-INTEGRATION.md                   │
-│                                                          │
-│ Templates:          contract-example.yml                │
-│                     test-example.test.ts                │
-│                                                          │
-│ Verify Setup:       ./verify-setup.sh                   │
+│ Core Docs:                                              │
+│   README.md              - Overview & quick start       │
+│   CONTRACTS-README.md    - System overview              │
+│   SPEC-FORMAT.md         - How to write specs           │
+│   CONTRACT-SCHEMA.md     - YAML contract format         │
+│   LLM-MASTER-PROMPT.md   - Prompt for LLM enforcement   │
+│                                                         │
+│ Adoption:                                               │
+│   MID-PROJECT-ADOPTION.md - Add to existing project     │
+│   USER-JOURNEY-CONTRACTS.md - E2E journey testing       │
+│   CI-INTEGRATION.md      - CI/CD setup                  │
+│                                                         │
+│ Demo:                                                   │
+│   demo/                  - Working example              │
+│   ./verify-setup.sh      - Check your setup             │
 └─────────────────────────────────────────────────────────┘
 ```
 

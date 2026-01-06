@@ -1,6 +1,8 @@
-# Contracts as Spec – System Overview
+# Specflow System Overview
 
-This repo uses **contracts** to turn your product spec into executable rules.
+Turn your product spec into executable rules that enforce themselves.
+
+This system uses **contracts** to make specs testable.
 
 You write a simple spec.
 We convert it into:
@@ -63,26 +65,34 @@ See `USER-JOURNEY-CONTRACTS.md` for the complete template and examples.
 
 1. **Write or update spec**
    - Edit `docs/specs/<feature>.md` in a simple, constrained format (see `SPEC-FORMAT.md`).
-   - Define REQS (requirements) and JOURNEYS (user flows).
+   - **Define ARCHITECTURE constraints first** (ARCH-xxx) - structural invariants.
+   - Define REQS (feature requirements) and JOURNEYS (user flows).
    - Mark journeys as **Critical**, **Important**, or **Future** in your Definition of Done.
 
-2. **Generate / update contracts**
+2. **Generate / update contracts (Architecture First!)**
+   - **First:** Create `feature_architecture.yml` with ARCH-xxx rules (if it doesn't exist).
+   - **Then:** Create feature contracts with FEAT-xxx rules.
+   - **Then:** Create journey contracts with DOD criticality.
    - Use the LLM with `LLM-MASTER-PROMPT.md` or run `npm run contracts:generate <feature>`.
-   - Feature contracts enforce code patterns (forbidden/required).
-   - Journey contracts define DOD with `dod_criticality` field.
 
 3. **Run tests**
-   - `npm test -- contracts` (pattern tests)
+   - `npm test -- contracts` (pattern tests - includes architecture checks)
    - `npm test -- journeys` (E2E journey tests)
    - Fix any violations.
 
-4. **Verify Definition of Done**
+4. **Feature Impact Analysis (for changes)**
+   - Which existing journeys does this feature touch?
+   - Re-run ALL affected journey tests.
+   - Architecture violations in new code break ALL journeys.
+
+5. **Verify Definition of Done**
    - All **Critical** journeys must be `passing`.
    - **Important** journeys should be `passing`.
    - **Future** journeys can remain `not_tested`.
 
-5. **Implement or refactor**
+6. **Implement or refactor**
    - LLMs AND humans read contracts before touching protected files.
+   - Architecture contracts are NEVER bypassed without explicit override.
 
 ---
 
@@ -242,15 +252,21 @@ project/
 
 ## Why Contracts? The Attention Problem
 
-**Models don't read, they pay attention.**
+**Humans read. LLMs attend.**
 
-When you tell an LLM "No shortcuts. Do it properly," it doesn't create a hard constraint—it creates a weighted influence that competes with the model's learned priors. Three hours into a session, it starts to drift and make mistakes while simultaneously presenting itself as knowing exactly what you're working on.
+A butterfly sees a flower—but not as petals, stems, or beauty. It sees UV patterns, contrast gradients, motion cues. Same photons. Radically different experience.
 
-This appearance of continuity is entirely aesthetic—an optimization artifact of how LLMs work. It's not real. And it causes cognitive dissonance because we mistake fluency for understanding.
+When you say "No shortcuts. Do it properly," you're hoping the LLM perceives salience the way you do. It doesn't. It optimizes what it was trained to attend to—and your carefully-worded instructions are just one voice in the crowd, competing with learned priors, token optimization, and style matching.
 
-This isn't laziness. It's entropy from competing signals: do this, don't do that, follow the spec, optimize for tokens, match the user's style... The model attends to all of it, and your carefully-worded instructions are just one voice in the crowd.
+Three hours into a session, it starts to drift while simultaneously presenting itself as knowing exactly what you're working on. This appearance of continuity is entirely aesthetic—an optimization artifact. It's not real. And it causes cognitive dissonance because we mistake fluency for understanding.
 
-**That's why contracts exist.**
+**Stop arguing with the butterfly. Paint UV markers on the flower.**
+
+- Prompting = *hoping* the right things feel salient
+- Contracts = *making* salience executable
+- Tests = *deciding* what the model must see
+
+We don't need LLMs to behave. **We need them to be checkable.**
 
 > Prompting expresses intent. Contracts enforce behaviour.
 > If you don't turn continuity into code, you'll mistake fluency for truth.
@@ -258,6 +274,20 @@ This isn't laziness. It's entropy from competing signals: do this, don't do that
 ---
 
 ## Why Contracts vs. Just Tests?
+
+**The compiler analogy:**
+
+Most LLM workflows look like this:
+```
+Human intent → Prompt → Hope → Review → Fix
+```
+
+Specflow inverts it:
+```
+Human intent → Contract → Generate → Test → Stop or Ship
+```
+
+You don't *trust* the middle. You *verify* the boundary.
 
 **Traditional tests**: Check implementation details (units, functions)
 **Contracts**: Check architectural invariants (business rules, journeys)
@@ -272,6 +302,11 @@ This isn't laziness. It's entropy from competing signals: do this, don't do that
 Contracts test **what must stay true**, not **how it's built**.
 
 The difference matters most with LLMs. A unit test checks code correctness. A contract catches the moment an LLM "optimizes" your auth flow into something that passes all tests but violates your security requirements.
+
+> LLMs aren't bad junior developers. They're untyped, side-effect-prone generators.
+> So instead of instruction, we need compilation.
+>
+> Generate freely. Fail loudly. Nothing ships unless it type-checks.
 
 ---
 
