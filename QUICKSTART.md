@@ -40,32 +40,69 @@ The blog walks through finding a problem, writing a spec, generating contracts, 
 
 | Your Situation | Path |
 |----------------|------|
-| New project, have a spec | Path 1: Complete Automation |
-| Existing project, want to protect it | Path 2: Mid-Project Adoption |
-| Want maximum control | Path 3: Manual Setup |
+| **Just show me how** | → [docs/SIMPLE-WALKTHROUGH.md](docs/SIMPLE-WALKTHROUGH.md) |
+| New project, have a spec | Path 1: Tell Claude |
+| Existing project | Path 2: Mid-Project Adoption |
+| Full automation | Path 3: Advanced (context/MASTER-ORCHESTRATOR.md) |
 
 ---
 
-## Path 1: Complete Automation
+## Path 1: Tell Claude to Follow Specflow
 
 **For: New projects with a product spec**
 
-### Step 1: Give Claude Your Spec
+### Step 1: Write Your Spec
+
+```markdown
+## Architecture (What's Always True)
+
+### ARCH-001 (MUST)
+All API routes must verify authentication.
+
+### ARCH-002 (MUST)
+User data must never be stored in localStorage.
+
+## Features (What It Does)
+
+### FEAT-001 (MUST)
+Users can register with email and password.
+
+## Journeys (What Users Accomplish)
+
+### J-AUTH-001: User Registration
+1. User enters email and password
+2. System creates account
+**Expected:** User exists with hashed password.
 ```
-Execute MASTER-ORCHESTRATOR.md with this spec:
 
-[Paste your entire product specification here]
+### Step 2: Give It to Claude
+
+```
+Read the Specflow docs in this repo:
+- SPEC-FORMAT.md
+- CONTRACT-SCHEMA.md
+- LLM-MASTER-PROMPT.md
+
+Build my app from this spec:
+
+[PASTE SPEC HERE]
+
+Follow Specflow:
+1. Generate ARCH contracts first
+2. Generate FEAT contracts
+3. Generate JOURNEY contracts
+4. Create tests that scan for violations
+5. Implement code
+6. Verify contracts pass before done
 ```
 
-### Step 2: Wait for Completion
-Claude will:
-- ✅ Generate all contracts from your spec
-- ✅ Create all verification tests
-- ✅ Implement features satisfying contracts
-- ✅ Verify everything passes
-- ✅ Report when ready to deploy
+### Step 3: Claude Produces
 
-**Time:** 30-60 minutes for medium project
+- YAML contracts in `docs/contracts/`
+- Tests in `src/__tests__/contracts/`
+- Implementation that passes all contracts
+
+**Full walkthrough:** [docs/SIMPLE-WALKTHROUGH.md](docs/SIMPLE-WALKTHROUGH.md)
 
 ---
 
