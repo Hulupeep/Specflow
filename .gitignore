@@ -24,3 +24,4 @@ gemini_version/node_modules
 # Environment files with secrets
 .env.local
 *.env.local
+samples/mindsplit/node_modules
