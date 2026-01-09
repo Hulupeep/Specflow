@@ -2,47 +2,101 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project Overview
+## What Is Specflow?
 
-Specflow is a methodology and template library for turning specs into enforceable architectural contracts. It provides:
-- A constrained spec format with requirement IDs (AUTH-001, EMAIL-042)
-- YAML contracts that map requirements to forbidden/required code patterns
-- Automated tests that scan source code for contract violations
-- LLM prompts that enforce contracts during development
+Specflow is a methodology for building software with LLMs that doesn't drift.
 
-**Core loop:** Write spec with IDs → Generate contracts → Auto-create tests → Violations = Build fails
+**The problem:** You build with an LLM. It works. You iterate. Slowly, the code drifts from your original intent. Unit tests pass, but architectural rules get violated.
+
+**The solution:** Write specs with requirement IDs → Generate contracts → Auto-create tests → Violations fail the build.
+
+## The Formula
+
+```
+Architecture + Features + Journeys = The Product
+```
+
+| Layer | What It Defines | Example |
+|-------|-----------------|---------|
+| **ARCH** | Structural invariants | "No payment data in localStorage" |
+| **FEAT** | Product capabilities | "Queue orders by FIFO" |
+| **JOURNEY** | User accomplishments (DOD) | "User can complete checkout" |
+
+**Skip any layer → ship blind.** Define all three → contracts enforce them.
 
 ## Repository Structure
 
-This is primarily a **documentation and template repository**, not a runtime library:
-- Root `.md` files: Core methodology docs and templates
-- `demo/`: Working example showing contracts catching violations that unit tests miss
-- `sample_spec/`: Example specifications
-- `backlog/`: Development planning docs
+```
+Specflow/
+├── README.md                    # Start here
+├── QUICKSTART.md               # Choose your path
+├── CONTRACTS-README.md         # System overview
+├── SPEC-FORMAT.md              # How to write specs
+├── CONTRACT-SCHEMA.md          # YAML contract format
+├── LLM-MASTER-PROMPT.md        # Prompt for LLMs
+├── demo/                       # Working example (run this!)
+├── blog/                       # QueueCraft dev blog
+├── docs/
+│   ├── DESIGNER-GUIDE.md       # Designer workflow
+│   ├── MEMORYSPEC.md           # ruvector integration
+│   ├── LIVE-DEMO-SCRIPT.md     # Presentation script
+│   └── AGENTIC-FOUNDATIONS-DECK.md  # 7-slide deck
+└── examples/                   # Contract and test templates
+```
 
-## Commands
+## Live Demo (Guaranteed to Work)
 
-### Demo (in demo/ directory)
+The demo proves Specflow catches what unit tests miss.
+
+### Quick Run (2 min)
 ```bash
 cd demo
 npm install
-npm run demo           # Full automated demo
-npm run demo:working   # Show working state
-npm run demo:broken    # Show LLM "optimization" that breaks contracts
-npm run demo:compare   # Run tests comparing unit vs contract tests
-npm test               # Run all tests
-npm run test:unit      # Run unit tests only
-npm run test:contracts # Run contract tests only
+npm run demo    # Automated walkthrough
 ```
 
-## Core Documentation
+### Manual Demo (for presentations)
 
-When working with this repo, understand these docs in order:
+**1. Setup:**
+```bash
+cd demo
+npm install
+npm run demo:reset
+```
 
-1. **CONTRACTS-README.md** - System overview, core loop, where things live
-2. **SPEC-FORMAT.md** - How to write specs (REQ IDs like `AUTH-001 (MUST)`, journey IDs like `J-AUTH-REGISTER`)
-3. **CONTRACT-SCHEMA.md** - YAML contract format (maps REQ IDs → rules → tests)
-4. **LLM-MASTER-PROMPT.md** - Reusable prompt for LLMs working with contracts
+**2. Show baseline (safe state):**
+```bash
+npm run test:unit      # ✅ 4 passing
+npm run test:contracts # ✅ 1 passing
+```
+
+**3. Introduce the violation:**
+```bash
+cp states/trap.js src/auth.js
+```
+
+**4. Unit tests still pass:**
+```bash
+npm run test:unit      # ✅ 4 passing (!)
+```
+
+**5. Contract catches it:**
+```bash
+npm run test:contracts # ❌ CONTRACT VIOLATION: AUTH-001
+```
+
+**6. Reset:**
+```bash
+npm run demo:reset
+```
+
+### The Invariant
+
+| ID | Rule | Violation |
+|----|------|-----------|
+| AUTH-001 | Sessions must use store with TTL | `localStorage` used instead |
+
+Unit tests verify behavior (they pass). Contracts verify architecture (they catch it).
 
 ## Key Concepts
 
@@ -50,10 +104,6 @@ When working with this repo, understand these docs in order:
 - Format: `[FEATURE]-[NUMBER]` (e.g., `AUTH-001`, `EMAIL-042`)
 - Tags: `(MUST)` = non-negotiable, `(SHOULD)` = guideline
 - Each REQ maps to exactly one contract rule
-
-### Contract Types
-- **Feature contracts**: `docs/contracts/feature_<name>.yml` - Pattern-based rules
-- **Journey contracts**: `docs/contracts/journey_<name>.yml` - E2E flow testing
 
 ### Contract Rules
 - `rules.non_negotiable`: MUST requirements - build fails if violated
@@ -70,10 +120,16 @@ When modifying this repo or using its methodology:
 3. **Always work incrementally:** spec → contract → test → code → verify
 4. **Contract tests must output:** `CONTRACT VIOLATION: <REQ-ID>` with file, line, and message
 
-## Demo Architecture
+## Core Docs (Read Order)
 
-The `demo/` directory demonstrates the methodology:
-- `states/safe.js`: Compliant code using store with TTL
-- `states/trap.js`: Violation using localStorage (simulates bad LLM suggestion)
-- `src/__tests__/contracts.test.js`: Contract test that catches violations unit tests miss
-- `docs/contract.yml`: Example contract for AUTH-001
+1. **README.md** - What Specflow is, why it exists
+2. **demo/** - See it work before reading more
+3. **SPEC-FORMAT.md** - How to write specs with requirement IDs
+4. **CONTRACT-SCHEMA.md** - YAML format for contracts
+5. **LLM-MASTER-PROMPT.md** - How LLMs should use contracts
+
+## The Key Insight
+
+> We don't need LLMs to behave. We need them to be checkable.
+
+Unit tests verify behavior. Contracts verify architecture. Both are needed.
