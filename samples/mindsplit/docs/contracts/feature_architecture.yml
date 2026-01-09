@@ -1,0 +1,170 @@
+# Architecture Contract: MindSplit Core Invariants
+# These rules are NON-NEGOTIABLE - violations fail the build
+
+contract_meta:
+  id: feature_architecture
+  version: 1
+  created_from_spec: "SPEC.md"
+  covers_reqs:
+    - ARCH-001
+    - ARCH-002
+    - ARCH-003
+    - ARCH-004
+  owner: "core-team"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_architecture"
+
+rules:
+  non_negotiable:
+
+    # ARCH-001: Graph operations must be pure
+    - id: ARCH-001
+      title: "Graph functions are pure - no side effects"
+      scope:
+        - "src/lib/graph/**/*.ts"
+        - "src/lib/mincut/**/*.ts"
+      behavior:
+        forbidden_patterns:
+          # No console.log in graph functions
+          - pattern: /console\.(log|warn|error)/
+            message: "Graph functions must be pure - no console output"
+          # No fetch/API calls
+          - pattern: /fetch\(|axios\.|http\./
+            message: "Graph functions must be pure - no network calls"
+          # No file system access
+          - pattern: /fs\.(read|write|append)/
+            message: "Graph functions must be pure - no file I/O"
+          # No global state mutation
+          - pattern: /global\.|process\.env\s*=/
+            message: "Graph functions must be pure - no global mutation"
+        required_patterns:
+          - pattern: /export\s+(function|const)/
+            message: "Graph functions must be exported pure functions"
+      example_violation: |
+        // WRONG - side effect in graph function
+        export function buildGraph(nodes) {
+          console.log('Building graph...')  // Side effect!
+          return createGraph(nodes)
+        }
+      example_compliant: |
+        // CORRECT - pure function
+        export function buildGraph(nodes: Node[]): Graph {
+          return createGraph(nodes)
+        }
+
+    # ARCH-002: Embeddings must be cached
+    - id: ARCH-002
+      title: "All embeddings cached in ruvector"
+      scope:
+        - "src/lib/embeddings/**/*.ts"
+        - "src/lib/similarity/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /ruvector\.(get|retrieve|fetch)|cache\.(get|has)/
+            message: "Must check cache before computing embeddings"
+          - pattern: /ruvector\.(set|store|save)|cache\.set/
+            message: "Must store computed embeddings in cache"
+        forbidden_patterns:
+          - pattern: /embed\(.*\)(?!.*cache)/
+            message: "Embedding calls must use cache - never compute twice"
+      example_violation: |
+        // WRONG - no caching
+        async function getEmbedding(text: string) {
+          return await embedModel.embed(text)  // Recomputes every time!
+        }
+      example_compliant: |
+        // CORRECT - cache-first
+        async function getEmbedding(text: string) {
+          const cacheKey = hash(text)
+          const cached = await ruvector.get(cacheKey)
+          if (cached) return cached
+
+          const embedding = await embedModel.embed(text)
+          await ruvector.set(cacheKey, embedding)
+          return embedding
+        }
+
+    # ARCH-003: Deterministic output
+    - id: ARCH-003
+      title: "Min-cut results must be deterministic"
+      scope:
+        - "src/lib/mincut/**/*.ts"
+        - "src/lib/graph/**/*.ts"
+      behavior:
+        forbidden_patterns:
+          # No unseeded Math.random
+          - pattern: /Math\.random\(\)(?!.*seed)/
+            message: "Use seeded random for determinism - never bare Math.random()"
+          # No Date.now for logic (only logging)
+          - pattern: /Date\.now\(\)(?!.*log)/
+            message: "Date.now() breaks determinism - use explicit timestamps"
+          # No uuid without seed
+          - pattern: /uuid\(\)(?!.*seed|.*deterministic)/
+            message: "UUIDs must be deterministic - use content hash instead"
+        required_patterns:
+          - pattern: /seed|deterministic|hash/i
+            message: "Min-cut must use seeded/deterministic operations"
+      example_violation: |
+        // WRONG - non-deterministic
+        function kargerMinCut(graph: Graph) {
+          while (graph.nodes.length > 2) {
+            const edge = edges[Math.floor(Math.random() * edges.length)]
+            // ...
+          }
+        }
+      example_compliant: |
+        // CORRECT - seeded random
+        function kargerMinCut(graph: Graph, seed: number) {
+          const rng = createSeededRandom(seed)
+          while (graph.nodes.length > 2) {
+            const edge = edges[Math.floor(rng() * edges.length)]
+            // ...
+          }
+        }
+
+    # ARCH-004: Atomic memory operations
+    - id: ARCH-004
+      title: "Memory operations must be atomic"
+      scope:
+        - "src/lib/memory/**/*.ts"
+        - "src/lib/storage/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /transaction|atomic|batch/i
+            message: "Memory operations must be wrapped in transaction/batch"
+        forbidden_patterns:
+          - pattern: /for\s*\(.*\)\s*\{[^}]*await\s+ruvector\.(set|store)/
+            message: "Don't await in loop - use batch operation for atomicity"
+      example_violation: |
+        // WRONG - non-atomic, partial state on failure
+        async function storeChunks(chunks: Chunk[]) {
+          for (const chunk of chunks) {
+            await ruvector.set(chunk.id, chunk)  // Fails halfway = bad state
+          }
+        }
+      example_compliant: |
+        // CORRECT - atomic batch
+        async function storeChunks(chunks: Chunk[]) {
+          await ruvector.batch(
+            chunks.map(c => ({ op: 'set', key: c.id, value: c }))
+          )
+        }
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Am I modifying graph/mincut code?"
+      if_yes: "Ensure function is pure - no side effects (ARCH-001)"
+    - question: "Am I computing embeddings?"
+      if_yes: "Check cache first, store after (ARCH-002)"
+    - question: "Am I using randomness?"
+      if_yes: "Use seeded random for determinism (ARCH-003)"
+    - question: "Am I storing multiple items?"
+      if_yes: "Use batch/transaction for atomicity (ARCH-004)"
+
+test_hooks:
+  tests:
+    - file: "src/__tests__/contracts/architecture.test.ts"
+      description: "Scans for ARCH-001 through ARCH-004 violations"
