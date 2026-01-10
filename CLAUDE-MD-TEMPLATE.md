@@ -37,10 +37,16 @@ This project uses **architectural contracts** (YAML files in `docs/contracts/`) 
 
 #### Files Protected by Contracts:
 
-<!-- UPDATE THIS LIST as you add contracts -->
-- `[src/path/to/file.ts]` → `docs/contracts/[contract_name].yml`
-- `[src/path/to/other.ts]` → `docs/contracts/[contract_name].yml`
+<!-- UPDATE THIS TABLE as you add contracts -->
+
+| Files | Contract | Key Rules |
+|-------|----------|-----------|
+| `packages/core/**/*.ts` | `feature_architecture.yml` | ARCH-001: No browser APIs |
+| `src/background/**/*.ts` | `feature_architecture.yml` | ARCH-002: API calls only here |
+| `src/auth/**/*.ts` | `feature_auth.yml` | AUTH-001: Require authMiddleware |
 <!-- Add more protected files here -->
+
+**Architecture contracts apply everywhere.** Check `feature_architecture.yml` before ANY code change.
 
 #### How to Check Contracts:
 
@@ -158,10 +164,14 @@ This project uses **architectural contracts** (YAML files in `docs/contracts/`) 
 
 #### Files Protected by Contracts:
 
-- `src/background.ts` → `docs/contracts/background_auth_hydration.yml`
-- `src/lib/authStorage.ts` → `docs/contracts/background_auth_hydration.yml`
-- `src/services/supabase/index.ts` → `docs/contracts/background_auth_hydration.yml`
-- `src/hooks/useStaxData/effects/useLoginEffect.ts` → `docs/contracts/background_auth_hydration.yml`
+| Files | Contract | Key Rules |
+|-------|----------|-----------|
+| `packages/core/**/*.ts` | `feature_architecture.yml` | ARCH-001: Pure TypeScript |
+| `src/background.ts` | `background_auth_hydration.yml` | No startup hydration |
+| `src/lib/authStorage.ts` | `background_auth_hydration.yml` | chrome.storage only |
+| `src/services/supabase/**` | `background_auth_hydration.yml` | Fire-and-forget |
+
+**Architecture contracts apply everywhere.** Check `feature_architecture.yml` before ANY code change.
 
 #### How to Check Contracts:
 

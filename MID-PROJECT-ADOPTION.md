@@ -1,4 +1,6 @@
-# Mid-Project Adoption: Adding Contracts Without Starting Over
+# Specflow Mid-Project Adoption
+
+> Adding contracts to existing projects without starting over
 
 ## The Challenge
 
@@ -753,3 +755,11 @@ npm test -- freezeCurrentAuth
 - Create "freeze current state" contracts
 - Write tests that verify existing behavior
 - Expand coverage incrementally
+
+---
+
+**Related Specflow docs:**
+- `SPEC-FORMAT.md` - How to write specs with REQ IDs
+- `CONTRACT-SCHEMA.md` - YAML contract format reference
+- `USER-JOURNEY-CONTRACTS.md` - Journey testing for E2E flows
+- `demo/` - Working example showing contracts catching violations

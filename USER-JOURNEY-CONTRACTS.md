@@ -1,4 +1,6 @@
-# User Journey Contracts: Your Definition of Done
+# Specflow User Journey Contracts
+
+> Your Definition of Done as executable tests
 
 User journey contracts serve two critical purposes:
 1. **Test what matters** - Verify complete user flows, not just code units

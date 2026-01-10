@@ -41,9 +41,49 @@ This project uses **contracts as spec**. Your job is to:
 2. Read the feature spec you're working on, e.g. `docs/specs/authentication.md`.
 
 Summarize:
-- REQs (AUTH-001, AUTH-002, …)
-- JOURNEYS (J-AUTH-REGISTER, …)
+- ARCH requirements (ARCH-001, ARCH-002, …) - **structural constraints**
+- Feature REQs (AUTH-001, AUTH-002, …) - **what it does**
+- JOURNEYS (J-AUTH-REGISTER, …) - **user flows**
 - DEFINITION OF DONE (which journeys are Critical, Important, Future)
+
+---
+
+### Phase 0.5 – Architecture First (New Projects Only)
+
+**Before writing feature contracts, ensure architecture contracts exist.**
+
+If `docs/contracts/feature_architecture.yml` does NOT exist:
+
+1. **Ask user to define architecture invariants:**
+   ```
+   Before I generate feature contracts, we need architecture constraints.
+
+   What are the structural rules that ALL features must follow?
+   - Package/module boundaries?
+   - Where can API calls happen?
+   - Storage restrictions (localStorage vs chrome.storage)?
+   - File/function size limits?
+
+   Or I can generate initial ARCH requirements based on your tech stack.
+   ```
+
+2. **Generate ARCH requirements:**
+   ```yaml
+   # Example for Chrome extension
+   ARCH-001: Core must be pure TypeScript (no browser APIs)
+   ARCH-002: GitHub API calls only from background service worker
+   ARCH-003: Files < 200 lines, functions < 80 lines
+   ARCH-004: Service workers must not use localStorage
+   ```
+
+3. **Create feature_architecture.yml** with these as `non_negotiable` rules
+
+4. **Create architecture tests** that scan for forbidden patterns
+
+**Why architecture first?**
+- Architecture contracts protect against structural drift
+- Feature contracts assume architecture is already defined
+- Without ARCH contracts, LLMs can "optimize" code into incompatible patterns
 
 ---
 
@@ -59,6 +99,9 @@ For a given spec file:
 
 3. For each `J-...` journey:
    - Ensure there is a `journey_*.yml` file with `steps` defined.
+   - **Extract preconditions** from user language (see SPEC-FORMAT.md):
+     - "cancel a **pending** order" → precondition: pending order exists
+     - "edit **their own** profile" → precondition: user is logged in
    - Set `dod_criticality`: `critical`, `important`, or `future`
    - Set initial `status`: `not_tested`
 
@@ -143,40 +186,95 @@ describe('Contract: feature_authentication', () => {
 })
 ```
 
+### Logic Test Setup
+
+When testing module functions directly (not just pattern scans), initialize state in `beforeEach`:
+
+```javascript
+const module = require('../../orders.js');
+
+describe('Calculation Logic', () => {
+  beforeEach(() => {
+    module.initialize();  // Reset state before each test
+  });
+
+  it('ORDER-001: Cannot cancel without order ID', () => {
+    expect(() => module.cancelOrder(null)).toThrow(/required/i);
+  });
+
+  it('ORDER-002: Cancellation timestamp is auto-generated', () => {
+    module.createOrder({ id: 'order-1', status: 'pending' });
+    const before = Date.now();
+    const result = module.cancelOrder('order-1');
+    expect(result.cancelledAt).toBeGreaterThanOrEqual(before);
+  });
+});
+```
+
+### Test File Organization
+
+Separate Jest (contract/logic tests) from Playwright (E2E journey tests):
+
+```
+src/__tests__/contracts/   ← Jest runs these
+tests/e2e/                 ← Playwright runs these
+```
+
+Create `jest.config.js` to prevent collision:
+```javascript
+module.exports = {
+  testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/'],
+  testMatch: ['**/src/__tests__/**/*.test.js']
+};
+```
+
 For each journey:
 
 1. Create or update an E2E test (e.g. Playwright) that:
+   - **Generates setup code for preconditions** (e.g., helper functions to create required state)
    - Drives the app through the journey steps.
    - Asserts required elements and expected behaviour.
+   - Uses **scoped locators** when testing items in lists (e.g., `listItem.locator('[data-testid="..."]')`)
 
-**Example:**
+**Example with preconditions:**
 
 ```typescript
-// tests/e2e/journey_auth_register.spec.ts
+// tests/e2e/journey_order_cancel.spec.ts
 
 import { test, expect } from '@playwright/test'
 
-test('J-AUTH-REGISTER: User registration flow', async ({ page }) => {
-  // Step 1: Visit registration page
-  await page.goto('/register')
-  await expect(page.locator('input[name="email"]')).toBeVisible()
-  await expect(page.locator('input[name="password"]')).toBeVisible()
+// PRECONDITION SETUP: Creates required state before journey
+async function createPendingOrder(page) {
+  await page.locator('[data-testid="product-item"]').first()
+    .locator('[data-testid="add-to-cart"]').click()
+  await page.locator('[data-testid="checkout-button"]').click()
+  // ... complete checkout to create pending order
+}
 
-  // Step 2: Fill form
-  await page.fill('input[name="email"]', 'test@example.com')
-  await page.fill('input[name="password"]', 'SecurePass123!')
+test('J-ORDER-CANCEL: Cancel pending order', async ({ page }) => {
+  await page.goto('/')
 
-  // Step 3: Submit
-  await page.click('button[type="submit"]')
+  // SETUP: Fulfill precondition "pending order exists"
+  await createPendingOrder(page)
 
-  // Step 4: Confirmation email sent (mock or check)
-  // ... verify email sent ...
+  // Step 1: Open orders (scoped locators for list items)
+  await page.locator('[data-testid="orders-tab"]').click()
+  const orderItem = page.locator('[data-testid="order-item"]').first()
 
-  // Step 5: Click confirmation link and land on dashboard
-  // await page.goto(confirmationLink)
-  await expect(page).toHaveURL(/\/dashboard/)
+  // Step 2: Click cancel on THIS order (scoped)
+  await orderItem.locator('[data-testid="cancel-button"]').click()
+
+  // Step 3: Confirm cancellation
+  await page.locator('[data-testid="confirm-cancel"]').click()
+
+  // Step 4: Order shows cancelled status
+  await expect(orderItem.locator('[data-testid="status-badge"]')).toContainText('Cancelled')
 })
 ```
+
+**Key patterns:**
+- Helper function fulfills preconditions before journey starts
+- Scoped locators (`orderItem.locator(...)`) prevent strict mode violations in lists
 
 ---
 
@@ -195,6 +293,70 @@ When you implement or refactor code:
      - Any relevant journey tests.
 
 Never "work around" the tests; instead, adjust the contract if the spec truly changed (with user approval).
+
+---
+
+### Phase 3.5 – Feature Impact Analysis (CRITICAL)
+
+**Before marking implementation complete, check which existing journeys your changes might affect.**
+
+When you add or modify a feature:
+
+1. **Check CONTRACT_INDEX.yml for affected journeys:**
+   ```bash
+   # Find journeys that cover requirements you touched
+   grep -l "AUTH-001\|AUTH-002" docs/contracts/journey_*.yml
+   ```
+
+2. **Identify file-to-journey mapping:**
+   - Your changes touch `src/auth/login.ts`
+   - Which journeys use login functionality?
+   - Check `requirements_coverage` in CONTRACT_INDEX.yml
+
+3. **Re-run affected journey tests:**
+   ```bash
+   # Run all journeys that might be affected
+   npm test -- journey_auth_login
+   npm test -- journey_checkout  # If checkout uses auth
+   ```
+
+4. **Document impact in PR:**
+   ```markdown
+   ## Feature Impact Analysis
+
+   **Changed files:**
+   - src/auth/login.ts
+
+   **Affected journeys:**
+   - J-AUTH-LOGIN: ✅ passing
+   - J-CHECKOUT: ✅ passing (uses auth)
+
+   **Regression risk:** Low - all affected journeys pass
+   ```
+
+**Why this matters:**
+- New features can break existing journeys
+- Architecture violations might not be caught by feature tests
+- Journey tests are your regression safety net
+
+**Example:**
+
+You add OAuth support to login:
+```
+Files changed: src/auth/login.ts, src/auth/oauth.ts
+
+Impact analysis:
+1. J-AUTH-LOGIN uses login.ts → MUST re-run
+2. J-AUTH-REGISTER calls login after register → MUST re-run
+3. J-CHECKOUT requires auth → SHOULD re-run
+4. feature_architecture contract scopes src/auth/** → MUST verify ARCH compliance
+
+Tests to run:
+  npm test -- auth_contract        # Architecture check
+  npm test -- journey_auth_login   # Direct impact
+  npm test -- journey_auth_register # Indirect impact
+  npm test -- journey_checkout     # Dependency
+```
 
 ---
 
@@ -606,27 +768,40 @@ Then you may proceed with changes that violate the contract, but you should:
 ┌─────────────────────────────────────────────────────────┐
 │ LLM Workflow Quick Reference                            │
 ├─────────────────────────────────────────────────────────┤
-│ Before any code change:                                 │
-│   1. Check: Is file protected?                          │
-│   2. Read: contract YAML                                │
-│   3. Check: compliance_checklist                        │
-│   4. Verify: npm test -- contracts                      │
+│ Phase 0: Understand spec                                │
+│   - Read ARCH, FEAT, JOURNEY requirements               │
+│   - Identify DOD critical journeys                      │
 │                                                          │
-│ When implementing:                                      │
-│   Spec → Contract → Test → Code → Verify → DOD Check   │
+│ Phase 0.5: Architecture First (new projects)            │
+│   - Create feature_architecture.yml BEFORE features    │
+│   - Define ARCH-xxx invariants                          │
 │                                                          │
-│ When refactoring:                                       │
-│   Baseline → Change → Test → Fix if broken → DOD Check │
+│ Phase 1: Generate contracts                             │
+│   - ARCH → feature_architecture.yml                     │
+│   - FEAT → feature_*.yml                                │
+│   - JOURNEY → journey_*.yml                             │
 │                                                          │
-│ DOD Verification (Phase 4):                             │
-│   1. Run critical journey tests                         │
-│   2. Update status in journey contracts                 │
-│   3. Report: Ready for release? Yes/No                  │
+│ Phase 2: Generate tests                                 │
+│   - Contract tests scan for patterns                    │
+│   - Journey tests validate user flows                   │
 │                                                          │
-│ DOD Criticality:                                        │
-│   critical = blocks release if failing                  │
-│   important = should fix before release                 │
-│   future = can release without                          │
+│ Phase 3: Implement                                      │
+│   - Check if file protected before editing              │
+│   - Run contract tests after changes                    │
+│                                                          │
+│ Phase 3.5: Impact Analysis (CRITICAL!)                  │
+│   - Which existing journeys does this feature touch?    │
+│   - Re-run ALL affected journey tests                   │
+│   - Document regression risk                            │
+│                                                          │
+│ Phase 4: Verify DOD                                     │
+│   - All critical journeys passing?                      │
+│   - Update journey status in contracts                  │
+│                                                          │
+│ Contract Hierarchy:                                     │
+│   ARCH → protects structure (never break)               │
+│   FEAT → protects behavior                              │
+│   JOURNEY → validates user flows                        │
 │                                                          │
 │ Override phrase:                                        │
 │   override_contract: <contract_id>                      │

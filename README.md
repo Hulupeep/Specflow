@@ -1,6 +1,8 @@
 # Specflow
 
-**Turn specs into tests that catch what unit tests miss.**
+**Specs that enforce themselves.**
+
+*Turn specs into tests that catch what unit tests miss.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 

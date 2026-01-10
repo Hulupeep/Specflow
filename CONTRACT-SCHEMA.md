@@ -120,6 +120,12 @@ journey_meta:
   status: passing              # passing | failing | not_tested
   last_verified: "2025-12-05"
 
+# Preconditions: State that must exist BEFORE journey starts
+# Extract from user language: "edit THEIR profile" → user logged in
+preconditions:
+  - description: "None - journey starts from blank state"
+    setup_hint: null
+
 steps:
   - step: 1
     name: "Visit registration page"
@@ -151,6 +157,34 @@ steps:
 test_hooks:
   e2e_test_file: "tests/e2e/journey_auth_register.spec.ts"
 ```
+
+### Journey WITH Preconditions
+
+When user language implies required state, extract it as preconditions:
+
+```yaml
+journey_meta:
+  id: J-ORDER-CANCEL
+  from_spec: "docs/specs/orders.md"
+  covers_reqs:
+    - ORDER-003
+  type: "e2e"
+  dod_criticality: critical
+  status: passing
+  last_verified: "2025-12-05"
+
+# User said: "cancel a PENDING order" → pending order must exist
+preconditions:
+  - description: "User has at least one pending order"
+    setup_hint: "Call createPendingOrder(page) helper before journey steps"
+
+steps:
+  - step: 1
+    name: "Open orders page"
+    # ...
+```
+
+**Rule:** When generating E2E tests, create helper functions for each precondition.
 
 ---
 
@@ -247,9 +281,22 @@ required_patterns:
     message: "Passwords must be hashed with bcrypt"
 ```
 
+### Pattern Matching Semantics
+
+**Critical distinction:**
+
+| Pattern Type | Meaning |
+|--------------|---------|
+| `forbidden_patterns` | Must NOT match in ANY file in scope |
+| `required_patterns` | Must match in AT LEAST ONE file in scope |
+
+Example: If scope is `["src/api/**/*.js"]` and you have 5 files:
+- `forbidden_patterns`: Fails if pattern found in ANY of the 5 files
+- `required_patterns`: Passes if pattern found in AT LEAST ONE of the 5 files
+
 ### Pattern Tips
 
-1. **Use regex syntax**: JavaScript regex format (`/pattern/`)
+1. **Use regex syntax**: `/pattern/` format (language-agnostic regex)
 2. **Be specific**: `/localStorage\.get/` not `/localStorage/` (matches comments)
 3. **Add context**: Match surrounding code to reduce false positives
 4. **Test patterns**: Run against real code before committing
@@ -267,13 +314,34 @@ scope:
   - "src/background.ts"            # Specific file
 ```
 
-**Exclude patterns:**
+### Scope Negation Syntax
+
+Prefix a pattern with `!` to **exclude** matching files from the scope:
 
 ```yaml
 scope:
   - "src/api/**/*.ts"
   - "!src/api/public/**"           # Exclude public API routes
+  - "!src/api/__tests__/**"        # Exclude test files
+  - "!**/*.test.ts"                # Exclude all test files
 ```
+
+**Evaluation order matters:** Patterns are evaluated top-to-bottom. Include patterns first, then exclusions.
+
+| Pattern | Effect |
+|---------|--------|
+| `"src/**/*.ts"` | Match all TypeScript files in src |
+| `"!src/generated/**"` | Then exclude generated files |
+| `"!**/*.d.ts"` | Then exclude type definition files |
+
+**Common exclusion patterns:**
+
+| Exclude | Pattern |
+|---------|---------|
+| Test files | `"!**/*.test.*"` or `"!**/__tests__/**"` |
+| Generated code | `"!**/generated/**"` or `"!**/*.gen.*"` |
+| Vendor/deps | `"!**/vendor/**"` or `"!**/node_modules/**"` |
+| Config files | `"!**/config/**"` |
 
 ---
 
@@ -291,6 +359,22 @@ scope:
 | `status` | string | ✅ | Test status: `passing`, `failing`, `not_tested` |
 | `last_verified` | string | ⚠️ | Date of last test run (ISO format) |
 
+### preconditions[]
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `description` | string | ✅ | Human-readable precondition (e.g. "User is logged in") |
+| `setup_hint` | string | ⚠️ | Code hint for test setup (e.g. "Call loginUser(page)") |
+
+**Extracting preconditions from user language:**
+
+| User Says | Precondition |
+|-----------|--------------|
+| "cancel a **pending** order" | `pending order exists` |
+| "edit **their own** profile" | `user is logged in` |
+| "view **other** user's posts" | `multiple users with posts exist` |
+| "checkout with **items in cart**" | `cart contains items` |
+
 ### DOD Criticality Levels
 
 | Level | Meaning | Release Impact |
@@ -298,6 +382,24 @@ scope:
 | `critical` | Core user flow | ❌ Blocks release if failing/not_tested |
 | `important` | Key feature | ⚠️ Should fix before release |
 | `future` | Planned feature | ✅ Can release without |
+
+### timing (Optional but Recommended)
+
+Document animation and async timing for accurate test generation:
+
+```yaml
+timing:
+  animation_slide: 300      # ms - slide-out animations
+  animation_fade: 200       # ms - fade transitions
+  debounce_input: 150       # ms - input debounce
+  api_timeout: 5000         # ms - API call timeout
+  completion_animation: 600 # ms - success/completion effect
+```
+
+**Why timing matters:** Tests need accurate `waitForTimeout()` values. Without documented timing:
+- Tests fail because they click before animations complete
+- Flaky tests due to race conditions
+- Hard-to-debug "works locally, fails in CI" issues
 
 ### steps[]
 
@@ -490,7 +592,167 @@ test_hooks:
 
 ---
 
-## 9. Contract Lifecycle
+## 9. Contract Index (CONTRACT_INDEX.yml)
+
+Every project should have a `docs/contracts/CONTRACT_INDEX.yml` that tracks all contracts and their relationships.
+
+### Purpose
+
+- **Central registry** of all contracts
+- **Coverage matrix** showing which REQs are covered
+- **DOD status** at a glance
+- **Gap identification** for uncovered requirements
+
+### Schema
+
+```yaml
+# docs/contracts/CONTRACT_INDEX.yml
+metadata:
+  project: [project_name]
+  version: [index_version]
+  total_contracts: [count]
+  total_requirements: "[X] MUST, [Y] SHOULD"
+  total_journeys: [count]
+
+# Definition of Done Summary
+definition_of_done:
+  critical_journeys:
+    - J-[FEATURE]-[NAME]    # Must pass to release
+  important_journeys:
+    - J-[FEATURE]-[NAME]    # Should pass before release
+  future_journeys:
+    - J-[FEATURE]-[NAME]    # Can release without
+
+  release_gate: |
+    All critical journeys must have status: passing
+    before release is allowed.
+
+contracts:
+  # Feature Contracts (Architecture + Features)
+  - id: feature_architecture
+    file: feature_architecture.yml
+    status: active
+    covers_reqs:
+      - ARCH-001
+      - ARCH-002
+    summary: "Package layering, API isolation, size limits"
+
+  - id: feature_[name]
+    file: feature_[name].yml
+    status: active
+    covers_reqs:
+      - [FEAT]-001
+    summary: "[Brief description]"
+
+  # Journey Contracts
+  - id: J-[FEATURE]-[NAME]
+    file: journey_[name].yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: passing
+    covers_reqs:
+      - [FEAT]-001
+    summary: "[User flow description]"
+    e2e_test: "tests/e2e/journey_[name].spec.ts"
+
+# Requirements Coverage Matrix
+requirements_coverage:
+  ARCH-001: feature_architecture
+  ARCH-002: feature_architecture
+  AUTH-001: [feature_auth, J-AUTH-LOGIN]
+  AUTH-002: feature_auth
+
+# Uncovered Requirements (gaps to fill)
+uncovered_requirements:
+  - AUTH-005  # No contract yet
+
+uncovered_journeys:
+  - J-AUTH-PASSWORD-RESET  # No E2E test yet
+
+test_files:
+  - path: "src/__tests__/contracts/*.test.js"
+    covers: [ARCH-001, ARCH-002, AUTH-001]
+  - path: "tests/e2e/journey_*.spec.ts"
+    covers: [J-AUTH-LOGIN, J-AUTH-REGISTER]
+```
+
+### Example
+
+```yaml
+# docs/contracts/CONTRACT_INDEX.yml
+metadata:
+  project: chat2repo
+  version: 2
+  total_contracts: 7
+  total_requirements: "16 MUST, 3 SHOULD"
+  total_journeys: 8
+
+definition_of_done:
+  critical_journeys:
+    - J-CHATGPT-QUICKSEND
+    - J-ERROR-NOCONFIG
+  important_journeys:
+    - J-CHATGPT-DETAILED
+    - J-WEB-QUICKSEND
+  future_journeys:
+    - J-AUTH-2FA
+
+  release_gate: |
+    All critical journeys must have status: passing
+    before release is allowed.
+
+contracts:
+  - id: feature_architecture
+    file: feature_architecture.yml
+    status: active
+    covers_reqs: [ARCH-001, ARCH-002, ARCH-003]
+    summary: "Package layering, GitHub API isolation, file size limits"
+
+  - id: feature_security
+    file: feature_security.yml
+    status: active
+    covers_reqs: [SEC-001, SEC-002, SEC-003]
+    summary: "PAT storage, secret protection, permissions"
+
+  - id: J-CHATGPT-QUICKSEND
+    file: journey_chatgpt_quicksend.yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: passing
+    covers_reqs: [UX-002, MD-001]
+    summary: "ChatGPT quick send flow"
+    e2e_test: "tests/e2e/journey_chatgpt_quicksend.spec.ts"
+
+requirements_coverage:
+  ARCH-001: feature_architecture
+  ARCH-002: feature_architecture
+  SEC-001: [feature_security, J-ERROR-NOCONFIG]
+  UX-002: [feature_ux, J-CHATGPT-QUICKSEND]
+
+uncovered_journeys:
+  - J-WEB-DETAILED
+  - J-ERROR-RATELIMIT
+```
+
+### Usage
+
+**Check coverage gaps:**
+```bash
+# Find uncovered requirements
+grep "uncovered" docs/contracts/CONTRACT_INDEX.yml
+```
+
+**Verify DOD status:**
+```bash
+# Check all critical journeys pass
+grep -A5 "critical_journeys" docs/contracts/CONTRACT_INDEX.yml
+```
+
+---
+
+## 10. Contract Lifecycle
 
 ### Creating:
 1. Write spec with REQ IDs
@@ -513,7 +775,7 @@ test_hooks:
 
 ---
 
-## 10. Quick Reference
+## 11. Quick Reference
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -542,6 +804,109 @@ test_hooks:
 │                                                         │
 │ DOD Rule: Critical journeys must pass before release    │
 └─────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 12. Contract → Test Transformation
+
+This section shows how to transform contract rules into executable tests. The pseudocode is language-agnostic.
+
+### Algorithm (Pseudocode)
+
+```
+FOR each contract_file IN contracts_directory:
+    contract = parse_yaml(contract_file)
+
+    FOR each rule IN contract.rules.non_negotiable:
+        files = glob(rule.scope)
+        files = exclude_negated_patterns(files, rule.scope)
+
+        # Check forbidden patterns
+        FOR each pattern IN rule.behavior.forbidden_patterns:
+            FOR each file IN files:
+                content = read_file(file)
+                matches = regex_find_all(pattern.pattern, content)
+                IF matches NOT EMPTY:
+                    FAIL("CONTRACT VIOLATION: {rule.id} - {pattern.message}")
+                    REPORT(file, line_number, match)
+
+        # Check required patterns
+        FOR each pattern IN rule.behavior.required_patterns:
+            found_in_any_file = FALSE
+            FOR each file IN files:
+                content = read_file(file)
+                IF regex_match(pattern.pattern, content):
+                    found_in_any_file = TRUE
+                    BREAK
+            IF NOT found_in_any_file:
+                FAIL("CONTRACT VIOLATION: {rule.id} - {pattern.message}")
+```
+
+### Language Implementation Table
+
+| Operation | JavaScript | Python | Go | Rust |
+|-----------|------------|--------|-----|------|
+| Parse YAML | `yaml.load(fs.readFileSync(f))` | `yaml.safe_load(open(f))` | `yaml.Unmarshal(data, &c)` | `serde_yaml::from_str(&s)` |
+| Glob files | `glob.sync(pattern)` | `glob.glob(pattern)` | `filepath.Glob(pattern)` | `glob::glob(pattern)` |
+| Read file | `fs.readFileSync(f, 'utf8')` | `open(f).read()` | `os.ReadFile(f)` | `std::fs::read_to_string(f)` |
+| Regex match | `new RegExp(p).test(s)` | `re.search(p, s)` | `regexp.MatchString(p, s)` | `Regex::new(p).is_match(s)` |
+| Find all matches | `s.matchAll(new RegExp(p, 'g'))` | `re.finditer(p, s)` | `re.FindAllString(s, -1)` | `re.find_iter(s)` |
+| Test assertion | `expect(x).toBe(y)` | `assert x == y` | `t.Errorf(...)` | `assert_eq!(x, y)` |
+
+### Minimal Test Template (Pseudocode → Any Language)
+
+```
+FUNCTION test_contract(contract_path):
+    contract = parse_yaml(contract_path)
+    violations = []
+
+    FOR each rule IN contract.rules.non_negotiable:
+        files = get_files_in_scope(rule.scope)
+
+        FOR each forbidden IN rule.behavior.forbidden_patterns:
+            FOR each file IN files:
+                IF pattern_found_in_file(forbidden.pattern, file):
+                    violations.append({
+                        rule_id: rule.id,
+                        file: file,
+                        pattern: forbidden.pattern,
+                        message: forbidden.message
+                    })
+
+        FOR each required IN rule.behavior.required_patterns:
+            IF NOT pattern_found_in_any_file(required.pattern, files):
+                violations.append({
+                    rule_id: rule.id,
+                    pattern: required.pattern,
+                    message: required.message
+                })
+
+    IF violations NOT EMPTY:
+        FOR each v IN violations:
+            PRINT("CONTRACT VIOLATION: {v.rule_id} - {v.message}")
+        FAIL_TEST()
+    ELSE:
+        PASS_TEST()
+```
+
+### Test Output Format
+
+Contract test output MUST follow this format for tooling compatibility:
+
+```
+CONTRACT VIOLATION: <REQ-ID> - <message>
+  File: <path>
+  Line: <number>
+  Match: <matched_text>
+```
+
+Example:
+```
+CONTRACT VIOLATION: AUTH-001 - API route missing authMiddleware
+  File: src/routes/users.ts
+  Line: 42
+  Match: router.get('/api/users', async (req, res) => {
 ```
 
 ---

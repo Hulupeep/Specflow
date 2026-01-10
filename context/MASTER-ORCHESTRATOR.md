@@ -1,6 +1,8 @@
-# MASTER ORCHESTRATOR: Spec → Contracts → Implementation
+# Specflow Master Orchestrator
 
-> **📌 STATUS: Legacy Orchestration Guide**
+> Spec → Contracts → Implementation (Complete Automation)
+
+> **📌 STATUS: Advanced Orchestration Guide**
 >
 > This document describes a comprehensive, monolithic approach to contract-based development.
 >

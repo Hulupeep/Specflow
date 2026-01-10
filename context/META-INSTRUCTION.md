@@ -1,4 +1,4 @@
-# META-INSTRUCTION: Contract-Based Development Infrastructure Setup
+# Specflow Infrastructure Setup Guide
 
 > **📌 STATUS: Infrastructure Setup Guide (Foundational)**
 >

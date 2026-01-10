@@ -1,8 +1,10 @@
-# CI/CD Integration Guide for Contract Tests
+# Specflow CI/CD Integration Guide
+
+> Integrate contract verification into your CI/CD pipeline
 
 ## Overview
 
-This guide shows how to integrate contract verification tests into your CI/CD pipeline, ensuring that contract violations block merges and deployments.
+This guide shows how to integrate Specflow contract tests into your CI/CD pipeline, ensuring that contract violations block merges and deployments.
 
 ---
 

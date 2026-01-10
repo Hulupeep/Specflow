@@ -1,4 +1,4 @@
-# Contract Implementation with Claude Subagents
+# Specflow Implementation with Claude Subagents
 
 > **📌 ALIGNED WITH NEW CORE DOCS**
 >

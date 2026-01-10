@@ -1,4 +1,4 @@
-# Spec → Contract Workflow
+# Specflow: Spec → Contract Conversion
 
 > **📌 STATUS: Reference Guide (Secondary)**
 >

@@ -35,6 +35,11 @@ Each spec file uses the same structure:
 ```markdown
 # Feature: [Feature Name]
 
+## ARCHITECTURE (Define First!)
+
+### ARCH-001 (MUST)
+[Structural constraint that all features must respect]
+
 ## REQS
 
 ### [REQ-ID] (MUST)
@@ -53,7 +58,148 @@ Each spec file uses the same structure:
 
 ---
 
-## 3. REQS Section
+## 3. Architecture Requirements (ARCH-xxx) - DEFINE FIRST
+
+**Architecture requirements are foundational invariants that constrain HOW all features are built.**
+
+Before writing feature requirements, define your architecture constraints. These are structural decisions that:
+- Cannot be violated by any feature
+- Protect against "optimizations" that break the system
+- Survive across feature iterations
+
+### Why Architecture First?
+
+Without explicit architecture contracts:
+1. LLM "optimizes" your auth flow and breaks security
+2. Someone adds localStorage to a service worker
+3. API calls start happening from UI components
+4. The codebase drifts into chaos
+
+**Architecture contracts prevent structural drift.**
+
+### How to Generate Architecture Invariants
+
+Ask your LLM:
+
+```
+I'm building [describe your app].
+
+Generate architecture invariants (ARCH-xxx requirements) that will:
+1. Enforce package/module boundaries
+2. Isolate secrets and sensitive operations
+3. Define where API calls can happen
+4. Set size/complexity limits
+5. Ensure platform compatibility (e.g., no localStorage in service workers)
+
+Format as ARCH-001 (MUST), ARCH-002 (MUST), etc.
+Include enforcement criteria for each.
+```
+
+### Architecture Requirement Format
+
+```markdown
+### ARCH-001 (MUST)
+[Package/layer] MUST [constraint].
+
+Enforcement:
+- [What pattern must NOT appear in code]
+- [What pattern MUST appear in code]
+- [File scope where this applies]
+
+Rationale:
+- [Why this constraint exists]
+```
+
+### Common Architecture Invariants
+
+**Package Layering:**
+```markdown
+### ARCH-001 (MUST)
+Core package MUST be pure TypeScript with no browser/platform APIs.
+
+Enforcement:
+- `packages/core/` must not import `chrome.*`, `browser.*`, `window.*`, or `localStorage`
+- Platform-specific code goes in `packages/extension/` or `packages/cli/`
+
+Rationale:
+- Core logic can be tested without browser
+- Core can be reused across platforms
+```
+
+**API Isolation:**
+```markdown
+### ARCH-002 (MUST)
+External API calls MUST only happen from background/server layer.
+
+Enforcement:
+- UI components and content scripts must not contain `fetch()` to external domains
+- Use message passing to delegate API calls to background
+
+Rationale:
+- Secrets stay in background
+- Rate limiting in one place
+- Easier to mock for testing
+```
+
+**Size Limits:**
+```markdown
+### ARCH-003 (MUST)
+Files MUST be under 200 lines. Functions MUST be under 80 lines.
+
+Enforcement:
+- Automated line count check in CI
+- Refactor into helpers when approaching limits
+
+Rationale:
+- LLMs work better with smaller files
+- Easier to review and maintain
+```
+
+**Platform Compatibility:**
+```markdown
+### ARCH-004 (MUST)
+Service workers MUST NOT use localStorage or sessionStorage.
+
+Enforcement:
+- `src/background/**` must not contain `localStorage` or `sessionStorage`
+- Use `chrome.storage.local` instead
+
+Rationale:
+- localStorage not available in MV3 service workers
+- Prevents runtime errors
+```
+
+### Architecture Contract Generation
+
+Architecture requirements become `feature_architecture.yml`:
+
+```yaml
+contract_meta:
+  id: feature_architecture
+  covers_reqs:
+    - ARCH-001
+    - ARCH-002
+    - ARCH-003
+
+rules:
+  non_negotiable:
+    - id: ARCH-001
+      title: "Core package must be pure TypeScript"
+      scope:
+        - "packages/core/**/*.ts"
+      behavior:
+        forbidden_patterns:
+          - pattern: /chrome\./
+            message: "Browser APIs not allowed in core (ARCH-001)"
+          - pattern: /localStorage/
+            message: "localStorage not allowed in core (ARCH-001)"
+```
+
+---
+
+## 4. Feature REQS Section
+
+Feature requirements define **what** the product does. Architecture requirements define **how** it's built.
 
 ### Format:
 
@@ -77,6 +223,7 @@ Session timeout SHOULD be configurable per environment.
    - Format: `[FEATURE]-[NUMBER]`
    - Numbers 001-009 for critical MUST requirements
    - Numbers 010+ for SHOULD requirements
+   - **Leave gaps for iteration**: Use 001-006 for V1, leave 007-019 empty, use 020+ for V2
 
 2. **Tags are explicit**: `(MUST)` or `(SHOULD)`
    - `(MUST)` → Becomes `non_negotiable` rule in contract
@@ -86,9 +233,27 @@ Session timeout SHOULD be configurable per environment.
 
 4. **Be specific**: "Auth tokens in httpOnly cookies" not "Tokens should be secure"
 
+### ID Gap Strategy for Iteration
+
+When building iteratively, leave gaps in REQ IDs:
+
+```markdown
+## V1 Requirements
+### AUTH-001 (MUST) - Core login
+### AUTH-002 (MUST) - Core logout
+### AUTH-003 (MUST) - Session management
+### AUTH-004 to AUTH-019 - [RESERVED FOR V1 ADDITIONS]
+
+## V2 Requirements (added later)
+### AUTH-020 (MUST) - OAuth support
+### AUTH-021 (MUST) - 2FA
+```
+
+**Why gaps?** New requirements added during iteration get IDs that group logically with their version, making the spec readable and the changelog clear.
+
 ---
 
-## 4. JOURNEYS Section
+## 5. JOURNEYS Section
 
 ### Format:
 
@@ -121,9 +286,64 @@ User login:
 
 4. **Expected outcomes**: What should happen at each step
 
+### Preconditions:
+
+**Extract preconditions from the user's language.** When users describe a journey, they often embed required state:
+
+| User Says | Precondition to Extract |
+|-----------|------------------------|
+| "cancel a **pending** order" | `pending order exists` |
+| "edit **their own** profile" | `user is logged in` |
+| "view **other** user's posts" | `multiple users with posts exist` |
+| "checkout with **items in cart**" | `cart has items` |
+| "approve a **submitted** request" | `submitted request exists` |
+
+**Format with preconditions:**
+
+```markdown
+### J-ORDER-CANCEL
+
+Preconditions:
+- User has at least one pending order
+
+Steps:
+1. User opens orders page
+2. User sees pending order
+3. User clicks cancel button
+4. User confirms cancellation
+5. Order status changes to cancelled
+```
+
+**Why this matters:** Tests generated from journeys need setup code. Explicit preconditions tell the LLM what state to create before running the journey steps.
+
+### List Contexts:
+
+When a step involves selecting from multiple items, mark with `[LIST]`:
+
+```markdown
+### J-ORDER-HISTORY
+
+Steps:
+1. User opens orders page
+2. User sees [LIST] past orders       ← signals multiple items
+3. User clicks on one order
+4. User sees order details
+```
+
+**Why this matters:** `[LIST]` tells the LLM to generate scoped locators:
+
+```javascript
+// Without [LIST] hint - FAILS with strict mode violation
+await page.locator('[data-testid="order-item"]').click();  // matches multiple!
+
+// With [LIST] hint - LLM generates scoped locators
+const orderItem = page.locator('[data-testid="order-item"]').first();
+await orderItem.locator('[data-testid="view-button"]').click();
+```
+
 ---
 
-## 5. DEFINITION OF DONE (DOD)
+## 6. DEFINITION OF DONE (DOD)
 
 Journeys serve as your **Definition of Done**. A feature isn't complete when code is written—it's complete when users can accomplish their goals.
 
@@ -170,7 +390,7 @@ Journeys serve as your **Definition of Done**. A feature isn't complete when cod
 
 ---
 
-## 6. Complete Example
+## 7. Complete Example
 
 ```markdown
 # Feature: User Authentication
@@ -243,7 +463,10 @@ User login:
 
 ### J-AUTH-LOGOUT
 
-User logout:
+Preconditions:
+- User is logged in with active session
+
+Steps:
 1. User clicks logout button
 2. System clears session cookie
 3. System redirects to /login
@@ -267,7 +490,7 @@ User logout:
 
 ---
 
-## 7. What the LLM Does With This
+## 8. What the LLM Does With This
 
 Given this spec, the LLM:
 
@@ -305,7 +528,7 @@ Given this spec, the LLM:
 
 ---
 
-## 8. Writing Tips
+## 9. Writing Tips
 
 ### ✅ Good REQs:
 
@@ -353,7 +576,7 @@ Authentication tokens MUST expire after 7 days.
 
 ---
 
-## 9. Spec Maintenance
+## 10. Spec Maintenance
 
 ### When to Update:
 
@@ -382,18 +605,21 @@ Add changelog at bottom of spec:
 
 ---
 
-## 10. Spec → Contract Mapping
+## 11. Spec → Contract Mapping
 
 | Spec Element | Contract Element | Test Type |
 |--------------|------------------|-----------|
-| `AUTH-001 (MUST)` | `rules.non_negotiable[0].id: AUTH-001` | Pattern scan |
-| `AUTH-010 (SHOULD)` | `rules.soft[0].id: AUTH-010` | Guideline |
-| `J-AUTH-REGISTER` | `journey_meta.id: J-AUTH-REGISTER` | E2E test |
+| `ARCH-001 (MUST)` | `feature_architecture.yml: rules.non_negotiable[].id` | Pattern scan |
+| `AUTH-001 (MUST)` | `feature_*.yml: rules.non_negotiable[].id` | Pattern scan |
+| `AUTH-010 (SHOULD)` | `feature_*.yml: rules.soft[].id` | Guideline |
+| `J-AUTH-REGISTER` | `journey_*.yml: journey_meta.id` | E2E test |
 | `Critical (MUST PASS)` | `journey_meta.dod_criticality: critical` | Release gate |
+
+**Hierarchy:** Architecture contracts protect structure. Feature contracts protect behavior. Journey contracts verify user flows.
 
 ---
 
-## 11. Quick Reference Card
+## 12. Quick Reference Card
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -403,31 +629,42 @@ Add changelog at bottom of spec:
 │                                                          │
 │ Structure:                                              │
 │   # Feature: [Name]                                     │
+│                                                          │
+│   ## ARCHITECTURE (Define First!)                       │
+│   ### ARCH-001 (MUST)                                   │
+│   [Structural constraint]                               │
+│                                                          │
 │   ## REQS                                               │
 │   ### [ID] (MUST)                                       │
-│   [Description]                                         │
+│   [Feature requirement]                                 │
 │                                                          │
 │   ## JOURNEYS                                           │
 │   ### J-[FEATURE]-[NAME]                                │
+│   Preconditions:                                        │
+│   - [Required state]                                    │
+│   Steps:                                                │
 │   1. Step one                                           │
-│   2. Step two                                           │
 │                                                          │
 │   ## DEFINITION OF DONE                                 │
 │   ### Critical (MUST PASS)                              │
 │   - J-[FEATURE]-[NAME]                                  │
 │                                                          │
-│ ID Format:   [FEATURE]-[NUMBER]                         │
-│              AUTH-001, EMAIL-042                        │
+│ ID Formats:                                             │
+│   ARCH-001    = Architecture invariant                  │
+│   [FEAT]-001  = Feature requirement (AUTH-001)          │
+│   J-[FEAT]-X  = Journey (J-AUTH-REGISTER)               │
 │                                                          │
 │ Tags:        (MUST) = non-negotiable                    │
 │              (SHOULD) = guideline                       │
 │                                                          │
-│ Journeys:    J-[FEATURE]-[NAME]                         │
-│              J-AUTH-REGISTER                            │
-│                                                          │
 │ DOD Levels:  Critical = blocks release                  │
 │              Important = should fix                     │
 │              Future = can skip                          │
+│                                                          │
+│ Contract Hierarchy:                                     │
+│   ARCH → protects structure                             │
+│   FEAT → protects behavior                              │
+│   JOURNEY → validates user flows                        │
 └─────────────────────────────────────────────────────────┘
 ```
 
