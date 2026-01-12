@@ -105,6 +105,7 @@ Then interview me about my project:
   (If I don't know, suggest best practices for my tech stack)
 - What features exist and how should they behave?
 - What user journeys must always work?
+  (Suggest obvious ones based on my features)
 
 From my answers:
 1. Generate REQ IDs (AUTH-001, STORAGE-001, J-CHECKOUT-001, etc.)
