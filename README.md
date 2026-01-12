@@ -20,6 +20,16 @@ const token = localStorage.getItem('auth') // 💥 CRASH or worse. No crash, jus
 
 **Result:** Production down. Hours debugging. Trust in AI tooling eroded.
 
+### Why This Happens
+
+**LLMs don't read. They attend.**
+
+Your carefully worded spec competes with millions of training examples. The model assigns weights you're not privy to. "MUST NOT use localStorage" might get less attention than a pattern it saw 10,000 times in training data.
+
+Three hours into a session, the LLM starts to drift while presenting itself as knowing exactly what you're working on. This fluency is an optimization artifact—not understanding.
+
+**You can't fix this with better prompts.** You need a gate.
+
 ---
 
 ## The Solution
@@ -151,15 +161,19 @@ See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions, GitLab, Azure, an
 
 ## What Is Specflow?
 
-Specflow is a methodology for building software with LLMs that doesn't drift.
+Specflow is a methodology for building software with LLMs that **guarantees** architectural rules can't be broken.
 
-**The problem:** You build with an LLM. It works. You iterate. Slowly, invisibly, the code drifts from your original intent. Unit tests pass, but architectural rules get violated. Security patterns get "optimized" away. The app breaks in ways tests don't catch.
+**The reality of LLMs:** Prompts express intent. But intent isn't enforcement. No matter how clear your instructions, the model might "optimize" your auth flow, "simplify" your security patterns, or "helpfully" refactor into an anti-pattern. Unit tests pass. The app breaks.
 
-**The solution:** Describe what matters → LLM generates contracts → Tests scan your code → Violations fail the build.
+**The only guaranteed solution:** Turn specs into tests that scan source code. If a pattern is forbidden, the build fails. Period.
 
 ```
 Describe → Contracts → Tests → Code → Violations blocked
 ```
+
+**Don't stop the AI from being creative. Do stop it from breaking the rules.**
+
+Specflow lets LLMs explore, generate, and surprise you—then type-checks them at the end. Creativity stays. Violations don't ship.
 
 ---
 
@@ -463,6 +477,43 @@ You're doing it right when:
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Integrations
+
+Specflow is a methodology—it works with your existing tools.
+
+### Memory & Learning
+
+| Integration | What It Does |
+|-------------|--------------|
+| **[ruvector](https://github.com/ruvnet/ruvector)** | Store violations in vector memory. LLMs learn from past mistakes. See [docs/MEMORYSPEC.md](docs/MEMORYSPEC.md) |
+
+### Claude Code
+
+| Integration | What It Does |
+|-------------|--------------|
+| **Skills** | Create a `/specflow` skill that sets up contracts for any project |
+| **Hooks** | Run contract tests on `post-edit` to catch violations immediately |
+| **CLAUDE.md** | Add contract rules so Claude checks before modifying protected files |
+
+### CI/CD
+
+| Platform | Guide |
+|----------|-------|
+| GitHub Actions | [CI-INTEGRATION.md](CI-INTEGRATION.md) |
+| GitLab CI | [CI-INTEGRATION.md](CI-INTEGRATION.md) |
+| Azure Pipelines | [CI-INTEGRATION.md](CI-INTEGRATION.md) |
+| CircleCI | [CI-INTEGRATION.md](CI-INTEGRATION.md) |
+
+### Testing Frameworks
+
+Contract tests are regular tests—they work with any framework:
+- Jest / Vitest
+- Mocha
+- Playwright (for journey contracts)
+- Any framework that can read files and match patterns
 
 ---
 
