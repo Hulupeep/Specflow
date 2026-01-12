@@ -102,6 +102,7 @@ I want to use Specflow to protect my codebase. Read these docs:
 
 Then interview me about my project:
 - What architectural rules should NEVER be broken?
+  (If I don't know, suggest best practices for my tech stack)
 - What features exist and how should they behave?
 - What user journeys must always work?
 
