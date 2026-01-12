@@ -10,7 +10,7 @@
 
 ## The Problem
 
-You write specs. An LLM "helpfully" changes something. Everything breaks:
+You write specs. An LLM "helpfully" changes something. Everything breaks...silently.
 
 ```typescript
 // Your spec: "Service workers MUST NOT use localStorage"
