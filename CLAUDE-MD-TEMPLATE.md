@@ -1,12 +1,14 @@
 # CLAUDE.md Contract Section Template
 
-> **📌 UPDATED: Now references the 4 core docs**
->
-> This template has been updated to point to the new simpler documentation structure:
-> - CONTRACTS-README.md (system overview)
-> - SPEC-FORMAT.md (how to write specs)
-> - CONTRACT-SCHEMA.md (YAML format)
-> - LLM-MASTER-PROMPT.md (LLM workflow)
+This is the **full template** with placeholders for customization.
+
+**Just tell your LLM:**
+```
+Use Specflow's CLAUDE-MD-TEMPLATE.md to add contract enforcement to my CLAUDE.md.
+Fill in the placeholders for my project.
+```
+
+For a simpler version, see [CLAUDE.md](CLAUDE.md).
 
 ---
 

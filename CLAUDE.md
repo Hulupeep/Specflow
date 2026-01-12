@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Add the content below to your project's CLAUDE.md** to enable Specflow contract enforcement.
 
+**Two options:**
+
+1. **Quick start:** Copy the simple template below
+2. **Full template:** Use [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) for detailed placeholders and examples
+
 Or just tell your LLM:
 ```
 Add Specflow CLAUDE.md content to my project's CLAUDE.md
