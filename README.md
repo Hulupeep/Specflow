@@ -74,46 +74,76 @@ graph LR
 
 ---
 
-## Get Started = Just Tell Your LLM
+## Get Started
 
-**You don't need to learn anything first.** Copy-paste one of these prompts:
+### Step 1: Add Specflow to Your Project
 
-### New Project
-```
-Set up Specflow for this project. Read LLM-MASTER-PROMPT.md and:
+**Dead simple approach:** Copy the Specflow folder into your project's docs:
 
-1. Ask me to describe what I'm building (plain English is fine)
-2. Generate REQ IDs from my description (AUTH-001, etc.)
-3. Create contracts in docs/contracts/ with forbidden/required patterns
-4. Create tests in src/__tests__/contracts/ that scan for violations
-5. Add contract tests to CI so violations block the build
-6. Update CLAUDE.md so future LLMs know the rules
-
-The goal: if anyone (human or LLM) violates a contract, the build fails.
+```bash
+cp -r Specflow/ your-project/docs/Specflow/
 ```
 
-### Existing Project
-```
-Set up Specflow to protect what already works. Read LLM-MASTER-PROMPT.md and:
-
-1. Ask me to describe our current architecture in plain English
-2. Generate REQ IDs from my description (AUTH-001, STORAGE-001, etc.)
-3. Create "freeze contracts" that lock current behavior
-4. Create tests that fail if someone breaks what works today
-5. Add contract tests to CI
-6. Update CLAUDE.md so future LLMs can't break these rules
-
-Start by asking: "What's working today that you never want broken?"
+Or clone it:
+```bash
+git clone https://github.com/Hulupeep/Specflow.git your-project/docs/Specflow
 ```
 
-### One-Liner (Existing Behavior)
+### Step 2: Tell Your LLM
+
+**You don't need to learn anything first.** Paste this prompt:
+
 ```
-I'll describe how [feature] works. Use Specflow to create contracts
-and tests that prevent anyone from breaking it. Ask me questions,
-then generate everything.
+I want to use Specflow to protect my codebase. Read these docs:
+- LLM-MASTER-PROMPT.md
+- SPEC-FORMAT.md
+- CONTRACT-SCHEMA.md
+- USER-JOURNEY-CONTRACTS.md
+
+Then interview me about my project:
+- What architectural rules should NEVER be broken?
+- What features exist and how should they behave?
+- What user journeys must always work?
+
+From my answers:
+1. Generate REQ IDs (AUTH-001, STORAGE-001, J-CHECKOUT-001, etc.)
+2. Create contract YAML files in docs/contracts/
+3. Create test files in src/__tests__/contracts/
+4. Show me how to add to CI
+5. Update this project's CLAUDE.md with contract rules
+
+I'll describe things in plain English. You structure it.
 ```
 
-**That's it.** The LLM will generate REQ IDs, contracts, tests, and CI config. You just describe things in plain English.
+**That's it.** The LLM will interview you, generate REQ IDs, contracts, tests, and update your CLAUDE.md.
+
+See [QUICKSTART.md](QUICKSTART.md) for more prompt variations and detailed paths.
+
+---
+
+## How Builds Are Stopped
+
+Contract tests are regular tests that scan your source code for violations. When they find one:
+
+```
+❌ CONTRACT VIOLATION: AUTH-001
+   File: src/auth.ts:42
+   Pattern: localStorage.setItem
+   Message: "Sessions must use Redis, not localStorage"
+```
+
+**The test fails → The build fails → The PR is blocked.**
+
+### Multiple CI Approaches
+
+| Approach | How It Works |
+|----------|--------------|
+| **npm test** | Contract tests run with your regular tests |
+| **Separate job** | `npm test -- contracts` as dedicated CI step |
+| **Pre-commit hook** | Run contract tests before commits |
+| **GitHub Action** | Block PRs on contract violations |
+
+See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions, GitLab, Azure, and CircleCI examples.
 
 ---
 
@@ -179,6 +209,8 @@ Architecture + Features + Journeys = The Product
 | **Journeys** | User accomplishments (DOD) | "User can complete checkout" |
 
 **Skip any layer → ship blind.** Define all three → contracts enforce them.
+
+**Journeys are your Definition of Done.** A feature isn't complete when code compiles—it's complete when users can accomplish their goals. See [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md).
 
 ---
 
@@ -257,45 +289,6 @@ it('AUTH-001: No localStorage for tokens', () => {
 ```
 
 **If someone (human or LLM) adds `localStorage.setItem('token', ...)`, the build fails.**
-
----
-
-## Implementation
-
-### New Project
-
-```bash
-# 1. Write your spec
-cat > docs/specs/auth.md << 'EOF'
-## REQS
-### AUTH-001 (MUST)
-Auth tokens must use httpOnly cookies, never localStorage.
-EOF
-
-# 2. Tell your LLM
-"Read LLM-MASTER-PROMPT.md and generate contracts for docs/specs/auth.md"
-
-# 3. LLM creates contracts + tests
-# 4. Run tests
-npm test -- contracts
-```
-
-### Existing Project
-
-```bash
-# 1. Document what works today
-cat > current-state.md << 'EOF'
-Our auth currently:
-- Stores sessions in Redis (key: session:{userId})
-- 7-day expiry
-- httpOnly cookies (never localStorage)
-EOF
-
-# 2. Tell your LLM
-"Read MID-PROJECT-ADOPTION.md and create 'freeze' contracts for current-state.md"
-
-# 3. Now if anyone (including LLMs) breaks this, tests fail
-```
 
 ---
 
