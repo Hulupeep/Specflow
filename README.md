@@ -236,16 +236,22 @@ Architecture + Features + Journeys = The Product
 | **Features** | `feature_*.yml` | Contract tests (pattern scanning) | Before build (on source code) |
 | **Journeys** | `journey_*.yml` | Playwright E2E tests | After build (on running app) |
 
-**Contract tests** scan your source code for forbidden/required patterns. They run early and fail fast—no build needed. **Enforcement is automatic:** add them to your test suite and they block PRs.
+**Contract tests** scan your source code for forbidden/required patterns. They run early and fail fast—no build needed. **Hard gate:** violations always block the PR.
 
-**Journey tests** run after a successful build, against your running application. **Enforcement requires CI setup:** you need to build, deploy to preview, then run Playwright before the PR can merge.
+**Journey tests** run after a successful build, against your running application. **Flexible gate:** can be a hard CI gate OR a manual review checkpoint—your choice.
 
-```
-Source code → Contract tests → Build → Deploy to preview → Journey tests → Merge
-              (automatic)                                   (needs CI setup)
-```
+| Enforcement | Contract Tests | Journey Tests |
+|-------------|----------------|---------------|
+| **Hard gate** | ✅ Always (automatic) | Optional (CI setup required) |
+| **Manual review** | ❌ Never | ✅ Common (review failures, decide) |
 
-See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions workflows that enforce both.
+**Why journeys might be manually gated:**
+- Flaky browser tests (timing, network)
+- Aspirational DOD (defined before fully implemented)
+- Known issues being worked on
+- Team wants human judgment on failures
+
+See [CI-INTEGRATION.md](CI-INTEGRATION.md) for both hard-gate and manual-gate approaches.
 
 ### Why Journeys Are Different
 

@@ -145,10 +145,10 @@ npm test -- journeys
 > **Journeys are your Definition of Done.** A feature isn't done when contract tests pass—it's done when users can accomplish their goals end-to-end.
 
 **Note on enforcement:**
-- Contract tests → automatic (just add to test suite)
-- Journey tests → needs CI setup (build → deploy preview → run Playwright → block PR)
+- Contract tests → **hard gate** (always block PR)
+- Journey tests → **flexible** (hard gate OR manual review—your choice)
 
-See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions that enforce journeys on PRs.
+Why manual review for journeys? Flaky tests, aspirational DOD, known issues. See [CI-INTEGRATION.md](CI-INTEGRATION.md).
 
 ---
 

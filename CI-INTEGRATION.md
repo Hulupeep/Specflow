@@ -856,13 +856,40 @@ export default defineConfig({
 
 ### Branch Protection for Journeys
 
+**Option A: Hard gate (strict)**
 ```
 Settings → Branches → Branch protection rules → main
 
 Required status checks:
 ✅ contracts
-✅ journeys    ← Add this to block PRs until E2E passes
+✅ journeys    ← PRs blocked until E2E passes
 ```
+
+**Option B: Manual gate (flexible)**
+```
+Settings → Branches → Branch protection rules → main
+
+Required status checks:
+✅ contracts    ← Hard gate
+
+NOT required (but visible):
+◻️ journeys    ← Runs, reports, but doesn't block
+```
+
+With manual gating, journey tests still run and report results, but a human decides whether to merge despite failures.
+
+### When to Use Manual Gating for Journeys
+
+| Situation | Hard Gate | Manual Gate |
+|-----------|-----------|-------------|
+| Stable E2E suite | ✅ | |
+| Flaky browser tests | | ✅ |
+| Aspirational DOD (not yet implemented) | | ✅ |
+| Known issues being fixed | | ✅ |
+| Strict release process | ✅ | |
+| Fast iteration / MVP | | ✅ |
+
+**Key insight:** Contract tests are deterministic (pattern matching). Journey tests involve browsers, networks, timing—more judgment needed.
 
 ---
 
