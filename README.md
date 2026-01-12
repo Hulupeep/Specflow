@@ -236,14 +236,16 @@ Architecture + Features + Journeys = The Product
 | **Features** | `feature_*.yml` | Contract tests (pattern scanning) | Before build (on source code) |
 | **Journeys** | `journey_*.yml` | Playwright E2E tests | After build (on running app) |
 
-**Contract tests** scan your source code for forbidden/required patterns. They run early and fail fast—no build needed. They catch drift that unit tests won't.
+**Contract tests** scan your source code for forbidden/required patterns. They run early and fail fast—no build needed. **Enforcement is automatic:** add them to your test suite and they block PRs.
 
-**Journey tests** run after a successful build, against your running application. Playwright opens a browser and verifies users can actually accomplish goals end-to-end.
+**Journey tests** run after a successful build, against your running application. **Enforcement requires CI setup:** you need to build, deploy to preview, then run Playwright before the PR can merge.
 
 ```
-Source code → Contract tests → Build → Deploy → Journey tests → Ship
-              (fail fast)                        (verify E2E)
+Source code → Contract tests → Build → Deploy to preview → Journey tests → Merge
+              (automatic)                                   (needs CI setup)
 ```
+
+See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions workflows that enforce both.
 
 ### Why Journeys Are Different
 
