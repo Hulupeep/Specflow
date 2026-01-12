@@ -4,9 +4,161 @@
 
 ## Overview
 
-This specification defines how Specflow integrates with ruvector (Claude Flow's self-learning memory layer) to create contracts that improve over time. When violations occur and are fixed, that knowledge is stored and shared across all agents.
+This specification defines how Specflow integrates with [ruvector](https://github.com/ruvnet/ruvector) to create contracts that improve over time. When violations occur and are fixed, that knowledge is stored and shared across all agents.
 
 **The shift:** Contracts go from "what's forbidden" to "what's forbidden AND what to do instead."
+
+---
+
+## Core Idea
+
+* **Specflow contracts** define *what must/must not happen*.
+* **Contract tests** detect violations and hard-stop.
+* **ruvector** stores *violation signatures + proven fixes* and broadcasts them so agents apply fixes **before** writing code.
+
+**Specflow stays the "compiler". ruvector becomes the "lint + autofix memory" layer.**
+
+---
+
+## New Primitives
+
+### 1) Violation Record (emitted by Specflow when a contract fails)
+
+A normalized event, not prose.
+
+| Field | Description |
+|-------|-------------|
+| `contract_id` | e.g., `AUTH-001`, `LAYER-001` |
+| `contract_name` | e.g., `arch_layering` |
+| `source_adr` | Optional, e.g., `ADR-007` |
+| `signature.rule_type` | `forbidden_pattern`, `forbidden_import`, `path_ownership`, `ast_rule` |
+| `signature.match` | The regex/import/AST node that triggered |
+| `evidence.files` | List of paths |
+| `evidence.snippets` | Minimal context lines around match |
+| `evidence.commit_hash` | Git commit |
+| `evidence.branch` | Git branch |
+| `evidence.repo` | Repository name |
+| `recommended_actions` | Optional placeholder |
+| `timestamp` | ISO timestamp |
+
+**Output locations:**
+* `artifacts/specflow/violations/<run_id>.json` (CI artifact)
+* `docs/violations/` (optional human-visible log)
+
+### 2) Remediation Recipe (stored in ruvector)
+
+Structured "what worked" attached to a violation signature.
+
+| Field | Description |
+|-------|-------------|
+| `contract_id` | e.g., `AUTH-001` |
+| `signature_hash` | Stable key for matching |
+| `when.file_glob` | Context/language |
+| `fix.type` | `patch`, `refactor_steps`, `snippet`, `instruction` |
+| `fix.payload` | Structured diff patch, AST transform, or steps |
+| `validation.tests_passed` | Boolean |
+| `validation.contract_passed` | Boolean |
+| `metrics.occurrences` | Total violations of this type |
+| `metrics.applied_count` | Times this fix was applied |
+| `metrics.success_count` | Times it worked |
+| `metrics.success_rate` | Calculated ratio |
+| `metrics.last_seen` | Timestamp |
+| `provenance.agent_id` | Which agent fixed it |
+| `provenance.run_id` | CI run ID |
+| `provenance.links` | CI run URL |
+
+**This is NOT "memory as vibes". It's a versioned remediation library.**
+
+### 3) Broadcast Packet (ruvector → agents)
+
+A small "pre-flight guard" message:
+
+* "You are about to violate `AUTH-001`."
+* "Known remediation exists: use httpOnly cookies instead of localStorage."
+* "Apply patch? / follow steps?"
+
+---
+
+## Pipeline: How It Works End-to-End
+
+### A) On Every Agent Attempt (pre-write / pre-commit)
+
+1. Agent proposes a change plan (or begins editing).
+2. **ruvector pre-check** runs:
+   * Look at touched paths + imports + planned operations
+   * Query remediation library for relevant signatures
+3. If likely violation:
+   * Inject "known constraints + known remedies" into the agent's working context
+   * Optionally block the write unless agent acknowledges remedy
+
+**Result:** Fewer failed test cycles, less thrash.
+
+### B) On Contract Failure (post-write)
+
+1. Specflow contract tests fail.
+2. Specflow emits **Violation Record**.
+3. ruvector ingests the Violation Record and:
+   * Links it to existing signature (or creates a new one)
+   * Increments `occurrences`
+4. Agent fixes code.
+5. Tests pass.
+6. ruvector captures:
+   * Diff patch (before/after)
+   * Minimal "why" note (optional)
+   * Stores as **Remediation Recipe**
+   * Updates metrics, sets success_rate
+
+**Result:** The same mistake becomes harder to repeat.
+
+### C) Org-Wide Learning (broadcast)
+
+When a Remediation Recipe reaches a threshold (e.g., 2 successes):
+* Broadcast to:
+  * Other agents
+  * Other repos in same org
+  * Same contract class (e.g., layering, auth, boundary)
+
+**Result:** One fix pays off many times.
+
+---
+
+## Contract Evolution: From "NO" to "NO + DO THIS"
+
+Contracts stay the same; remediation is separate.
+
+**Keep contracts pure:**
+* Contracts define invariants
+* ruvector defines remedies
+
+This avoids bloating YAML contracts with brittle examples.
+
+---
+
+## Signature Design (Important)
+
+You need stable keys so "same violation" matches across code variations.
+
+**Priority order:**
+1. **AST signature** (best): "CallExpression prisma.* inside controller function"
+2. **Import signature**: "controllers import prisma client"
+3. **Regex match** (fallback): your existing forbidden patterns
+
+Even if you start with regex, design now so AST can replace later without breaking IDs.
+
+---
+
+## Deterministic Gates (Non-Negotiable)
+
+To avoid "memory rot":
+
+* A remediation recipe is only "verified" if:
+  * Contract tests pass
+  * Unit tests pass (or configured suite)
+* Store both:
+  * Patch
+  * Validation context (test suite + versions)
+
+If validation context changes, recipe confidence decays.
 
 ## Architecture
 
@@ -537,8 +689,57 @@ hooks:
 3. **Validation** - Verify fixes before marking as proven
 4. **Audit trail** - Log all pattern modifications
 
+---
+
+## Where This Lives in Specflow (Minimal, Clean Extension)
+
+### 1) Add a Specflow "Violation Emitter"
+
+A small component inside the contract runner:
+
+* On fail:
+  * Compute `signature_hash`
+  * Write Violation Record artifact
+  * Optionally print a short machine-parsable line to stdout for CI pickup
+
+### 2) Add a Specflow "Remediation Hook" (optional)
+
+Before failing the run completely, Specflow can:
+
+* Query ruvector: "any known remediation for this signature?"
+* If found:
+  * Include it in the failure output
+  * Attach it to PR comment / CI log
+
+**Specflow still fails the build. It just fails WITH a fix.**
+
+---
+
+## Minimal Build Order (Ship This First)
+
+1. **Violation Record emitter** (Specflow → artifact)
+2. **ruvector ingestion** of violations (counts only)
+3. **Capture successful fix** as patch after pass
+4. **Lookup + attach fix** on next failure
+5. **Pre-flight guard** (warn before writing)
+
+**That's enough to demonstrate "enforcement becomes teaching" without boiling the ocean.**
+
+---
+
+## Next Actions
+
+1. Define the Violation Record JSON schema (v0.1).
+2. Implement emitter in Specflow contract runner.
+3. Create ruvector endpoint: `POST /violations` and `GET /remediations?signature_hash=...`
+4. Implement "capture fix on pass" by diffing failing commit vs passing commit.
+5. Add CI output: when failure occurs, print "Known fix available" with short steps/patch.
+
+---
+
 ## Related Documents
 
 - [CONTRACTS-README.md](../CONTRACTS-README.md) - Specflow overview
 - [LLM-MASTER-PROMPT.md](../LLM-MASTER-PROMPT.md) - LLM enforcement prompt
+- [ruvector Documentation](https://github.com/ruvnet/ruvector) - Distributed vector database
 - [Claude Flow Documentation](https://github.com/ruvnet/claude-flow) - ruvector and hooks

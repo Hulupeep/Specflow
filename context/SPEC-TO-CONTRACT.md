@@ -1,17 +1,28 @@
 # Specflow: Spec → Contract Conversion
 
-> **📌 STATUS: Reference Guide (Secondary)**
+> **📌 STATUS: Reference Guide (Feature Contracts)**
 >
-> This document provides detailed conversion examples and patterns.
+> This document shows how to convert specs into **feature contracts** (architecture + features).
+> For **journey contracts**, see [../USER-JOURNEY-CONTRACTS.md](../USER-JOURNEY-CONTRACTS.md).
 >
 > **For most users, start with these docs instead:**
-> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - Normalized spec format with REQ IDs (simpler, more deterministic)
-> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - Lean YAML schema
-> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - Incremental workflow
+> - **[../QUICKSTART.md](../QUICKSTART.md)** - Copy-paste prompt, LLM interviews you
+> - **[../SPEC-FORMAT.md](../SPEC-FORMAT.md)** - Normalized spec format with REQ IDs
+> - **[../CONTRACT-SCHEMA.md](../CONTRACT-SCHEMA.md)** - Lean YAML schema
+> - **[../LLM-MASTER-PROMPT.md](../LLM-MASTER-PROMPT.md)** - Incremental workflow
 >
 > **Use this doc when:** You need deep-dive examples of converting arbitrary prose specs into contracts.
 >
 > **Prefer SPEC-FORMAT.md when:** You're writing new specs (use the normalized format from the start).
+>
+> **Don't have a structured spec?** Just paste this prompt to your LLM:
+> ```
+> Interview me about my project:
+> - What architectural rules should NEVER be broken?
+>   (If I don't know, suggest best practices for my tech stack)
+> - What features exist and how should they behave?
+> ```
+> The LLM will generate REQ IDs and contracts from your plain English answers.
 >
 > ---
 
@@ -721,4 +732,15 @@ test_scenarios:
 
 ---
 
-**Next:** See [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md) for converting user journeys into contracts.
+## Two Types of Enforcement
+
+| Type | Tests | Location | Timing |
+|------|-------|----------|--------|
+| **Feature contracts** (this doc) | Pattern scanning | `src/__tests__/contracts/` | BEFORE build |
+| **Journey contracts** | Playwright E2E | `tests/e2e/` | AFTER build |
+
+> **Journeys are your Definition of Done.** A feature isn't complete when contract tests pass—it's complete when users can accomplish their goals end-to-end.
+
+---
+
+**Next:** See [../USER-JOURNEY-CONTRACTS.md](../USER-JOURNEY-CONTRACTS.md) for converting user journeys into Playwright E2E tests.

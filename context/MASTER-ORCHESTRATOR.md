@@ -7,14 +7,26 @@
 > This document describes a comprehensive, monolithic approach to contract-based development.
 >
 > **For most users, start with the simpler core docs instead:**
-> - **[CONTRACTS-README.md](CONTRACTS-README.md)** - System overview
-> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - How to write specs
-> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - YAML format
-> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - LLM workflow
+> - **[../QUICKSTART.md](../QUICKSTART.md)** - Copy-paste prompt, LLM interviews you
+> - **[../SPEC-FORMAT.md](../SPEC-FORMAT.md)** - How to write specs
+> - **[../CONTRACT-SCHEMA.md](../CONTRACT-SCHEMA.md)** - YAML format
+> - **[../LLM-MASTER-PROMPT.md](../LLM-MASTER-PROMPT.md)** - LLM workflow
+> - **[../USER-JOURNEY-CONTRACTS.md](../USER-JOURNEY-CONTRACTS.md)** - Journey testing
 >
 > **Use this doc when:** You want complete end-to-end automation from spec → deployed app in one session.
 >
 > **Prefer the core docs when:** You're working incrementally (most common workflow).
+>
+> **Don't have a structured spec?** Just paste this prompt to your LLM:
+> ```
+> Interview me about my project:
+> - What architectural rules should NEVER be broken?
+>   (If I don't know, suggest best practices for my tech stack)
+> - What features exist and how should they behave?
+> - What user journeys must always work?
+>   (Suggest obvious ones based on my features)
+> ```
+> The LLM will generate REQ IDs and contracts from your plain English answers.
 >
 > ---
 
@@ -25,12 +37,17 @@ This is a **complete, executable orchestration prompt** that takes a product spe
 **Input:** Product specification (markdown, user stories, requirements doc)
 
 **Output:**
-- ✅ Architectural contracts (YAML)
-- ✅ Contract verification tests
+- ✅ Architectural contracts (YAML) in `docs/contracts/`
+- ✅ Contract verification tests in `src/__tests__/contracts/` (run BEFORE build)
+- ✅ Journey tests (Playwright) in `tests/e2e/` (run AFTER build)
 - ✅ Implementation todos
 - ✅ Fully implemented features
 - ✅ Infrastructure setup
 - ✅ All contracts verified
+
+**Key timing:**
+- Contract tests → scan source code → run BEFORE build
+- Journey tests → Playwright E2E → run AFTER build on running app
 
 ---
 
@@ -341,7 +358,14 @@ For each critical journey from Phase 1.3:
 
 # Use USER-JOURNEY-CONTRACTS.md template
 # Convert: Journey steps → Required elements + Expected behavior
+# NOTE: Journey tests are Playwright E2E tests in tests/e2e/, NOT contract tests
 ```
+
+**Important distinction:**
+- **Contract tests** (`src/__tests__/contracts/`) → Pattern scanning, run BEFORE build
+- **Journey tests** (`tests/e2e/`) → Playwright E2E, run AFTER build on running app
+
+> **Journeys are your Definition of Done.** A feature isn't complete when contract tests pass—it's complete when users can accomplish their goals end-to-end.
 
 **Example:**
 ```yaml
@@ -448,12 +472,12 @@ describe('Contract: auth_001_api_endpoints', () => {
 
 ---
 
-**3.2: Create journey tests**
+**3.2: Create journey tests (Playwright E2E)**
 
-For each user journey contract:
+For each user journey contract, create a **Playwright E2E test** (NOT a contract test):
 
 ```typescript
-// tests/contracts/journey_registration.test.ts
+// tests/e2e/journey_registration.spec.ts  (Playwright, runs AFTER build)
 
 describe('Journey: User Registration', () => {
   it('follows complete registration flow', async () => {
@@ -804,19 +828,30 @@ Contract: [ID]
 
 ---
 
-**6.4: Journey verification**
+**6.4: Journey verification (Playwright E2E)**
 
 For each journey:
 
 ```bash
-# Run journey test
-npm test -- tests/contracts/journey_[name].test.ts
+# Journeys are Playwright E2E tests (run AFTER build, on running app)
 
-# If using Playwright:
-npx playwright test tests/contracts/journey_[name].test.ts
+# 1. Build the app first
+npm run build
+
+# 2. Start the server (in background or separate terminal)
+npm run start &
+
+# 3. Run journey tests
+npx playwright test tests/e2e/journey_[name].spec.ts
 
 # Expected: Full journey completes successfully
 ```
+
+**Note:** Journey tests require a running app. They verify the complete user experience, not just code patterns.
+
+> **Journey enforcement options:**
+> - **Hard gate:** Journey failures block PR merge
+> - **Manual gate:** Journey failures require human review (for flaky tests or aspirational DOD)
 
 **✅ Checkpoint 6.4:** All journeys verified.
 

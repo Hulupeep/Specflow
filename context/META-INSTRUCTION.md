@@ -5,10 +5,12 @@
 > This document focuses on setting up the infrastructure (directories, templates, scripts, CI).
 >
 > **After setup, use these docs for the actual workflow:**
-> - **[CONTRACTS-README.md](CONTRACTS-README.md)** - What contracts are, how they work
-> - **[SPEC-FORMAT.md](SPEC-FORMAT.md)** - How to write specs
-> - **[CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md)** - Contract YAML format
-> - **[LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md)** - LLM workflow
+> - **[../QUICKSTART.md](../QUICKSTART.md)** - Copy-paste prompt, LLM interviews you
+> - **[../CONTRACTS-README.md](../CONTRACTS-README.md)** - What contracts are, how they work
+> - **[../SPEC-FORMAT.md](../SPEC-FORMAT.md)** - How to write specs
+> - **[../CONTRACT-SCHEMA.md](../CONTRACT-SCHEMA.md)** - Contract YAML format
+> - **[../USER-JOURNEY-CONTRACTS.md](../USER-JOURNEY-CONTRACTS.md)** - Journey testing (Playwright)
+> - **[../LLM-MASTER-PROMPT.md](../LLM-MASTER-PROMPT.md)** - LLM workflow
 >
 > **Use this doc for:** Infrastructure setup only (directories, templates, CI/CD).
 >
@@ -73,21 +75,28 @@ touch test-write-access && rm test-write-access
 # Create directories
 mkdir -p docs/contracts
 mkdir -p docs/contracts/templates
-mkdir -p src/__tests__/contracts
+mkdir -p src/__tests__/contracts   # Contract tests (pattern scanning, run BEFORE build)
+mkdir -p tests/e2e                 # Journey tests (Playwright E2E, run AFTER build)
 mkdir -p scripts
 
 # Verify creation
 ls -la docs/contracts/
 ls -la src/__tests__/contracts/
+ls -la tests/e2e/
 ```
 
 **Expected output:**
 ```
-docs/contracts/
+docs/contracts/           # Contract YAML definitions
 docs/contracts/templates/
-src/__tests__/contracts/
+src/__tests__/contracts/  # Contract tests (source code scanning)
+tests/e2e/                # Journey tests (Playwright E2E)
 scripts/
 ```
+
+**Key distinction:**
+- `src/__tests__/contracts/` → Contract tests that scan source code for patterns (run BEFORE build)
+- `tests/e2e/` → Journey tests using Playwright (run AFTER build, on running app)
 
 **✅ Checkpoint:** All directories exist before proceeding.
 
@@ -681,12 +690,34 @@ echo "⚠️  Add 'npm test' to your CI config"
 
 Add to `.github/workflows/ci.yml` (or equivalent):
 ```yaml
-- name: Run Tests
-  run: npm test
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
 
-- name: Verify Contracts
-  run: npm test -- src/__tests__/contracts/
+      # Contract tests FIRST (fail fast, before build)
+      - name: Run Contract Tests
+        run: npm test -- src/__tests__/contracts/
+
+      # Build
+      - name: Build
+        run: npm run build
+
+      # Journey tests AFTER build (Playwright needs running app)
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+
+      - name: Run Journey Tests
+        run: npx playwright test tests/e2e/
 ```
+
+**Note on enforcement:**
+- Contract tests → **hard gate** (always block PR)
+- Journey tests → **flexible** (hard gate OR manual review, your choice)
+
+See [../CI-INTEGRATION.md](../CI-INTEGRATION.md) for full CI configuration including Playwright setup.
 
 **✅ Checkpoint:** CI runs contract tests.
 
@@ -941,6 +972,8 @@ Project Root
 │   └── contracts/
 │       ├── README.md                    ✅ Created
 │       ├── contract_template.yml        ✅ Created
+│       ├── feature_*.yml                Contract definitions
+│       ├── journey_*.yml                Journey definitions
 │       └── templates/
 │           ├── META-INSTRUCTION.md      ✅ This file
 │           ├── contract-example.yml     (Next to create)
@@ -948,11 +981,18 @@ Project Root
 ├── src/
 │   └── __tests__/
 │       └── contracts/
-│           └── contractTemplate.test.ts ✅ Created
+│           └── contractTemplate.test.ts ✅ Contract tests (pattern scanning)
+├── tests/
+│   └── e2e/
+│       └── journey_*.spec.ts            ✅ Journey tests (Playwright E2E)
 ├── scripts/
 │   └── check-contracts.js               ✅ Created
 └── CLAUDE.md                            ✅ Updated with contract section
 ```
+
+**Test timing:**
+- `src/__tests__/contracts/` → Run BEFORE build (source scanning)
+- `tests/e2e/` → Run AFTER build (Playwright on running app)
 
 ---
 

@@ -309,11 +309,25 @@ it('LLM CHECK: all files in [scope] follow [rule]', () => {
 
 ## Test Organization
 
-Create tests for:
-1. Each non_negotiable_rule
-2. Logging contracts (if present)
-3. Compliance checklist validation
-4. Cross-contract dependencies
+**Contract tests** (pattern scanning, run BEFORE build):
+- Location: `src/__tests__/contracts/`
+- Create tests for each non_negotiable_rule
+- Tests scan source code for forbidden/required patterns
+- Fast, no build required
+
+**Journey tests** (Playwright E2E, run AFTER build):
+- Location: `tests/e2e/`
+- One test per journey contract
+- Tests verify complete user flows
+- Require running app
+
+**When to create which:**
+| Contract Type | Test Type | Location |
+|---------------|-----------|----------|
+| `feature_*.yml` | Pattern scanning | `src/__tests__/contracts/` |
+| `journey_*.yml` | Playwright E2E | `tests/e2e/` |
+
+> **Journeys are your Definition of Done.** A feature isn't complete when contract tests pass—it's complete when users can accomplish their goals end-to-end.
 
 ## Output Format
 
@@ -323,14 +337,44 @@ Return:
 3. Coverage summary
 4. Suggested additional scenarios
 
+## Journey Test Template (Playwright)
+
+For journey contracts, generate Playwright tests in `tests/e2e/`:
+
+```typescript
+// tests/e2e/journey_registration.spec.ts
+
+import { test, expect } from '@playwright/test';
+
+test.describe('Journey: J-AUTH-REGISTER', () => {
+  test('user can complete registration', async ({ page }) => {
+    // Step 1: Navigate to registration
+    await page.goto('/register');
+    await expect(page.locator('input[name="email"]')).toBeVisible();
+
+    // Step 2: Fill form
+    await page.fill('input[name="email"]', 'test@example.com');
+    await page.fill('input[name="password"]', 'SecurePass123!');
+
+    // Step 3: Submit
+    await page.click('button[type="submit"]');
+
+    // Step 4: Verify outcome
+    await expect(page).toHaveURL(/dashboard/);
+  });
+});
+```
+
 ## Quality Checks
 
 Before returning:
-- ✅ Every non_negotiable_rule has at least one test
-- ✅ Tests use clear "LLM CHECK:" naming
+- ✅ Every non_negotiable_rule has at least one contract test
+- ✅ Every journey has a Playwright E2E test
+- ✅ Contract tests use clear "LLM CHECK:" naming
+- ✅ Journey tests use REQ IDs in describe blocks
 - ✅ Error messages reference contract file
 - ✅ Tests can be run independently
-- ✅ File paths are correct
+- ✅ File paths are correct (contract → `src/__tests__/contracts/`, journey → `tests/e2e/`)
 ```
 
 ---
@@ -356,23 +400,29 @@ You are a contract verification specialist. Your job is to run contract tests an
 
 When invoked:
 
-1. **Run contract tests**
+1. **Run contract tests** (pattern scanning, BEFORE build)
    ```bash
    npm test -- src/__tests__/contracts/
    ```
 
-2. **Analyze results**
+2. **Run journey tests** (Playwright E2E, AFTER build)
+   ```bash
+   # Requires app to be running
+   npx playwright test tests/e2e/
+   ```
+
+3. **Analyze results**
    - Count passing tests
    - Identify failing tests
    - Parse violation messages
    - Identify violated contract IDs
 
-3. **Run contract checker**
+4. **Run contract checker**
    ```bash
    node scripts/check-contracts.js
    ```
 
-4. **Report findings**
+5. **Report findings**
    - List all violations by contract
    - Include file paths and line numbers
    - Reference contract YAML files
