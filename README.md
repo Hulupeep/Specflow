@@ -534,6 +534,8 @@ Specflow is a methodology—it works with your existing tools.
 | **Hooks** | Run contract tests on `post-edit` to catch violations immediately |
 | **CLAUDE.md** | Add contract rules so Claude checks before modifying protected files |
 
+See [context/CLAUDE-CODE-SKILL.md](context/CLAUDE-CODE-SKILL.md) for skill setup instructions and hook examples.
+
 ### CI/CD
 
 | Platform | Guide |
