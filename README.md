@@ -2,7 +2,7 @@
 
 **Specs that enforce themselves.**
 
-*Turn specs into tests that catch what unit tests miss.*
+*Turn specs into contracts that can't be broken by helpful LLMs.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
