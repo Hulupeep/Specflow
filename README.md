@@ -230,15 +230,20 @@ Architecture + Features + Journeys = The Product
 
 ### How Each Layer Is Enforced
 
-| Layer | Contract Type | Enforced By | Runs In CI |
-|-------|---------------|-------------|------------|
-| **Architecture** | `feature_architecture.yml` | Contract tests (pattern scanning) | `npm test -- contracts` |
-| **Features** | `feature_*.yml` | Contract tests (pattern scanning) | `npm test -- contracts` |
-| **Journeys** | `journey_*.yml` | Playwright E2E tests | `npm test -- journeys` |
+| Layer | Contract Type | Enforced By | When It Runs |
+|-------|---------------|-------------|--------------|
+| **Architecture** | `feature_architecture.yml` | Contract tests (pattern scanning) | Before build (on source code) |
+| **Features** | `feature_*.yml` | Contract tests (pattern scanning) | Before build (on source code) |
+| **Journeys** | `journey_*.yml` | Playwright E2E tests | After build (on running app) |
 
-**Contract tests** scan your source code for forbidden/required patterns. They catch drift that unit tests won't—like an LLM "optimizing" your auth into an anti-pattern.
+**Contract tests** scan your source code for forbidden/required patterns. They run early and fail fast—no build needed. They catch drift that unit tests won't.
 
-**Journey tests** run end-to-end in a browser via Playwright. They verify users can actually accomplish goals—not just that code compiles.
+**Journey tests** run after a successful build, against your running application. Playwright opens a browser and verifies users can actually accomplish goals end-to-end.
+
+```
+Source code → Contract tests → Build → Deploy → Journey tests → Ship
+              (fail fast)                        (verify E2E)
+```
 
 ### Why Journeys Are Different
 

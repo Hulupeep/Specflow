@@ -110,7 +110,7 @@ The LLM will ask things like:
 - "Are there API routes? Do they all need authentication?"
 - "What's the critical user flow that must never break?"
 
-Just answer in plain English. No special format needed. If you don't know, ask the LLM to suggest best practices for this tech stack. Now is better than later.
+Just answer in plain English. No special format needed**. If you don't know, ask the LLM to suggest best practices** for this tech stack. Now is better than later.
 
 ### Step 3: LLM Produces
 
@@ -130,17 +130,19 @@ Just answer in plain English. No special format needed. If you don't know, ask t
 ### Step 4: Run Tests
 
 ```bash
-# Run contract tests (architecture + features)
+# Run contract tests FIRST (scans source code, no build needed)
 npm test -- contracts
 
-# Run journey tests (Playwright E2E)
-npm test -- journeys
+# Build your app
+npm run build
 
-# Run everything
-npm test
+# Run journey tests AFTER build (Playwright needs running app)
+npm test -- journeys
 ```
 
-**Journeys are your Definition of Done, enforced by Playwright.** A feature isn't done when contract tests pass—it's done when users can accomplish their goals end-to-end.
+**Contract tests fail fast** (before you waste time building). **Journey tests verify E2E** (after the app is running).
+
+> **Journeys are your Definition of Done.** A feature isn't done when contract tests pass—it's done when users can accomplish their goals end-to-end.
 
 ---
 
@@ -193,14 +195,14 @@ Example answers:
 ### Step 4: Run Tests
 
 ```bash
-# Run contract tests (architecture + features)
+# Contract tests FIRST (fail fast, no build needed)
 npm test -- contracts
 
-# Run journey tests (Playwright E2E)
-npm test -- journeys
+# Build, then journey tests (Playwright needs running app)
+npm run build && npm test -- journeys
 ```
 
-Now if anyone tries to "optimize" your auth to use localStorage, **the build fails**.
+Now if anyone tries to "optimize" your auth to use localStorage, **contract tests fail before the build even starts**.
 
 ---
 
@@ -245,8 +247,9 @@ The LLM will:
 
 **Run tests:**
 ```bash
-npm test -- contracts   # Architecture + Features
-npm test -- journeys    # Playwright E2E
+npm test -- contracts   # FIRST: fail fast on source code
+npm run build           # Build the app
+npm test -- journeys    # THEN: Playwright E2E on running app
 ```
 
 ---
