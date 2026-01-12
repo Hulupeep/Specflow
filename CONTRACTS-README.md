@@ -2,9 +2,32 @@
 
 Turn your product spec into executable rules that enforce themselves.
 
+## Just Tell Your LLM
+
+**You don't need to learn anything first.** Paste this to your LLM:
+
+```
+Set up Specflow for this project. Read LLM-MASTER-PROMPT.md, then:
+
+1. Ask me what should NEVER be broken (plain English is fine)
+2. Generate REQ IDs from my description (AUTH-001, STORAGE-001, etc.)
+3. Create contracts in docs/contracts/
+4. Create tests in src/__tests__/contracts/
+5. Add to CI so violations block the build
+6. Update CLAUDE.md with the rules
+
+Goal: Anyone who violates a contract = build fails. Start by asking me questions.
+```
+
+The LLM will interview you, then generate everything.
+
+---
+
+## How It Works
+
 This system uses **contracts** to make specs testable.
 
-You write a simple spec.
+You describe what matters.
 We convert it into:
 - YAML **feature contracts** (pattern-based rules)
 - YAML **journey contracts** (Definition of Done)

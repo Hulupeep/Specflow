@@ -1,12 +1,31 @@
 # Specflow Quick Start
 
+## TL;DR: Copy-Paste This to Your LLM
+
+**You don't need to read anything first.** Just paste this prompt:
+
+```
+Set up Specflow for this project. Read LLM-MASTER-PROMPT.md, then:
+
+1. Ask me to describe what I'm building (plain English)
+2. YOU generate REQ IDs from my description (AUTH-001, STORAGE-001, etc.)
+3. Create contracts in docs/contracts/ with forbidden/required patterns
+4. Create tests in src/__tests__/contracts/ that scan for violations
+5. Add to CI so violations block the build
+6. Update CLAUDE.md so future LLMs know the rules
+
+Goal: Anyone who violates a contract = build fails. Start by asking me questions.
+```
+
+**That's it.** Describe things in plain English. The LLM does the rest.
+
+---
+
 ## The Formula
 
 ```
 Architecture + Features + Journeys = The Product
 ```
-
-This is Specflow in one line:
 
 | Layer | What It Defines | Example |
 |-------|-----------------|---------|
@@ -18,21 +37,15 @@ This is Specflow in one line:
 
 ---
 
-## First: See It Work
+## See It Work First (2 min)
 
-**Option A: Run the demo (2 min)**
 ```bash
 cd demo
 npm install
 npm run demo
 ```
 
-**Option B: Read the dev blog (15 min)**
-
-See Specflow build a real product from Reddit pain point to working app:
-→ [blog/README.md](blog/README.md)
-
-The blog walks through finding a problem, writing a spec, generating contracts, implementing, and **catching a security violation that unit tests missed**.
+You'll see a contract catch what unit tests miss.
 
 ---
 
@@ -40,157 +53,161 @@ The blog walks through finding a problem, writing a spec, generating contracts, 
 
 | Your Situation | Path |
 |----------------|------|
-| **Just show me how** | → [docs/SIMPLE-WALKTHROUGH.md](docs/SIMPLE-WALKTHROUGH.md) |
-| New project, have a spec | Path 1: Tell Claude |
-| Existing project | Path 2: Mid-Project Adoption |
-| Full automation | Path 3: Advanced (context/MASTER-ORCHESTRATOR.md) |
+| **I just want it to work** | Copy the prompt above, paste to LLM |
+| Want to understand the system | Path 1 below |
+| Existing project to protect | Path 2 below |
+| Full automation | Path 3: [context/MASTER-ORCHESTRATOR.md](context/MASTER-ORCHESTRATOR.md) |
 
 ---
 
-## Path 1: Tell Claude to Follow Specflow
+## Path 1: LLM Generates Everything (Recommended)
 
-**For: New projects with a product spec**
+**For: Anyone who wants contracts without learning the format first**
 
-### Step 1: Write Your Spec
-
-```markdown
-## Architecture (What's Always True)
-
-### ARCH-001 (MUST)
-All API routes must verify authentication.
-
-### ARCH-002 (MUST)
-User data must never be stored in localStorage.
-
-## Features (What It Does)
-
-### FEAT-001 (MUST)
-Users can register with email and password.
-
-## Journeys (What Users Accomplish)
-
-### J-AUTH-001: User Registration
-1. User enters email and password
-2. System creates account
-**Expected:** User exists with hashed password.
-```
-
-### Step 2: Give It to Claude
+### Step 1: Paste This Prompt
 
 ```
-Read the Specflow docs in this repo:
+I want to use Specflow to protect my codebase. Read these docs:
+- LLM-MASTER-PROMPT.md
+- SPEC-FORMAT.md
+- CONTRACT-SCHEMA.md
+
+Then interview me about my project:
+- What architectural rules should NEVER be broken?
+- What features exist and how should they behave?
+- What user journeys must always work?
+
+From my answers:
+1. Generate REQ IDs (AUTH-001, STORAGE-001, J-CHECKOUT-001, etc.)
+2. Create contract YAML files in docs/contracts/
+3. Create test files in src/__tests__/contracts/
+4. Show me how to add to CI
+5. Create/update CLAUDE.md with contract rules
+
+I'll describe things in plain English. You structure it.
+```
+
+### Step 2: Answer Questions
+
+The LLM will ask things like:
+- "What storage mechanisms are used? Any that should be forbidden?"
+- "Are there API routes? Do they all need authentication?"
+- "What's the critical user flow that must never break?"
+
+Just answer in plain English. No special format needed.
+
+### Step 3: LLM Produces
+
+- `docs/contracts/feature_*.yml` - Pattern rules
+- `docs/contracts/journey_*.yml` - User flow definitions
+- `src/__tests__/contracts/*.test.ts` - Violation scanners
+- `CLAUDE.md` updates - So future LLMs follow the rules
+- CI config - So violations block merges
+
+---
+
+## Path 2: Protect Existing Project
+
+**For: You have working code and don't want LLMs breaking it**
+
+### Step 1: Paste This Prompt
+
+```
+I have an existing project that works. I want to use Specflow to
+prevent anyone (human or LLM) from breaking what works today.
+
+Read LLM-MASTER-PROMPT.md and MID-PROJECT-ADOPTION.md, then:
+
+1. Ask me what's working today that I never want broken
+2. Generate "freeze contracts" from my plain English description
+3. Create tests that scan the codebase for violations
+4. If violations exist TODAY, tell me (we'll decide if they're ok)
+5. Set up CI gates
+6. Update CLAUDE.md
+
+Start by asking: "What's working today that you never want broken?"
+```
+
+### Step 2: Describe What Works
+
+Example answers:
+```
+"Our auth uses Redis sessions with 7-day TTL. Never localStorage."
+
+"API routes all go through authMiddleware. No exceptions except /health."
+
+"Passwords are bcrypt hashed. Never stored in plain text anywhere."
+
+"The checkout flow: cart → payment → confirmation. If this breaks, we're dead."
+```
+
+### Step 3: LLM Creates Freeze Contracts
+
+The LLM will generate:
+- `AUTH-001`: Sessions use Redis, not localStorage
+- `AUTH-002`: All /api/* routes have authMiddleware
+- `SEC-001`: Passwords use bcrypt
+- `J-CHECKOUT-001`: Cart → payment → confirmation flow works
+
+Now if anyone tries to "optimize" your auth to use localStorage, **the build fails**.
+
+---
+
+## Path 3: I Already Have a Structured Spec
+
+**For: Teams with existing requirement documents**
+
+### Paste This Prompt
+
+```
+I have a spec with requirements. Use Specflow to turn it into
+enforceable contracts.
+
+Read:
 - SPEC-FORMAT.md
 - CONTRACT-SCHEMA.md
 - LLM-MASTER-PROMPT.md
 
-Build my app from this spec:
+Here's my spec:
 
 [PASTE SPEC HERE]
 
-Follow Specflow:
-1. Generate ARCH contracts first
-2. Generate FEAT contracts
-3. Generate JOURNEY contracts
-4. Create tests that scan for violations
-5. Implement code
-6. Verify contracts pass before done
+Generate:
+1. ARCH contracts first (structural invariants)
+2. FEAT contracts (feature requirements)
+3. JOURNEY contracts (user flows with DOD criticality)
+4. Tests for each contract
+5. CI configuration
+6. CLAUDE.md updates
 ```
 
-### Step 3: Claude Produces
-
-- YAML contracts in `docs/contracts/`
-- Tests in `src/__tests__/contracts/`
-- Implementation that passes all contracts
-
-**Full walkthrough:** [docs/SIMPLE-WALKTHROUGH.md](docs/SIMPLE-WALKTHROUGH.md)
+The LLM will:
+- Parse your existing requirements
+- Generate REQ IDs if missing
+- Create all contracts, tests, and config
 
 ---
 
-## Path 2: Add to Existing Project
+## Path 4: Manual Setup (For Learning)
 
-**For: Existing codebases**
+**For: Understanding the system deeply**
 
-### Step 1: Read the Guide
+### Step 1: Read the Core Docs
 ```
-Read MID-PROJECT-ADOPTION.md
-```
-
-### Step 2: Document Current Behavior
-Pick your most critical feature and document how it works today:
-```markdown
-## Current Working Behavior
-
-Feature: User Authentication
-- Sessions stored in Redis
-- Key pattern: session:{userId}
-- 7-day expiry
-- Auth middleware on all /api/* routes
+SPEC-FORMAT.md      → How specs are structured
+CONTRACT-SCHEMA.md  → YAML contract format
+LLM-MASTER-PROMPT.md → How LLMs should use contracts
 ```
 
-### Step 3: Create "Freeze" Contract
-```
-Use contract-generator subagent to create a contract
-documenting current auth behavior from above
-```
-
-### Step 4: Generate Tests
-```
-Use test-generator subagent to create tests for
-the auth contract
-```
-
-### Step 5: Verify
+### Step 2: Create Contract Manually
 ```bash
-npm test -- contracts
-```
-
-**Time:** 15 minutes per feature
-
----
-
-## Path 3: Using Subagents (Advanced)
-
-**For: Maximum efficiency with Claude Code**
-
-### Step 1: Install Subagents
-```bash
-mkdir -p .claude/agents
-# Copy the 4 subagent files from SUBAGENT-CONTRACTS.md
-```
-
-### Step 2: Use Contract Orchestrator
-```
-Use contract-orchestrator subagent with this spec:
-[paste spec]
-```
-
-The orchestrator spawns specialized subagents for each phase:
-- contract-generator (clean context)
-- test-generator (clean context)
-- contract-verifier (clean context)
-
-**Time:** 45-90 minutes, more efficient context usage
-
----
-
-## Path 4: Manual Setup
-
-**For: Learning or custom workflows**
-
-### Step 1: Set Up Infrastructure
-```
-Read META-INSTRUCTION.md and execute sequentially
-```
-
-### Step 2: Create Your First Contract
-```bash
-cp contract-example.yml docs/contracts/my_first_contract.yml
+cp examples/contract-example.yml docs/contracts/my_first_contract.yml
 # Edit to match your constraint
 ```
 
-### Step 3: Create Tests
+### Step 3: Create Test Manually
 ```bash
-cp test-example.test.ts src/__tests__/contracts/myFirstContract.test.ts
+cp examples/test-example.test.ts src/__tests__/contracts/myFirstContract.test.ts
 # Edit patterns to match your contract
 ```
 
@@ -199,7 +216,16 @@ cp test-example.test.ts src/__tests__/contracts/myFirstContract.test.ts
 npm test -- myFirstContract
 ```
 
-**Time:** 1-2 hours for initial setup
+---
+
+## Advanced: Subagents
+
+For maximum efficiency with Claude Code, see [context/SUBAGENT-CONTRACTS.md](context/SUBAGENT-CONTRACTS.md).
+
+Subagents let you spawn specialized assistants:
+- `contract-generator` - Creates contracts from descriptions
+- `test-generator` - Creates tests from contracts
+- `contract-verifier` - Validates everything works
 
 ---
 
@@ -295,20 +321,24 @@ Test: End-to-end registration process
 
 ## Getting Help
 
-**Documentation:**
-- MASTER-ORCHESTRATOR.md - Complete automation
-- META-INSTRUCTION.md - Step-by-step setup
-- SPEC-TO-CONTRACT.md - Spec conversion guide
-- USER-JOURNEY-CONTRACTS.md - Journey testing
+**Core Docs:**
+- LLM-MASTER-PROMPT.md - How LLMs should use Specflow
+- SPEC-FORMAT.md - Spec format (if writing manually)
+- CONTRACT-SCHEMA.md - YAML contract format
 - MID-PROJECT-ADOPTION.md - Existing projects
-- SUBAGENT-CONTRACTS.md - Subagent implementation
+- USER-JOURNEY-CONTRACTS.md - Journey testing
 
-**Templates:**
-- contract-example.yml - Real contract example
-- test-example.test.ts - Complete test suite
+**Deep Dives (in context/):**
+- context/MASTER-ORCHESTRATOR.md - Complete automation
+- context/SUBAGENT-CONTRACTS.md - Claude subagent patterns
+- context/SPEC-TO-CONTRACT.md - Conversion examples
+
+**Templates (in examples/):**
+- examples/contract-example.yml - Real contract example
+- examples/test-example.test.ts - Complete test suite
 
 **Tools:**
-- verify-setup.sh - Verify infrastructure
+- ./verify-setup.sh - Verify infrastructure
 - CI-INTEGRATION.md - GitHub Actions, GitLab
 
 ---
@@ -331,24 +361,30 @@ You're doing it right when:
 ┌─────────────────────────────────────────────────────────┐
 │ Specflow Quick Reference                                │
 ├─────────────────────────────────────────────────────────┤
-│ Core Docs:                                              │
-│   README.md              - Overview & quick start       │
-│   CONTRACTS-README.md    - System overview              │
-│   SPEC-FORMAT.md         - How to write specs           │
-│   CONTRACT-SCHEMA.md     - YAML contract format         │
-│   LLM-MASTER-PROMPT.md   - Prompt for LLM enforcement   │
 │                                                         │
-│ Adoption:                                               │
-│   MID-PROJECT-ADOPTION.md - Add to existing project     │
-│   USER-JOURNEY-CONTRACTS.md - E2E journey testing       │
-│   CI-INTEGRATION.md      - CI/CD setup                  │
+│ FASTEST WAY: Copy the prompt at the top of this file   │
+│              and paste it to your LLM.                  │
 │                                                         │
-│ Demo:                                                   │
-│   demo/                  - Working example              │
-│   ./verify-setup.sh      - Check your setup             │
+│ Core Loop:                                              │
+│   Describe in plain English → LLM generates REQ IDs    │
+│   → Contracts created → Tests created → CI blocks      │
+│                                                         │
+│ File Locations:                                         │
+│   docs/contracts/feature_*.yml  = Pattern rules        │
+│   docs/contracts/journey_*.yml  = User flow DOD        │
+│   src/__tests__/contracts/      = Contract tests       │
+│                                                         │
+│ Key Commands:                                           │
+│   npm test -- contracts   Run contract tests           │
+│   npm test -- journeys    Run journey tests            │
+│   ./verify-setup.sh       Check setup                  │
+│                                                         │
+│ The Gate:                                               │
+│   Violation = Build fails. End of story.               │
+│                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-**Ready to start?** Pick Path 1 (automation) or Path 2 (existing project) and go! 🚀
+**Ready to start?** Copy the prompt at the top and paste it to your LLM. That's it.

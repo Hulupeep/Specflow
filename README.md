@@ -8,16 +8,59 @@
 
 ---
 
+## Just Tell Your LLM
+
+**You don't need to learn anything first.** Copy-paste one of these prompts:
+
+### New Project
+```
+Set up Specflow for this project. Read LLM-MASTER-PROMPT.md and:
+
+1. Ask me to describe what I'm building (plain English is fine)
+2. Generate REQ IDs from my description (AUTH-001, etc.)
+3. Create contracts in docs/contracts/ with forbidden/required patterns
+4. Create tests in src/__tests__/contracts/ that scan for violations
+5. Add contract tests to CI so violations block the build
+6. Update CLAUDE.md so future LLMs know the rules
+
+The goal: if anyone (human or LLM) violates a contract, the build fails.
+```
+
+### Existing Project
+```
+Set up Specflow to protect what already works. Read LLM-MASTER-PROMPT.md and:
+
+1. Ask me to describe our current architecture in plain English
+2. Generate REQ IDs from my description (AUTH-001, STORAGE-001, etc.)
+3. Create "freeze contracts" that lock current behavior
+4. Create tests that fail if someone breaks what works today
+5. Add contract tests to CI
+6. Update CLAUDE.md so future LLMs can't break these rules
+
+Start by asking: "What's working today that you never want broken?"
+```
+
+### One-Liner (Existing Behavior)
+```
+I'll describe how [feature] works. Use Specflow to create contracts
+and tests that prevent anyone from breaking it. Ask me questions,
+then generate everything.
+```
+
+**That's it.** The LLM will generate REQ IDs, contracts, tests, and CI config. You just describe things in plain English.
+
+---
+
 ## What Is This?
 
 Specflow is a methodology for building software with LLMs that doesn't drift.
 
 **The problem:** You build with an LLM. It works. You iterate. Slowly, invisibly, the code drifts from your original intent. Unit tests pass, but architectural rules get violated. Security patterns get "optimized" away. The app breaks in ways tests don't catch.
 
-**The solution:** Write your spec with requirement IDs. Generate contracts (YAML files with forbidden/required patterns). Auto-create tests that scan your code. Now violations fail the build—whether a human or an LLM introduced them.
+**The solution:** Describe what matters → LLM generates contracts → Tests scan your code → Violations fail the build.
 
 ```
-Spec → Contracts → Tests → Code → Violations blocked
+Describe → Contracts → Tests → Code → Violations blocked
 ```
 
 ---

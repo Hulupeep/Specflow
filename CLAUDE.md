@@ -8,102 +8,124 @@ Specflow is a methodology for building software with LLMs that doesn't drift.
 
 **The problem:** You build with an LLM. It works. You iterate. Slowly, the code drifts from your original intent. Unit tests pass, but architectural rules get violated.
 
-**The solution:** Write specs with requirement IDs → Generate contracts → Auto-create tests → Violations fail the build.
+**The solution:** Describe what matters → Generate contracts → Auto-create tests → Violations fail the build.
 
-## The Formula
+## When a User Asks for Specflow
 
-```
-Architecture + Features + Journeys = The Product
-```
+If a user says anything like:
+- "Set up Specflow"
+- "Create contracts for this project"
+- "Protect this code from breaking"
+- "Make sure no one can break [feature]"
 
-| Layer | What It Defines | Example |
-|-------|-----------------|---------|
-| **ARCH** | Structural invariants | "No payment data in localStorage" |
-| **FEAT** | Product capabilities | "Queue orders by FIFO" |
-| **JOURNEY** | User accomplishments (DOD) | "User can complete checkout" |
+**Your job:**
 
-**Skip any layer → ship blind.** Define all three → contracts enforce them.
+1. **Interview them in plain English** - Ask what matters:
+   - "What architectural rules should NEVER be broken?"
+   - "What's working today that you don't want anyone to break?"
+   - "What user flows are critical?"
 
-## Repository Structure
+2. **YOU generate REQ IDs** from their answers:
+   - `ARCH-001`, `ARCH-002` for architecture rules
+   - `AUTH-001`, `STORAGE-001` for feature rules
+   - `J-CHECKOUT-001` for user journeys
 
-```
-Specflow/
-├── README.md                    # Start here
-├── QUICKSTART.md               # Choose your path
-├── CONTRACTS-README.md         # System overview
-├── SPEC-FORMAT.md              # How to write specs
-├── CONTRACT-SCHEMA.md          # YAML contract format
-├── LLM-MASTER-PROMPT.md        # Prompt for LLMs
-├── demo/                       # Working example (run this!)
-├── blog/                       # QueueCraft dev blog
-├── docs/
-│   ├── DESIGNER-GUIDE.md       # Designer workflow
-│   ├── MEMORYSPEC.md           # ruvector integration
-│   ├── LIVE-DEMO-SCRIPT.md     # Presentation script
-│   └── AGENTIC-FOUNDATIONS-DECK.md  # 7-slide deck
-└── examples/                   # Contract and test templates
-```
+3. **Create contracts** in `docs/contracts/`:
+   - `feature_*.yml` for pattern rules
+   - `journey_*.yml` for user flows
 
-## Live Demo (Guaranteed to Work)
+4. **Create tests** in `src/__tests__/contracts/`:
+   - Tests that scan for `forbidden_patterns`
+   - Tests that verify `required_patterns`
 
-The demo proves Specflow catches what unit tests miss.
+5. **Update CI** to run contract tests on every PR
 
-### Quick Run (2 min)
+6. **Update this CLAUDE.md** with the contract rules so future LLMs know them
+
+**The user describes things in plain English. You do the structuring.**
+
+---
+
+## Commands
+
+### Demo (proves the concept works)
 ```bash
-cd demo
-npm install
-npm run demo    # Automated walkthrough
+cd demo && npm install
+npm run demo              # Full automated walkthrough
+npm run demo:reset        # Reset to safe state
+npm run test:unit         # Run unit tests only
+npm run test:contracts    # Run contract tests only
+npm test                  # Run all tests
 ```
 
-### Manual Demo (for presentations)
-
-**1. Setup:**
+### Verification
 ```bash
-cd demo
-npm install
-npm run demo:reset
+./verify-setup.sh         # Check if project setup is correct
 ```
 
-**2. Show baseline (safe state):**
+### When adopting Specflow in your project
 ```bash
-npm run test:unit      # ✅ 4 passing
-npm run test:contracts # ✅ 1 passing
+npm test -- contracts     # Run contract tests
+npm test -- journeys      # Run journey tests (E2E)
 ```
 
-**3. Introduce the violation:**
-```bash
-cp states/trap.js src/auth.js
+---
+
+## File Locations
+
+| Type | Location | Naming |
+|------|----------|--------|
+| Specs | `docs/specs/*.md` | `authentication.md` |
+| Feature contracts | `docs/contracts/feature_*.yml` | `feature_authentication.yml` |
+| Journey contracts | `docs/contracts/journey_*.yml` | `journey_auth_register.yml` |
+| Contract tests | `src/__tests__/contracts/*.test.ts` | `auth_contract.test.ts` |
+| E2E journey tests | `tests/e2e/journey_*.spec.ts` | `journey_auth_register.spec.ts` |
+| Contract index | `docs/contracts/CONTRACT_INDEX.yml` | Tracks all contracts |
+
+---
+
+## The Core Loop
+
+```
+User describes → You generate REQ IDs → Contract YAML → Test file → CI blocks violations
 ```
 
-**4. Unit tests still pass:**
-```bash
-npm run test:unit      # ✅ 4 passing (!)
+Example transformation:
+
+**User says:** "Our auth uses Redis sessions, never localStorage"
+
+**You generate:**
+```yaml
+# docs/contracts/feature_auth.yml
+rules:
+  non_negotiable:
+    - id: AUTH-001
+      title: "Sessions use Redis, not localStorage"
+      scope: ["src/**/*.ts", "src/**/*.js"]
+      behavior:
+        forbidden_patterns:
+          - pattern: /localStorage\.(get|set)Item.*session/i
+            message: "Sessions must use Redis, not localStorage"
 ```
 
-**5. Contract catches it:**
-```bash
-npm run test:contracts # ❌ CONTRACT VIOLATION: AUTH-001
+**And test:**
+```typescript
+// src/__tests__/contracts/auth.test.ts
+it('AUTH-001: No localStorage for sessions', () => {
+  // Scan source files for forbidden pattern
+  // Fail with: CONTRACT VIOLATION: AUTH-001
+})
 ```
 
-**6. Reset:**
-```bash
-npm run demo:reset
-```
-
-### The Invariant
-
-| ID | Rule | Violation |
-|----|------|-----------|
-| AUTH-001 | Sessions must use store with TTL | `localStorage` used instead |
-
-Unit tests verify behavior (they pass). Contracts verify architecture (they catch it).
+---
 
 ## Key Concepts
 
 ### Requirement IDs
 - Format: `[FEATURE]-[NUMBER]` (e.g., `AUTH-001`, `EMAIL-042`)
+- Architecture: `ARCH-001`, `ARCH-002` (structural invariants, define first)
+- Journeys: `J-AUTH-REGISTER`, `J-CHECKOUT` (user flows)
 - Tags: `(MUST)` = non-negotiable, `(SHOULD)` = guideline
-- Each REQ maps to exactly one contract rule
 
 ### Contract Rules
 - `rules.non_negotiable`: MUST requirements - build fails if violated
@@ -111,25 +133,47 @@ Unit tests verify behavior (they pass). Contracts verify architecture (they catc
 - `forbidden_patterns`: Regex patterns that must NOT appear in code
 - `required_patterns`: Regex patterns that MUST appear in code
 
+### Test Output Format
+Contract tests MUST output violations in this format:
+```
+CONTRACT VIOLATION: <REQ-ID> - <message>
+  File: <path>
+  Line: <number>
+  Match: <matched_text>
+```
+
+---
+
 ## LLM Behavior Rules
 
-When modifying this repo or using its methodology:
+When modifying this repo or projects using Specflow:
 
 1. **Do NOT modify protected code without checking contracts first**
 2. **Do NOT change `non_negotiable` rules unless user says `override_contract: <id>`**
 3. **Always work incrementally:** spec → contract → test → code → verify
-4. **Contract tests must output:** `CONTRACT VIOLATION: <REQ-ID>` with file, line, and message
+4. **Architecture contracts (`ARCH-*`) come before feature contracts**
+5. **Critical journeys must pass before release**
+6. **When user describes something in plain English, YOU generate the REQ IDs**
+
+---
 
 ## Core Docs (Read Order)
 
-1. **README.md** - What Specflow is, why it exists
-2. **demo/** - See it work before reading more
-3. **SPEC-FORMAT.md** - How to write specs with requirement IDs
-4. **CONTRACT-SCHEMA.md** - YAML format for contracts
-5. **LLM-MASTER-PROMPT.md** - How LLMs should use contracts
+For full details on the methodology:
+
+1. **LLM-MASTER-PROMPT.md** - Complete workflow for LLMs
+2. **SPEC-FORMAT.md** - How to write specs with requirement IDs
+3. **CONTRACT-SCHEMA.md** - YAML format for contracts
+4. **MID-PROJECT-ADOPTION.md** - Adding to existing projects
+5. **CI-INTEGRATION.md** - Setting up CI gates
+
+---
 
 ## The Key Insight
 
 > We don't need LLMs to behave. We need them to be checkable.
 
-Unit tests verify behavior. Contracts verify architecture. Both are needed.
+- Unit tests verify behavior (does it work?)
+- Contracts verify architecture (does it stay correct?)
+
+**If someone violates a contract, the build fails. End of story.**

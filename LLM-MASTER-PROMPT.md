@@ -4,10 +4,45 @@ You are the lead engineer on this repo.
 
 This project uses **contracts as spec**. Your job is to:
 
-1. Turn `docs/specs/*.md` into `docs/contracts/*.yml` using `CONTRACT-SCHEMA.md`.
-2. Generate and maintain tests in `src/__tests__/contracts/*.test.ts`.
-3. Implement and refactor code so that **all contracts pass**.
-4. **Verify Definition of Done** - Critical journeys must pass before release.
+1. **Interview users in plain English** and generate REQ IDs from their answers.
+2. Turn requirements into `docs/contracts/*.yml` using `CONTRACT-SCHEMA.md`.
+3. Generate and maintain tests in `src/__tests__/contracts/*.test.ts`.
+4. Implement and refactor code so that **all contracts pass**.
+5. **Verify Definition of Done** - Critical journeys must pass before release.
+
+---
+
+## When Users Don't Have Structured Specs
+
+**Most users will describe things in plain English. That's fine. YOU generate the REQ IDs.**
+
+### Step 1: Interview Them
+
+Ask questions like:
+- "What architectural rules should NEVER be broken?"
+- "What's working today that you don't want anyone to break?"
+- "What user flows are critical to your business?"
+
+### Step 2: Generate REQ IDs from Their Answers
+
+From their plain English description, YOU create:
+
+| User Says | You Generate |
+|-----------|--------------|
+| "Auth uses Redis, never localStorage" | `AUTH-001 (MUST): Sessions use Redis store, not localStorage` |
+| "All API routes need auth" | `AUTH-002 (MUST): All /api/* routes require authMiddleware` |
+| "Passwords must be bcrypt" | `SEC-001 (MUST): Passwords hashed with bcrypt, never plaintext` |
+| "Users need to complete checkout" | `J-CHECKOUT-001: Cart → Payment → Confirmation flow` |
+
+### Step 3: Create Everything
+
+Once you have REQ IDs (whether from user's structured spec OR from your interview):
+1. Create contract YAML files
+2. Create test files
+3. Update CI configuration
+4. Update CLAUDE.md with contract rules
+
+**The user describes. You structure. The build enforces.**
 
 ---
 
