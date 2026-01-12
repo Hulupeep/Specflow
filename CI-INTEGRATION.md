@@ -680,6 +680,192 @@ jobs:
 
 ---
 
+## Journey Tests (Playwright E2E)
+
+Journey tests are different from contract tests:
+- **Contract tests** scan source code (no build needed)
+- **Journey tests** need a running app (build → deploy → test)
+
+### GitHub Actions: Full Pipeline with Journeys
+
+```yaml
+# .github/workflows/ci-with-journeys.yml
+name: CI with Journey Tests
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  # Step 1: Contract tests (fail fast)
+  contracts:
+    name: 🔒 Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm test -- contracts
+
+  # Step 2: Build (only if contracts pass)
+  build:
+    name: 🏗️ Build
+    runs-on: ubuntu-latest
+    needs: contracts
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v3
+        with:
+          name: build
+          path: dist/
+
+  # Step 3: Deploy to preview
+  deploy-preview:
+    name: 🚀 Deploy Preview
+    runs-on: ubuntu-latest
+    needs: build
+    outputs:
+      preview-url: ${{ steps.deploy.outputs.url }}
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/download-artifact@v3
+        with:
+          name: build
+          path: dist/
+
+      # Example: Vercel preview deploy
+      - name: Deploy to Vercel
+        id: deploy
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      # Or: Netlify preview deploy
+      # - name: Deploy to Netlify
+      #   id: deploy
+      #   uses: nwtgck/actions-netlify@v2
+      #   with:
+      #     publish-dir: './dist'
+      #     github-token: ${{ secrets.GITHUB_TOKEN }}
+      #     deploy-message: "PR Preview"
+
+  # Step 4: Journey tests against preview
+  journeys:
+    name: 🎭 Journey Tests (Playwright)
+    runs-on: ubuntu-latest
+    needs: deploy-preview
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run journey tests
+        run: npm test -- journeys
+        env:
+          BASE_URL: ${{ needs.deploy-preview.outputs.preview-url }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: playwright-report
+          path: playwright-report/
+```
+
+### Simpler: Local Server in CI
+
+If you don't need a preview deploy, run the app locally in CI:
+
+```yaml
+journeys:
+  name: 🎭 Journey Tests
+  runs-on: ubuntu-latest
+  needs: [contracts, build]
+  steps:
+    - uses: actions/checkout@v3
+    - uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+    - uses: actions/download-artifact@v3
+      with:
+        name: build
+        path: dist/
+
+    - run: npm ci
+    - run: npx playwright install --with-deps
+
+    # Start server in background
+    - name: Start server
+      run: npm run preview &
+      # Or: npx serve dist &
+
+    - name: Wait for server
+      run: npx wait-on http://localhost:3000
+
+    - name: Run journey tests
+      run: npm test -- journeys
+      env:
+        BASE_URL: http://localhost:3000
+```
+
+### Playwright Config for CI
+
+```typescript
+// playwright.config.ts
+import { defineConfig } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  testMatch: 'journey_*.spec.ts',
+
+  use: {
+    baseURL: process.env.BASE_URL || 'http://localhost:3000',
+  },
+
+  // CI-specific settings
+  ...(process.env.CI && {
+    forbidOnly: true,      // Fail if test.only() left in
+    retries: 2,            // Retry flaky tests
+    workers: 1,            // Reduce parallelism in CI
+  }),
+
+  reporter: [
+    ['html', { outputFolder: 'playwright-report' }],
+    ['github'],  // GitHub Actions annotations
+  ],
+});
+```
+
+### Branch Protection for Journeys
+
+```
+Settings → Branches → Branch protection rules → main
+
+Required status checks:
+✅ contracts
+✅ journeys    ← Add this to block PRs until E2E passes
+```
+
+---
+
 ## Summary
 
 **Minimum Integration:**
@@ -702,4 +888,13 @@ jobs:
 - Slack/email notifications
 - Branch protection rules
 
-**Key Principle:** Contract violations must BLOCK merges, not just warn.
+**Full Pipeline with Journeys:**
+```yaml
+jobs:
+  contracts:    # Fail fast (no build needed)
+  build:        # Only if contracts pass
+  deploy:       # Preview environment
+  journeys:     # Playwright against preview
+```
+
+**Key Principle:** Contract AND journey violations must BLOCK merges, not just warn.
