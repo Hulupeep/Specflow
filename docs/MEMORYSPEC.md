@@ -160,6 +160,195 @@ To avoid "memory rot":
 
 If validation context changes, recipe confidence decays.
 
+---
+
+## Min-Cut Gating: Selective Learning Injection
+
+**Problem:** How do we inject lessons without replaying everything?
+
+**Answer:** Min-cut is a gate that decides *how much* memory to inject and *from where*.
+
+### The Core Insight
+
+Min-cut in ruvector is a **real-time stress/boundary detector** on a graph:
+- If the cut value is high (well-connected): inject **few remedies** (low friction)
+- If the cut value is low (fragile): inject **more context** (heavier guardrails)
+
+This gives you a dial: stable situations get hints, risky situations get guardrails.
+
+### Build the Edit-Intent Graph
+
+For each agent run, build a small graph (cheap, local):
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                      Edit-Intent Graph                               │
+├─────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  LEFT SIDE (Intent)              RIGHT SIDE (Memory)                │
+│  ─────────────────               ──────────────────                 │
+│                                                                      │
+│  ┌────────────────┐              ┌────────────────┐                 │
+│  │ Touched Paths  │──────────────│ Remediation    │                 │
+│  │ controllers/   │              │ Recipes        │                 │
+│  │ auth.ts        │              │ (Violation→Fix)│                 │
+│  └────────────────┘              └────────────────┘                 │
+│         │                               │                            │
+│         │                               │                            │
+│  ┌────────────────┐              ┌────────────────┐                 │
+│  │ New Imports    │──────────────│ Prior Incidents│                 │
+│  │ prisma,        │   weight     │ in this repo   │                 │
+│  │ jsonwebtoken   │              │                │                 │
+│  └────────────────┘              └────────────────┘                 │
+│         │                               │                            │
+│         │                               │                            │
+│  ┌────────────────┐              ┌────────────────┐                 │
+│  │ API Calls      │──────────────│ ADR-derived    │                 │
+│  │ localStorage   │              │ Constraints    │                 │
+│  │ .setItem       │              │                │                 │
+│  └────────────────┘              └────────────────┘                 │
+│         │                               │                            │
+│         │                               │                            │
+│  ┌────────────────┐                                                 │
+│  │ Contract       │                                                 │
+│  │ Candidates     │                                                 │
+│  │ AUTH-001,      │                                                 │
+│  │ LAYER-001      │                                                 │
+│  └────────────────┘                                                 │
+│                                                                      │
+│  ════════════════════════════════════════════════════════════════   │
+│                         MIN-CUT LINE                                 │
+│  ════════════════════════════════════════════════════════════════   │
+│                                                                      │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+### Edge Weights
+
+| Connection | Higher Weight | Lower Weight |
+|------------|---------------|--------------|
+| Intent → Contract | Exact pattern match | Fuzzy similarity |
+| Contract → Remediation | Same signature | Different signature |
+| Remediation → Context | Same folder, stack | Different stack |
+| Recency | Recent (< 7 days) | Old (> 30 days) |
+| Success Rate | > 0.8 | < 0.5 |
+
+### Min-Cut as Filter
+
+Compute a cut between:
+- **S = intent cluster** (what we're about to do)
+- **T = remediation library** (what we've learned)
+
+**Interpretation:**
+
+| Cut Value | Tension | Action |
+|-----------|---------|--------|
+| High (well-connected) | Low | Inject **1-3 remedies** (hints) |
+| Medium | Medium | Inject **5-7 remedies** (guidance) |
+| Low (fragile) | High | Inject **10+ remedies** or **escalate** |
+| Very Low | Critical | **Force stop**, require human review |
+
+### Practical Implementation (No Research Project)
+
+You don't need full graph theory everywhere:
+
+1. **Signature match + weights** → shortlist 20 candidates
+2. **Min-cut on subgraph** → decide injection size (3 vs 10)
+3. **Default = 3 remedies max** unless min-cut says "fragile"
+
+```typescript
+interface InjectionDecision {
+  candidates: Remediation[];     // shortlisted by signature match
+  cutValue: number;              // min-cut result
+  tension: 'low' | 'medium' | 'high' | 'critical';
+  injectCount: number;           // how many to inject
+  escalate: boolean;             // require human review?
+}
+
+function decideInjection(intentGraph: Graph): InjectionDecision {
+  // 1. Shortlist by signature
+  const candidates = matchSignatures(intentGraph.intents, remediationLibrary);
+
+  // 2. Build subgraph
+  const subgraph = buildSubgraph(intentGraph, candidates.slice(0, 20));
+
+  // 3. Compute min-cut
+  const cutValue = minCut(subgraph, intentCluster, remediationCluster);
+
+  // 4. Decide injection size
+  if (cutValue > 0.8) return { tension: 'low', injectCount: 3 };
+  if (cutValue > 0.5) return { tension: 'medium', injectCount: 7 };
+  if (cutValue > 0.2) return { tension: 'high', injectCount: 10 };
+  return { tension: 'critical', injectCount: 20, escalate: true };
+}
+```
+
+### Integration Points
+
+**1. Preflight (before planning)**
+```
+Agent starts → Build intent graph → Min-cut gate → Inject "Guardrail Brief"
+```
+
+**2. On Failure (contract test fails)**
+```
+Test fails → Emit violation record → Store in ruvector → Connect to intent nodes
+```
+
+**3. On Success (tests pass)**
+```
+Tests pass → Store remediation recipe → Increase edge weight/confidence
+```
+
+### The Guardrail Brief
+
+What gets injected (based on min-cut decision):
+
+```markdown
+## Guardrail Brief (3 items, low tension)
+
+You are about to edit `controllers/auth.ts`.
+
+**Known constraints:**
+- AUTH-001: No localStorage for tokens (use httpOnly cookies)
+
+**Proven fixes for similar edits:**
+1. Replace `localStorage.setItem('token', ...)` with `res.cookie('token', ..., { httpOnly: true })`
+
+**If you violate AUTH-001, the build will fail.**
+```
+
+vs.
+
+```markdown
+## Guardrail Brief (10 items, HIGH TENSION)
+
+⚠️ This edit touches multiple protected areas.
+
+**Active constraints:**
+- AUTH-001: No localStorage for tokens
+- LAYER-001: Controllers cannot import prisma directly
+- SEC-002: All inputs must be validated
+
+**Prior incidents in this repo:**
+- 3 violations of AUTH-001 in past 30 days
+- 2 violations of LAYER-001 in this folder
+
+**Proven fixes:**
+1. localStorage → httpOnly cookie
+2. Direct prisma → service layer
+3. req.body → validateInput(req.body)
+...
+
+**Recommendation:** Review docs/contracts/ before proceeding.
+```
+
+### One-Sentence Summary
+
+> "The injection path is a mandatory preflight retrieval. Min-cut is the gate that decides how much to inject by measuring how strongly the current edit-intent connects to prior violation→remedy patterns."
+
+---
+
 ## Architecture
 
 ```
