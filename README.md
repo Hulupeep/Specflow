@@ -6,9 +6,75 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+
+
+## The Problem
+
+You write specs. An LLM "helpfully" changes something. Everything breaks:
+
+```typescript
+// Your spec: "Service workers MUST NOT use localStorage"
+// LLM adds this anyway after iteration 2:
+const token = localStorage.getItem('auth') // 💥 CRASH or worse. No crash, just drift
+```
+
+**Result:** Production down. Hours debugging. Trust in AI tooling eroded.
+
 ---
 
-## Just Tell Your LLM
+## The Solution
+
+**Contracts = Specs that enforce themselves.**
+
+```
+Write spec with IDs → Generate contracts → Auto-create tests → Violations  = CI Build fails
+```
+
+**Core loop:**
+
+1. Write `docs/specs/authentication.md` with `AUTH-001 (MUST)` requirements
+2. Generate `docs/contracts/feature_authentication.yml` with rules
+3. Tests scan source code for violations
+4. CI blocks merges if contracts broken
+
+## Workflow 
+
+```mermaid
+graph LR
+    A[Write Spec<br/>AUTH-001 MUST] --> B[Generate Contract<br/>feature_auth.yml]
+    B --> C[Generate Test<br/>auth.test.ts]
+    C --> D[Implement Code<br/>Add authMiddleware]
+    D --> E{Run Tests}
+    E -->|PASS| F[✅ Merge]
+    E -->|FAIL| G[❌ Fix Code]
+    G --> D
+
+    style A fill:#e1f5ff
+    style B fill:#fff3cd
+    style C fill:#fff3cd
+    style F fill:#d4edda
+    style G fill:#f8d7da
+```
+
+---
+
+## What You Get with Contacts
+
+✅ **Specs become enforceable** — Requirements have IDs (AUTH-001), contracts enforce them, tests verify them
+
+✅ **Incremental workflow** — Add one REQ → update contract → update test → implement → verify (not monolithic)
+
+✅ **Single source of truth** — Each REQ maps to exactly one contract rule, tests reference REQ IDs
+
+✅ **LLM-friendly** — Normalized spec format, clear IDs, reusable prompt, compliance checklists
+
+✅ **Mid-project safe** — Document current state as contract, prevent regressions, refactor safely
+
+✅ **CI/CD integrated** — Tests run automatically, violations block merges
+
+---
+
+## Get Started = Just Tell Your LLM
 
 **You don't need to learn anything first.** Copy-paste one of these prompts:
 
@@ -51,7 +117,7 @@ then generate everything.
 
 ---
 
-## What Is This?
+## What Is Specflow?
 
 Specflow is a methodology for building software with LLMs that doesn't drift.
 
@@ -194,7 +260,7 @@ it('AUTH-001: No localStorage for tokens', () => {
 
 ---
 
-## Quick Start
+## Implementation
 
 ### New Project
 
