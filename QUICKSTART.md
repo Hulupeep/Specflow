@@ -5,19 +5,28 @@
 **You don't need to read anything first.** Just paste this prompt:
 
 ```
-Set up Specflow for this project. Read LLM-MASTER-PROMPT.md, then:
+I want to use Specflow to protect my codebase. Read these docs:
+- LLM-MASTER-PROMPT.md
+- SPEC-FORMAT.md
+- CONTRACT-SCHEMA.md
+- USER-JOURNEY-CONTRACTS.md
 
-1. Ask me to describe what I'm building (plain English)
-2. YOU generate REQ IDs from my description (AUTH-001, STORAGE-001, etc.)
-3. Create contracts in docs/contracts/ with forbidden/required patterns
-4. Create tests in src/__tests__/contracts/ that scan for violations
-5. Add to CI so violations block the build
-6. Update CLAUDE.md so future LLMs know the rules
+Then interview me about my project:
+- What architectural rules should NEVER be broken?
+- What features exist and how should they behave?
+- What user journeys must always work?
 
-Goal: Anyone who violates a contract = build fails. Start by asking me questions.
+From my answers:
+1. Generate REQ IDs (AUTH-001, STORAGE-001, J-CHECKOUT-001, etc.)
+2. Create contract YAML files in docs/contracts/
+3. Create test files in src/__tests__/contracts/
+4. Show me how to add to CI
+5. Update this project's CLAUDE.md with contract rules
+
+I'll describe things in plain English. You structure it.
 ```
 
-**That's it.** Describe things in plain English. The LLM does the rest.
+**That's it.** The LLM interviews you, then generates everything.
 
 ---
 
@@ -71,6 +80,7 @@ I want to use Specflow to protect my codebase. Read these docs:
 - LLM-MASTER-PROMPT.md
 - SPEC-FORMAT.md
 - CONTRACT-SCHEMA.md
+- USER-JOURNEY-CONTRACTS.md
 
 Then interview me about my project:
 - What architectural rules should NEVER be broken?
@@ -82,7 +92,7 @@ From my answers:
 2. Create contract YAML files in docs/contracts/
 3. Create test files in src/__tests__/contracts/
 4. Show me how to add to CI
-5. Create/update CLAUDE.md with contract rules
+5. Update this project's CLAUDE.md with contract rules
 
 I'll describe things in plain English. You structure it.
 ```
