@@ -226,6 +226,8 @@ Architecture + Features + Journeys = The Product
 
 **Skip any layer → ship blind.** Define all three → contracts enforce them.
 
+> **Journeys are your Definition of Done.** A feature isn't complete when tests pass—it's complete when users can accomplish their goals.
+
 ### How Each Layer Is Enforced
 
 | Layer | Contract Type | Enforced By | Runs In CI |
@@ -239,8 +241,6 @@ Architecture + Features + Journeys = The Product
 **Journey tests** run end-to-end in a browser via Playwright. They verify users can actually accomplish goals—not just that code compiles.
 
 ### Why Journeys Are Different
-
-**Journeys are your Definition of Done.** A feature isn't complete when tests pass—it's complete when users can accomplish their goals.
 
 Define journeys **before implementation**:
 1. Write `journey_checkout.yml` describing the flow
