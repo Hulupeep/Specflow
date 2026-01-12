@@ -2,7 +2,7 @@
 
 ## TL;DR: Copy-Paste This to Your LLM
 
-**You don't need to read anything first.** Just paste this prompt:
+**You don't need to read anything first.** Just paste this prompt after copying the Specflow folder into your project.
 
 ```
 I want to use Specflow to protect my codebase. Read these docs:
@@ -21,9 +21,10 @@ Then interview me about my project:
 From my answers:
 1. Generate REQ IDs (AUTH-001, STORAGE-001, J-CHECKOUT-001, etc.)
 2. Create contract YAML files in docs/contracts/
-3. Create test files in src/__tests__/contracts/
-4. Show me how to add to CI
-5. Update this project's CLAUDE.md with contract rules
+3. Create contract tests in src/__tests__/contracts/ (pattern scanning)
+4. Create journey tests in tests/e2e/ (Playwright E2E)
+5. Show me how to add to CI
+6. Update this project's CLAUDE.md with contract rules
 
 I'll describe things in plain English. You structure it.
 ```
@@ -42,7 +43,7 @@ Architecture + Features + Journeys = The Product
 |-------|-----------------|---------|
 | **Architecture** | Structural invariants | "No payment data in localStorage" |
 | **Features** | Product capabilities | "Queue orders by FIFO" |
-| **Journeys** | User accomplishments | "User can add a commission" |
+| **Journeys** | User accomplishments.  A feature isn't complete when tests pass—**it's complete when users can accomplish their goals.** | "User can add a commission" |
 
 **Skip any layer → ship blind.** Define all three → contracts enforce them.
 
@@ -94,9 +95,10 @@ Then interview me about my project:
 From my answers:
 1. Generate REQ IDs (AUTH-001, STORAGE-001, J-CHECKOUT-001, etc.)
 2. Create contract YAML files in docs/contracts/
-3. Create test files in src/__tests__/contracts/
-4. Show me how to add to CI
-5. Update this project's CLAUDE.md with contract rules
+3. Create contract tests in src/__tests__/contracts/ (pattern scanning)
+4. Create journey tests in tests/e2e/ (Playwright E2E)
+5. Show me how to add to CI
+6. Update this project's CLAUDE.md with contract rules
 
 I'll describe things in plain English. You structure it.
 ```
@@ -108,7 +110,7 @@ The LLM will ask things like:
 - "Are there API routes? Do they all need authentication?"
 - "What's the critical user flow that must never break?"
 
-Just answer in plain English. No special format needed.
+Just answer in plain English. No special format needed. If you don't know, ask the LLM to suggest best practices for this tech stack. Now is better than later.
 
 ### Step 3: LLM Produces
 
@@ -179,11 +181,24 @@ Example answers:
 
 ### Step 3: LLM Creates Freeze Contracts
 
-The LLM will generate:
-- `AUTH-001`: Sessions use Redis, not localStorage
-- `AUTH-002`: All /api/* routes have authMiddleware
-- `SEC-001`: Passwords use bcrypt
-- `J-CHECKOUT-001`: Cart → payment → confirmation flow works
+**Contract files:**
+- `docs/contracts/feature_architecture.yml` - Architecture invariants
+- `docs/contracts/feature_*.yml` - Feature rules (AUTH-001, SEC-001, etc.)
+- `docs/contracts/journey_*.yml` - Critical user flows (J-CHECKOUT-001)
+
+**Test files:**
+- `src/__tests__/contracts/*.test.ts` - Contract tests (pattern scanning)
+- `tests/e2e/journey_*.spec.ts` - Journey tests (Playwright E2E)
+
+### Step 4: Run Tests
+
+```bash
+# Run contract tests (architecture + features)
+npm test -- contracts
+
+# Run journey tests (Playwright E2E)
+npm test -- journeys
+```
 
 Now if anyone tries to "optimize" your auth to use localStorage, **the build fails**.
 
@@ -221,6 +236,18 @@ The LLM will:
 - Parse your existing requirements
 - Generate REQ IDs if missing
 - Create all contracts, tests, and config
+
+**What you get:**
+- `docs/contracts/feature_*.yml` - Contract files
+- `docs/contracts/journey_*.yml` - Journey definitions
+- `src/__tests__/contracts/*.test.ts` - Contract tests
+- `tests/e2e/journey_*.spec.ts` - Journey tests (Playwright)
+
+**Run tests:**
+```bash
+npm test -- contracts   # Architecture + Features
+npm test -- journeys    # Playwright E2E
+```
 
 ---
 
@@ -409,6 +436,7 @@ You're doing it right when:
 │   docs/contracts/feature_*.yml  = Pattern rules        │
 │   docs/contracts/journey_*.yml  = User flow DOD        │
 │   src/__tests__/contracts/      = Contract tests       │
+│   tests/e2e/journey_*.spec.ts   = Journey tests        │
 │                                                         │
 │ Key Commands:                                           │
 │   npm test -- contracts   Run contract tests           │
