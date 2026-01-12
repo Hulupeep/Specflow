@@ -112,11 +112,33 @@ Just answer in plain English. No special format needed.
 
 ### Step 3: LLM Produces
 
-- `docs/contracts/feature_*.yml` - Pattern rules
-- `docs/contracts/journey_*.yml` - User flow definitions
-- `src/__tests__/contracts/*.test.ts` - Violation scanners
+**Contract files:**
+- `docs/contracts/feature_architecture.yml` - Architecture invariants
+- `docs/contracts/feature_*.yml` - Feature rules
+- `docs/contracts/journey_*.yml` - User journey definitions (DOD)
+
+**Test files:**
+- `src/__tests__/contracts/*.test.ts` - Contract tests (pattern scanning)
+- `tests/e2e/journey_*.spec.ts` - Journey tests (Playwright E2E)
+
+**Config:**
 - `CLAUDE.md` updates - So future LLMs follow the rules
 - CI config - So violations block merges
+
+### Step 4: Run Tests
+
+```bash
+# Run contract tests (architecture + features)
+npm test -- contracts
+
+# Run journey tests (Playwright E2E)
+npm test -- journeys
+
+# Run everything
+npm test
+```
+
+**Journeys are your Definition of Done, enforced by Playwright.** A feature isn't done when contract tests pass—it's done when users can accomplish their goals end-to-end.
 
 ---
 

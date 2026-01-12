@@ -26,7 +26,7 @@ const token = localStorage.getItem('auth') // 💥 CRASH or worse. No crash, jus
 
 Your carefully worded spec competes with millions of training examples. The model assigns weights you're not privy to. "MUST NOT use localStorage" might get less attention than a pattern it saw 10,000 times in training data.
 
-Three hours into a session, the LLM starts to drift while presenting itself as knowing exactly what you're working on. This fluency is an optimization artifact—not understanding.
+Three hours into a session, the LLM starts to drift while presenting itself as knowing exactly what you're working on. This fluency is a known optimization artifact—not understanding.
 
 **You can't fix this with better prompts.** You need a gate.
 
@@ -161,7 +161,7 @@ See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions, GitLab, Azure, an
 
 ## What Is Specflow?
 
-Specflow is a methodology for building software with LLMs that **guarantees** architectural rules can't be broken.
+Specflow is a methodology for building software with LLMs that **guarantees** architectural rules  and featurescan't be broken and journeys work end to end. 
 
 **The reality of LLMs:** Prompts express intent. But intent isn't enforcement. No matter how clear your instructions, the model might "optimize" your auth flow, "simplify" your security patterns, or "helpfully" refactor into an anti-pattern. Unit tests pass. The app breaks.
 
@@ -226,7 +226,30 @@ Architecture + Features + Journeys = The Product
 
 **Skip any layer → ship blind.** Define all three → contracts enforce them.
 
-**Journeys are your Definition of Done.** A feature isn't complete when code compiles—it's complete when users can accomplish their goals. See [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md).
+### How Each Layer Is Enforced
+
+| Layer | Contract Type | Enforced By | Runs In CI |
+|-------|---------------|-------------|------------|
+| **Architecture** | `feature_architecture.yml` | Contract tests (pattern scanning) | `npm test -- contracts` |
+| **Features** | `feature_*.yml` | Contract tests (pattern scanning) | `npm test -- contracts` |
+| **Journeys** | `journey_*.yml` | Playwright E2E tests | `npm test -- journeys` |
+
+**Contract tests** scan your source code for forbidden/required patterns. They catch drift that unit tests won't—like an LLM "optimizing" your auth into an anti-pattern.
+
+**Journey tests** run end-to-end in a browser via Playwright. They verify users can actually accomplish goals—not just that code compiles.
+
+### Why Journeys Are Different
+
+**Journeys are your Definition of Done.** A feature isn't complete when tests pass—it's complete when users can accomplish their goals.
+
+Define journeys **before implementation**:
+1. Write `journey_checkout.yml` describing the flow
+2. Generate Playwright tests from the journey contract
+3. Build until Playwright passes
+
+Without this, you let the LLM build flows, then discover broken UX late. With Specflow, the build target is explicit from day one.
+
+See [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md) for journey contract format and examples.
 
 ---
 
@@ -509,11 +532,12 @@ Specflow is a methodology—it works with your existing tools.
 
 ### Testing Frameworks
 
-Contract tests are regular tests—they work with any framework:
-- Jest / Vitest
-- Mocha
-- Playwright (for journey contracts)
-- Any framework that can read files and match patterns
+| Test Type | Framework | Purpose |
+|-----------|-----------|---------|
+| **Contract tests** | Jest / Vitest / Mocha | Scan code for forbidden/required patterns |
+| **Journey tests** | Playwright | E2E browser tests from journey contracts |
+
+Contract tests work with any framework that can read files and match patterns. Journey tests use Playwright for real browser verification.
 
 ---
 
