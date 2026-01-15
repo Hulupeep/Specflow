@@ -1,0 +1,197 @@
+# Contract Index - AISP + Specflow To-Do App Demo
+# ═══════════════════════════════════════════════════════════════════
+# Central registry of all contracts and their relationships
+# ═══════════════════════════════════════════════════════════════════
+
+metadata:
+  project: aisp-specflow-todo
+  version: 1
+  date: "2026-01-15"
+  total_contracts: 6
+  total_requirements: "9 MUST, 2 SHOULD"
+  total_journeys: 3
+  aisp_source: "docs/specs/TODO-APP.aisp"
+
+# ═══════════════════════════════════════════════════════════════════
+# DEFINITION OF DONE
+# ═══════════════════════════════════════════════════════════════════
+
+definition_of_done:
+  critical_journeys:
+    - J-TODO-CREATE    # Must pass: user can create tasks
+    - J-TODO-COMPLETE  # Must pass: user can complete tasks
+    - J-TODO-DELETE    # Must pass: user can delete tasks
+
+  important_journeys: []
+
+  future_journeys:
+    - J-TODO-FILTER    # Filter by status
+    - J-TODO-PERSIST   # Full persistence test
+
+  release_gate: |
+    All critical journeys must have status: passing
+    before release is allowed.
+
+# ═══════════════════════════════════════════════════════════════════
+# CONTRACTS
+# ═══════════════════════════════════════════════════════════════════
+
+contracts:
+  # Feature Contracts
+  - id: feature_todo
+    file: feature_todo.yml
+    status: active
+    type: feature
+    covers_reqs:
+      - TODO-001
+      - TODO-002
+      - TODO-005
+    summary: "CRUD operations and storage patterns"
+    aisp_blocks:
+      - "⟦Γ:Rules⟧.TODO-001"
+      - "⟦Γ:Rules⟧.TODO-002"
+      - "⟦Γ:Rules⟧.TODO-005"
+
+  - id: feature_security
+    file: feature_security.yml
+    status: active
+    type: feature
+    covers_reqs:
+      - SEC-001
+      - SEC-002
+    summary: "Service worker storage restrictions"
+    aisp_blocks:
+      - "⟦Γ:Rules⟧.SEC-001"
+      - "⟦Γ:Rules⟧.SEC-002"
+
+  - id: feature_data
+    file: feature_data.yml
+    status: active
+    type: feature
+    covers_reqs:
+      - DATA-001
+      - DATA-002
+    summary: "Data integrity and type constraints"
+    aisp_blocks:
+      - "⟦Γ:Rules⟧.DATA-001"
+      - "⟦Γ:Rules⟧.DATA-002"
+
+  # Journey Contracts
+  - id: J-TODO-CREATE
+    file: journey_todo_create.yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: not_tested
+    covers_reqs:
+      - TODO-001
+      - TODO-004
+    summary: "Create task flow"
+    e2e_test: "tests/e2e/journey_todo_create.spec.ts"
+
+  - id: J-TODO-COMPLETE
+    file: journey_todo_complete.yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: not_tested
+    covers_reqs:
+      - TODO-002
+      - TODO-004
+      - DATA-002
+    summary: "Complete task flow"
+    e2e_test: "tests/e2e/journey_todo_complete.spec.ts"
+
+  - id: J-TODO-DELETE
+    file: journey_todo_delete.yml
+    status: active
+    type: e2e
+    dod_criticality: critical
+    dod_status: not_tested
+    covers_reqs:
+      - TODO-003
+      - TODO-004
+    summary: "Delete task flow"
+    e2e_test: "tests/e2e/journey_todo_delete.spec.ts"
+
+# ═══════════════════════════════════════════════════════════════════
+# REQUIREMENTS COVERAGE MATRIX
+# ═══════════════════════════════════════════════════════════════════
+
+requirements_coverage:
+  # CRUD Operations
+  TODO-001: [feature_todo, J-TODO-CREATE]
+  TODO-002: [feature_todo, J-TODO-COMPLETE]
+  TODO-003: [J-TODO-DELETE]
+  TODO-004: [J-TODO-CREATE, J-TODO-COMPLETE, J-TODO-DELETE]
+  TODO-005: [feature_todo]
+
+  # Security
+  SEC-001: [feature_security]
+  SEC-002: [feature_security]
+
+  # UI (soft rules - not in contracts)
+  UI-001: []  # Covered by journey tests implicitly
+  UI-002: []  # Performance - manual verification
+  UI-003: []  # Empty state - future journey
+
+  # Data Integrity
+  DATA-001: [feature_data]
+  DATA-002: [feature_data, J-TODO-COMPLETE]
+
+# ═══════════════════════════════════════════════════════════════════
+# GAPS & COVERAGE ANALYSIS
+# ═══════════════════════════════════════════════════════════════════
+
+uncovered_requirements:
+  - UI-001  # Soft rule - implicit in journeys
+  - UI-002  # Soft rule - performance
+  - UI-003  # Soft rule - empty state
+
+uncovered_journeys:
+  - J-TODO-FILTER   # Planned for v1.1
+  - J-TODO-PERSIST  # Extended persistence test
+
+# ═══════════════════════════════════════════════════════════════════
+# TEST FILES
+# ═══════════════════════════════════════════════════════════════════
+
+test_files:
+  contract_tests:
+    - path: "tests/contracts/todo_contract.test.ts"
+      covers: [TODO-001, TODO-002, TODO-005]
+    - path: "tests/contracts/security_contract.test.ts"
+      covers: [SEC-001, SEC-002]
+    - path: "tests/contracts/data_contract.test.ts"
+      covers: [DATA-001, DATA-002]
+
+  e2e_tests:
+    - path: "tests/e2e/journey_todo_create.spec.ts"
+      covers: [J-TODO-CREATE]
+    - path: "tests/e2e/journey_todo_complete.spec.ts"
+      covers: [J-TODO-COMPLETE]
+    - path: "tests/e2e/journey_todo_delete.spec.ts"
+      covers: [J-TODO-DELETE]
+
+# ═══════════════════════════════════════════════════════════════════
+# AISP → SPECFLOW MAPPING
+# ═══════════════════════════════════════════════════════════════════
+
+aisp_mapping:
+  source_file: "docs/specs/TODO-APP.aisp"
+  mappings:
+    - aisp_block: "⟦Σ:Types⟧.Task"
+      specflow: "src/types/task.ts"
+      description: "Task interface definition"
+
+    - aisp_block: "⟦Γ:Rules⟧"
+      specflow: "docs/contracts/feature_*.yml"
+      description: "Rules become contract patterns"
+
+    - aisp_block: "⟦Λ:Functions⟧"
+      specflow: "src/services/*.ts"
+      description: "Functions become implementation"
+
+    - aisp_block: "⟦Ε⟧"
+      specflow: "CONTRACT_INDEX.yml:dod_criticality"
+      description: "Evidence maps to DOD levels"

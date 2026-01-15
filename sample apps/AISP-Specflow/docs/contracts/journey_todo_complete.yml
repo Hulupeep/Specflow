@@ -1,0 +1,79 @@
+journey_meta:
+  id: J-TODO-COMPLETE
+  from_spec: "docs/specs/todo.md"
+  aisp_source: "docs/specs/TODO-APP.aisp"
+  covers_reqs:
+    - TODO-002
+    - TODO-004
+    - DATA-002
+  type: "e2e"
+  dod_criticality: critical
+  status: not_tested
+  last_verified: null
+
+description: |
+  User completes an existing task and verifies the completed state
+  persists across page refresh.
+
+preconditions:
+  - description: "At least one incomplete task exists"
+    setup_hint: "Create a task first using J-TODO-CREATE flow"
+
+timing:
+  animation_complete: 200
+  checkbox_transition: 150
+
+steps:
+  - step: 1
+    name: "User sees incomplete task"
+    action: "navigate"
+    target: "/"
+    required_elements:
+      - selector: "[data-testid='task-item']"
+        description: "Task item in list"
+      - selector: "[data-testid='task-checkbox']"
+        description: "Unchecked checkbox"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='task-checkbox']"
+      - type: "attribute"
+        selector: "[data-testid='task-checkbox']"
+        attribute: "data-checked"
+        value: "false"
+
+  - step: 2
+    name: "User clicks checkbox"
+    action: "click"
+    target: "[data-testid='task-checkbox']"
+    expected:
+      - type: "attribute"
+        selector: "[data-testid='task-checkbox']"
+        attribute: "data-checked"
+        value: "true"
+
+  - step: 3
+    name: "Task shows completed styling"
+    expected:
+      - type: "css_class"
+        selector: "[data-testid='task-item']"
+        contains: "completed"
+
+  - step: 4
+    name: "Completed state persists after refresh"
+    action: "reload"
+    expected:
+      - type: "attribute"
+        selector: "[data-testid='task-checkbox']"
+        attribute: "data-checked"
+        value: "true"
+      - type: "css_class"
+        selector: "[data-testid='task-item']"
+        contains: "completed"
+
+success_criteria:
+  - "Checkbox becomes checked on click"
+  - "Task shows strikethrough/completed styling"
+  - "Completed state persists after refresh"
+
+test_hooks:
+  e2e_test_file: "tests/e2e/journey_todo_complete.spec.ts"

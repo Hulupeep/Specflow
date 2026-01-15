@@ -1,0 +1,42 @@
+{
+  "name": "aisp-specflow-todo",
+  "version": "1.0.0",
+  "description": "To-Do App built with AISP + Specflow methodology",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:contracts": "npm test -- --testPathPattern=contracts",
+    "test:e2e": "playwright test",
+    "lint": "eslint src/**/*.ts",
+    "dev": "vite",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "aisp",
+    "specflow",
+    "todo",
+    "contracts",
+    "deterministic"
+  ],
+  "author": "AISP+Specflow Demo",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/jest": "^29.5.12",
+    "@types/node": "^20.11.0",
+    "@types/react": "^19.2.8",
+    "@types/react-dom": "^19.2.3",
+    "glob": "^10.3.10",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "^5.1.2",
+    "idb": "^8.0.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "vite": "^7.3.1"
+  }
+}

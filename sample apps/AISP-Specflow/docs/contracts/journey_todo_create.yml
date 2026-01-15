@@ -1,0 +1,84 @@
+journey_meta:
+  id: J-TODO-CREATE
+  from_spec: "docs/specs/todo.md"
+  aisp_source: "docs/specs/TODO-APP.aisp"
+  covers_reqs:
+    - TODO-001
+    - TODO-004
+    - UI-001
+  type: "e2e"
+  dod_criticality: critical
+  status: not_tested
+  last_verified: null
+
+description: |
+  User creates a new task and verifies it appears in the list
+  and persists across page refresh.
+
+preconditions: []
+
+timing:
+  animation_add: 200
+  debounce_input: 0
+  api_timeout: 5000
+
+steps:
+  - step: 1
+    name: "User sees input field"
+    action: "navigate"
+    target: "/"
+    required_elements:
+      - selector: "[data-testid='task-input']"
+        description: "Task input field"
+      - selector: "[data-testid='add-button']"
+        description: "Add task button"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='task-input']"
+
+  - step: 2
+    name: "User types task title"
+    action: "type"
+    target: "[data-testid='task-input']"
+    value: "Buy groceries"
+    expected:
+      - type: "input_value"
+        selector: "[data-testid='task-input']"
+        value: "Buy groceries"
+
+  - step: 3
+    name: "User submits task"
+    action: "press"
+    target: "[data-testid='task-input']"
+    key: "Enter"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='task-item']"
+      - type: "text_content"
+        selector: "[data-testid='task-item']"
+        contains: "Buy groceries"
+
+  - step: 4
+    name: "Input field clears"
+    expected:
+      - type: "input_value"
+        selector: "[data-testid='task-input']"
+        value: ""
+
+  - step: 5
+    name: "Task persists after refresh"
+    action: "reload"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='task-item']"
+      - type: "text_content"
+        selector: "[data-testid='task-item']"
+        contains: "Buy groceries"
+
+success_criteria:
+  - "Task appears in list after creation"
+  - "Input clears after submission"
+  - "Task persists after page refresh"
+
+test_hooks:
+  e2e_test_file: "tests/e2e/journey_todo_create.spec.ts"

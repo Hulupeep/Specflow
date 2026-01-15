@@ -461,6 +461,63 @@ Both valuable. Different problems.
 
 ---
 
+## Limitations (Honest Assessment)
+
+Contract tests catch a lot. They don't catch everything.
+
+### Pattern Scanning Has Blind Spots
+
+Contract tests work by scanning source code for forbidden patterns. But patterns can be circumvented:
+
+```javascript
+// Pattern: /localStorage/
+localStorage.setItem('token', jwt)  // ✅ Caught
+
+// Same violation, different syntax:
+window['localStorage']['setItem']('token', jwt)  // ❌ Missed
+const storage = window.localStorage; storage.setItem('token', jwt)  // ❌ Missed
+```
+
+**You can't write patterns for every variation.** Patterns are narrow by design—too broad and you get false positives.
+
+### Neither Patterns Nor Journeys Are Sufficient Alone
+
+| Enforcement | What It Catches | What It Misses |
+|-------------|-----------------|----------------|
+| **Patterns** | Known code shapes, fast | Novel violations, runtime behavior |
+| **Journeys** | Actual breakage, authoritative | Slow, flaky, only what's tested |
+
+Patterns are fast but blind to variations. Journeys are authoritative but slow and only cover tested flows.
+
+### Defense in Depth
+
+Specflow's value isn't perfect prevention—it's catching **most** drift **early**.
+
+```
+Pattern tests: First line of defense (fast, cheap, catches known shapes)
+                        ↓
+Journey tests: Second line of defense (slow, authoritative, catches actual breakage)
+                        ↓
+Production: Some things still get through
+```
+
+**The honest truth:**
+- Patterns catch 80% of drift instantly
+- Journeys catch another 15% after build
+- ~5% still gets through to production
+
+That's dramatically better than 0% enforcement, which is what you have without contracts.
+
+### How to Strengthen the Gate
+
+1. **Write more specific patterns.** When a violation slips through, add a pattern for that specific shape.
+2. **Cover critical flows with journeys.** If a pattern can't catch it, a journey can.
+3. **Learn from escapes.** Every production issue that should have been caught → becomes a new pattern or journey.
+
+The gate gets stronger over time, but it's never perfect. Neither is any other enforcement mechanism.
+
+---
+
 ## Verification
 
 Check if your project is set up correctly:

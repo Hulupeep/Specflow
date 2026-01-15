@@ -1,0 +1,80 @@
+contract_meta:
+  id: feature_security
+  version: 1
+  created_from_spec: "docs/specs/todo.md"
+  aisp_source: "docs/specs/TODO-APP.aisp"
+  covers_reqs:
+    - SEC-001
+    - SEC-002
+  owner: "aisp-specflow-demo"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_security"
+
+rules:
+  non_negotiable:
+    # ═══════════════════════════════════════════════════════════════
+    # SEC-001: No localStorage in service workers
+    # AISP: ∀file∈ServiceWorkerFiles:¬∃call:call.target≡localStorage
+    # ═══════════════════════════════════════════════════════════════
+    - id: SEC-001
+      title: "No localStorage in service workers"
+      scope:
+        - "src/sw/**/*.ts"
+        - "src/sw/**/*.js"
+        - "src/background/**/*.ts"
+        - "src/background/**/*.js"
+        - "src/service-worker/**/*.ts"
+        - "src/service-worker/**/*.js"
+      behavior:
+        forbidden_patterns:
+          - pattern: /localStorage/
+            message: "localStorage not available in service workers (SEC-001)"
+          - pattern: /window\.localStorage/
+            message: "window.localStorage not available in service workers (SEC-001)"
+        example_violation: |
+          // In src/sw/worker.ts
+          const tasks = localStorage.getItem('tasks')
+        example_compliant: |
+          // In src/sw/worker.ts
+          const tasks = await chrome.storage.local.get('tasks')
+
+    # ═══════════════════════════════════════════════════════════════
+    # SEC-002: No sessionStorage in service workers
+    # AISP: ∀file∈ServiceWorkerFiles:¬∃call:call.target≡sessionStorage
+    # ═══════════════════════════════════════════════════════════════
+    - id: SEC-002
+      title: "No sessionStorage in service workers"
+      scope:
+        - "src/sw/**/*.ts"
+        - "src/sw/**/*.js"
+        - "src/background/**/*.ts"
+        - "src/background/**/*.js"
+        - "src/service-worker/**/*.ts"
+        - "src/service-worker/**/*.js"
+      behavior:
+        forbidden_patterns:
+          - pattern: /sessionStorage/
+            message: "sessionStorage not available in service workers (SEC-002)"
+          - pattern: /window\.sessionStorage/
+            message: "window.sessionStorage not available in service workers (SEC-002)"
+        example_violation: |
+          // In src/background/bg.ts
+          sessionStorage.setItem('temp', 'value')
+        example_compliant: |
+          // In src/background/bg.ts
+          await chrome.storage.session.set({ temp: 'value' })
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you editing service worker or background script?"
+      if_yes: "Never use localStorage or sessionStorage. Use chrome.storage or indexedDB."
+    - question: "Are you adding browser storage code?"
+      if_yes: "Check file location. If in sw/ or background/, only use chrome.storage."
+
+test_hooks:
+  tests:
+    - file: "tests/contracts/security_contract.test.ts"
+      description: "Pattern checks for SEC-001, SEC-002"

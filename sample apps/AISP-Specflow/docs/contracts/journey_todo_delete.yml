@@ -1,0 +1,68 @@
+journey_meta:
+  id: J-TODO-DELETE
+  from_spec: "docs/specs/todo.md"
+  aisp_source: "docs/specs/TODO-APP.aisp"
+  covers_reqs:
+    - TODO-003
+    - TODO-004
+  type: "e2e"
+  dod_criticality: critical
+  status: not_tested
+  last_verified: null
+
+description: |
+  User deletes a task and verifies it is removed from the list
+  and does not reappear after page refresh.
+
+preconditions:
+  - description: "At least one task exists"
+    setup_hint: "Create a task first using J-TODO-CREATE flow"
+
+timing:
+  animation_delete: 200
+  hover_reveal: 100
+
+steps:
+  - step: 1
+    name: "User sees task in list"
+    action: "navigate"
+    target: "/"
+    required_elements:
+      - selector: "[data-testid='task-item']"
+        description: "Task item to delete"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='task-item']"
+
+  - step: 2
+    name: "User hovers to reveal delete button"
+    action: "hover"
+    target: "[data-testid='task-item']"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='delete-button']"
+
+  - step: 3
+    name: "User clicks delete button"
+    action: "click"
+    target: "[data-testid='delete-button']"
+    expected:
+      - type: "element_not_visible"
+        selector: "[data-testid='task-item']"
+        timeout: 500
+
+  - step: 4
+    name: "Task stays deleted after refresh"
+    action: "reload"
+    expected:
+      - type: "element_count"
+        selector: "[data-testid='task-item']"
+        count: 0
+
+success_criteria:
+  - "Delete button appears on hover"
+  - "Task removed from list on delete"
+  - "Task does not reappear after refresh"
+
+test_hooks:
+  e2e_test_file: "tests/e2e/journey_todo_delete.spec.ts"

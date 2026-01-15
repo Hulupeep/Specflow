@@ -1,0 +1,293 @@
+𝔸1.0.todo-app@2026-01-15
+γ≔application.todo.specification
+ρ≔⟨crud,persistence,security,ui⟩
+⊢ND∧ΠΣ
+
+;; ═══════════════════════════════════════════════════════════════════
+;; AISP FORMAL SPECIFICATION: To-Do Application
+;; ═══════════════════════════════════════════════════════════════════
+;;
+;; This specification defines a to-do application with:
+;; - CRUD operations for tasks
+;; - Persistent storage across sessions
+;; - Security constraints for service worker environments
+;; - UI invariants for user experience
+;;
+;; Human Requirements (source):
+;; "Build a to-do app where users can create tasks, mark them complete,
+;; and delete them. Tasks should persist across browser sessions.
+;; Don't use localStorage in service workers."
+;;
+;; ═══════════════════════════════════════════════════════════════════
+
+;; ─── Ω: FOUNDATION & INVARIANTS ───
+⟦Ω:Meta⟧{
+  ∀D∈AISP:Ambig(D)<0.02
+  Domain≜"Task management application"
+  Version≜"1.0.0"
+  Author≜"AISP+Specflow Demo"
+
+  ;; Core invariant: Every operation must be deterministic
+  ∀op∈{create,complete,delete}:deterministic(op)
+}
+
+;; ─── Σ: TYPE DEFINITIONS ───
+⟦Σ:Types⟧{
+  ;; Primitive types
+  UUID≜𝕊[36]:format("xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx")
+  Timestamp≜ℕ:milliseconds_since_epoch
+  TaskTitle≜𝕊:len∈[1,500]
+
+  ;; Core domain type
+  Task≜⟨
+    id:UUID,
+    title:TaskTitle,
+    completed:𝔹,
+    createdAt:Timestamp,
+    completedAt:Option⟨Timestamp⟩
+  ⟩
+
+  ;; Collection type
+  TaskList≜List⟨Task⟩
+
+  ;; Storage mechanisms
+  ApprovedStorage≜{indexedDB,chrome.storage.local}
+  ForbiddenStorage≜{localStorage,sessionStorage}
+
+  ;; Application state
+  AppState≜⟨
+    tasks:TaskList,
+    filter:FilterType,
+    loading:𝔹
+  ⟩
+
+  FilterType≜{all,active,completed}
+
+  ;; Result types for operations
+  Result⟨T⟩≜Either⟨Error,T⟩
+  Error≜⟨code:ℕ,message:𝕊⟩
+}
+
+;; ─── Γ: RULES & CONSTRAINTS ───
+⟦Γ:Rules⟧{
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; CRUD OPERATIONS (TODO-001 through TODO-003)
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; TODO-001: Create task adds to list with unique ID
+  TODO-001:∀title:TaskTitle.
+    create(title)⇒∃task∈TaskList:
+      task.id∈UUID∧
+      task.title≡title∧
+      task.completed≡⊥∧
+      task.createdAt≤now()
+
+  ;; TODO-002: Complete task sets completed flag
+  TODO-002:∀task∈TaskList.
+    complete(task)⇒task.completed≔⊤∧task.completedAt≔Some(now())
+
+  ;; TODO-003: Delete task removes from list
+  TODO-003:∀task∈TaskList.
+    delete(task)⇒¬∃t∈TaskList:t.id≡task.id
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; PERSISTENCE (TODO-004 through TODO-005)
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; TODO-004: Tasks persist across sessions
+  TODO-004:∀session_n,session_{n+1}:
+    TaskList(session_n)≡TaskList(session_{n+1})
+    ;; (modulo explicit user changes)
+
+  ;; TODO-005: Storage uses approved mechanisms only
+  TODO-005:∀write:persist(TaskList)⇒storage∈ApprovedStorage
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; SECURITY (SEC-001 through SEC-002)
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; SEC-001: No localStorage in service workers
+  SEC-001:∀file∈ServiceWorkerFiles:
+    ¬∃call∈file:call.target≡localStorage
+
+  ;; SEC-002: No sessionStorage in service workers
+  SEC-002:∀file∈ServiceWorkerFiles:
+    ¬∃call∈file:call.target≡sessionStorage
+
+  ;; Define service worker file patterns
+  ServiceWorkerFiles≜{f|path(f)∈"src/sw/**"∨path(f)∈"src/background/**"}
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; UI INVARIANTS (UI-001 through UI-003)
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; UI-001: All tasks visible unless filtered
+  UI-001:∀task∈TaskList:
+    visible(task)⇔(filter≡all)∨
+                  (filter≡active∧¬task.completed)∨
+                  (filter≡completed∧task.completed)
+
+  ;; UI-002: Actions provide immediate feedback
+  UI-002:∀action∈{create,complete,delete}:
+    response_time(action)<300ms
+
+  ;; UI-003: Empty state shows helpful message
+  UI-003:|TaskList|≡0⇒show(emptyStateMessage)
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; DATA INTEGRITY (DATA-001 through DATA-002)
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; DATA-001: Task IDs are unique
+  DATA-001:∀t1,t2∈TaskList:t1≢t2⇒t1.id≢t2.id
+
+  ;; DATA-002: Completed tasks have completion timestamp
+  DATA-002:∀task∈TaskList:
+    task.completed≡⊤⇒task.completedAt≢None
+}
+
+;; ─── Λ: FUNCTION DEFINITIONS ───
+⟦Λ:Functions⟧{
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; TASK OPERATIONS
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; Create a new task
+  createTask:TaskTitle→Task
+  createTask≜λtitle.⟨
+    id:generateUUID(),
+    title:title,
+    completed:⊥,
+    createdAt:now(),
+    completedAt:None
+  ⟩
+
+  ;; Mark task as complete
+  completeTask:Task→Task
+  completeTask≜λt.t[completed↦⊤,completedAt↦Some(now())]
+
+  ;; Toggle task completion
+  toggleTask:Task→Task
+  toggleTask≜λt.t.completed?uncompleteTask(t):completeTask(t)
+
+  ;; Uncomplete a task
+  uncompleteTask:Task→Task
+  uncompleteTask≜λt.t[completed↦⊥,completedAt↦None]
+
+  ;; Delete task from list
+  deleteTask:TaskList×UUID→TaskList
+  deleteTask≜λ(list,id).filter(list,λt.t.id≢id)
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; PERSISTENCE OPERATIONS
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; Save tasks to storage
+  persistTasks:TaskList→IO⟨Result⟨⟩⟩
+  persistTasks≜λlist.indexedDB.put("tasks",serialize(list))
+
+  ;; Load tasks from storage
+  loadTasks:⟨⟩→IO⟨Result⟨TaskList⟩⟩
+  loadTasks≜λ_.indexedDB.get("tasks").map(deserialize)
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; FILTERING OPERATIONS
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; Apply filter to task list
+  applyFilter:TaskList×FilterType→TaskList
+  applyFilter≜λ(list,filter).case filter of
+    all→list
+    active→filter(list,λt.¬t.completed)
+    completed→filter(list,λt.t.completed)
+
+  ;; Count tasks by status
+  countActive:TaskList→ℕ
+  countActive≜λlist.|filter(list,λt.¬t.completed)|
+
+  countCompleted:TaskList→ℕ
+  countCompleted≜λlist.|filter(list,λt.t.completed)|
+
+  ;; ═══════════════════════════════════════════════════════════════
+  ;; UTILITY FUNCTIONS
+  ;; ═══════════════════════════════════════════════════════════════
+
+  ;; Generate UUID v4
+  generateUUID:⟨⟩→UUID
+  generateUUID≜λ_.crypto.randomUUID()
+
+  ;; Get current timestamp
+  now:⟨⟩→Timestamp
+  now≜λ_.Date.now()
+
+  ;; Serialize task list for storage
+  serialize:TaskList→𝕊
+  serialize≜λlist.JSON.stringify(list)
+
+  ;; Deserialize task list from storage
+  deserialize:𝕊→Result⟨TaskList⟩
+  deserialize≜λstr.try(JSON.parse(str))
+}
+
+;; ─── Χ: ERROR HANDLING ───
+⟦Χ:Errors⟧{
+  ;; Storage errors
+  ε_storage≜⟨code:1001,message:"Failed to access storage"⟩
+  ε_serialize≜⟨code:1002,message:"Failed to serialize tasks"⟩
+  ε_deserialize≜⟨code:1003,message:"Failed to deserialize tasks"⟩
+
+  ;; Validation errors
+  ε_empty_title≜⟨code:2001,message:"Task title cannot be empty"⟩
+  ε_title_too_long≜⟨code:2002,message:"Task title exceeds 500 characters"⟩
+  ε_invalid_id≜⟨code:2003,message:"Invalid task ID format"⟩
+
+  ;; Not found errors
+  ε_task_not_found≜⟨code:3001,message:"Task not found"⟩
+
+  ;; Recovery functions
+  ρ_storage≜λe.retry(3,exponential_backoff)
+  ρ_deserialize≜λe.return(empty_list)
+}
+
+;; ─── Ε: EVIDENCE & CERTIFICATION ───
+⟦Ε⟧⟨
+  δ≜0.85
+  φ≜100
+  τ≜◊⁺⁺
+
+  ;; Requirements coverage
+  ⊢TODO-001:create_adds_task
+  ⊢TODO-002:complete_sets_flag
+  ⊢TODO-003:delete_removes_task
+  ⊢TODO-004:persistence_across_sessions
+  ⊢TODO-005:approved_storage_only
+  ⊢SEC-001:no_localStorage_in_sw
+  ⊢SEC-002:no_sessionStorage_in_sw
+  ⊢UI-001:filter_visibility
+  ⊢UI-002:action_feedback_time
+  ⊢UI-003:empty_state_message
+  ⊢DATA-001:unique_task_ids
+  ⊢DATA-002:completion_timestamp
+
+  ;; Formal verification
+  ⊢ND:natural_deduction_proofs
+  ⊢ΠΣ:dependent_types
+  ⊢Ambig(D)<0.02
+
+  ;; Specflow mapping ready
+  ⊢SPECFLOW_READY:all_rules_have_ids
+⟩
+
+;; ═══════════════════════════════════════════════════════════════════
+;; END OF SPECIFICATION
+;; ═══════════════════════════════════════════════════════════════════
+;;
+;; This AISP specification is ready for Specflow contract generation.
+;;
+;; Mapping guide:
+;;   ⟦Γ:Rules⟧.TODO-* → feature_todo.yml:rules.non_negotiable
+;;   ⟦Γ:Rules⟧.SEC-*  → feature_security.yml:rules.non_negotiable
+;;   ⟦Γ:Rules⟧.UI-*   → feature_ui.yml:rules.soft
+;;   ⟦Γ:Rules⟧.DATA-* → feature_data.yml:rules.non_negotiable
+;;
+;; ═══════════════════════════════════════════════════════════════════

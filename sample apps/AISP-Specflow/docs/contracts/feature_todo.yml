@@ -1,0 +1,95 @@
+contract_meta:
+  id: feature_todo
+  version: 1
+  created_from_spec: "docs/specs/todo.md"
+  aisp_source: "docs/specs/TODO-APP.aisp"
+  covers_reqs:
+    - TODO-001
+    - TODO-002
+    - TODO-003
+    - TODO-004
+    - TODO-005
+  owner: "aisp-specflow-demo"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_todo"
+
+rules:
+  non_negotiable:
+    # ═══════════════════════════════════════════════════════════════
+    # TODO-001: Create task adds to list with unique ID
+    # AISP: ∀title:TaskTitle.create(title)⇒∃task∈TaskList:task.id∈UUID
+    # ═══════════════════════════════════════════════════════════════
+    - id: TODO-001
+      title: "Creating a task must generate unique UUID"
+      scope:
+        - "src/services/**/*.ts"
+        - "src/hooks/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /crypto\.randomUUID|uuid(?:v4)?|nanoid/
+            message: "Task creation must use UUID generator (TODO-001)"
+        example_violation: |
+          function createTask(title) {
+            return { id: Math.random(), title }  // Bad: not UUID
+          }
+        example_compliant: |
+          function createTask(title) {
+            return { id: crypto.randomUUID(), title, completed: false }
+          }
+
+    # ═══════════════════════════════════════════════════════════════
+    # TODO-002: Complete task sets completed flag
+    # AISP: ∀task.complete(task)⇒task.completed≔⊤
+    # ═══════════════════════════════════════════════════════════════
+    - id: TODO-002
+      title: "Completing task must set completed and timestamp"
+      scope:
+        - "src/services/**/*.ts"
+        - "src/hooks/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /completed:\s*true|completed\s*=\s*true/
+            message: "Complete function must set completed: true (TODO-002)"
+        example_violation: |
+          function completeTask(task) {
+            task.done = true  // Bad: wrong property name
+          }
+        example_compliant: |
+          function completeTask(task) {
+            return { ...task, completed: true, completedAt: Date.now() }
+          }
+
+    # ═══════════════════════════════════════════════════════════════
+    # TODO-005: Storage uses approved mechanisms
+    # AISP: ∀write:persist(TaskList)⇒storage∈ApprovedStorage
+    # ═══════════════════════════════════════════════════════════════
+    - id: TODO-005
+      title: "Persistence must use indexedDB or chrome.storage"
+      scope:
+        - "src/services/storage*.ts"
+        - "src/services/persist*.ts"
+        - "src/hooks/use*Storage*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /indexedDB|IDBDatabase|chrome\.storage\.local|idb/
+            message: "Must use indexedDB or chrome.storage for persistence (TODO-005)"
+        forbidden_patterns:
+          - pattern: /localStorage\.setItem.*tasks|localStorage\.getItem.*tasks/i
+            message: "Do not use localStorage for task persistence (TODO-005)"
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you implementing task creation?"
+      if_yes: "Use crypto.randomUUID() for task IDs, include completed: false"
+    - question: "Are you implementing task completion?"
+      if_yes: "Set completed: true AND completedAt: Date.now()"
+    - question: "Are you implementing persistence?"
+      if_yes: "Use indexedDB via idb library, never localStorage"
+
+test_hooks:
+  tests:
+    - file: "tests/contracts/todo_contract.test.ts"
+      description: "Pattern checks for TODO-001, TODO-002, TODO-005"

@@ -1,0 +1,79 @@
+contract_meta:
+  id: feature_data
+  version: 1
+  created_from_spec: "docs/specs/todo.md"
+  aisp_source: "docs/specs/TODO-APP.aisp"
+  covers_reqs:
+    - DATA-001
+    - DATA-002
+  owner: "aisp-specflow-demo"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_data"
+
+rules:
+  non_negotiable:
+    # ═══════════════════════════════════════════════════════════════
+    # DATA-001: Task IDs are unique
+    # AISP: ∀t1,t2∈TaskList:t1≢t2⇒t1.id≢t2.id
+    # ═══════════════════════════════════════════════════════════════
+    - id: DATA-001
+      title: "Task IDs must be unique (UUID)"
+      scope:
+        - "src/services/**/*.ts"
+        - "src/types/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /id:\s*string|id:\s*UUID/
+            message: "Task type must have id: string property (DATA-001)"
+        forbidden_patterns:
+          - pattern: /id:\s*number/
+            message: "Task ID must be string (UUID), not number (DATA-001)"
+        example_violation: |
+          interface Task {
+            id: number;  // Bad: should be string UUID
+          }
+        example_compliant: |
+          interface Task {
+            id: string;  // Good: UUID format
+          }
+
+    # ═══════════════════════════════════════════════════════════════
+    # DATA-002: Completed tasks have completion timestamp
+    # AISP: ∀task.completed≡⊤⇒task.completedAt≢None
+    # ═══════════════════════════════════════════════════════════════
+    - id: DATA-002
+      title: "Completed tasks must have completedAt timestamp"
+      scope:
+        - "src/types/**/*.ts"
+        - "src/services/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /completedAt\??\s*:\s*(number|Date)/
+            message: "Task type must have completedAt property (DATA-002)"
+        example_violation: |
+          interface Task {
+            id: string;
+            completed: boolean;
+            // Missing completedAt
+          }
+        example_compliant: |
+          interface Task {
+            id: string;
+            completed: boolean;
+            completedAt?: number;  // Timestamp when completed
+          }
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you modifying the Task type?"
+      if_yes: "Ensure id is string (UUID) and completedAt is optional number"
+    - question: "Are you implementing task completion?"
+      if_yes: "Always set completedAt when setting completed: true"
+
+test_hooks:
+  tests:
+    - file: "tests/contracts/data_contract.test.ts"
+      description: "Pattern checks for DATA-001, DATA-002"
