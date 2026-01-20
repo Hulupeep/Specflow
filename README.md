@@ -30,6 +30,9 @@ Three hours into a session, the LLM starts to drift while presenting itself as k
 
 **You can't fix this with better prompts.** You need a gate.
 
+**WAIT** Isn't this just another OMG THIS WILL MAKE LLMS DETERMINISTIC (and then don't)
+No. It's just one simple idea. A gate. Break a rule, build fails. Most other solutions try and coerce agents into behaving. Great. Use that too. But a gate is a gate. You need both.
+
 ---
 
 ## The Solution
