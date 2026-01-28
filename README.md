@@ -71,7 +71,7 @@ graph LR
 
 ---
 
-## What You Get with Contacts
+## What You Get with Contracts
 
 ✅ **Specs become enforceable** — Requirements have IDs (AUTH-001), contracts enforce them, tests verify them
 
@@ -304,6 +304,7 @@ After that, read what you need:
 - Adding to existing project? → [MID-PROJECT-ADOPTION.md](MID-PROJECT-ADOPTION.md)
 - Setting up CI/CD? → [CI-INTEGRATION.md](CI-INTEGRATION.md)
 - Journey/E2E testing? → [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md)
+- Parallel agentic execution with Claude Code? → [agents/README.md](agents/README.md)
 
 ---
 
@@ -393,12 +394,21 @@ it('AUTH-001: No localStorage for tokens', () => {
 
 | Resource | Purpose |
 |----------|---------|
-| [blog/](blog/) | **Dev blog: Build a real product with Specflow** (15 min read) |
 | [demo/](demo/) | Working example showing contracts catch what unit tests miss |
 | [examples/contract-example.yml](examples/contract-example.yml) | Real contract template |
 | [examples/test-example.test.ts](examples/test-example.test.ts) | Test implementation template |
 | [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) | Template for project CLAUDE.md |
 | [PROMPT-TEMPLATE.md](PROMPT-TEMPLATE.md) | Reusable prompt for LLMs |
+
+### Agentic Execution (Claude Code Task Tool)
+
+| Doc | Purpose |
+|-----|---------|
+| [agents/README.md](agents/README.md) | Setup guide: add agents to your project, run the pipeline |
+| [agents/WORKFLOW.md](agents/WORKFLOW.md) | Step-by-step walkthrough with exact prompts |
+| [agents/specflow-writer.md](agents/specflow-writer.md) | Core agent: issues --> full-stack specs |
+| [agents/dependency-mapper.md](agents/dependency-mapper.md) | SQL REFERENCES --> sprint waves |
+| [agents/sprint-executor.md](agents/sprint-executor.md) | Parallel wave execution coordinator |
 
 ### Deep Dives (Reference)
 
@@ -406,7 +416,7 @@ it('AUTH-001: No localStorage for tokens', () => {
 |-----|---------|
 | [context/MASTER-ORCHESTRATOR.md](context/MASTER-ORCHESTRATOR.md) | Full automation workflow |
 | [context/SPEC-TO-CONTRACT.md](context/SPEC-TO-CONTRACT.md) | Conversion examples |
-| [context/SUBAGENT-CONTRACTS.md](context/SUBAGENT-CONTRACTS.md) | Claude subagent patterns |
+| [context/SUBAGENT-CONTRACTS.md](context/SUBAGENT-CONTRACTS.md) | Claude subagent patterns (YAML enforcement contracts) |
 
 ---
 
@@ -593,8 +603,11 @@ Specflow is a methodology—it works with your existing tools.
 | **Skills** | Create a `/specflow` skill that sets up contracts for any project |
 | **Hooks** | Run contract tests on `post-edit` to catch violations immediately |
 | **CLAUDE.md** | Add contract rules so Claude checks before modifying protected files |
+| **Task Tool Agents** | 12 reusable subagents for parallel, dependency-ordered implementation |
 
 See [context/CLAUDE-CODE-SKILL.md](context/CLAUDE-CODE-SKILL.md) for skill setup instructions and hook examples.
+
+See **[agents/](agents/)** for the full subagent library and parallel execution workflow.
 
 ### CI/CD
 
@@ -613,6 +626,64 @@ See [context/CLAUDE-CODE-SKILL.md](context/CLAUDE-CODE-SKILL.md) for skill setup
 | **Journey tests** | Playwright | E2E browser tests from journey contracts |
 
 Contract tests work with any framework that can read files and match patterns. Journey tests use Playwright for real browser verification.
+
+---
+
+## Agentic Execution with Claude Code's Task Tool
+
+Specflow contracts don't just prevent drift — they enable **automatic, parallel, dependency-ordered implementation** using Claude Code's Task tool.
+
+### The Insight
+
+When every GitHub issue has executable SQL contracts (`CREATE TABLE`, `REFERENCES`, `CREATE POLICY`), those contracts contain the dependency graph. A `REFERENCES notifications_queue(id)` clause in issue #11 is a dependency on whichever issue creates that table. No manual "blocked by" linking needed.
+
+### The Agent Library
+
+**12 subagent definitions** in [`agents/`](agents/) that form a complete pipeline:
+
+```
+specflow-writer          Raw issues --> full-stack specs with SQL + Gherkin
+  --> board-auditor      Compliance audit (which issues are build-ready?)
+  --> specflow-uplifter  Fix gaps in partial specs
+  --> dependency-mapper  SQL REFERENCES --> topological sprint plan
+  --> sprint-executor    Launch parallel agents per wave
+    --> migration-builder + frontend-builder + edge-function-builder
+  --> contract-validator Verify implementation matches contracts
+  --> playwright-from-specflow + journey-tester   Generate e2e tests
+  --> ticket-closer      Close validated issues
+```
+
+### Quick Start
+
+```bash
+# 1. Copy agents into your project
+cp -r Specflow/agents/ your-project/scripts/agents/
+
+# 2. Tell Claude Code to uplift your issues
+"Read scripts/agents/specflow-writer.md. Uplift issues #10-#25 with
+ Gherkin, SQL contracts, RLS, TypeScript interfaces, and ACs."
+
+# 3. Map dependencies from the code contracts
+"Read scripts/agents/dependency-mapper.md. Build a sprint plan from
+ all open issues. Topological sort by SQL REFERENCES."
+
+# 4. Execute Sprint 0 in parallel
+"Read scripts/agents/sprint-executor.md. Launch Sprint 0 agents for
+ issues #10, #12, #15, #18, #20. Pre-assign migration numbers."
+```
+
+**Result:** 9 agents running in parallel, ~8 minutes wall-clock, zero coordination overhead. Each agent reads its issue spec, builds the code, posts a GitHub comment, and adds a label. The parent tracks completions and cascades to the next sprint wave.
+
+### Why This Matters
+
+| Without code contracts | With code contracts |
+|----------------------|---------------------|
+| Manual "blocked by" links | Automatic dependency detection |
+| Sequential implementation | Parallel sprint waves |
+| "I think I'm done" | Contract-validated closure |
+| Status meetings | Agents self-report on GitHub issues |
+
+See **[agents/README.md](agents/README.md)** for setup instructions and **[agents/WORKFLOW.md](agents/WORKFLOW.md)** for the detailed walkthrough.
 
 ---
 

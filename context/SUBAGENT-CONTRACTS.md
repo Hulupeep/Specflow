@@ -1,5 +1,10 @@
 # Specflow Implementation with Claude Subagents
 
+> **📌 SEE ALSO: [agents/](../agents/)** — 12 production-ready agent definitions for Claude Code's Task tool.
+> This document describes **YAML enforcement contracts** (CI pattern scanning). The agents/ directory
+> describes **SQL data contracts** (executable specs in GitHub issues that enable automatic dependency
+> detection and parallel sprint execution). Both are part of the Specflow system.
+
 > **📌 ALIGNED WITH NEW CORE DOCS**
 >
 > This guide uses the simplified contract system. All subagents must follow:
