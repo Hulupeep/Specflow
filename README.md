@@ -164,11 +164,11 @@ See [CI-INTEGRATION.md](CI-INTEGRATION.md) for GitHub Actions, GitLab, Azure, an
 
 ## What Is Specflow?
 
-Specflow is a methodology for building software with LLMs that **guarantees** architectural rules  and featurescan't be broken and journeys work end to end. 
+Specflow is a methodology for building software with LLMs that **enforces** architectural rules  and featurescan't be broken and journeys work end to end. 
 
 **The reality of LLMs:** Prompts express intent. But intent isn't enforcement. No matter how clear your instructions, the model might "optimize" your auth flow, "simplify" your security patterns, or "helpfully" refactor into an anti-pattern. Unit tests pass. The app breaks.
 
-**The only guaranteed solution:** Turn specs into tests that scan source code. If a pattern is forbidden, the build fails. Period.
+**The only workable solution:** Turn specs into tests that scan source code. If a pattern is forbidden, the build fails. Period.
 
 ```
 Describe → Contracts → Tests → Code → Violations blocked
