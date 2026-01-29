@@ -136,6 +136,96 @@ See [QUICKSTART.md](QUICKSTART.md) for more prompt variations and detailed paths
 
 ---
 
+## Easy Way: Subagents (Recommended)
+
+The fastest way to use Specflow is with Claude Code's Task tool and the 16 pre-built subagents.
+
+### Step 1: Install the Agents
+
+```bash
+# Copy agents into your project
+cp -r Specflow/agents/ your-project/scripts/agents/
+```
+
+### Step 2: Add to CLAUDE.md
+
+Add this to your project's CLAUDE.md:
+
+```markdown
+## Subagent Library
+
+Reusable agent prompts live in `scripts/agents/*.md`. When spawning a subagent
+via the Task tool, read the agent prompt file first, then pass its content as
+context along with the specific task.
+
+### Agent Registry
+| Agent | When to Use |
+|-------|-------------|
+| `specflow-writer` | New feature needs acceptance criteria, Gherkin, SQL contracts |
+| `board-auditor` | Check which issues are specflow-compliant |
+| `dependency-mapper` | Extract dependencies, build sprint waves |
+| `sprint-executor` | Execute parallel build waves |
+| `contract-validator` | Verify implementation matches spec |
+| `test-runner` | Run tests, report failures with details |
+| `journey-enforcer` | Verify journey coverage, release readiness |
+| `ticket-closer` | Close validated issues with summaries |
+
+### Auto-Trigger: After ANY Code Changes
+Run `test-runner` and `journey-enforcer` before marking work complete.
+```
+
+### Step 3: Tell Claude Code
+
+Open Claude Code and say:
+
+```
+Note the agents in scripts/agents/. Read the README there.
+```
+
+### Step 4: Execute Your Backlog
+
+Now use this single prompt to run the full pipeline:
+
+```
+Create tasks to check (or create) my GitHub issues with the Specflow subagents
+to be specflow-compliant (Gherkin, SQL contracts, RLS, TypeScript interfaces,
+data-testid coverage).
+
+Then create tasks in waves of parallel work based on dependencies to execute
+my backlog. Use dependency-mapper to find the waves, then sprint-executor
+to run each wave.
+
+Finally, run test-runner and journey-enforcer before closing any tickets.
+```
+
+**What happens:**
+1. `board-auditor` scans your issues for compliance gaps
+2. `specflow-writer` + `specflow-uplifter` fill the gaps
+3. `dependency-mapper` extracts SQL REFERENCES to build sprint waves
+4. `sprint-executor` launches parallel agents for each wave
+5. `test-runner` executes tests and reports failures
+6. `journey-enforcer` validates journey coverage
+7. `ticket-closer` closes validated issues
+
+**Result:** Your entire backlog executed in parallel waves, with contracts enforced at every step.
+
+### Why This Works
+
+Claude Code's Task tool spawns independent subagents. Each agent:
+- Reads its prompt from `scripts/agents/{agent}.md`
+- Works autonomously on its assigned task
+- Returns results to the parent conversation
+- Can run in parallel with other agents
+
+The agents coordinate through:
+- GitHub issues (shared state)
+- Contract files (shared rules)
+- Memory/context (parent tracks progress)
+
+**No external orchestrator needed.** The parent conversation coordinates; agents do the work.
+
+---
+
 ## How Builds Are Stopped
 
 Contract tests are regular tests that scan your source code for violations. When they find one:
@@ -409,6 +499,8 @@ it('AUTH-001: No localStorage for tokens', () => {
 | [agents/specflow-writer.md](agents/specflow-writer.md) | Core agent: issues --> full-stack specs |
 | [agents/dependency-mapper.md](agents/dependency-mapper.md) | SQL REFERENCES --> sprint waves |
 | [agents/sprint-executor.md](agents/sprint-executor.md) | Parallel wave execution coordinator |
+| [agents/test-runner.md](agents/test-runner.md) | Execute tests, parse results, report failures |
+| [agents/journey-enforcer.md](agents/journey-enforcer.md) | Verify journey coverage, release readiness |
 
 ### Deep Dives (Reference)
 
@@ -579,7 +671,13 @@ You're doing it right when:
 │ Commands:                                               │
 │   npm test -- contracts     Run contract tests          │
 │   npm test -- journeys      Run journey tests           │
+│   npx playwright test       Run E2E tests               │
 │   ./verify-setup.sh         Check setup                 │
+│                                                         │
+│ Subagent Quick Commands:                                │
+│   "Run test-runner"         Execute tests, report fails │
+│   "Run journey-enforcer"    Check journey coverage      │
+│   "Run board-auditor"       Check issue compliance      │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
@@ -603,7 +701,7 @@ Specflow is a methodology—it works with your existing tools.
 | **Skills** | Create a `/specflow` skill that sets up contracts for any project |
 | **Hooks** | Run contract tests on `post-edit` to catch violations immediately |
 | **CLAUDE.md** | Add contract rules so Claude checks before modifying protected files |
-| **Task Tool Agents** | 12 reusable subagents for parallel, dependency-ordered implementation |
+| **Task Tool Agents** | 16 reusable subagents for parallel, dependency-ordered implementation |
 
 See [context/CLAUDE-CODE-SKILL.md](context/CLAUDE-CODE-SKILL.md) for skill setup instructions and hook examples.
 
@@ -639,7 +737,7 @@ When every GitHub issue has executable SQL contracts (`CREATE TABLE`, `REFERENCE
 
 ### The Agent Library
 
-**12 subagent definitions** in [`agents/`](agents/) that form a complete pipeline:
+**16 subagent definitions** in [`agents/`](agents/) that form a complete pipeline:
 
 ```
 specflow-writer          Raw issues --> full-stack specs with SQL + Gherkin
@@ -650,6 +748,8 @@ specflow-writer          Raw issues --> full-stack specs with SQL + Gherkin
     --> migration-builder + frontend-builder + edge-function-builder
   --> contract-validator Verify implementation matches contracts
   --> playwright-from-specflow + journey-tester   Generate e2e tests
+  --> test-runner        Execute tests, report failures with file:line details
+  --> journey-enforcer   Verify journey coverage, release readiness check
   --> ticket-closer      Close validated issues
 ```
 

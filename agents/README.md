@@ -96,7 +96,7 @@ The agents know the patterns. You provide direction.
 
 ---
 
-## The 15 Agents
+## The 16 Agents
 
 ### Writing Specs
 | Agent | What it does |
@@ -127,6 +127,7 @@ The agents know the patterns. You provide direction.
 | **journey-enforcer** | Ensures UI stories have journeys; blocks release if critical journeys fail |
 | **playwright-from-specflow** | Generates Playwright tests from Gherkin scenarios |
 | **journey-tester** | Creates cross-feature E2E journey tests from journey contracts |
+| **test-runner** | Executes E2E and contract tests; parses results; reports failures with file:line details |
 
 ### Closing
 | Agent | What it does |
@@ -171,13 +172,21 @@ Phase 4: VALIDATE
     └─ journey-tester (parallel)
   │
   ↓
-  npx playwright test ← JOURNEY CONTRACTS ENFORCED
+Phase 5: TEST EXECUTION
+  test-runner
+  │
+  ├─ npm test -- contracts ← ARCH/FEAT CONTRACTS VERIFIED
+  └─ npx playwright test ← JOURNEY CONTRACTS VERIFIED
+  │
+  ↓
+  All tests pass? → Continue
+  Tests fail? → Fix and re-run
   │
   ↓
 YOU: "Close the completed issues"
   │
   ↓
-Phase 5: CLOSE
+Phase 6: CLOSE
   ticket-closer
 ```
 
@@ -191,8 +200,9 @@ Phase 5: CLOSE
 | **Jest tests** | `contract-test-generator` | YAML contracts | `src/__tests__/contracts/*.test.ts` |
 | **Playwright feature tests** | `playwright-from-specflow` | Gherkin in issues | `tests/e2e/*.spec.ts` |
 | **Playwright journey tests** | `journey-tester` | Journey contracts | `tests/e2e/journeys/*.journey.spec.ts` |
+| **Test execution report** | `test-runner` | Test files | Failure report with file:line details |
 
-**The key insight:** Jest tests enforce YAML contracts (pattern scanning). Playwright tests verify behavior (Gherkin + journeys). Both can be generated before or after implementation.
+**The key insight:** Jest tests enforce YAML contracts (pattern scanning). Playwright tests verify behavior (Gherkin + journeys). Both can be generated before or after implementation. `test-runner` executes them and produces actionable failure reports.
 
 ---
 
@@ -210,6 +220,8 @@ Phase 5: CLOSE
 
 **JOURNEY catches:** User can't complete registration, checkout flow broken, data not syncing.
 
+**test-runner** executes all three layers and produces actionable failure reports with file:line references.
+
 ---
 
 ## Quick Commands
@@ -224,6 +236,8 @@ Phase 5: CLOSE
 | Plan the sprint | "Run dependency-mapper, show me the waves" |
 | Build a wave | "Execute sprint 0: issues #A, #B, #C" |
 | Validate contracts | "Run contract-validator on the implemented issues" |
+| Run tests | "Run test-runner" or "Run all tests" |
+| Check what's failing | "What tests are failing?" |
 | Check release readiness | "Are critical journeys passing?" |
 | Close tickets | "Run ticket-closer on issues #X-#Y" |
 
