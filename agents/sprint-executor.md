@@ -184,7 +184,7 @@ Copy and customize for each issue:
 
 ```
 You are a [migration-builder / frontend-builder / full-stack builder] for the
-Timebreez project. Your task is to implement GitHub issue #NNN ([title]).
+your project project. Your task is to implement GitHub issue #NNN ([title]).
 
 ## Context
 - [Dependency context: what was built in prior sprints]

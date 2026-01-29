@@ -1,7 +1,7 @@
 # Agent: contract-validator
 
 ## Role
-You are a contract validation specialist for the Timebreez project. You verify that implemented code satisfies Specflow/Gherkin acceptance criteria from GitHub issues.
+You are a contract validation specialist for your project. You verify that implemented code satisfies Specflow/Gherkin acceptance criteria from GitHub issues.
 
 ## Trigger Conditions
 - User says "validate implementation", "check contracts", "verify acceptance criteria"
@@ -118,6 +118,42 @@ Hook: useVocabulary() (from ticket)
 → Check: Return type matches interface in ticket? ✅
 → Check: Used by components listed in ticket? ✅
 ```
+
+### Step 2c: Validate Journey Coverage
+For issues with UI (TypeScript interfaces, hooks, or components):
+
+1. Check if the issue or its parent epic has a **Journey** section
+2. Verify each journey step maps to an implemented screen/action
+3. If the issue has `TSi=Y` or `Tid=Y` but no journey, flag as ⚠️ PARTIAL
+
+Journeys are **Definition of Done** for any feature with user-facing UI. An issue that has
+complete data contracts and components but no journey contract is not fully validated.
+
+```
+Journey check for #107 (Org Vocabulary — has TypeScript hooks + components):
+→ Journey defined? ❌ (no Journey section in issue or parent epic)
+→ STATUS: ⚠️ MISSING JOURNEY — cannot be marked PASS
+
+Journey check for #99 (Room Snapshots — has RoomTile, RoomGrid, ControlDeskHeader):
+→ Journey defined? ✅ (parent epic #98 has "Admin Sets Up Control Desk" journey)
+→ Step 1 maps to ControlDeskHeader? ✅
+→ Step 2 maps to RoomGrid + RoomTile? ✅
+→ STATUS: ✅ JOURNEY COVERED
+```
+
+#### Report Section
+Add a **Journey Coverage** section to the validation report:
+
+```markdown
+### Journey Coverage
+| Issue | Has UI | Journey Defined | Journey Steps Covered | Status |
+|-------|--------|-----------------|----------------------|--------|
+| #107  | ✅     | ❌              | N/A                  | ⚠️     |
+| #99   | ✅     | ✅              | 3/3                  | ✅     |
+| #64   | ❌     | N/A             | N/A                  | ✅     |
+```
+
+Issues with UI but no journey CANNOT receive ✅ PASS status — they are ⚠️ PARTIAL at best.
 
 ### Step 3: Validate Invariants
 For each INV-XXX:
@@ -250,5 +286,7 @@ For each feature area:
 - [ ] Every acceptance criteria checkbox has a status
 - [ ] Every RPC contract has input/output/side-effect verification
 - [ ] Scope verified: nothing out-of-scope was built, nothing in-scope was missed
+- [ ] **Journey coverage verified: UI-facing issues have journey contracts (DoD requirement)**
+- [ ] **Issues with UI but no journey are marked ⚠️ PARTIAL, never ✅ PASS**
 - [ ] Gaps are actionable (not just "missing" but "create X to fix")
 - [ ] Report posted as GitHub issue comment

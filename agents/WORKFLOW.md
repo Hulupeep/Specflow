@@ -1,463 +1,300 @@
-# Specflow-to-Sprint: Agentic Execution Workflow
+# Specflow Workflow
 
-**How to go from raw GitHub issues to parallel, dependency-ordered implementation using Claude Code's Task tool and the Specflow agent chain.**
+## What This Is
 
----
+These agents make Specflow work with Claude Code's **Task tool as the orchestrator**. They ensure your GitHub issues have **ARCH**, **FEAT**, and **JOURNEY** contracts that can be executed:
 
-## The Problem
+- **At build time** — Jest pattern tests catch architectural violations (`npm test -- contracts`)
+- **Post-build** — Playwright tests verify user journeys work end-to-end
 
-You have 30+ GitHub issues on a board. Some are one-liners ("Add leave request feature"), some have partial specs, some are well-written. You want to:
-
-1. Make them all build-ready with executable contracts
-2. Know which ones depend on which
-3. Execute them in parallel waves, respecting dependencies
-4. Have agents post status updates on every ticket as they go
-
-This workflow does all four.
-
----
-
-## The Agent Chain
+This three-layer approach reduces architectural drift and ensures work meets Definition of Done.
 
 ```
-┌─────────────────────┐
-│  1. specflow-writer  │  Raw issues → full-stack tickets with executable contracts
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│  2. board-auditor    │  Audit: are all tickets spec-compliant?
-│     + specflow-      │  Produces gap report, triggers remediation
-│     uplifter         │
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│  3. dependency       │  Parse SQL REFERENCES, TypeScript imports, epic hierarchy
-│     mapper           │  → topological sort → sprint waves
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│  4. implementation   │  Per-issue agents using:
-│     agents           │  • migration-builder (SQL)
-│     (parallel)       │  • edge-function-builder (Deno)
-│                      │  • frontend builder (React hooks + components)
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│  5. contract-        │  Verify implementation matches contracts
-│     validator        │  → close tickets or flag gaps
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│  6. playwright-      │  Generate e2e tests from Gherkin scenarios
-│     from-specflow    │
-└──────────┬──────────┘
-           │
-┌──────────▼──────────┐
-│  7. ticket-closer    │  Post final comments, close issues
-└─────────────────────┘
+ARCH contracts  → Build fails if: forbidden patterns in code
+FEAT contracts  → Build fails if: required patterns missing
+JOURNEY contracts → Release blocked if: user flows don't work
 ```
 
 ---
 
-## Step-by-Step Walkthrough
+## How You Use It
 
-### Phase 1: Make Issues Build-Ready
+You give Claude Code a high-level goal. It figures out which agents to call.
 
-**What you tell Claude Code:**
-
-> Take issues #67-#86 and #98-#103 and run the specflow-writer agent on each one. Make them compliant with full Gherkin, SQL contracts, RLS policies, TypeScript interfaces, invariants, and acceptance criteria.
-
-**What happens:**
-
-Claude Code reads `scripts/agents/specflow-writer.md`, then launches one Task per issue (or batches them into a few agents that handle multiple issues each):
-
-```javascript
-// Claude Code spawns these in a single message — all run in parallel
-Task("Uplift #67-#72", "Read specflow-writer.md. For each of issues 67-72,
-  read the issue, generate full-stack ticket sections, post as a comment.
-  Include: Gherkin scenarios, SQL data contracts (CREATE TABLE, RLS, triggers,
-  RPCs), TypeScript interfaces, invariant references, acceptance criteria.",
-  "general-purpose", { run_in_background: true })
-
-Task("Uplift #73-#78", "...", "general-purpose", { run_in_background: true })
-Task("Uplift #79-#86", "...", "general-purpose", { run_in_background: true })
+**High-level prompt:**
+```
+"Create tasks to make sure all stories in TODO status are specflow-compliant,
+that all contracts are created, and every UI story has a journey contract
+with Playwright tests."
 ```
 
-**What each agent produces (posted as GitHub comments):**
+Claude Code will:
+1. Run `board-auditor` to check compliance
+2. Run `specflow-uplifter` on non-compliant issues
+3. Run `contract-generator` to create YAML contracts
+4. Run `contract-test-generator` to create Jest tests
+5. Run `journey-enforcer` to check journey coverage
+6. Run `playwright-from-specflow` and `journey-tester` to create Playwright tests
 
-```markdown
-## Scope
-**In Scope:** Notification inbox table, mark-read RPCs, bell component
-**Not In Scope:** Email delivery, SMS, push sending
+**You don't need to name agents explicitly.** Just describe what you want. The agents are documented so Claude Code knows when to use each one.
 
-## Data Contract
-
-### Table: `notification_inbox`
-```sql
-CREATE TABLE notification_inbox (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  employee_id UUID NOT NULL REFERENCES employees(id),
-  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  notification_queue_id UUID REFERENCES notifications_queue(id),  -- ← DEPENDENCY SIGNAL
-  title TEXT NOT NULL,
-  body TEXT,
-  read_at TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
+**But you can be specific if you prefer:**
+```
+"Run board-auditor on issues #42-#48"
+"Run journey-tester for J-AUTH-LOGIN"
 ```
 
-### RLS Policies
-```sql
-CREATE POLICY "inbox_select" ON notification_inbox FOR SELECT
-  USING (employee_id IN (SELECT id FROM employees WHERE user_id = auth.uid()));
-```
-
-### RPCs
-```sql
-CREATE OR REPLACE FUNCTION mark_notification_read(p_notification_id UUID)
-RETURNS BOOLEAN AS $$ ... $$ LANGUAGE plpgsql SECURITY DEFINER;
-```
-
-## Frontend Interface
-```typescript
-interface UseNotificationInboxReturn {
-  notifications: NotificationInboxItem[];
-  unreadCount: number;
-  markAsRead: (id: string) => Promise<void>;
-  markAllAsRead: () => Promise<void>;
-}
-```
-
-## Invariants Referenced
-- I-NTF-006: Unread count must be non-negative
-- I-NTF-007: read_at is immutable once set
-
-## Acceptance Criteria
-- [ ] Inbox table created with RLS
-- [ ] mark_notification_read RPC works
-- [ ] NotificationBell shows unread count
-- [ ] Clicking notification marks as read
-
-## Gherkin Scenarios
-```gherkin
-Feature: In-app Notification Inbox
-
-Scenario: Employee sees unread notification count
-  Given an employee has 3 unread notifications
-  When they view the dashboard
-  Then the notification bell shows "3"
-```
-```
-
-**Why this matters:** Every issue now has *executable* SQL, *typed* interfaces, and *testable* scenarios. This is what makes dependency detection possible.
+Both approaches work. High-level prompts for convenience; specific commands for control.
 
 ---
 
-### Phase 2: Audit Compliance
+## Example Session
 
-**What you tell Claude Code:**
-
-> Run the board-auditor agent across all uplifted issues. Tell me which ones are fully compliant and which have gaps.
-
-**What happens:**
-
-Claude Code reads `scripts/agents/board-auditor.md` and launches an audit agent:
-
-```javascript
-Task("Audit all issues", "Read board-auditor.md. For issues 67-86 and
-  98-112, check each for: Gherkin (Y/N), Invariants (Y/N), Acceptance
-  Criteria (Y/N), SQL contracts (Y/N), Scope section (Y/N), RLS policies
-  (Y/N). Produce a compliance report and create a GitHub issue with results.",
-  "general-purpose", { run_in_background: true })
-```
-
-**Output example:**
+### Morning: Prep the Sprint
 
 ```
-# 73 | Ghk=Y Inv=Y AC=Y SQL=Y Scp=Y RLS=Y | Channel router DB migration
-# 74 | Ghk=Y Inv=Y AC=Y SQL=N Scp=Y RLS=N | Notification Router         ← GAPS
-#107 | Ghk=Y Inv=Y AC=Y SQL=Y Scp=Y RLS=N | Org Vocabulary              ← GAPS
+YOU: "Run board-auditor on all open issues labeled 'feature'"
+
+CLAUDE: [Spawns board-auditor agent via Task tool]
+
+AGENT RETURNS:
+  Compliance Matrix:
+  #42 User Profile      Ghk=Y SQL=Y RLS=N TSi=Y Jrn=N  → Partial
+  #43 Settings Page     Ghk=Y SQL=Y RLS=Y TSi=Y Jrn=N  → Partial
+  #44 Password Reset    Ghk=N SQL=Y RLS=Y TSi=N Jrn=N  → Partial
+
+  3 issues need work before sprint.
+
+YOU: "Run specflow-uplifter on #42, #43, #44 — add missing sections"
+
+CLAUDE: [Spawns 3 specflow-uplifter agents in parallel]
+
+AGENTS RETURN:
+  #42: Added RLS policy, added J-USR-PROFILE journey reference
+  #43: Added J-USR-SETTINGS journey reference
+  #44: Added Gherkin scenarios, TypeScript interface, journey reference
 ```
 
-Issues with gaps get remediation — either re-run specflow-writer on them or have a targeted uplift agent add the missing sections.
-
----
-
-### Phase 3: Map Dependencies
-
-**What you tell Claude Code:**
-
-> Read all compliant issues and build a dependency map. For each issue, find what tables it REFERENCES, what RPCs it calls, what hooks it imports. Produce a topological sort into sprint waves.
-
-**What happens:**
-
-```javascript
-Task("Map dependencies", "Read every open issue. For each:
-  1. Extract CREATE TABLE statements → note table names created
-  2. Extract REFERENCES clauses → note table names depended on
-  3. Extract TypeScript imports → note hooks/components depended on
-  4. Match created-tables to referenced-tables across issues
-  5. Build a directed dependency graph
-  6. Topological sort into sprint waves (depth-first)
-  7. Identify bottleneck issues (most downstream dependents)
-  8. Create a GitHub issue with the full map + Mermaid diagram",
-  "general-purpose", { run_in_background: true })
-```
-
-**How the agent detects dependencies from code contracts:**
-
-| Signal | Example | Dependency |
-|--------|---------|------------|
-| SQL `REFERENCES` | `notification_queue_id UUID REFERENCES notifications_queue(id)` | #67 → #73 |
-| SQL table usage in RPC | `SELECT ... FROM push_subscriptions` in #68's RPC | #68 → #73 |
-| TypeScript import | `import { registerServiceWorker } from '@/lib/...'` | #69 → #71 |
-| RLS join chain | `zone.space_id → space.site_id → site.org_id` | #109 → #108 |
-| Epic child numbering | `TB-ADM-SPACES-001.3` depends on `001.2` | #109 → #108 |
-| Explicit "Depends on" | Issue body says "Requires #73 notification tables" | Explicit |
-
-**Output — sprint waves:**
+### Mid-Morning: Generate Contracts and Tests
 
 ```
-Sprint 0 (depth=0, no blockers, all parallel):
-  #64, #34, #62, #107, #108, #71, #67, #73, #104
+YOU: "Generate all contracts and tests for the user management features"
 
-Sprint 1 (depth=1, blocked by Sprint 0):
-  #63→#62  #109→#108  #70→#73  #69→#71  #85→#71  #106→#104
+CLAUDE: [Figures out which agents to call, spawns them]
 
-Sprint 2 (depth=2):
-  #99→#62,#63  #68→#73,#70  #110→#109  #61→#62,#63  #113→#106,#104
+  1. contract-generator → Creates YAML contracts from issue specs:
+     - docs/contracts/feature_architecture.yml (ARCH-001, ARCH-002)
+     - docs/contracts/feature_user_management.yml (USR-001, USR-002, USR-003)
+     - docs/contracts/journey_user_profile.yml (J-USR-PROFILE)
+
+  2. contract-test-generator → Creates Jest tests from YAML:
+     - src/__tests__/contracts/architecture.test.ts
+     - src/__tests__/contracts/user_management.test.ts
+
+  3. playwright-from-specflow → Creates Playwright tests from Gherkin:
+     - tests/e2e/user-profile.spec.ts
+     - tests/e2e/settings.spec.ts
+
+  4. journey-tester → Creates journey tests from journey contracts:
+     - tests/e2e/journeys/user-profile.journey.spec.ts
+
+AGENT RETURNS:
+  Created:
+  - 3 YAML contracts (ARCH, FEAT, JOURNEY)
+  - 2 Jest test files (run at: npm test -- contracts)
+  - 3 Playwright test files (run at: npx playwright test)
+```
+
+Or be specific if you prefer:
+```
+YOU: "Run contract-generator on #42-#44, then contract-test-generator"
+```
+
+### Afternoon: Build
+
+```
+YOU: "Map dependencies and show me the sprint waves"
+
+CLAUDE: [Spawns dependency-mapper agent]
+
+AGENT RETURNS:
+  Wave 0 (no dependencies): #44 (password reset - standalone)
+  Wave 1 (depends on #44): #42 (user profile), #43 (settings page)
+
+YOU: "Execute wave 0, then wave 1. Last migration was 015."
+
+CLAUDE: [Spawns sprint-executor, which dispatches:]
+  Wave 0:
+    - migration-builder for #44 → creates 016_password_reset.sql
+
+  Wave 1 (after 0 completes):
+    - migration-builder for #42 → creates 017_user_profile.sql
+    - migration-builder for #43 → creates 018_settings.sql
+    - frontend-builder for #42 → creates useProfile hook
+    - frontend-builder for #43 → creates useSettings hook
+
+BUILD: npm test -- contracts
+  ✓ ARCH-001: No direct DB calls in components
+  ✓ ARCH-002: Auth context required
+  ✓ USR-001: Profile data validation
+  ✓ USR-002: Settings access control
+  ✓ USR-003: Password requirements enforced
+```
+
+### End of Day: Validate & Close
+
+```
+YOU: "Validate and check release readiness"
+
+CLAUDE: [Spawns contract-validator, then journey-enforcer]
+
+RETURNS:
+  ARCH/FEAT Contracts: All satisfied
+  Critical Journeys:
+  - J-USR-PROFILE: ✓ passing
+  - J-AUTH-LOGIN: ✓ passing
+  - J-CHECKOUT-FLOW: ⚠️ no test
+
+  Status: NOT READY (1 critical journey untested)
+
+YOU: "Generate the checkout journey test"
+
+CLAUDE: [Spawns journey-tester agent]
+
+YOU: "Now close #42, #43, #44"
+
+CLAUDE: [Spawns ticket-closer agent]
 ```
 
 ---
 
-### Phase 4: Execute Sprints
+## Who Generates What (And When)
 
-**What you tell Claude Code:**
+| What | Agent | Input | Output | When to Run |
+|------|-------|-------|--------|-------------|
+| **YAML contracts** | `contract-generator` | Issue specs (Gherkin, SQL, journeys) | `docs/contracts/*.yml` | After issues are specflow-compliant |
+| **Jest pattern tests** | `contract-test-generator` | YAML contracts | `src/__tests__/contracts/*.test.ts` | After YAML contracts exist |
+| **Playwright feature tests** | `playwright-from-specflow` | Gherkin scenarios in issues | `tests/e2e/*.spec.ts` | After implementation or alongside |
+| **Playwright journey tests** | `journey-tester` | Journey contracts in issues/epics | `tests/e2e/journeys/*.journey.spec.ts` | After implementation or alongside |
 
-> Create tasks for Sprint 0 issues and execute them in parallel using the right agent for each. Pre-assign migration numbers to avoid conflicts. Each agent should read the issue spec, build the code, post a comment on the issue, and add the "in-progress" label.
-
-**What happens:**
-
-Claude Code creates `TaskCreate` entries with `blockedBy` relationships, then launches all Sprint 0 agents in a single message:
-
-```javascript
-// First: create tasks with dependency tracking
-TaskCreate({ subject: "Sprint 0: #73 — Notification Engine DB" })  // Task 1
-TaskCreate({ subject: "Sprint 0: #108 — Site + Space CRUD" })      // Task 3
-TaskCreate({ subject: "Sprint 1: #109 — Zone CRUD" })              // Task 11
-TaskUpdate({ taskId: "11", addBlockedBy: ["3"] })                  // #109 waits for #108
-
-// Then: launch all Sprint 0 agents (single message = parallel)
-Task("Build #73 notification DB", `
-  You are a Supabase migration builder. Read scripts/agents/migration-builder.md.
-  Read issue #73 with gh issue view 73.
-  Create supabase/migrations/028_notification_engine.sql.
-  [detailed requirements...]
-  Post comment on issue. Add in-progress label.`,
-  "general-purpose", { run_in_background: true })
-
-Task("Build #108 site+space CRUD", `...`, "general-purpose", { run_in_background: true })
-Task("Build #71 service worker", `...`, "general-purpose", { run_in_background: true })
-// ... 6 more agents, all in the same message
+**The flow:**
+```
+Issues with specs → YAML contracts → Jest tests → BUILD
+                                   ↘
+                    Gherkin/Journeys → Playwright tests → POST-BUILD
 ```
 
-**Pre-assigned collision resources:**
+**Key insight:** Jest tests come from YAML contracts. Playwright tests come from issue content (Gherkin + journeys). Both can be generated before or after implementation — they test what SHOULD happen, not what currently exists.
 
-```
-Migration 028 → #73 (notification engine)
-Migration 029 → #107 (org vocabulary)
-Migration 030 → #108 (sites and spaces)
-Migration 031 → #67 (notification inbox)
-Migration 032 → #104 (country rule packs)
-Migration 033 → #64 (pg_cron)
-```
+---
 
-This prevents two agents from both writing `028_*.sql`.
+## The Three Layers
 
-**As agents complete, the parent cascades:**
+| Layer | What It Enforces | When It Runs | Failure Mode |
+|-------|------------------|--------------|--------------|
+| **ARCH** | Structural invariants | `npm test` | Build fails |
+| **FEAT** | Feature requirements | `npm test` | Build fails |
+| **JOURNEY** | User flows work | Playwright | Release blocked |
 
-```
-[Agent #62 completes] → TaskUpdate(7, "completed") → Task 10 (#63) is unblocked
-[Agent #71 completes] → TaskUpdate(4, "completed") → Tasks 13, 14 (#69, #85) unblocked
-[Agent #73 completes] → TaskUpdate(1, "completed") → Task 12 (#70) unblocked
-... all Sprint 0 done ...
-→ Launch all 6 Sprint 1 agents in next message
+**Example ARCH contract:**
+```yaml
+- id: ARCH-001
+  forbidden_patterns:
+    - pattern: /supabase\.(from|rpc)/
+      message: "Components must use hooks, not direct DB calls"
+  scope: ["src/components/**/*.tsx"]
 ```
 
-**Each agent self-reports on the GitHub issue:**
+**Example FEAT contract:**
+```yaml
+- id: USR-002
+  required_patterns:
+    - pattern: /validatePassword/
+      message: "Password validation required"
+  scope: ["src/features/auth/**/*.ts"]
+```
 
-```markdown
-## Implementation: Migration 028
-
-**File:** `supabase/migrations/028_notification_engine.sql`
-
-### Tables Created
-- `notification_events` — delivery lifecycle tracking
-- `notification_channels` — per-org channel config
-- `push_subscriptions` — Web Push API subscriptions
-- `notification_preferences` — user channel prefs
-- `escalation_config` — escalation ladders
-
-### Included
-- RLS policies (SELECT/INSERT/UPDATE/DELETE) for all tables
-- updated_at triggers
-- Indexes for FKs and common queries
-- Demo org seed data
-
-**Status:** Migration file created, ready for review.
+**Example JOURNEY contract:**
+```yaml
+journey_meta:
+  id: J-USR-PROFILE
+  dod_criticality: critical
+steps:
+  - name: "User updates profile"
+    required_elements:
+      - selector: "[data-testid='profile-form']"
 ```
 
 ---
 
-### Phase 5-7: Validate, Test, Close
+## The Pattern
 
-After implementation sprints complete:
+Every interaction:
 
-```javascript
-// Validate contracts match implementation
-Task("Validate Sprint 0+1", "Read contract-validator.md. For each implemented
-  issue, verify: tables exist in migrations, RLS matches spec, RPCs have
-  correct signatures, hooks exist in src/, all ACs are met.",
-  "general-purpose", { run_in_background: true })
-
-// Generate e2e tests from Gherkin
-Task("Generate tests", "Read playwright-from-specflow.md. For issues with
-  Gherkin scenarios, create Playwright test files in tests/e2e/.",
-  "general-purpose", { run_in_background: true })
-
-// Close validated tickets
-Task("Close tickets", "Read ticket-closer.md. For each validated issue,
-  post a closing comment and close the issue.",
-  "general-purpose", { run_in_background: true })
 ```
+YOU: [Direction] "Do X on issues Y"
+     ↓
+CLAUDE: [Spawns appropriate agent(s) via Task tool]
+     ↓
+AGENT: [Does work, returns result]
+     ↓
+YOU: [Review, next direction]
+```
+
+You're directing traffic, not writing code.
 
 ---
 
-## What This Unlocks
+## When Things Go Wrong
 
-### 1. Executable Specs as Dependency Signals
-
-Traditional issue trackers need manual "blocked by" links. With code contracts in every ticket, dependencies are **embedded in the SQL**:
-
-```sql
--- This line in issue #67's spec IS the dependency declaration:
-notification_queue_id UUID REFERENCES notifications_queue(id)
--- → notifications_queue is created by #73
--- → therefore #67 depends on #73
+**ARCH violation (build fails):**
 ```
-
-No manual linking. No dependency management tool. The code contracts *are* the dependency graph.
-
-### 2. Parallel Execution Without Orchestration
-
-Traditional multi-agent systems need a coordination bus (memory store, message queue, shared state). This workflow needs none — each agent is briefed with everything it needs and runs independently. The parent conversation is the orchestrator.
-
-**9 agents, one message, ~8 minutes wall-clock for work that would take 45-60 minutes sequentially.**
-
-### 3. Self-Documenting Implementation
-
-Every agent posts its own status comment on the GitHub issue. The board updates itself. The commit history shows what was built. The migration files show the schema evolution. No separate status reports needed.
-
-### 4. Sprint-Level Parallelism
-
-Instead of one developer working through a backlog serially, you get:
-
+CONTRACT VIOLATION: ARCH-001 - direct DB call in component
+  src/components/UserCard.tsx:42 - "supabase.from('users')"
 ```
-Sprint 0:  ████████████████████  9 agents parallel  (~8 min)
-Sprint 1:  ████████████████████  6 agents parallel  (~8 min)
-Sprint 2:  ████████████████████  5 agents parallel  (~8 min)
-Sprint 3+: ████████████████████  ...
+→ "Fix the violation — use a hook instead of direct call"
+
+**FEAT violation (build fails):**
 ```
+CONTRACT VIOLATION: USR-003 - password validation missing
+  src/features/auth/hooks/usePasswordReset.ts:42
+```
+→ "Add password validation to usePasswordReset"
 
-Each sprint launches the moment its blockers clear. No idle time between sprints.
+**JOURNEY violation (release blocked):**
+```
+Step 3: Profile updated successfully → FAILED
+  Element not found: success-message
+```
+→ "The success message isn't showing. Check the mutation response."
 
-### 5. Deterministic Quality
-
-Every agent reads the same `migration-builder.md` patterns. Every migration uses `gen_random_uuid()`. Every table gets RLS. Every RPC gets `GRANT EXECUTE` and `COMMENT ON FUNCTION`. The quality gates are in the agent prompt, not in a developer's memory.
-
-### 6. Contract-Validated Closure
-
-Tickets aren't closed because someone says "I think I'm done." They're closed because the contract-validator agent proved:
-- Every table in the spec exists in a migration
-- Every RLS policy matches the spec
-- Every RPC has the correct signature
-- Every acceptance criterion is met
-- Every invariant is enforced (at DB, app, or test level)
+**Issue missing specs:**
+```
+#56 Export Feature - Non-compliant (missing: Gherkin, SQL)
+```
+→ "Run specflow-writer on #56"
 
 ---
 
-## Quick Reference: What to Tell Claude Code
+## Checklist
 
-### "Make my issues build-ready"
-```
-Read scripts/agents/specflow-writer.md. For issues #X-#Y, generate full-stack
-ticket specs with Gherkin, SQL contracts, RLS, TypeScript interfaces, invariants,
-and acceptance criteria. Post as comments on each issue.
-```
+**Before sprint:**
+- [ ] All issues have Gherkin, SQL, RLS, TypeScript, journey refs
+- [ ] YAML contracts generated (ARCH, FEAT, JOURNEY)
+- [ ] Jest tests generated for ARCH/FEAT contracts
+- [ ] Dependencies mapped into sprint waves
 
-### "Audit my board"
-```
-Read scripts/agents/board-auditor.md. Scan issues #X-#Y for compliance:
-Gherkin, invariants, ACs, SQL, scope, RLS. Report gaps.
-```
-
-### "Map dependencies and build order"
-```
-Read all open issues. Extract CREATE TABLE names, REFERENCES clauses, TypeScript
-imports, and epic hierarchy. Build a dependency graph. Topological sort into
-sprint waves. Create a GitHub issue with the map.
-```
-
-### "Execute Sprint N"
-```
-Create tasks for Sprint N issues using TaskCreate with blockedBy dependencies.
-Pre-assign migration numbers starting at [NNN]. Launch implementation agents in
-parallel — each reads its issue spec, builds code, posts a comment, adds
-in-progress label. Use migration-builder.md patterns for SQL agents.
-```
-
-### "Validate and close"
-```
-Read scripts/agents/contract-validator.md. For each implemented issue, verify
-all contracts are satisfied. Post validation reports. Close issues that pass.
-Flag issues with gaps.
-```
+**Before release:**
+- [ ] `npm test -- contracts` passes (ARCH + FEAT)
+- [ ] All critical journey tests exist and pass
 
 ---
 
-## Agent File Reference
+## The Magic
 
-| File | Agent | Phase | Role |
-|------|-------|-------|------|
-| `specflow-writer.md` | Specflow Writer | 1 | Raw issues → executable full-stack specs |
-| `board-auditor.md` | Board Auditor | 2 | Audit spec compliance (Y/N per section) |
-| `specflow-uplifter.md` | Specflow Uplifter | 2 | Fill gaps in partially-compliant issues |
-| `dependency-mapper.md` | Dependency Mapper | 3 | SQL REFERENCES → topological sprint waves |
-| `sprint-executor.md` | Sprint Executor | 4 | Coordinate parallel agent launches per wave |
-| `migration-builder.md` | Migration Builder | 4 | Supabase PostgreSQL migration patterns |
-| `frontend-builder.md` | Frontend Builder | 4 | React hooks + components |
-| `edge-function-builder.md` | Edge Function Builder | 4 | Supabase Deno Edge Function patterns |
-| `contract-validator.md` | Contract Validator | 5 | Verify implementation matches contracts |
-| `playwright-from-specflow.md` | Playwright Generator | 6 | Gherkin → Playwright e2e tests |
-| `journey-tester.md` | Journey Tester | 6 | Cross-feature e2e journey tests |
-| `ticket-closer.md` | Ticket Closer | 7 | Post results, close validated issues |
+You never write specs by hand. Agents generate them.
+You never write contracts by hand. Agents generate them.
+You never write tests by hand. Agents generate them.
+You never track dependencies by hand. SQL REFERENCES tells us.
 
----
-
-## Real Numbers (Timebreez, Jan 2026)
-
-| Metric | Value |
-|--------|-------|
-| Issues uplifted to full-stack specs | 40+ |
-| Sprint 0 agents (parallel) | 9 |
-| Sprint 1 agents (parallel) | 6 |
-| Wall-clock time per sprint | ~8 minutes |
-| Migrations created (028-036) | 9 |
-| React hooks created | 12+ |
-| Components created | 6+ |
-| GitHub comments posted by agents | 30+ |
-| Migration numbering conflicts | 0 |
-| TypeScript errors introduced | 0 |
-| Manual dependency linking | 0 |
-
-The code contracts are the dependency graph. The Task tool is the orchestrator. The agents are the workforce.
+You point. Agents work. Build catches mistakes. Release blocked if journeys fail.

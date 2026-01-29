@@ -13,6 +13,7 @@ Given an epic (or its build-slice list), produce one GitHub issue per slice with
 
 ### Mode C: Single Ticket
 Produce a standalone ticket for a feature that doesn't need epic decomposition.
+**If the feature includes UI** (components, hooks, routes), the ticket MUST include a Journey section — even for standalone tickets. Journeys are Definition of Done for any user-facing feature.
 
 ---
 
@@ -204,8 +205,10 @@ Separate from Gherkin. These are the **checkbox DoD items** for the implementer:
 - [ ] Unique constraint: no duplicate zone names within same space
 ```
 
-### Step 8: Define Journeys (Epic mode only)
-Multi-step flows that cross feature boundaries:
+### Step 8: Define Journeys (Required for all UI features)
+Multi-step flows that cross feature boundaries. **Journeys are Definition of Done** for any
+feature with user-facing UI — not just epics. For standalone tickets (Mode C) with UI, include
+at least one journey showing how the user discovers and uses the feature end-to-end.
 
 ```markdown
 ## Journey: Admin Sets Up New Site
@@ -366,95 +369,62 @@ Use `gh issue create` with proper formatting. Always use heredoc for body.
 
 ## Domain Knowledge
 
-> **ADAPTATION NOTE:** The section below contains domain knowledge for the Timebreez project
-> (workforce management for childcare, hospitality, healthcare). When adapting this agent
-> for your project, **replace everything below this line** with your own:
-> - Entity list (tables, their relationships, key columns)
+> **ADAPTATION REQUIRED:** Add your project's domain knowledge below.
+> This section should contain:
+> - Entity list (tables, relationships, key columns)
 > - Domain-specific business rules
-> - Invariant registry with your own numbering convention
+> - Invariant registry with your numbering convention (I-{DOMAIN}-{NNN})
 > - Personas/actors in your system
 >
 > The **process steps above** (Steps 1-9), **templates**, **quality gates**, and
-> **anti-patterns** are stack-agnostic and should not need changes.
+> **anti-patterns** are stack-agnostic and don't need changes.
 
 ---
 
-### Timebreez Entities (Core)
-- **organizations**: Multi-tenant root, has org_ui_vocabulary
-- **employees**: Staff with roles (org_admin, site_admin, manager, employee)
-- **profiles**: Auth-linked user profiles
+### Example: E-Commerce Domain
 
-### Leave & Payroll Domain (I-PTO-*)
-- **leave_requests**: Time-off requests — status lifecycle: pending → approved/denied → canceled
-- **leave_entitlements**: Ledger of balance transactions (accrual, debit, adjustment) in minutes
-- **leave_types**: Configurable leave categories per org
-- **shift_instances**: Individual shift occurrences with status
-- **coverage_thresholds**: Minimum staffing rules per role per day
-- **blackout_periods**: Date ranges where leave is blocked
-- **audit_log**: Append-only action log
+**Entities (Core)**
+- **users**: Account holders with roles (admin, customer, vendor)
+- **products**: Items for sale with inventory tracking
+- **orders**: Purchase transactions with status lifecycle
 
-### Spaces & Zones Domain (I-ADM-*)
-- **org_ui_vocabulary**: Per-org UI labels (Room/Bay/Station/Chair/Area)
-- **site**: Physical/logical location per org
-- **space**: Operational container inside a site
-- **zone**: Atomic area where people work and compliance is computed
-- **zone_ruleset**: Staffing rules per zone (min_staff, required_roles, required_certs)
-- **admin_audit_event**: Immutable audit trail for admin mutations
+**Entities (Payments)**
+- **payments**: Payment records with provider references
+- **refunds**: Refund transactions linked to orders
+- **subscriptions**: Recurring billing records
 
-### Operations Domain (I-OPS-*)
-- **room_snapshot**: Current state of each zone (required/planned/present counts, status)
-- **dispatch_records**: Staff dispatch requests with lifecycle
-- **paxton_events**: Physical access badge swipes
-- **whatsapp_messages**: Outbound message log with delivery status
+**Business Rules**
+- Inventory decremented on order confirmation, not cart add
+- Refunds cannot exceed original payment amount
+- Subscription billing retries 3x before cancellation
+- All financial mutations audited with before/after state
 
-### Scheduling Domain (I-SCH-*)
-- **shift_patterns**: Recurring shift templates
-- **shift_instances**: Concrete shift assignments per zone per date
-- **schedule_versions**: Versioned schedule snapshots
+**Invariant Registry**
 
-### Business Rules
-- Leave balances tracked in minutes (480 min = 1 day)
-- Coverage check runs before leave approval
-- Override reason required when coverage would breach
-- Approved leave auto-cancels overlapping shifts
-- Cancelled leave auto-restores shifts and credits balance
-- Blackout periods block leave requests (not just warn)
-- Zone min_staff >= 1 always
-- Soft-delete only for zones/spaces once used by shifts
-- All admin mutations audited with before/after JSONB
-- Dispatch always requires Dispatch Drawer (never auto-send)
-- Rate limits: 3 dispatches/staff/hour, 5 WhatsApp/staff/day
+Use I-{DOMAIN}-{NNN} format. Domains might include:
+- `AUTH` — authentication/authorization
+- `PAY` — payments/billing
+- `INV` — inventory
+- `ORD` — orders/fulfillment
+- `USR` — user management
+
+Example invariants:
+- **I-ORD-001:** Order total must equal sum of line items + tax + shipping
+- **I-ORD-002:** Order status transitions: draft → pending → paid → shipped → delivered
+- **I-PAY-001:** Refund amount cannot exceed original payment
+- **I-INV-001:** Inventory count cannot go negative
 
 ---
 
-## Invariant Registry
+### Adding Your Domain Knowledge
 
-Reference these when writing tickets. Continue the sequence; never reuse numbers.
+1. **List your entities** with key columns and relationships
+2. **Define your domains** for invariant prefixes (I-AUTH-*, I-PAY-*, etc.)
+3. **Document business rules** that code must enforce
+4. **Create invariants** for rules that must NEVER be violated
+5. **Update as you go** — new features may reveal new invariants
 
-### I-PTO (Leave & Payroll)
-- **I-PTO-001:** Leave balance cannot go below org minimum (default: 0)
-- **I-PTO-002:** A shift_instance cannot be both 'scheduled' and 'cancelled' simultaneously
-- **I-PTO-003:** approved_at must be set when status transitions to 'approved'
-- **I-PTO-004:** audit_log entries are append-only (no updates or deletes)
-
-### I-ADM (Admin Setup)
-- **I-ADM-001:** Each org must have UI vocabulary (defaults applied if not set)
-- **I-ADM-002:** Each site must have at least one space
-- **I-ADM-003:** Each space must have at least one zone
-- **I-ADM-004:** Each zone must have a ruleset row (min_staff >= 1)
-- **I-ADM-005:** Deleting spaces/zones is soft-delete only once used
-- **I-ADM-006:** Any change to space/zone/ruleset writes an audit event with actor + before/after
-- **I-ADM-007:** Zone identifiers are stable across scheduling, control desk, payroll, sensors
-- **I-ADM-008:** Zone vocabulary changes must not break data; only UI labels change
-
-### I-OPS (Operations)
-- **I-OPS-001:** Room status derived from Required vs Present — never manually set
-- **I-OPS-002:** Dispatch always goes through Dispatch Drawer — never auto-sent
-- **I-OPS-003:** Override reason mandatory when approving with coverage breach
-- **I-OPS-004:** Every override writes to audit_log with before/after
-- **I-OPS-005:** Badge events update room snapshot within 5 seconds
-- **I-OPS-006:** Escalation follows configured rules, never automatic WhatsApp without config
-- **I-OPS-007:** Acknowledgment updates UI within 5 seconds
+The agent will reference this section when generating specs to ensure consistency.
 
 ---
 
@@ -477,6 +447,12 @@ Before creating any issue, verify:
 - [ ] Indexes exist for query patterns (foreign keys, sort columns, filters)
 - [ ] Triggers have full function bodies
 - [ ] RPCs have full PL/pgSQL bodies with RETURNS type
+
+### Journey Quality
+- [ ] Every issue with UI (TypeScript interfaces, components, routes) has a Journey section
+- [ ] Journey steps reference specific screens/routes
+- [ ] Journey covers the discovery-to-completion flow (not just the happy path)
+- [ ] Journey crosses at least one feature boundary (if the feature interacts with other features)
 
 ### Scope Quality
 - [ ] In Scope items are concrete and buildable in one slice
@@ -506,4 +482,4 @@ Before creating any issue, verify:
 5. **Vague acceptance criteria**: Never write "system works correctly". Write "zone_ruleset row exists with min_staff=1 after zone creation".
 6. **Scope creep in subtasks**: A subtask should be buildable in isolation. If it needs 3 other slices first, it's too big or misordered.
 7. **Missing error paths**: If there's a constraint, there must be a Gherkin scenario for violating it.
-8. **PTO-only thinking**: Timebreez is multi-vertical (creches, cafes, clinics, salons). Domain knowledge must cover all verticals.
+8. **Single-domain thinking**: If your app serves multiple use cases or verticals, ensure domain knowledge covers all of them.

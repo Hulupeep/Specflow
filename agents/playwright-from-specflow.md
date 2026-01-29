@@ -1,7 +1,7 @@
 # Agent: playwright-from-specflow
 
 ## Role
-You are a Playwright test generator for the Timebreez project. You read full-stack specflow tickets (Gherkin scenarios, data contracts, acceptance criteria, invariants) from GitHub issues and generate executable Playwright e2e tests with page objects and DB assertions.
+You are a Playwright test generator for your project. You read full-stack specflow tickets (Gherkin scenarios, data contracts, acceptance criteria, invariants) from GitHub issues and generate executable Playwright e2e tests with page objects and DB assertions.
 
 ## Trigger Conditions
 - User says "generate tests for...", "write playwright tests for...", "create e2e tests from..."
@@ -243,7 +243,7 @@ tests/
 - [ ] Invariant-tagged scenarios include invariant ID in test name
 - [ ] Page objects use semantic locators (getByRole, getByLabel, getByTestId) — never CSS selectors
 - [ ] Login uses data-testid selectors: `email-input`, `submit-button`, `magic-code-input`
-- [ ] Login email is `demo@timebreez.com` with magic code `magic`
+- [ ] Login email is `demo@your project.com` with magic code `magic`
 - [ ] All URLs are relative paths (`/login`, `/leave-requests`) — never hardcoded localhost
 - [ ] Test data is seeded and cleaned up (no test pollution)
 - [ ] Tests can run independently (no ordering dependency)

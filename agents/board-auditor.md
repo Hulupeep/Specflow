@@ -59,10 +59,17 @@ Output a one-line-per-issue summary:
 
 | Level | Criteria | Action |
 |-------|----------|--------|
-| **Fully Compliant** | All of Ghk, Inv, AC, SQL, Scp, RLS = Y | Ready for implementation |
-| **Partially Compliant** | Has Ghk + AC but missing SQL or RLS | Needs specflow-uplifter |
+| **Fully Compliant** | All of Ghk, Inv, AC, SQL, Scp, RLS = Y **AND** if TSi=Y or Tid=Y then Jrn=Y | Ready for implementation |
+| **Partially Compliant** | Has Ghk + AC but missing SQL, RLS, **or missing Jrn when UI is present** | Needs specflow-uplifter |
 | **Non-Compliant** | Missing Ghk or AC | Needs full specflow-writer pass |
 | **Infrastructure** | No SQL/RLS expected (ops/config tasks) | Mark as infra, skip SQL checks |
+
+> **Journey Rule:** Any issue with TypeScript interfaces (`TSi=Y`) or data-testid references
+> (`Tid=Y`) is a UI-facing issue. UI-facing issues MUST have a Journey reference (`Jrn=Y`)
+> to be classified as Fully Compliant. This is because journeys are Definition of Done for
+> features with user-facing components. An issue with perfect data contracts but no journey
+> is not build-ready — the implementer won't know how the feature fits into the user's
+> end-to-end flow.
 
 ### Step 5: Produce Report
 
@@ -113,6 +120,7 @@ Or post as a comment on an existing meta-tracking issue.
 - [ ] Every target issue checked (no gaps in the range)
 - [ ] Both issue body AND comments scanned (uplift comments contain the SQL)
 - [ ] Infrastructure issues correctly classified (not falsely flagged as non-compliant)
+- [ ] **UI-facing issues (TSi=Y or Tid=Y) without journeys (Jrn=N) classified as Partially Compliant**
 - [ ] Report includes actionable recommendations (which agent to run on which issues)
 - [ ] Compliance percentages are accurate
 - [ ] Report posted to GitHub for team visibility
