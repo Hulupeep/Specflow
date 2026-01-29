@@ -6,7 +6,28 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
+---
 
+## Zero-Setup: Just Tell Claude Code
+
+Copy Specflow into your project and say:
+
+```
+Read Specflow/README.md and set up my project with Specflow agents.
+Then make my issues compliant and execute my backlog in waves.
+```
+
+**That's it.** Claude Code will:
+1. Copy agents to `scripts/agents/`
+2. Update your CLAUDE.md with enforcement rules
+3. Make your GitHub issues specflow-compliant (Gherkin, contracts, data-testid)
+4. Build dependency waves from your tickets
+5. Execute your backlog in parallel
+6. Run tests and close validated tickets
+
+**One prompt. Full pipeline. No manual setup.**
+
+---
 
 ## The Problem
 
