@@ -13,13 +13,13 @@
 Copy Specflow into your project and say:
 
 ```
-Read Specflow/README.md and set up my project with Specflow agents.
+Read Specflow/README.md and set up my project with Specflow agents including updateing my CLAUDE.md to run the right agents at the right time. Use the claude template CLAUDE-MD-TEMPLATE.md in specflow to update the claude.md.
 Then make my issues compliant and execute my backlog in waves.
 ```
 
 **That's it.** Claude Code will:
 1. Copy agents to `scripts/agents/`
-2. Update your CLAUDE.md with enforcement rules
+2. Update your CLAUDE.md with enforcement rules. This is key - if it doesn't update the claude.md it will not invoke the agents.
 3. Make your GitHub issues specflow-compliant (Gherkin, contracts, data-testid)
 4. Build dependency waves from your tickets
 5. Execute your backlog in parallel
@@ -105,6 +105,53 @@ graph LR
 ✅ **Mid-project safe** — Document current state as contract, prevent regressions, refactor safely
 
 ✅ **CI/CD integrated** — Tests run automatically, violations block merges
+
+---
+
+## 🚀 Frontier Improvements (Production-Tested)
+
+**NEW:** Timebreez project delivered 280+ GitHub issues using Specflow with autonomous wave execution, E2E quality enforcement, and 18 specialized agents. These production-tested improvements are now available for **any project**.
+
+### Key Achievements
+
+- ✅ **0 Critical E2E Anti-Patterns** (down from 117) - Tests FAIL when features break (no silent passes)
+- ✅ **Autonomous Wave Execution** - Say "Execute waves" → controller orchestrates everything
+- ✅ **CI Quality Gates** - PRs blocked if test quality violations detected
+- ✅ **18 Agent Library** - Complete end-to-end delivery automation
+- ✅ **280+ Issues Delivered** - Production-validated across 30 waves
+
+### Quick Extraction (< 5 minutes)
+
+```bash
+# Copy all frontier improvements to your project
+bash extract-to-project.sh /path/to/your/project
+
+# Follow the printed next steps for adaptation
+```
+
+**What gets copied:**
+- Quality contract system (QUALITY-001 to QUALITY-004)
+- Wave execution framework (8-phase autonomous protocol)
+- 18 specialized agents (specflow-writer, waves-controller, journey-enforcer, etc.)
+- CI/CD integration templates (E2E quality gates)
+- CLAUDE.md enhancements (auto-trigger rules, test execution gate)
+
+**Impact:**
+```
+BEFORE: 117 E2E anti-patterns → Tests silently passed when features broke
+AFTER:  0 critical anti-patterns → CI accurately reflects reality (green = working, red = broken)
+
+BEFORE: Manual orchestration → Developer coordinates all agents
+AFTER:  "Execute waves" → Autonomous end-to-end execution with dependency calculation
+```
+
+### Documentation
+
+- **[README_FRONTIER.md](README_FRONTIER.md)** - Quick start guide (< 5 min)
+- **[FRONTIER_IMPROVEMENTS.md](FRONTIER_IMPROVEMENTS.md)** - Full documentation (1,300+ lines)
+- **[extract-to-project.sh](extract-to-project.sh)** - Automated extraction script
+
+**These improvements transform Specflow from a specification framework into a complete platform engineering capability.**
 
 ---
 
