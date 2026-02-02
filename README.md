@@ -40,7 +40,7 @@ Then make my issues compliant and execute my backlog in waves.
 6. Run tests and close validated tickets
 
 **One prompt. Full pipeline. No manual setup.**
-This is the fastest way to setup specflow though YMMV as to how well your LLM interprets it! So
+This is the fastest way to setup specflow  
 
 ---
 
