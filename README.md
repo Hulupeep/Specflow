@@ -27,7 +27,7 @@ Result: you can let the LLM explore, but the rules + flows can’t be broken wit
 Copy Specflow into your project and say to Claude Code:
 
 ```
-Read Specflow/README.md and set up my project with Specflow agents including updateing my CLAUDE.md to run the right agents at the right time. Use the claude template CLAUDE-MD-TEMPLATE.md in specflow to update the claude.md.
+Read Specflow/README.md and set up my project with Specflow agents including updating my CLAUDE.md to run the right agents at the right time. Use the claude template CLAUDE-MD-TEMPLATE.md in specflow to update the claude.md.
 Then make my issues compliant and execute my backlog in waves.
 ```
 
