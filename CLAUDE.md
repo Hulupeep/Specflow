@@ -78,19 +78,42 @@ _No contracts defined yet. Run specflow-writer to create them._
 
 This is the **Specflow methodology repository** containing:
 - Documentation on specs and contracts
-- 16 subagents for automated execution
+- 18 subagents for automated execution
 - Templates and examples
 - Demo proving contracts catch what unit tests miss
 
 ### Quick Start with Subagents
 
 ```bash
-# 1. Copy agents to your project
+# 1. Copy agents and protocol to your project
 cp -r Specflow/agents/ your-project/scripts/agents/
+cp Specflow/templates/WAVE_EXECUTION_PROTOCOL.md your-project/docs/
 
 # 2. Tell Claude Code
-"Note the agents in scripts/agents/. Execute my backlog in parallel waves."
+"Execute waves"
 ```
+
+### The Orchestrator
+
+The `waves-controller` agent is the master orchestrator. It:
+- Fetches all open issues
+- Builds dependency graph
+- Calculates parallel waves
+- Spawns all other agents
+- Handles quality gates
+- Closes completed issues
+
+**One command does everything:** `"Execute waves"`
+
+### Quick Commands
+
+| Goal | Say this |
+|------|----------|
+| Execute entire backlog | "Execute waves" |
+| Execute specific issues | "Execute issues #50, #51, #52" |
+| Execute by milestone | "Execute waves for milestone v1.0" |
+| Audit test quality | "Run e2e-test-auditor" |
+| Check compliance | "Run board-auditor" |
 
 ### Demo
 
@@ -106,5 +129,7 @@ npm run demo              # See contracts in action
 | [README.md](README.md) | Full documentation |
 | [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) | Complete CLAUDE.md template |
 | [agents/README.md](agents/README.md) | Subagent library setup |
+| [agents/waves-controller.md](agents/waves-controller.md) | Master orchestrator |
+| [templates/WAVE_EXECUTION_PROTOCOL.md](templates/WAVE_EXECUTION_PROTOCOL.md) | Wave execution protocol template |
 | [LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md) | How to generate contracts |
 | [CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md) | YAML contract format |

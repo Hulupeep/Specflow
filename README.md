@@ -221,13 +221,14 @@ See [QUICKSTART.md](QUICKSTART.md) for more prompt variations and detailed paths
 
 ## Easy Way: Subagents (Recommended)
 
-The fastest way to use Specflow is with Claude Code's Task tool and the 16 pre-built subagents.
+The fastest way to use Specflow is with Claude Code's Task tool and the 18 pre-built subagents.
 
 ### Step 1: Install the Agents
 
 ```bash
-# Copy agents into your project
+# Copy agents and protocol template into your project
 cp -r Specflow/agents/ your-project/scripts/agents/
+cp Specflow/templates/WAVE_EXECUTION_PROTOCOL.md your-project/docs/
 ```
 
 ### Step 2: Add to CLAUDE.md
@@ -237,75 +238,77 @@ Add this to your project's CLAUDE.md:
 ```markdown
 ## Subagent Library
 
-Reusable agent prompts live in `scripts/agents/*.md`. When spawning a subagent
-via the Task tool, read the agent prompt file first, then pass its content as
-context along with the specific task.
+Reusable agent prompts live in `scripts/agents/*.md`. The `waves-controller` is the
+master orchestrator — invoke it once, it handles everything.
+
+### Quick Commands
+| Goal | Say this |
+|------|----------|
+| Execute entire backlog | "Execute waves" |
+| Execute specific issues | "Execute issues #50, #51, #52" |
+| Execute by milestone | "Execute waves for milestone v1.0" |
+| Audit test quality | "Run e2e-test-auditor" |
+| Check compliance | "Run board-auditor" |
 
 ### Agent Registry
 | Agent | When to Use |
 |-------|-------------|
+| `waves-controller` | Execute entire backlog in dependency-ordered waves (MASTER ORCHESTRATOR) |
 | `specflow-writer` | New feature needs acceptance criteria, Gherkin, SQL contracts |
 | `board-auditor` | Check which issues are specflow-compliant |
 | `dependency-mapper` | Extract dependencies, build sprint waves |
 | `sprint-executor` | Execute parallel build waves |
 | `contract-validator` | Verify implementation matches spec |
 | `test-runner` | Run tests, report failures with details |
+| `e2e-test-auditor` | Find tests that silently pass when broken |
 | `journey-enforcer` | Verify journey coverage, release readiness |
 | `ticket-closer` | Close validated issues with summaries |
 
 ### Auto-Trigger: After ANY Code Changes
-Run `test-runner` and `journey-enforcer` before marking work complete.
+Run `test-runner` and `e2e-test-auditor` before marking work complete.
 ```
 
-### Step 3: Tell Claude Code
+### Step 3: Execute Your Backlog
 
-Open Claude Code and say:
-
-```
-Note the agents in scripts/agents/. Read the README there.
-```
-
-### Step 4: Execute Your Backlog
-
-Now use this single prompt to run the full pipeline:
+One command does everything:
 
 ```
-Create tasks to check (or create) my GitHub issues with the Specflow subagents
-to be specflow-compliant (Gherkin, SQL contracts, RLS, TypeScript interfaces,
-data-testid coverage).
-
-Then create tasks in waves of parallel work based on dependencies to execute
-my backlog. Use dependency-mapper to find the waves, then sprint-executor
-to run each wave.
-
-Finally, run test-runner and journey-enforcer before closing any tickets.
+Execute waves
 ```
 
-**What happens:**
-1. `board-auditor` scans your issues for compliance gaps
-2. `specflow-writer` + `specflow-uplifter` fill the gaps
-3. `dependency-mapper` extracts SQL REFERENCES to build sprint waves
-4. `sprint-executor` launches parallel agents for each wave
-5. `test-runner` executes tests and reports failures
-6. `journey-enforcer` validates journey coverage
-7. `ticket-closer` closes validated issues
+**That's it.** The `waves-controller` orchestrates all 8 phases:
+
+1. **Discovery** — Fetches issues, builds dependency graph, calculates waves
+2. **Contract Generation** — `specflow-writer` creates YAML contracts
+3. **Contract Audit** — `contract-validator` validates contracts
+4. **Implementation** — `migration-builder`, `frontend-builder`, `edge-function-builder` build code
+5. **Test Generation** — `playwright-from-specflow`, `journey-tester` create E2E tests
+6. **Test Execution** — `test-runner`, `journey-enforcer`, `e2e-test-auditor` verify everything
+7. **Issue Closure** — `ticket-closer` closes completed issues
+8. **Wave Report** — Summary + next wave
 
 **Result:** Your entire backlog executed in parallel waves, with contracts enforced at every step.
 
 ### Why This Works
 
+The `waves-controller` is a meta-agent that:
+- Reads `docs/WAVE_EXECUTION_PROTOCOL.md` for project-specific config
+- Spawns subagents in parallel where possible
+- Handles quality gates (stops on test failures)
+- Reports progress at each phase
+
 Claude Code's Task tool spawns independent subagents. Each agent:
 - Reads its prompt from `scripts/agents/{agent}.md`
 - Works autonomously on its assigned task
-- Returns results to the parent conversation
+- Returns results to the orchestrator
 - Can run in parallel with other agents
 
 The agents coordinate through:
 - GitHub issues (shared state)
 - Contract files (shared rules)
-- Memory/context (parent tracks progress)
+- The orchestrator (tracks progress, enforces quality gates)
 
-**No external orchestrator needed.** The parent conversation coordinates; agents do the work.
+**One command. Full pipeline. No manual coordination.**
 
 ---
 
@@ -579,11 +582,14 @@ it('AUTH-001: No localStorage for tokens', () => {
 |-----|---------|
 | [agents/README.md](agents/README.md) | Setup guide: add agents to your project, run the pipeline |
 | [agents/WORKFLOW.md](agents/WORKFLOW.md) | Step-by-step walkthrough with exact prompts |
+| [agents/waves-controller.md](agents/waves-controller.md) | **Master orchestrator**: "execute waves" runs entire pipeline |
 | [agents/specflow-writer.md](agents/specflow-writer.md) | Core agent: issues --> full-stack specs |
 | [agents/dependency-mapper.md](agents/dependency-mapper.md) | SQL REFERENCES --> sprint waves |
 | [agents/sprint-executor.md](agents/sprint-executor.md) | Parallel wave execution coordinator |
 | [agents/test-runner.md](agents/test-runner.md) | Execute tests, parse results, report failures |
+| [agents/e2e-test-auditor.md](agents/e2e-test-auditor.md) | Find tests that silently pass when broken |
 | [agents/journey-enforcer.md](agents/journey-enforcer.md) | Verify journey coverage, release readiness |
+| [templates/WAVE_EXECUTION_PROTOCOL.md](templates/WAVE_EXECUTION_PROTOCOL.md) | Wave execution protocol template (copy to your project) |
 
 ### Deep Dives (Reference)
 
@@ -758,6 +764,8 @@ You're doing it right when:
 │   ./verify-setup.sh         Check setup                 │
 │                                                         │
 │ Subagent Quick Commands:                                │
+│   "Execute waves"           Run entire backlog          │
+│   "Run e2e-test-auditor"    Find unreliable tests       │
 │   "Run test-runner"         Execute tests, report fails │
 │   "Run journey-enforcer"    Check journey coverage      │
 │   "Run board-auditor"       Check issue compliance      │
@@ -784,7 +792,7 @@ Specflow is a methodology—it works with your existing tools.
 | **Skills** | Create a `/specflow` skill that sets up contracts for any project |
 | **Hooks** | Run contract tests on `post-edit` to catch violations immediately |
 | **CLAUDE.md** | Add contract rules so Claude checks before modifying protected files |
-| **Task Tool Agents** | 16 reusable subagents for parallel, dependency-ordered implementation |
+| **Task Tool Agents** | 18 reusable subagents for parallel, dependency-ordered implementation |
 
 See [context/CLAUDE-CODE-SKILL.md](context/CLAUDE-CODE-SKILL.md) for skill setup instructions and hook examples.
 
@@ -820,10 +828,11 @@ When every GitHub issue has executable SQL contracts (`CREATE TABLE`, `REFERENCE
 
 ### The Agent Library
 
-**16 subagent definitions** in [`agents/`](agents/) that form a complete pipeline:
+**18 subagent definitions** in [`agents/`](agents/) that form a complete pipeline:
 
 ```
-specflow-writer          Raw issues --> full-stack specs with SQL + Gherkin
+waves-controller         MASTER ORCHESTRATOR: "execute waves" runs everything
+  --> specflow-writer    Raw issues --> full-stack specs with SQL + Gherkin
   --> board-auditor      Compliance audit (which issues are build-ready?)
   --> specflow-uplifter  Fix gaps in partial specs
   --> dependency-mapper  SQL REFERENCES --> topological sprint plan
@@ -832,6 +841,7 @@ specflow-writer          Raw issues --> full-stack specs with SQL + Gherkin
   --> contract-validator Verify implementation matches contracts
   --> playwright-from-specflow + journey-tester   Generate e2e tests
   --> test-runner        Execute tests, report failures with file:line details
+  --> e2e-test-auditor   Find tests that silently pass when broken
   --> journey-enforcer   Verify journey coverage, release readiness check
   --> ticket-closer      Close validated issues
 ```
@@ -839,23 +849,25 @@ specflow-writer          Raw issues --> full-stack specs with SQL + Gherkin
 ### Quick Start
 
 ```bash
-# 1. Copy agents into your project
+# 1. Copy agents and protocol into your project
 cp -r Specflow/agents/ your-project/scripts/agents/
+cp Specflow/templates/WAVE_EXECUTION_PROTOCOL.md your-project/docs/
 
-# 2. Tell Claude Code to uplift your issues
-"Read scripts/agents/specflow-writer.md. Uplift issues #10-#25 with
- Gherkin, SQL contracts, RLS, TypeScript interfaces, and ACs."
-
-# 3. Map dependencies from the code contracts
-"Read scripts/agents/dependency-mapper.md. Build a sprint plan from
- all open issues. Topological sort by SQL REFERENCES."
-
-# 4. Execute Sprint 0 in parallel
-"Read scripts/agents/sprint-executor.md. Launch Sprint 0 agents for
- issues #10, #12, #15, #18, #20. Pre-assign migration numbers."
+# 2. Tell Claude Code
+"Execute waves"
 ```
 
-**Result:** 9 agents running in parallel, ~8 minutes wall-clock, zero coordination overhead. Each agent reads its issue spec, builds the code, posts a GitHub comment, and adds a label. The parent tracks completions and cascades to the next sprint wave.
+**That's it.** The `waves-controller` orchestrates all 8 phases automatically:
+1. Fetches issues, builds dependency graph, calculates waves
+2. Generates contracts (`specflow-writer`)
+3. Validates contracts (`contract-validator`)
+4. Implements code (`migration-builder`, `frontend-builder`, `edge-function-builder`)
+5. Generates tests (`playwright-from-specflow`, `journey-tester`)
+6. Runs tests (`test-runner`, `e2e-test-auditor`, `journey-enforcer`)
+7. Closes issues (`ticket-closer`)
+8. Reports wave completion, continues to next wave
+
+**Result:** Entire backlog executed in parallel waves, zero manual coordination. Each agent reads its prompt, does its work, returns results to the orchestrator.
 
 ### Why This Matters
 

@@ -96,7 +96,12 @@ The agents know the patterns. You provide direction.
 
 ---
 
-## The 16 Agents
+## The 18 Agents
+
+### Orchestration
+| Agent | What it does |
+|-------|--------------|
+| **waves-controller** | Master orchestrator: executes entire backlog in dependency-ordered waves through all 8 phases |
 
 ### Writing Specs
 | Agent | What it does |
@@ -128,6 +133,7 @@ The agents know the patterns. You provide direction.
 | **playwright-from-specflow** | Generates Playwright tests from Gherkin scenarios |
 | **journey-tester** | Creates cross-feature E2E journey tests from journey contracts |
 | **test-runner** | Executes E2E and contract tests; parses results; reports failures with file:line details |
+| **e2e-test-auditor** | Scans tests for anti-patterns that silently mask failures; generates health score and remediation plan |
 
 ### Closing
 | Agent | What it does |
@@ -137,6 +143,26 @@ The agents know the patterns. You provide direction.
 ---
 
 ## The Pipeline
+
+### One-Command Execution (Recommended)
+
+```
+YOU: "Execute waves"
+  │
+  ↓
+waves-controller (orchestrates all 8 phases automatically)
+  │
+  ├─ Phase 1: Discovery & dependency mapping
+  ├─ Phase 2: Contract generation (specflow-writer)
+  ├─ Phase 3: Contract audit (contract-validator)
+  ├─ Phase 4: Implementation (migration-builder, frontend-builder, edge-function-builder)
+  ├─ Phase 5: Test generation (playwright-from-specflow, journey-tester)
+  ├─ Phase 6: Test execution (test-runner, journey-enforcer, e2e-test-auditor)
+  ├─ Phase 7: Issue closure (ticket-closer)
+  └─ Phase 8: Wave report → next wave or EXIT
+```
+
+### Manual Execution (Step-by-Step Control)
 
 ```
 YOU: "Make issues #X-#Y specflow-compliant"
@@ -173,14 +199,15 @@ Phase 4: VALIDATE
   │
   ↓
 Phase 5: TEST EXECUTION
-  test-runner
+  test-runner + e2e-test-auditor
   │
   ├─ npm test -- contracts ← ARCH/FEAT CONTRACTS VERIFIED
-  └─ npx playwright test ← JOURNEY CONTRACTS VERIFIED
+  ├─ npx playwright test ← JOURNEY CONTRACTS VERIFIED
+  └─ Anti-pattern scan ← TEST RELIABILITY VERIFIED
   │
   ↓
-  All tests pass? → Continue
-  Tests fail? → Fix and re-run
+  All tests pass + no anti-patterns? → Continue
+  Tests fail or anti-patterns found? → Fix and re-run
   │
   ↓
 YOU: "Close the completed issues"
@@ -196,13 +223,15 @@ Phase 6: CLOSE
 
 | What | Agent | Input | Output |
 |------|-------|-------|--------|
+| **Wave execution** | `waves-controller` | GitHub issues | Complete implementation with tests |
 | **YAML contracts** | `contract-generator` | Issue specs | `docs/contracts/*.yml` |
 | **Jest tests** | `contract-test-generator` | YAML contracts | `src/__tests__/contracts/*.test.ts` |
 | **Playwright feature tests** | `playwright-from-specflow` | Gherkin in issues | `tests/e2e/*.spec.ts` |
 | **Playwright journey tests** | `journey-tester` | Journey contracts | `tests/e2e/journeys/*.journey.spec.ts` |
 | **Test execution report** | `test-runner` | Test files | Failure report with file:line details |
+| **Test quality audit** | `e2e-test-auditor` | Test files | Health score + remediation plan |
 
-**The key insight:** Jest tests enforce YAML contracts (pattern scanning). Playwright tests verify behavior (Gherkin + journeys). Both can be generated before or after implementation. `test-runner` executes them and produces actionable failure reports.
+**The key insight:** Jest tests enforce YAML contracts (pattern scanning). Playwright tests verify behavior (Gherkin + journeys). Both can be generated before or after implementation. `test-runner` executes them and produces actionable failure reports. `e2e-test-auditor` ensures tests actually fail when features break.
 
 ---
 
@@ -228,6 +257,9 @@ Phase 6: CLOSE
 
 | Goal | Say this |
 |------|----------|
+| **Execute entire backlog** | "Execute waves" |
+| **Execute specific issues** | "Execute issues #A, #B, #C" |
+| **Execute by filter** | "Execute waves for milestone v1.0" |
 | Make issues spec-ready | "Run specflow-writer on issues #X-#Y" |
 | Check compliance | "Run board-auditor on all open issues" |
 | Fill spec gaps | "Run specflow-uplifter on issues missing RLS" |
@@ -238,6 +270,8 @@ Phase 6: CLOSE
 | Validate contracts | "Run contract-validator on the implemented issues" |
 | Run tests | "Run test-runner" or "Run all tests" |
 | Check what's failing | "What tests are failing?" |
+| **Audit test quality** | "Run e2e-test-auditor" |
+| **Find unreliable tests** | "Why are tests passing but app broken?" |
 | Check release readiness | "Are critical journeys passing?" |
 | Close tickets | "Run ticket-closer on issues #X-#Y" |
 
