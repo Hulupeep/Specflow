@@ -68,6 +68,21 @@ override_contract: <contract_id>
 _No contracts defined yet. Run specflow-writer to create them._
 ```
 
+### Wave Execution & Orchestration (Optional)
+
+If your project uses **wave-based GitHub issue orchestration**, see [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) for:
+
+- Progress tracking templates with dependency graphs
+- Autonomous execution requirements (5 parameters)
+- Automatic parallel execution determination
+- Parallelization savings reporting
+
+**Key capabilities:**
+- Parse issue dependencies automatically
+- Determine which issues can run in parallel
+- Execute multiple agents simultaneously (3-4x faster)
+- Report time savings from parallelization
+
 ---
 
 # ⬆️ END ⬆️
