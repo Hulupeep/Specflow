@@ -3,6 +3,8 @@
 **Specs that enforce themselves.**
 
 *Turn specs into contracts that can't be broken by helpful LLMs.*
+The simple explanation: Hard Gates at build time, playwright journeys as DOD. Gates come from 'invariants' when you write your issues/stories as a) Feature contracts, b) Architectural contracts c) Journeys in your UI 
+Tests execute when your try to build, playwright tests will execute based on your journey contract. The two approaches help provide a much higher level of 'determinism' in this is what aI want vs this what i got
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -26,6 +28,7 @@ Then make my issues compliant and execute my backlog in waves.
 6. Run tests and close validated tickets
 
 **One prompt. Full pipeline. No manual setup.**
+This is the fastest way to setup specflow though YMMV as to how well your LLM interprets it! So
 
 ---
 
