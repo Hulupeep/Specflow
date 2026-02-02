@@ -3,12 +3,19 @@
 **Specs that enforce themselves.**
 
 *Turn specs into contracts that can't be broken by helpful LLMs.*
-The simple explanation: 
-1. Hard Gates at build time, playwright journeys as DOD.
-2. Gates come from 'invariants' when you write your issues/stories as a) Feature contracts, b) Architectural contracts c) Journeys in your UI 
-3. Tests execute when your try to build, playwright tests will execute based on your journey contract.
+Specflow turns your specs into enforceable contracts so LLM changes can’t silently drift your product.
 
-The two approaches help provide a much higher level of 'determinism' in this is what aI want vs this what i got
+It uses two gates:
+
+1. Contract tests (hard gate, fast): scan your code for forbidden/required patterns. Break a rule → CI fails before build.
+2. Journey tests (DoD, authoritative): Playwright runs your critical user flows. If journeys don’t pass, the feature isn’t “done.”
+3.  You write three kinds of invariants:
+
+    a) Architecture (how the system must be built)
+    b) Features (what must be true)
+    c)  Journeys (what users must be able to accomplish)
+
+Result: you can let the LLM explore, but the rules + flows can’t be broken without being caught
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
