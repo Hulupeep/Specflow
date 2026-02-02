@@ -3,8 +3,12 @@
 **Specs that enforce themselves.**
 
 *Turn specs into contracts that can't be broken by helpful LLMs.*
-The simple explanation: Hard Gates at build time, playwright journeys as DOD. Gates come from 'invariants' when you write your issues/stories as a) Feature contracts, b) Architectural contracts c) Journeys in your UI 
-Tests execute when your try to build, playwright tests will execute based on your journey contract. The two approaches help provide a much higher level of 'determinism' in this is what aI want vs this what i got
+The simple explanation: 
+1. Hard Gates at build time, playwright journeys as DOD.
+2. Gates come from 'invariants' when you write your issues/stories as a) Feature contracts, b) Architectural contracts c) Journeys in your UI 
+3. Tests execute when your try to build, playwright tests will execute based on your journey contract.
+
+The two approaches help provide a much higher level of 'determinism' in this is what aI want vs this what i got
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
