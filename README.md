@@ -9,10 +9,11 @@ It uses two gates:
 
 1. Contract tests (hard gate, fast): scan your code for forbidden/required patterns. Break a rule → CI fails before build.
 2. Journey tests (DoD, authoritative): Playwright runs your critical user flows. If journeys don’t pass, the feature isn’t “done.”
-3.  You write three kinds of invariants:
+
+You write three kinds of invariants (what must be true in your product):
 
     a) Architecture (how the system must be built)
-    b) Features (what must be true)
+    b) Features (what must be true about features)
     c)  Journeys (what users must be able to accomplish)
 
 Result: you can let the LLM explore, but the rules + flows can’t be broken without being caught
@@ -21,9 +22,9 @@ Result: you can let the LLM explore, but the rules + flows can’t be broken wit
 
 ---
 
-## Zero-Setup: Just Tell Claude Code
+## Quick start (Claude Code Task Tool)
 
-Copy Specflow into your project and say:
+Copy Specflow into your project and say to Claude Code:
 
 ```
 Read Specflow/README.md and set up my project with Specflow agents including updateing my CLAUDE.md to run the right agents at the right time. Use the claude template CLAUDE-MD-TEMPLATE.md in specflow to update the claude.md.
