@@ -148,3 +148,4 @@ npm run demo              # See contracts in action
 | [templates/WAVE_EXECUTION_PROTOCOL.md](templates/WAVE_EXECUTION_PROTOCOL.md) | Wave execution protocol template |
 | [LLM-MASTER-PROMPT.md](LLM-MASTER-PROMPT.md) | How to generate contracts |
 | [CONTRACT-SCHEMA.md](CONTRACT-SCHEMA.md) | YAML contract format |
+| [CONTRACT-SCHEMA-EXTENSIONS.md](CONTRACT-SCHEMA-EXTENSIONS.md) | **NEW: DPAO parallel execution extensions** |
