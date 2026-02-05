@@ -947,6 +947,32 @@ See **[agents/README.md](agents/README.md)** for setup instructions and **[agent
 
 ---
 
+## About
+
+### Why I Built This
+
+I build products for a living—for clients and for myself. When you're shipping real software to real users, you need things that actually work. Not "works in demo." Not "works on my machine." Works in production, under load, when users do unexpected things.
+
+After years of watching LLMs confidently break production code, I started developing patterns to catch drift before it shipped. Specflow is the result of trying these patterns on numerous projects—some successful, some painful lessons.
+
+**This is still a work in progress.** The core idea (contracts that enforce themselves) is solid and battle-tested. The tooling keeps evolving as I discover what works and what doesn't across different stacks and team sizes.
+
+### The Philosophy
+
+Most "AI guardrails" try to make LLMs behave better. That's backwards. You can't fix probabilistic outputs with better prompts—you need a gate that stops bad outputs from shipping.
+
+Specflow doesn't trust the LLM. It doesn't trust the human either. It trusts the tests. If the contract test passes, ship it. If it fails, fix it. Simple as that.
+
+### Connect
+
+- **LinkedIn:** [Colm Byrne](https://www.linkedin.com/in/colmbyrne/)
+- **GitHub:** [Hulupeep](https://github.com/Hulupeep)
+- **Issues/Ideas:** [Specflow Issues](https://github.com/Hulupeep/Specflow/issues)
+
+If you're using Specflow on a real project, I'd love to hear what works and what doesn't. The best improvements come from production feedback.
+
+---
+
 ## License
 
 MIT - Use freely, commercially, anywhere.
