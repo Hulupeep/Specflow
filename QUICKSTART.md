@@ -1,5 +1,27 @@
 # Specflow Quick Start
 
+## ⚠️ Critical Setup: Commit Message Format
+
+**Before anything else:** Specflow hooks only work if commits reference GitHub issues.
+
+```bash
+# ✅ GOOD - hooks find #375 and run its journey tests
+git commit -m "feat: add signup validation (#375)"
+
+# ❌ BAD - hooks find nothing, no tests run
+git commit -m "feat: add signup validation"
+```
+
+**Why?** After `pnpm build` or `git commit`, hooks:
+1. Extract issue numbers from recent commits
+2. Fetch each issue to find journey contract (`J-SIGNUP-FLOW`)
+3. Run only those Playwright tests
+4. Block on failure
+
+**Install hooks:** `bash Specflow/install-hooks.sh .`
+
+---
+
 ## TL;DR: Copy-Paste This to Your LLM
 
 **You don't need to read anything first.** Just paste this prompt after copying the Specflow folder into your project.

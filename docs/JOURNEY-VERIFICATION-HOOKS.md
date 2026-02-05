@@ -1,294 +1,288 @@
 # Journey Verification Hooks
 
-## Why This Exists
-
-There are two ways to get Claude to run E2E tests:
-
-### Option A: Manual (You Tell Claude)
-```
-User: "Run the playwright tests"
-Claude: [runs tests]
-```
-
-**Problem:** You have to remember to ask every time. You'll forget. Production breaks.
-
-### Option B: Automatic (Hooks Tell Claude)
-```
-[Claude commits code]
-[HOOK fires: "Run journey verification"]
-Claude: [automatically runs tests without being asked]
-```
-
-**Solution:** Hooks make it automatic. Claude runs tests at the right moments without you asking.
+Claude Code hooks that **automatically run Playwright tests** after builds and commits.
 
 ---
 
-## The Problem Hooks Solve
+## ⚠️ Critical: Commit Message Format
 
-**Scenario without hooks:**
-1. You implement a feature
-2. `pnpm build` passes ✅
-3. You say "done"
-4. Code deploys to production
-5. Production is broken 💥
-6. You discover it hours later
+**Hooks only work if commits reference GitHub issues:**
 
-**Scenario with hooks:**
-1. You implement a feature
-2. `pnpm build` passes
-3. [HOOK] Claude automatically runs E2E tests
-4. Tests fail - Claude reports the issue
-5. You fix it BEFORE deploying
-6. Production works ✅
-
----
-
-## Local vs Production: Critical Distinction
-
-### Two Different Test Environments
-
-| Environment | When | URL | Purpose |
-|-------------|------|-----|---------|
-| **LOCAL** | Before commit | `localhost:3000` | Verify code works locally |
-| **PRODUCTION** | After deploy | `https://yourapp.com` | Verify production works |
-
-### The Deploy Pipeline
-
-```
-git push → GitHub → Vercel auto-deploys → PRODUCTION CHANGES
-
-                                          ↑
-                                    Tests MUST run here
-                                    against production URL
-```
-
-### When to Run Where
-
-| Trigger | Environment | Why |
-|---------|-------------|-----|
-| PRE-BUILD | Local | Baseline before changes |
-| POST-BUILD | Local | Verify local changes work |
-| POST-COMMIT | **PRODUCTION** | Verify deploy didn't break prod |
-| POST-MIGRATION | **PRODUCTION** | Verify schema changes work in prod |
-
-**CRITICAL:** After `git push`, tests MUST run against production URL, not localhost.
-
----
-
-## Mandatory Reporting Requirements
-
-### Never Hide Information
-
-Claude MUST report ALL of the following. No exceptions. No "skipped" without explanation.
-
-### 1. WHERE Tests Ran
-
-```
-❌ BAD: "Tests passed"
-✅ GOOD: "Tests passed against LOCAL (localhost:5173)"
-✅ GOOD: "Tests passed against PRODUCTION (https://www.yourapp.com)"
-```
-
-### 2. WHICH Tests Ran
-
-```
-❌ BAD: "E2E tests passed"
-✅ GOOD: "Ran tests/e2e/auth/signup.spec.ts, tests/e2e/auth/login.spec.ts"
-```
-
-### 3. HOW MANY Tests
-
-```
-❌ BAD: "Tests passed"
-✅ GOOD: "12/12 tests passed (0 failed, 0 skipped)"
-```
-
-### 4. What SKIPPED Means
-
-**Skipped tests are NOT passing tests.** They are tests that didn't run.
-
-```
-❌ BAD: "10/12 passed, 2 skipped" (sounds fine!)
-✅ GOOD: "10/12 passed, 0 failed, 2 SKIPPED
-         SKIPPED TESTS (investigate why):
-         - signup-with-demo.spec.ts:45 - @skip tag
-         - checkout.spec.ts:78 - conditional skip (missing env var)"
-```
-
-**Rule:** Every skipped test needs an explanation. "Skipped" is often hiding problems.
-
-### 5. Console Errors
-
-```
-❌ BAD: [silently ignores console errors]
-✅ GOOD: "Console errors captured:
-         - [ERROR] RPC returned 400: column 'org_id' does not exist
-         - [HTTP 500] /api/provision failed"
-```
-
----
-
-## Report Template
-
-After EVERY test run, use this format:
-
-```
-══════════════════════════════════════════════════════════════
-E2E TEST REPORT
-══════════════════════════════════════════════════════════════
-
-ENVIRONMENT: LOCAL (localhost:5173)
-             or
-             PRODUCTION (https://www.yourapp.com)
-
-CONTEXT: Wave 3 (#325, #326, #327)
-JOURNEYS: J-USER-SIGNUP, J-USER-CHECKOUT
-
-TESTS RUN:
-  - tests/e2e/auth/signup.spec.ts
-  - tests/e2e/auth/login.spec.ts
-  - tests/e2e/checkout/flow.spec.ts
-
-RESULTS: 18/20 passed, 1 failed, 1 skipped
-
-FAILURES:
-  ✗ signup.spec.ts:67 "should create demo org"
-    Error: RPC returned 400
-    Expected: org created
-    Actual: "column 'organization_id' does not exist"
-
-SKIPPED (explain why):
-  ⊘ checkout.spec.ts:120 "should process payment"
-    Reason: @skip tag - Stripe not configured in test env
-
-CONSOLE ERRORS:
-  - [ERROR] column 'organization_id' does not exist
-  - [HTTP 400] POST /rest/v1/rpc/provision_demo_org
-
-══════════════════════════════════════════════════════════════
-```
-
----
-
-## Configuration
-
-Add to your CLAUDE.md:
-
-```markdown
-## Test Configuration
-
-- **Package Manager:** pnpm
-- **Test Command:** `pnpm test:e2e`
-- **Test Directory:** `tests/e2e`
-- **Local URL:** `http://localhost:5173`
-- **Production URL:** `https://www.yourapp.com`
-- **Deploy Platform:** Vercel
-- **Deploy Wait:** 90 seconds (time for Vercel to deploy after push)
-```
-
----
-
-## Trigger Behavior
-
-### PRE-BUILD (Local)
 ```bash
-# Run against local dev server
-pnpm test:e2e
-# Report: "LOCAL (localhost:5173): 15/15 passed"
-```
+# ✅ GOOD - hooks find #375 and run its journey tests
+git commit -m "feat: add signup validation (#375)"
 
-### POST-BUILD (Local)
-```bash
-# Run against local build
-pnpm test:e2e
-# Report: "LOCAL (localhost:5173): 15/15 passed"
-```
-
-### POST-COMMIT (Production)
-```bash
-# Wait for deploy
-sleep 90
-
-# Run against production
-PLAYWRIGHT_BASE_URL=https://www.yourapp.com pnpm test:e2e
-
-# Report: "PRODUCTION (https://www.yourapp.com): 15/15 passed"
-```
-
-### POST-MIGRATION (Production)
-```bash
-# Run against production (schema already changed)
-PLAYWRIGHT_BASE_URL=https://www.yourapp.com pnpm test:e2e
-
-# Report: "PRODUCTION (https://www.yourapp.com): 15/15 passed"
+# ❌ BAD - hooks find nothing, no tests run
+git commit -m "feat: add signup validation"
 ```
 
 ---
 
-## Anti-Patterns to Avoid
-
-### 1. People-Pleasing Reports
+## How It Works
 
 ```
-❌ "Tests mostly passed with a few minor skips"
-✅ "12/15 passed, 2 failed, 1 skipped. Here are the failures..."
+pnpm build (success)
+    ↓
+PostToolUse hook fires (matcher: Bash)
+    ↓
+post-build-check.sh detects "build" or "commit"
+    ↓
+run-journey-tests.sh:
+    1. git log -5 → extract #issue numbers
+    2. gh issue view → find J-XXX journey contract
+    3. Map J-SIGNUP-FLOW → journey_signup_flow.spec.ts
+    4. Run: pnpm test:e2e <those files only>
+    ↓
+Exit 0 (pass) or Exit 2 (fail → blocks with error to Claude)
 ```
 
-### 2. Hiding Failures Behind "Skipped"
-
-```
-❌ "All tests passed (5 skipped)"
-✅ "10/15 passed. 5 tests SKIPPED - investigating why:
-    - 3 have @skip tags (need removal)
-    - 2 failed to initialize (env issue)"
-```
-
-### 3. Vague Environment
-
-```
-❌ "E2E tests passed"
-✅ "E2E tests passed against PRODUCTION (https://www.yourapp.com)"
-```
-
-### 4. Missing Test Count
-
-```
-❌ "Journey tests passed"
-✅ "Journey tests: 8/8 passed (signup.spec.ts, login.spec.ts, ...)"
-```
-
-### 5. Ignoring Console Errors
-
-```
-❌ [runs tests, ignores console output]
-✅ "Tests passed but captured 2 console errors:
-    - RPC 400 error (non-blocking but investigate)
-    - Deprecation warning (low priority)"
-```
+**Key point:** Only tests relevant to the issues you're working on run. Not the full suite.
 
 ---
 
 ## Installation
 
 ```bash
-# From Specflow repo
-bash install-hooks.sh /path/to/your/project
+# From your project root
+bash Specflow/install-hooks.sh .
 
-# What gets installed:
-# .claude/settings.json - hook triggers
-# .claude/hooks/journey-verification.md - behavior spec
+# Or manually
+mkdir -p .claude/hooks
+cp Specflow/hooks/*.sh .claude/hooks/
+cp Specflow/hooks/settings.json .claude/settings.json
+chmod +x .claude/hooks/*.sh
 ```
 
-Then add the configuration section to your CLAUDE.md.
+### Requirements
+
+- `gh` CLI installed and authenticated (`gh auth login`)
+- `jq` installed (`brew install jq` or `apt install jq`)
+
+---
+
+## Three Things Must Be True
+
+### 1. Commits Reference Issues
+
+```bash
+# ✅ Works
+git commit -m "feat: add signup validation (#375)"
+git commit -m "fix: handle edge case (#375, #376)"
+
+# ❌ Doesn't work
+git commit -m "feat: add signup validation"
+```
+
+### 2. Issues Have Journey Contracts
+
+Issue body must contain journey reference:
+
+```markdown
+## Journey Contract
+J-SIGNUP-FLOW (CRITICAL)
+
+## Acceptance Criteria
+...
+```
+
+The hook extracts `J-SIGNUP-FLOW` using regex: `J-[A-Z0-9-]+`
+
+### 3. Test Files Follow Naming Convention
+
+| Journey Contract | Test File |
+|------------------|-----------|
+| `J-SIGNUP-FLOW` | `tests/e2e/journey_signup_flow.spec.ts` |
+| `J-BILLING-DASHBOARD` | `tests/e2e/journey_billing_dashboard.spec.ts` |
+| `J-USER-CHECKOUT` | `tests/e2e/journey_user_checkout.spec.ts` |
+
+**Pattern:** `J-UPPER-CASE` → `journey_lower_case.spec.ts`
+
+---
+
+## Deferring Tests
+
+If tests are slow or you need to skip temporarily:
+
+```bash
+# Defer tests (creates flag file)
+touch .claude/.defer-tests
+
+# Re-enable tests (removes flag file)
+rm .claude/.defer-tests
+```
+
+When deferred, hook outputs: `"Tests deferred. Run 'rm .claude/.defer-tests' to re-enable."`
+
+---
+
+## Files Installed
+
+| File | Purpose |
+|------|---------|
+| `.claude/settings.json` | Claude Code hook configuration |
+| `.claude/hooks/post-build-check.sh` | Detects build/commit commands |
+| `.claude/hooks/run-journey-tests.sh` | Smart test runner |
+| `.claude/hooks/README.md` | Documentation |
+
+---
+
+## Hook Configuration
+
+`.claude/settings.json`:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-build-check.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Build Commands Detected
+
+The hook triggers on these commands:
+
+- `npm run build`
+- `pnpm build`
+- `yarn build`
+- `vite build`
+- `next build`
+- `turbo build`
+- `make build`
+- `git commit`
+
+---
+
+## Customization
+
+### Different Test Directory
+
+Edit `run-journey-tests.sh`:
+
+```bash
+# Change this line
+echo "tests/e2e/journey_${test_name}.spec.ts"
+
+# To your pattern
+echo "e2e/journeys/${test_name}.test.ts"
+```
+
+### Different Test Command
+
+The script auto-detects package manager. Override by editing:
+
+```bash
+get_test_command() {
+    echo "your-custom-test-command"
+}
+```
+
+### More Build Commands
+
+Edit `post-build-check.sh`:
+
+```bash
+is_build_command() {
+    echo "$cmd" | grep -qE '(npm run build|pnpm build|your-command)'
+}
+```
+
+---
+
+## Troubleshooting
+
+### "No issues found in recent commits"
+
+- Commits need `#123` format
+- Check: `git log -5 --oneline`
+- Fix: Use `git commit -m "feat: thing (#123)"`
+
+### "No journey contract found"
+
+- Issue body needs `J-FEATURE-NAME`
+- Check: `gh issue view 123`
+- Fix: Add `J-SIGNUP-FLOW` to issue body
+
+### "Test file not found"
+
+- Naming mismatch
+- `J-SIGNUP-FLOW` expects `journey_signup_flow.spec.ts`
+- Check: `ls tests/e2e/journey_*.spec.ts`
+
+### Tests not running at all
+
+- Check hook registered: `/hooks` in Claude Code
+- Check scripts executable: `ls -la .claude/hooks/`
+- Check jq installed: `which jq`
+- Check gh authenticated: `gh auth status`
+
+---
+
+## Example Flow
+
+```bash
+# 1. Make changes for issue #375 (has J-SIGNUP-FLOW)
+# 2. Commit with issue reference
+git commit -m "feat: add email validation (#375)"
+
+# 3. Hook automatically runs:
+🔍 Detecting issues worked on...
+📋 Issues found: 375
+  Checking #375 for journey contracts...
+  ✓ #375 → J-SIGNUP-FLOW → tests/e2e/journey_signup_flow.spec.ts
+
+🧪 Running journey tests: tests/e2e/journey_signup_flow.spec.ts
+
+  7 passed (28.3s)
+
+✅ Journey tests PASSED
+```
+
+---
+
+## Why This Approach?
+
+### Before (Manual)
+
+```
+User: "Run the playwright tests"
+Claude: [runs ALL tests - slow, noisy]
+```
+
+### After (Smart Hooks)
+
+```
+[Claude commits code for #375]
+[Hook detects #375 → J-SIGNUP-FLOW → journey_signup_flow.spec.ts]
+[Runs ONLY that test - fast, targeted]
+```
+
+**Benefits:**
+- **Fast** - Only relevant tests run
+- **Automatic** - No manual "run tests" needed
+- **Targeted** - Issue #375 → its journey tests
+- **Blocking** - Failures stop the workflow
 
 ---
 
 ## Summary
 
-| Without Hooks | With Hooks |
-|---------------|------------|
-| You ask "run tests" | Tests run automatically |
-| You forget, prod breaks | Can't forget, hooks remind |
-| Vague "tests passed" | Explicit WHERE/WHAT/HOW MANY |
-| Skipped = ignored | Skipped = explained |
-| Local only | Local + Production verified |
+| Component | Purpose |
+|-----------|---------|
+| Commit format | `#issue` numbers enable hook discovery |
+| Issue body | `J-XXX` journey contracts define what to test |
+| Test naming | `journey_xxx.spec.ts` maps from contracts |
+| Hooks | Auto-trigger after build/commit |
+| Defer flag | `.claude/.defer-tests` skips when needed |

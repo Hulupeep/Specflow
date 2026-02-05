@@ -47,6 +47,26 @@ Or point me to a CLAUDE.md with project context already filled in.
 | Shortcut | `sc` | `brew install shortcut-cli` | API token env var |
 | Notion | MCP server | MCP config | API key |
 
+### ⚠️ Commit Message Format (Critical for Hooks)
+
+**Specflow hooks only work if commits reference issues:**
+
+```bash
+# ✅ GOOD - hooks find #375 and run its journey tests
+git commit -m "feat: add signup validation (#375)"
+
+# ❌ BAD - hooks find nothing, no tests run
+git commit -m "feat: add signup validation"
+```
+
+After `pnpm build` or `git commit`, hooks automatically:
+1. Extract issue numbers from recent commits
+2. Fetch each issue for journey contract (`J-SIGNUP-FLOW`)
+3. Run only relevant Playwright tests
+4. Block on failure (exit 2)
+
+**Install hooks:** `bash Specflow/install-hooks.sh .`
+
 **DO NOT assume or guess.** Different projects have different boards, contracts, and conventions.
 
 ---

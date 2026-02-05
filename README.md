@@ -55,7 +55,73 @@ Then make my issues compliant and execute my backlog in waves.
 6. Run tests and close validated tickets
 
 **One prompt. Full pipeline. No manual setup.**
-This is the fastest way to setup specflow  
+This is the fastest way to setup specflow
+
+---
+
+## 🔧 Automatic Test Enforcement (Hooks)
+
+Specflow includes Claude Code hooks that **automatically run Playwright tests** after builds and commits.
+
+### How It Works
+
+```
+pnpm build (success)
+    ↓
+Hook extracts issue numbers from recent commits (#123, #456)
+    ↓
+Fetches each issue to find journey contract (J-SIGNUP-FLOW)
+    ↓
+Maps to test file (journey_signup_flow.spec.ts)
+    ↓
+Runs only those tests (not full suite)
+    ↓
+Pass → continue | Fail → blocks with error
+```
+
+### Install Hooks
+
+```bash
+bash Specflow/install-hooks.sh .
+```
+
+### ⚠️ Critical: Commit Message Format
+
+**Hooks only work if commits reference issues:**
+
+```bash
+# ✅ GOOD - hooks will find #375 and run its journey tests
+git commit -m "feat: add signup validation (#375)"
+
+# ❌ BAD - hooks find nothing, no tests run
+git commit -m "feat: add signup validation"
+```
+
+### Issue Requirements
+
+Issues must have journey contract in body:
+
+```markdown
+## Journey Contract
+J-SIGNUP-FLOW (CRITICAL)
+```
+
+### Test File Naming
+
+Test files must follow this pattern:
+- `J-SIGNUP-FLOW` → `tests/e2e/journey_signup_flow.spec.ts`
+- `J-BILLING-DASHBOARD` → `tests/e2e/journey_billing_dashboard.spec.ts`
+
+### Defer Tests
+
+If tests are slow or you need to skip temporarily:
+
+```bash
+touch .claude/.defer-tests    # Skip tests
+rm .claude/.defer-tests       # Re-enable
+```
+
+See `hooks/README.md` for full documentation.
 
 ---
 
