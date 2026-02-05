@@ -1,46 +1,16 @@
 {
   "hooks": {
-    "post-tool-use": [
+    "PostToolUse": [
       {
-        "tool": "Bash",
-        "pattern": "git commit",
-        "command": "echo '[HOOK] Commit detected. Run journey verification against production.'"
-      },
-      {
-        "tool": "Bash",
-        "pattern": "build",
-        "command": "echo '[HOOK] Build completed. Run E2E journey tests.'"
-      },
-      {
-        "tool": "Bash",
-        "pattern": "migrate",
-        "command": "echo '[HOOK] Migration completed. Verify APIs and run E2E tests.'"
-      }
-    ]
-  },
-  "instructions": {
-    "journey-verification": {
-      "enabled": true,
-      "description": "Automatically verify journey contracts at build boundaries",
-      "triggers": [
-        "After build passes → Run E2E journey tests",
-        "After git commit → Wait for deploy, verify production",
-        "After migration → Test APIs, run E2E tests",
-        "When executing waves → Check journey contracts from issues"
-      ],
-      "configuration": {
-        "note": "Configure project-specific values in CLAUDE.md or .claude/hooks/config.yml",
-        "required": [
-          "package_manager (npm/yarn/pnpm/bun)",
-          "test_command (e.g., test:e2e)",
-          "production_url (for post-commit verification)"
-        ],
-        "optional": [
-          "deploy_platform (vercel/netlify/railway)",
-          "deploy_wait_seconds (default: 90)",
-          "migration_command (e.g., supabase db push, prisma migrate)"
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo '[HOOK] Check if journey verification needed (build/commit/migrate)'",
+            "timeout": 5
+          }
         ]
       }
-    }
+    ]
   }
 }
