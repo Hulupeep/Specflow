@@ -12,6 +12,27 @@ For a simpler version, see [CLAUDE.md](CLAUDE.md).
 
 ---
 
+## 🚨 NEW SESSION ONBOARDING (For LLMs)
+
+**If you are starting a fresh session with this template but don't have project context, ASK FIRST:**
+
+```
+I see this is a Specflow project, but I need context before I can help:
+
+1. What repository/project are we working in?
+2. Where are the GitHub issues? (org/repo format)
+3. What's the current focus? (issues, milestone, or "show me the backlog")
+4. What's the tech stack? (React, Node, Python, etc.)
+
+Please provide this info or point me to a project CLAUDE.md with context.
+```
+
+**DO NOT assume or guess.** Each project has its own contracts, schemas, and conventions.
+
+Once you have context, add it to the project's CLAUDE.md so future sessions don't need to ask.
+
+---
+
 ## Instructions for LLMs:
 
 **Copy the section below and add it to the TOP of your project's CLAUDE.md file.**
@@ -24,6 +45,19 @@ Replace placeholders in [brackets] with your project-specific information.
 
 ```markdown
 # [PROJECT_NAME] - Development Guide
+
+## Project Context
+
+<!-- REQUIRED: Fill this in so Claude knows the project context -->
+
+**Repository:** [org/repo-name]
+**GitHub Issues:** [org/repo-name] (or different repo if issues are elsewhere)
+**Tech Stack:** [e.g., React + Vite + Tailwind, Supabase, Vercel]
+**Primary Focus:** [e.g., Scheduling SaaS for childcare providers]
+
+<!-- If this section is empty, Claude MUST ask the user for context before proceeding -->
+
+---
 
 ## 🚨 CRITICAL: Architectural Contracts - READ THIS FIRST
 

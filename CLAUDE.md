@@ -2,6 +2,36 @@
 
 This file provides guidance to Claude Code when working with Specflow projects.
 
+---
+
+## 🚨 NEW SESSION ONBOARDING
+
+**If you are a new Claude session and don't know the project context, ASK FIRST:**
+
+Before doing any work, you MUST know:
+
+1. **Repository** - Which repo are we working in?
+2. **GitHub org/project** - Where are the issues? (e.g., `Hulupeep/my-project`)
+3. **Current focus** - What wave/milestone/issues should I work on?
+4. **Tech stack** - What framework/language is this project?
+
+**If any of this is missing from your CLAUDE.md context, ASK the user:**
+
+```
+I'm starting a new Specflow session. Before I can help, I need to know:
+
+1. What repository are we working in?
+2. Where are the GitHub issues? (org/repo)
+3. What should I focus on? (specific issues, milestone, or "show me the backlog")
+4. Is there a specific tech stack I should know about?
+
+Or point me to a CLAUDE.md with project context.
+```
+
+**DO NOT assume or guess.** Different projects have different contracts, schemas, and conventions.
+
+---
+
 ## For Your Project
 
 **Add the content below to your project's CLAUDE.md** to enable Specflow enforcement.
@@ -17,6 +47,18 @@ This file provides guidance to Claude Code when working with Specflow projects.
 ---
 
 ```markdown
+## Project Context
+
+<!-- REQUIRED: Fill this in so Claude knows the project -->
+
+**Repository:** [org/repo-name]
+**GitHub Issues:** [org/repo-name]
+**Tech Stack:** [e.g., React, Node, Python, etc.]
+
+<!-- If empty, Claude will ask for context before proceeding -->
+
+---
+
 ## Specflow Rules
 
 ### Rule 1: No Ticket = No Code
