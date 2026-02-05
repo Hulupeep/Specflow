@@ -46,12 +46,16 @@ else
   TEMP_DIR=$(mktemp -d)
   HOOKS_DIR="$TEMP_DIR"
 
-  curl -fsSL "https://raw.githubusercontent.com/YOUR_ORG/Specflow/main/hooks/journey-verification.md" -o "$HOOKS_DIR/journey-verification.md" || {
+  # Update YOUR_ORG to your actual GitHub organization
+  BASE_URL="https://raw.githubusercontent.com/YOUR_ORG/Specflow/main/hooks"
+
+  curl -fsSL "$BASE_URL/journey-verification.md" -o "$HOOKS_DIR/journey-verification.md" || {
     echo -e "${RED}Error: Failed to download journey-verification.md${NC}"
+    echo "Make sure to update YOUR_ORG in the script to your GitHub organization"
     exit 1
   }
 
-  curl -fsSL "https://raw.githubusercontent.com/YOUR_ORG/Specflow/main/hooks/settings.json" -o "$HOOKS_DIR/settings.json" || {
+  curl -fsSL "$BASE_URL/settings.json" -o "$HOOKS_DIR/settings.json" || {
     echo -e "${RED}Error: Failed to download settings.json${NC}"
     exit 1
   }
@@ -107,23 +111,42 @@ fi
 echo ""
 
 # ============================================================================
-# 3. Add CLAUDE.md section (if CLAUDE.md exists)
+# 3. Show CLAUDE.md integration instructions
 # ============================================================================
 
-echo -e "${BLUE}[3/3]${NC} Checking CLAUDE.md integration..."
+echo -e "${BLUE}[3/3]${NC} CLAUDE.md integration..."
 
 CLAUDE_MD="$TARGET_DIR/CLAUDE.md"
 
 if [ -f "$CLAUDE_MD" ]; then
   # Check if hook section already exists
   if grep -q "Journey Verification Hook" "$CLAUDE_MD"; then
-    echo -e "${YELLOW}⚠️${NC}  Journey Verification Hook section already exists in CLAUDE.md"
+    echo -e "${GREEN}✓${NC} Journey Verification Hook section already exists in CLAUDE.md"
   else
-    echo -e "${YELLOW}⚠️${NC}  CLAUDE.md found but missing Journey Verification Hook section"
+    echo -e "${YELLOW}⚠️${NC}  CLAUDE.md found but missing hook section"
     echo ""
-    echo -e "Add the following to your CLAUDE.md:"
-    echo ""
-    cat << 'CLAUDE_SECTION'
+    echo -e "${YELLOW}Add the following sections to your CLAUDE.md:${NC}"
+  fi
+else
+  echo -e "${YELLOW}⚠️${NC}  No CLAUDE.md found"
+  echo ""
+  echo -e "${YELLOW}Create a CLAUDE.md with these sections:${NC}"
+fi
+
+echo ""
+cat << 'CLAUDE_SECTION'
+─────────────────────────────────────────────────────────────
+## Project Configuration
+
+- **Package Manager:** pnpm          # npm | yarn | pnpm | bun
+- **Build Command:** `pnpm build`
+- **Test Command:** `pnpm test:e2e`
+- **Test Directory:** `tests/e2e`
+- **Production URL:** `https://www.yourapp.com`
+- **Deploy Platform:** Vercel        # vercel | netlify | railway | none
+- **Deploy Wait:** 90 seconds
+- **Migration Command:** N/A         # supabase db push | prisma migrate | etc
+
 ---
 
 ## Journey Verification Hook
@@ -131,15 +154,15 @@ if [ -f "$CLAUDE_MD" ]; then
 **MANDATORY**: Before claiming ANY ticket complete:
 
 1. Claude MUST identify journey contracts from context (tasks, waves, git)
-2. Claude MUST run Playwright tests at BUILD BOUNDARIES
+2. Claude MUST run E2E tests at BUILD BOUNDARIES
 3. Claude MUST capture and report console errors
 4. Claude MUST verify against production after deploy
 
 **Trigger points (BUILD BOUNDARIES ONLY):**
-- PRE-BUILD: Before running pnpm build
+- PRE-BUILD: Before running build command
 - POST-BUILD: After build succeeds
 - POST-COMMIT: After commit succeeds
-- POST-MIGRATION: After supabase db push succeeds
+- POST-MIGRATION: After migration succeeds (if applicable)
 
 **Ticket discovery is AUTOMATIC from:**
 - Active tasks (TaskList)
@@ -148,13 +171,8 @@ if [ -f "$CLAUDE_MD" ]; then
 - Conversation context
 
 **See:** `.claude/hooks/journey-verification.md` for detailed behavior.
-
+─────────────────────────────────────────────────────────────
 CLAUDE_SECTION
-  fi
-else
-  echo -e "${YELLOW}⚠️${NC}  No CLAUDE.md found - skipping integration"
-  echo "    Create a CLAUDE.md and run again, or manually add hook instructions"
-fi
 
 echo ""
 
@@ -176,24 +194,29 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 
 echo -e "${GREEN}Installed files:${NC}"
-echo "  .claude/settings.json          - Hook triggers"
-echo "  .claude/hooks/journey-verification.md - Hook behavior spec"
+echo "  .claude/settings.json                  - Hook triggers"
+echo "  .claude/hooks/journey-verification.md  - Hook behavior spec"
 echo ""
 
 echo -e "${YELLOW}Next steps:${NC}"
 echo ""
-echo "1. If not already done, add Journey Verification Hook section to CLAUDE.md"
+echo "1. Add Project Configuration section to CLAUDE.md"
+echo "   - Set your package manager, build command, test command"
+echo "   - Set your production URL and deploy platform"
 echo ""
-echo "2. Ensure your project has Playwright tests:"
-echo "   tests/e2e/journey_*.spec.ts"
+echo "2. Add Journey Verification Hook section to CLAUDE.md"
+echo "   - Copy the template shown above"
 echo ""
-echo "3. Ensure your tickets reference journey contracts:"
-echo "   ## Journey"
-echo "   J-FEATURE-NAME (criticality: CRITICAL)"
+echo "3. Ensure your project has E2E tests"
+echo "   - Playwright, Cypress, or other E2E framework"
+echo "   - Tests should be runnable via your test command"
 echo ""
-echo "4. Test the hook by running a build:"
-echo "   pnpm build"
-echo "   # Claude should run Playwright tests after build passes"
+echo "4. Ensure tickets reference journey contracts"
+echo "   - Add ## Journey section to GitHub issues"
+echo "   - Format: J-FEATURE-NAME (criticality: CRITICAL/IMPORTANT)"
+echo ""
+echo "5. Test the hook by running a build"
+echo "   - Claude should run E2E tests after build passes"
 echo ""
 
 echo -e "${GREEN}Documentation:${NC} .claude/hooks/journey-verification.md"

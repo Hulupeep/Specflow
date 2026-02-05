@@ -2,15 +2,15 @@
 
 ## Purpose
 
-Automatically verify journey contracts at BUILD BOUNDARIES. Prevents "build passed but production broken" scenarios by running Playwright tests at the right moments.
+Automatically verify journey contracts at BUILD BOUNDARIES. Prevents "build passed but production broken" scenarios by running E2E tests at the right moments.
 
 ## Key Principle
 
 **Triggers fire at boundaries, NOT on every activity:**
-- PRE-BUILD: Before `pnpm build` runs
-- POST-BUILD: After `pnpm build` succeeds
-- POST-COMMIT: After `git commit` succeeds
-- POST-MIGRATION: After `supabase db push` succeeds
+- PRE-BUILD: Before build runs
+- POST-BUILD: After build succeeds
+- POST-COMMIT: After commit succeeds
+- POST-MIGRATION: After database migration succeeds (if applicable)
 
 **Ticket discovery is AUTOMATIC:**
 - From active tasks (TaskList)
@@ -22,11 +22,36 @@ You do NOT need to mention a ticket number explicitly.
 
 ---
 
+## Configuration
+
+Before using, configure these project-specific values in your `.claude/hooks/config.yml` or set in your CLAUDE.md:
+
+```yaml
+# .claude/hooks/config.yml (optional - or just document in CLAUDE.md)
+project:
+  package_manager: pnpm          # npm | yarn | pnpm | bun
+  build_command: build           # The script name in package.json
+  test_command: test:e2e         # E2E test script
+  test_directory: tests/e2e      # Where E2E tests live
+  test_pattern: "journey_*.spec.ts"  # Test file pattern
+
+deploy:
+  platform: vercel               # vercel | netlify | railway | cloudflare | none
+  wait_seconds: 90               # Time to wait for deploy
+  production_url: https://www.yourapp.com
+
+database:
+  type: supabase                 # supabase | prisma | drizzle | none
+  migration_command: "supabase db push"  # or "prisma migrate deploy"
+```
+
+---
+
 ## Trigger Points
 
 ### 1. PRE-BUILD: Before running build
 ```
-Trigger: User says "build", "pnpm build", "let's build", or agent is about to run build
+Trigger: User says "build" or agent is about to run build command
 ```
 
 **Agent thinks:**
@@ -36,27 +61,25 @@ Trigger: User says "build", "pnpm build", "let's build", or agent is about to ru
 1. Check TaskList for in-progress tasks
 2. If executing a wave, get issues from wave context
 3. Look up journey contracts from those issues
-4. Run baseline Playwright tests BEFORE building
+4. Run baseline E2E tests BEFORE building
 
 ```bash
 # Discover current ticket from tasks or git
 gh issue view $(git log -1 --format=%s | grep -oE '#[0-9]+' | head -1 | tr -d '#') 2>/dev/null
 
-# Or from task context - agent reads TaskList and extracts issue refs
-
-# Run baseline tests
-pnpm test:e2e tests/e2e/journey_*.spec.ts 2>&1 | tee /tmp/pre-build-baseline.log
+# Run baseline tests (replace with your test command)
+$PACKAGE_MANAGER run $TEST_COMMAND $TEST_DIRECTORY/$TEST_PATTERN 2>&1 | tee /tmp/pre-build-baseline.log
 ```
 
 **Report:**
-> "Current work touches J-DEMO-SIGNUP. Baseline: 5/8 tests passing.
+> "Current work touches J-USER-SIGNUP. Baseline: 5/8 tests passing.
 > Proceeding with build..."
 
 ---
 
 ### 2. POST-BUILD: After build succeeds
 ```
-Trigger: Bash command contains "build" and exits 0
+Trigger: Build command exits 0
 ```
 
 **Agent thinks:**
@@ -64,20 +87,20 @@ Trigger: Bash command contains "build" and exits 0
 
 **Actions:**
 1. Get journey contracts from current context (tasks, waves, recent commits)
-2. Run Playwright tests with console capture
+2. Run E2E tests with console capture
 3. Compare against pre-build baseline
 
 ```bash
 # Run with console capture
-pnpm test:e2e tests/e2e/auth/signup-with-demo.spec.ts 2>&1 | tee /tmp/post-build-tests.log
+$PACKAGE_MANAGER run $TEST_COMMAND 2>&1 | tee /tmp/post-build-tests.log
 
-# Check for errors
-grep -E "(column.*does not exist|permission denied|404|500|RPC)" /tmp/post-build-tests.log
+# Check for common errors
+grep -E "(does not exist|permission denied|404|500|error|Error)" /tmp/post-build-tests.log
 ```
 
 **If errors found:**
-> "Build passed but Playwright caught issues:
-> - RPC 400 error in signup flow
+> "Build passed but E2E tests caught issues:
+> - API returned 400 error
 > - Baseline was 5/8, now 4/8 (REGRESSION)
 >
 > Let me investigate before commit."
@@ -89,50 +112,44 @@ grep -E "(column.*does not exist|permission denied|404|500|RPC)" /tmp/post-build
 
 ### 3. POST-COMMIT: After commit succeeds
 ```
-Trigger: Bash command is "git commit" and exits 0
+Trigger: git commit exits 0
 ```
 
 **Agent thinks:**
 > "Committed. This will deploy. Let me verify production after deploy."
 
 **Actions:**
-1. Wait 90 seconds for deploy
-2. Run Playwright against production URL
+1. Wait for deploy (configurable seconds)
+2. Run E2E tests against production URL
 3. Report production status
 
 ```bash
-sleep 90
-PLAYWRIGHT_BASE_URL=https://www.yourapp.com pnpm test:e2e tests/e2e/auth/signup-with-demo.spec.ts
+sleep $DEPLOY_WAIT_SECONDS
+PLAYWRIGHT_BASE_URL=$PRODUCTION_URL $PACKAGE_MANAGER run $TEST_COMMAND
 ```
 
 **Report:**
-> "Committed. Vercel deploying...
+> "Committed. Deploying...
 > Production verification: 8/8 passing
 > Ready to close ticket."
 
 ---
 
-### 4. POST-MIGRATION: After db push succeeds
+### 4. POST-MIGRATION: After database migration succeeds
 ```
-Trigger: Bash command contains "supabase db push" and exits 0
+Trigger: Migration command exits 0 (if database configured)
 ```
 
 **Agent thinks:**
-> "Migration pushed. Schema changed. Let me verify RPCs and E2E."
+> "Migration pushed. Schema changed. Let me verify APIs and E2E."
 
 **Actions:**
-1. Test affected RPCs directly
-2. Run related Playwright tests
+1. Test affected APIs directly (if applicable)
+2. Run related E2E tests
 
 ```bash
-# Test RPC
-curl -s "$SUPABASE_URL/rest/v1/rpc/provision_demo_org" \
-  -H "apikey: $ANON_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"p_job_id": "test"}' | head -1
-
-# Run E2E
-pnpm test:e2e tests/e2e/auth/signup-with-demo.spec.ts
+# Run E2E tests
+$PACKAGE_MANAGER run $TEST_COMMAND
 ```
 
 ---
@@ -165,7 +182,7 @@ Scan recent messages for issue numbers, feature names, or journey refs
 **Example automatic discovery:**
 > "I see we're executing Wave 3 which includes #325, #326, #327.
 > Let me check journey contracts for these...
-> Found: J-WHATSAPP-NO-SHOW, J-WHATSAPP-COVERAGE
+> Found: J-USER-SIGNUP, J-USER-CHECKOUT
 > Running baseline tests..."
 
 ---
@@ -178,19 +195,19 @@ The hook should NOT trigger on:
 - Every message (annoying)
 - Research/exploration commands (not build boundary)
 
-**Only fire at these specific commands:**
-- `pnpm build` / `npm run build`
-- `git commit`
-- `supabase db push`
+**Only fire at these specific boundaries:**
+- Build commands (`build`, `compile`, `bundle`)
+- Commit commands (`git commit`)
+- Migration commands (project-specific)
 
 ---
 
 ## Console Capture Pattern
 
-Every Playwright run should capture errors:
+Every E2E test run should capture errors:
 
 ```typescript
-// In test setup
+// In Playwright test setup (example)
 page.on('console', msg => {
   if (msg.type() === 'error') {
     console.log(`[CONSOLE ERROR] ${msg.text()}`)
@@ -216,8 +233,8 @@ JOURNEY VERIFICATION
 ══════════════════════════════════════════════════════════════
 
 Context: Wave 3 (#325, #326, #327)
-Journeys: J-WHATSAPP-NO-SHOW, J-WHATSAPP-COVERAGE
-Test Files: tests/e2e/whatsapp/*.spec.ts
+Journeys: J-USER-SIGNUP, J-USER-CHECKOUT
+Test Files: tests/e2e/journey_*.spec.ts
 
 PRE-BUILD BASELINE:
   - 12/20 tests passing
@@ -240,22 +257,21 @@ STATUS: Wave 3 journeys verified
 ## Integration with Claude Code
 
 ### settings.json hooks
-These provide REMINDERS to the agent. The actual test execution is agent behavior.
+These provide REMINDERS to the agent. Customize patterns for your project.
 
 ```json
 {
   "hooks": {
     "post-tool-use": [
       {"tool": "Bash", "pattern": "git commit", "command": "echo '[HOOK] Run journey verification'"},
-      {"tool": "Bash", "pattern": "supabase db push", "command": "echo '[HOOK] Test RPCs and E2E'"},
-      {"tool": "Bash", "pattern": "pnpm build", "command": "echo '[HOOK] Run Playwright tests'"}
+      {"tool": "Bash", "pattern": "build", "command": "echo '[HOOK] Run E2E tests'"}
     ]
   }
 }
 ```
 
 ### CLAUDE.md instructions
-The CLAUDE.md file instructs the agent on the expected behavior at each trigger.
+Document your project-specific configuration in CLAUDE.md.
 
 ---
 
@@ -266,7 +282,7 @@ The CLAUDE.md file instructs the agent on the expected behavior at each trigger.
 **Claude:**
 > "Starting Wave 3. Issues: #325, #326, #327
 > Checking journey contracts...
-> Found: J-WHATSAPP-NO-SHOW (CRITICAL), J-WHATSAPP-COVERAGE (IMPORTANT)
+> Found: J-USER-SIGNUP (CRITICAL), J-USER-CHECKOUT (IMPORTANT)
 >
 > PRE-BUILD baseline: Running tests..."
 
@@ -286,7 +302,7 @@ The CLAUDE.md file instructs the agent on the expected behavior at each trigger.
 
 *[Commits]*
 
-> "Committed. Waiting for Vercel (90s)...
+> "Committed. Waiting for deploy...
 > POST-COMMIT production verification..."
 
 *[Runs prod tests]*
@@ -302,8 +318,8 @@ The CLAUDE.md file instructs the agent on the expected behavior at each trigger.
 
 **Claude:**
 > "About to build. Let me check current context...
-> Active tasks: #158 (signup fix)
-> Journey: J-DEMO-SIGNUP
+> Active tasks: #158 (user fix)
+> Journey: J-USER-SIGNUP
 >
 > PRE-BUILD baseline: 6/10 passing
 > Building..."
@@ -316,3 +332,17 @@ The CLAUDE.md file instructs the agent on the expected behavior at each trigger.
 *[Commits, waits, verifies]*
 
 > "Production verified. 10/10 passing."
+
+---
+
+## Adapting to Your Stack
+
+| Stack | Build Command | Test Command | Migration Command |
+|-------|--------------|--------------|-------------------|
+| Next.js + Vercel | `npm run build` | `npm run test:e2e` | N/A or Prisma |
+| Vite + Supabase | `pnpm build` | `pnpm test:e2e` | `supabase db push` |
+| Rails + Heroku | `rails assets:precompile` | `rails test:system` | `rails db:migrate` |
+| Django + Railway | `python manage.py collectstatic` | `pytest` | `python manage.py migrate` |
+| Go + Fly.io | `go build` | `go test ./...` | `goose up` |
+
+Configure the patterns in `.claude/settings.json` to match your project.

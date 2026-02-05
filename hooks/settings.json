@@ -4,35 +4,43 @@
       {
         "tool": "Bash",
         "pattern": "git commit",
-        "command": "echo '[HOOK] Commit detected. Journey verification should run.'"
+        "command": "echo '[HOOK] Commit detected. Run journey verification against production.'"
       },
       {
         "tool": "Bash",
-        "pattern": "supabase db push",
-        "command": "echo '[HOOK] Migration pushed. Verify RPCs and run Playwright.'"
+        "pattern": "build",
+        "command": "echo '[HOOK] Build completed. Run E2E journey tests.'"
       },
       {
         "tool": "Bash",
-        "pattern": "pnpm build",
-        "command": "echo '[HOOK] Build passed. Run journey tests before claiming done.'"
-      },
-      {
-        "tool": "Bash",
-        "pattern": "npm run build",
-        "command": "echo '[HOOK] Build passed. Run journey tests before claiming done.'"
+        "pattern": "migrate",
+        "command": "echo '[HOOK] Migration completed. Verify APIs and run E2E tests.'"
       }
     ]
   },
   "instructions": {
     "journey-verification": {
       "enabled": true,
-      "description": "Automatically verify journey contracts after builds, commits, and migrations",
+      "description": "Automatically verify journey contracts at build boundaries",
       "triggers": [
-        "After 'pnpm build' passes → Run relevant Playwright tests",
-        "After 'git commit' → Wait for Vercel, verify production",
-        "After 'supabase db push' → Test RPCs, run E2E tests",
-        "When ticket mentioned → Check for journey contracts, run baseline"
-      ]
+        "After build passes → Run E2E journey tests",
+        "After git commit → Wait for deploy, verify production",
+        "After migration → Test APIs, run E2E tests",
+        "When executing waves → Check journey contracts from issues"
+      ],
+      "configuration": {
+        "note": "Configure project-specific values in CLAUDE.md or .claude/hooks/config.yml",
+        "required": [
+          "package_manager (npm/yarn/pnpm/bun)",
+          "test_command (e.g., test:e2e)",
+          "production_url (for post-commit verification)"
+        ],
+        "optional": [
+          "deploy_platform (vercel/netlify/railway)",
+          "deploy_wait_seconds (default: 90)",
+          "migration_command (e.g., supabase db push, prisma migrate)"
+        ]
+      }
     }
   }
 }
