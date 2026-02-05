@@ -86,6 +86,11 @@ echo -e "${BLUE}[2/3]${NC} Installing hook files..."
 cp "$HOOKS_DIR/journey-verification.md" "$TARGET_DIR/.claude/hooks/"
 echo -e "${GREEN}✓${NC} Installed .claude/hooks/journey-verification.md"
 
+# Copy session-start script (reminds Claude of CLAUDE.md rules)
+cp "$HOOKS_DIR/session-start.sh" "$TARGET_DIR/.claude/hooks/"
+chmod +x "$TARGET_DIR/.claude/hooks/session-start.sh"
+echo -e "${GREEN}✓${NC} Installed .claude/hooks/session-start.sh (SessionStart hook)"
+
 # Handle settings.json - merge if exists, create if not
 if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
   echo -e "${YELLOW}⚠️${NC}  Existing settings.json found - merging hooks..."
