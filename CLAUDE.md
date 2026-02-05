@@ -11,9 +11,10 @@ This file provides guidance to Claude Code when working with Specflow projects.
 Before doing any work, you MUST know:
 
 1. **Repository** - Which repo are we working in?
-2. **GitHub org/project** - Where are the issues? (e.g., `Hulupeep/my-project`)
-3. **Current focus** - What wave/milestone/issues should I work on?
-4. **Tech stack** - What framework/language is this project?
+2. **Project Board** - Where are issues/stories tracked?
+3. **Board CLI** - What tool manipulates the board?
+4. **Current focus** - What wave/milestone/issues should I work on?
+5. **Tech stack** - What framework/language is this project?
 
 **If any of this is missing from your CLAUDE.md context, ASK the user:**
 
@@ -21,14 +22,32 @@ Before doing any work, you MUST know:
 I'm starting a new Specflow session. Before I can help, I need to know:
 
 1. What repository are we working in?
-2. Where are the GitHub issues? (org/repo)
-3. What should I focus on? (specific issues, milestone, or "show me the backlog")
-4. Is there a specific tech stack I should know about?
 
-Or point me to a CLAUDE.md with project context.
+2. Where is your project board?
+   - GitHub Issues/Projects → I'll use `gh` CLI
+   - Jira → I'll need `jira` CLI configured
+   - Linear → I'll need `linear` CLI configured
+   - Notion → I'll need Notion MCP or API
+   - Other → Please specify tool and auth method
+
+3. What should I focus on? (specific issues, milestone, or "show me the backlog")
+
+4. What's the tech stack?
+
+Or point me to a CLAUDE.md with project context already filled in.
 ```
 
-**DO NOT assume or guess.** Different projects have different contracts, schemas, and conventions.
+### Supported Project Boards
+
+| Board | CLI | Install | Auth Required |
+|-------|-----|---------|---------------|
+| GitHub Issues | `gh` | `brew install gh` | `gh auth login` |
+| Jira | `jira` | `brew install jira-cli` | `jira init` |
+| Linear | `linear` | `npm i -g @linear/cli` | `linear auth` |
+| Shortcut | `sc` | `brew install shortcut-cli` | API token env var |
+| Notion | MCP server | MCP config | API key |
+
+**DO NOT assume or guess.** Different projects have different boards, contracts, and conventions.
 
 ---
 
@@ -52,7 +71,8 @@ Or point me to a CLAUDE.md with project context.
 <!-- REQUIRED: Fill this in so Claude knows the project -->
 
 **Repository:** [org/repo-name]
-**GitHub Issues:** [org/repo-name]
+**Project Board:** [GitHub Issues | Jira | Linear | Notion | Other]
+**Board CLI:** [gh | jira | linear | other] (must be installed and authenticated)
 **Tech Stack:** [e.g., React, Node, Python, etc.]
 
 <!-- If empty, Claude will ask for context before proceeding -->

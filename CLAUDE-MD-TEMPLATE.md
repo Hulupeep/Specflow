@@ -20,14 +20,32 @@ For a simpler version, see [CLAUDE.md](CLAUDE.md).
 I see this is a Specflow project, but I need context before I can help:
 
 1. What repository/project are we working in?
-2. Where are the GitHub issues? (org/repo format)
+
+2. Where is your project board?
+   - GitHub Issues/Projects → I'll use `gh` CLI
+   - Jira → I'll need `jira` CLI configured
+   - Linear → I'll need `linear` CLI configured
+   - Notion → I'll need Notion MCP or API
+   - Other → Please specify tool and auth method
+
 3. What's the current focus? (issues, milestone, or "show me the backlog")
+
 4. What's the tech stack? (React, Node, Python, etc.)
 
 Please provide this info or point me to a project CLAUDE.md with context.
 ```
 
-**DO NOT assume or guess.** Each project has its own contracts, schemas, and conventions.
+### Supported Project Boards
+
+| Board | CLI | Install | Auth |
+|-------|-----|---------|------|
+| GitHub Issues | `gh` | `brew install gh` | `gh auth login` |
+| Jira | `jira` | `brew install jira-cli` | `jira init` |
+| Linear | `linear` | `npm i -g @linear/cli` | `linear auth` |
+| Shortcut | `sc` | `brew install shortcut-cli` | API token env var |
+| Notion | MCP server | MCP config | API key |
+
+**DO NOT assume or guess.** Each project has its own board, contracts, schemas, and conventions.
 
 Once you have context, add it to the project's CLAUDE.md so future sessions don't need to ask.
 
@@ -51,7 +69,8 @@ Replace placeholders in [brackets] with your project-specific information.
 <!-- REQUIRED: Fill this in so Claude knows the project context -->
 
 **Repository:** [org/repo-name]
-**GitHub Issues:** [org/repo-name] (or different repo if issues are elsewhere)
+**Project Board:** [GitHub Issues | Jira | Linear | Notion | Other]
+**Board CLI:** [gh | jira | linear | other] (must be installed and authenticated)
 **Tech Stack:** [e.g., React + Vite + Tailwind, Supabase, Vercel]
 **Primary Focus:** [e.g., Scheduling SaaS for childcare providers]
 
