@@ -47,6 +47,91 @@ database:
 
 ---
 
+## Local vs Production: CRITICAL
+
+### Two Different Test Environments
+
+| Environment | When | URL | Purpose |
+|-------------|------|-----|---------|
+| **LOCAL** | Before/after build | `localhost:3000` | Verify code works locally |
+| **PRODUCTION** | After commit/deploy | `https://yourapp.com` | Verify production works |
+
+### The Deploy Pipeline
+
+```
+git push → GitHub → Auto-deploys → PRODUCTION CHANGES
+                                   ↑
+                             Tests MUST run HERE
+                             against production URL
+```
+
+### When to Test Where
+
+| Trigger | Environment | Why |
+|---------|-------------|-----|
+| PRE-BUILD | **LOCAL** | Baseline before changes |
+| POST-BUILD | **LOCAL** | Verify local changes work |
+| POST-COMMIT | **PRODUCTION** | Verify deploy didn't break prod |
+| POST-MIGRATION | **PRODUCTION** | Verify schema changes work in prod |
+
+**CRITICAL:** After `git push`, tests MUST run against production URL, not localhost.
+
+---
+
+## Mandatory Reporting Requirements
+
+### Never Hide Information
+
+Claude MUST report ALL of the following. No exceptions.
+
+### 1. WHERE Tests Ran
+
+```
+❌ BAD:  "Tests passed"
+✅ GOOD: "Tests passed against LOCAL (localhost:5173)"
+✅ GOOD: "Tests passed against PRODUCTION (https://www.yourapp.com)"
+```
+
+### 2. WHICH Tests Ran
+
+```
+❌ BAD:  "E2E tests passed"
+✅ GOOD: "Ran: signup.spec.ts, login.spec.ts, checkout.spec.ts"
+```
+
+### 3. HOW MANY Tests
+
+```
+❌ BAD:  "Tests passed"
+✅ GOOD: "12/12 tests passed (0 failed, 0 skipped)"
+```
+
+### 4. What SKIPPED Means
+
+**Skipped tests are NOT passing tests.** They didn't run.
+
+```
+❌ BAD:  "10/12 passed, 2 skipped" (sounds fine!)
+
+✅ GOOD: "10/12 passed, 0 failed, 2 SKIPPED
+         SKIPPED TESTS (investigate why):
+         - signup.spec.ts:45 - @skip tag (needs removal)
+         - checkout.spec.ts:78 - missing env var STRIPE_KEY"
+```
+
+**Rule:** Every skipped test needs an explanation. "Skipped" often hides problems.
+
+### 5. Console Errors
+
+```
+❌ BAD:  [silently ignores console errors]
+✅ GOOD: "Console errors captured:
+         - [ERROR] API returned 400
+         - [HTTP 500] /api/provision failed"
+```
+
+---
+
 ## Trigger Points
 
 ### 1. PRE-BUILD: Before running build

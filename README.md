@@ -164,9 +164,59 @@ AFTER:  "Execute waves" → Autonomous end-to-end execution with dependency calc
 
 - **[README_FRONTIER.md](README_FRONTIER.md)** - Quick start guide (< 5 min)
 - **[FRONTIER_IMPROVEMENTS.md](FRONTIER_IMPROVEMENTS.md)** - Full documentation (1,300+ lines)
+- **[docs/JOURNEY-VERIFICATION-HOOKS.md](docs/JOURNEY-VERIFICATION-HOOKS.md)** - Automatic test enforcement
 - **[extract-to-project.sh](extract-to-project.sh)** - Automated extraction script
+- **[install-hooks.sh](install-hooks.sh)** - Install Claude Code hooks
 
 **These improvements transform Specflow from a specification framework into a complete platform engineering capability.**
+
+---
+
+## Journey Verification Hooks
+
+### The Problem: You Forget to Test
+
+Without hooks:
+```
+You: [implement feature]
+You: "pnpm build" → passes ✅
+You: "Done!"
+[deploys to production]
+[production is broken] 💥
+```
+
+### The Solution: Hooks Make It Automatic
+
+With hooks:
+```
+You: [implement feature]
+You: "pnpm build" → passes
+[HOOK] Claude automatically runs E2E tests
+Claude: "Build passed. Running journey tests..."
+Claude: "2 failures detected. Fixing before commit..."
+```
+
+### Two Ways to Run Tests
+
+| Approach | How | Reliability |
+|----------|-----|-------------|
+| **Manual** | You say "run tests" | You'll forget |
+| **Hooks** | Automatic at build/commit | Can't forget |
+
+### Install Hooks
+
+```bash
+bash install-hooks.sh /path/to/project
+```
+
+### What Hooks Enforce
+
+1. **WHERE** tests ran (local vs production)
+2. **WHICH** tests ran (file names)
+3. **HOW MANY** tests (12/12 passed)
+4. **SKIPPED** explained (not hidden)
+
+See **[docs/JOURNEY-VERIFICATION-HOOKS.md](docs/JOURNEY-VERIFICATION-HOOKS.md)** for full documentation.
 
 ---
 
