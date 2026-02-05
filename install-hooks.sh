@@ -1,7 +1,7 @@
 #!/bin/bash
 # Specflow Journey Verification Hooks - Installation Script
 # Usage: bash install-hooks.sh /path/to/target/project
-#    or: curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/Specflow/main/install-hooks.sh | bash -s /path/to/project
+#    or: curl -fsSL https://raw.githubusercontent.com/Hulupeep/Specflow/main/install-hooks.sh | bash -s /path/to/project
 
 set -e
 
@@ -46,19 +46,13 @@ else
   TEMP_DIR=$(mktemp -d)
   HOOKS_DIR="$TEMP_DIR"
 
-  # Update YOUR_ORG to your actual GitHub organization
-  BASE_URL="https://raw.githubusercontent.com/YOUR_ORG/Specflow/main/hooks"
+  BASE_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/hooks"
 
-  curl -fsSL "$BASE_URL/journey-verification.md" -o "$HOOKS_DIR/journey-verification.md" || {
-    echo -e "${RED}Error: Failed to download journey-verification.md${NC}"
-    echo "Make sure to update YOUR_ORG in the script to your GitHub organization"
-    exit 1
-  }
-
-  curl -fsSL "$BASE_URL/settings.json" -o "$HOOKS_DIR/settings.json" || {
-    echo -e "${RED}Error: Failed to download settings.json${NC}"
-    exit 1
-  }
+  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh README.md; do
+    curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
+      echo -e "${YELLOW}Warning: Could not download $file${NC}"
+    }
+  done
 
   echo -e "${GREEN}Source:${NC} GitHub (downloaded)"
 fi
@@ -66,10 +60,29 @@ fi
 echo ""
 
 # ============================================================================
-# 1. Create .claude directory structure
+# 1. Check requirements
 # ============================================================================
 
-echo -e "${BLUE}[1/3]${NC} Creating .claude directory structure..."
+echo -e "${BLUE}[1/4]${NC} Checking requirements..."
+
+if ! command -v jq &> /dev/null; then
+  echo -e "${YELLOW}⚠️${NC}  jq not found. Install with: brew install jq (mac) or apt install jq (linux)"
+fi
+
+if ! command -v gh &> /dev/null; then
+  echo -e "${YELLOW}⚠️${NC}  gh CLI not found. Install with: brew install gh"
+  echo -e "    Required for fetching issue journey contracts"
+else
+  echo -e "${GREEN}✓${NC} gh CLI found"
+fi
+
+echo ""
+
+# ============================================================================
+# 2. Create .claude directory structure
+# ============================================================================
+
+echo -e "${BLUE}[2/4]${NC} Creating .claude directory structure..."
 
 mkdir -p "$TARGET_DIR/.claude/hooks"
 
@@ -77,25 +90,30 @@ echo -e "${GREEN}✓${NC} Created $TARGET_DIR/.claude/hooks/"
 echo ""
 
 # ============================================================================
-# 2. Copy hook files
+# 3. Copy hook files
 # ============================================================================
 
-echo -e "${BLUE}[2/3]${NC} Installing hook files..."
+echo -e "${BLUE}[3/4]${NC} Installing hook files..."
 
-# Copy journey verification spec
-cp "$HOOKS_DIR/journey-verification.md" "$TARGET_DIR/.claude/hooks/"
-echo -e "${GREEN}✓${NC} Installed .claude/hooks/journey-verification.md"
+# Copy main hook scripts
+for script in post-build-check.sh run-journey-tests.sh session-start.sh; do
+  if [ -f "$HOOKS_DIR/$script" ]; then
+    cp "$HOOKS_DIR/$script" "$TARGET_DIR/.claude/hooks/"
+    chmod +x "$TARGET_DIR/.claude/hooks/$script"
+    echo -e "${GREEN}✓${NC} Installed .claude/hooks/$script"
+  fi
+done
 
-# Copy session-start script (reminds Claude of CLAUDE.md rules)
-cp "$HOOKS_DIR/session-start.sh" "$TARGET_DIR/.claude/hooks/"
-chmod +x "$TARGET_DIR/.claude/hooks/session-start.sh"
-echo -e "${GREEN}✓${NC} Installed .claude/hooks/session-start.sh (SessionStart hook)"
+# Copy README for reference
+if [ -f "$HOOKS_DIR/README.md" ]; then
+  cp "$HOOKS_DIR/README.md" "$TARGET_DIR/.claude/hooks/"
+  echo -e "${GREEN}✓${NC} Installed .claude/hooks/README.md"
+fi
 
 # Handle settings.json - merge if exists, create if not
 if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
   echo -e "${YELLOW}⚠️${NC}  Existing settings.json found - merging hooks..."
 
-  # Check if jq is available
   if command -v jq &> /dev/null; then
     # Merge using jq
     TEMP_SETTINGS=$(mktemp)
@@ -116,75 +134,13 @@ fi
 echo ""
 
 # ============================================================================
-# 3. Show CLAUDE.md integration instructions
+# 4. Show usage instructions
 # ============================================================================
 
-echo -e "${BLUE}[3/3]${NC} CLAUDE.md integration..."
-
-CLAUDE_MD="$TARGET_DIR/CLAUDE.md"
-
-if [ -f "$CLAUDE_MD" ]; then
-  # Check if hook section already exists
-  if grep -q "Journey Verification Hook" "$CLAUDE_MD"; then
-    echo -e "${GREEN}✓${NC} Journey Verification Hook section already exists in CLAUDE.md"
-  else
-    echo -e "${YELLOW}⚠️${NC}  CLAUDE.md found but missing hook section"
-    echo ""
-    echo -e "${YELLOW}Add the following sections to your CLAUDE.md:${NC}"
-  fi
-else
-  echo -e "${YELLOW}⚠️${NC}  No CLAUDE.md found"
-  echo ""
-  echo -e "${YELLOW}Create a CLAUDE.md with these sections:${NC}"
-fi
-
-echo ""
-cat << 'CLAUDE_SECTION'
-─────────────────────────────────────────────────────────────
-## Project Configuration
-
-- **Package Manager:** pnpm          # npm | yarn | pnpm | bun
-- **Build Command:** `pnpm build`
-- **Test Command:** `pnpm test:e2e`
-- **Test Directory:** `tests/e2e`
-- **Production URL:** `https://www.yourapp.com`
-- **Deploy Platform:** Vercel        # vercel | netlify | railway | none
-- **Deploy Wait:** 90 seconds
-- **Migration Command:** N/A         # supabase db push | prisma migrate | etc
-
----
-
-## Journey Verification Hook
-
-**MANDATORY**: Before claiming ANY ticket complete:
-
-1. Claude MUST identify journey contracts from context (tasks, waves, git)
-2. Claude MUST run E2E tests at BUILD BOUNDARIES
-3. Claude MUST capture and report console errors
-4. Claude MUST verify against production after deploy
-
-**Trigger points (BUILD BOUNDARIES ONLY):**
-- PRE-BUILD: Before running build command
-- POST-BUILD: After build succeeds
-- POST-COMMIT: After commit succeeds
-- POST-MIGRATION: After migration succeeds (if applicable)
-
-**Ticket discovery is AUTOMATIC from:**
-- Active tasks (TaskList)
-- Wave execution context
-- Recent git commits
-- Conversation context
-
-**See:** `.claude/hooks/journey-verification.md` for detailed behavior.
-─────────────────────────────────────────────────────────────
-CLAUDE_SECTION
-
+echo -e "${BLUE}[4/4]${NC} Setup complete!"
 echo ""
 
-# ============================================================================
 # Cleanup temp files if downloaded
-# ============================================================================
-
 if [ -n "$TEMP_DIR" ] && [ -d "$TEMP_DIR" ]; then
   rm -rf "$TEMP_DIR"
 fi
@@ -199,30 +155,34 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 
 echo -e "${GREEN}Installed files:${NC}"
-echo "  .claude/settings.json                  - Hook triggers"
-echo "  .claude/hooks/journey-verification.md  - Hook behavior spec"
+echo "  .claude/settings.json              - Hook configuration"
+echo "  .claude/hooks/post-build-check.sh  - Detects build/commit"
+echo "  .claude/hooks/run-journey-tests.sh - Runs targeted tests"
+echo "  .claude/hooks/README.md            - Documentation"
 echo ""
 
-echo -e "${YELLOW}Next steps:${NC}"
+echo -e "${YELLOW}How it works:${NC}"
 echo ""
-echo "1. Add Project Configuration section to CLAUDE.md"
-echo "   - Set your package manager, build command, test command"
-echo "   - Set your production URL and deploy platform"
-echo ""
-echo "2. Add Journey Verification Hook section to CLAUDE.md"
-echo "   - Copy the template shown above"
-echo ""
-echo "3. Ensure your project has E2E tests"
-echo "   - Playwright, Cypress, or other E2E framework"
-echo "   - Tests should be runnable via your test command"
-echo ""
-echo "4. Ensure tickets reference journey contracts"
-echo "   - Add ## Journey section to GitHub issues"
-echo "   - Format: J-FEATURE-NAME (criticality: CRITICAL/IMPORTANT)"
-echo ""
-echo "5. Test the hook by running a build"
-echo "   - Claude should run E2E tests after build passes"
+echo "  1. After 'pnpm build' or 'git commit' succeeds"
+echo "  2. Hook extracts issue numbers from recent commits (#123)"
+echo "  3. Fetches each issue to find journey contract (J-SIGNUP-FLOW)"
+echo "  4. Maps to test file (journey_signup_flow.spec.ts)"
+echo "  5. Runs only those tests"
+echo "  6. Blocks on failure (exit 2)"
 echo ""
 
-echo -e "${GREEN}Documentation:${NC} .claude/hooks/journey-verification.md"
+echo -e "${YELLOW}Requirements:${NC}"
+echo ""
+echo "  - Commits reference issues: 'feat: thing (#123)'"
+echo "  - Issues have journey contract: 'J-FEATURE-NAME' in body"
+echo "  - Test files named: 'journey_feature_name.spec.ts'"
+echo ""
+
+echo -e "${YELLOW}To defer tests:${NC}"
+echo ""
+echo "  touch .claude/.defer-tests    # Skip tests"
+echo "  rm .claude/.defer-tests       # Re-enable tests"
+echo ""
+
+echo -e "${GREEN}Documentation:${NC} .claude/hooks/README.md"
 echo ""

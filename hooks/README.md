@@ -1,123 +1,149 @@
 # Specflow Journey Verification Hooks
 
-Claude Code hooks that enforce journey contract verification at build boundaries.
+Claude Code hooks that **automatically run Playwright tests** after builds/commits.
 
-## Problem
+## What It Does
 
-"Build passed" does NOT mean "feature works". Common failures:
-- Code compiles but E2E tests fail
-- Local tests pass but production is broken
-- Migration succeeds but APIs return errors
-- Code committed before verifying journeys
+After a successful `pnpm build` or `git commit`:
 
-## Solution
+1. **Detects issues** from recent commit messages (`#123`, `#456`)
+2. **Looks up journey contracts** in each issue (e.g., `J-SIGNUP-FLOW`)
+3. **Maps to test files** (e.g., `tests/e2e/journey_signup_flow.spec.ts`)
+4. **Runs only those tests** - not the full suite
+5. **Blocks on failure** - shows error to Claude with exit code 2
 
-Hooks that trigger at BUILD BOUNDARIES:
+## Requirements
 
-| Trigger | When | Action |
-|---------|------|--------|
-| PRE-BUILD | Before build | Run baseline journey tests |
-| POST-BUILD | After build succeeds | Run journey tests, compare to baseline |
-| POST-COMMIT | After `git commit` | Wait for deploy, verify production |
-| POST-MIGRATION | After migration | Test APIs, run E2E |
+- `gh` CLI installed and authenticated (`gh auth login`)
+- `jq` installed (`brew install jq` or `apt install jq`)
+- Issues must reference journey contracts in body: `J-FEATURE-NAME`
+- Commits must reference issues: `fix: thing (#123)`
+- Test files follow naming: `journey_feature_name.spec.ts`
 
 ## Quick Install
 
 ```bash
-# From Specflow repo
-bash install-hooks.sh /path/to/your/project
+# From your project root
+bash /path/to/Specflow/install-hooks.sh .
 
-# Or via curl (update YOUR_ORG to your GitHub org)
-curl -fsSL https://raw.githubusercontent.com/YOUR_ORG/Specflow/main/install-hooks.sh | bash -s /path/to/project
-
-# Or copy manually
-mkdir -p /path/to/project/.claude/hooks
-cp hooks/* /path/to/project/.claude/hooks/
-cp hooks/settings.json /path/to/project/.claude/settings.json
-```
-
-## What Gets Installed
-
-```
-your-project/
-├── .claude/
-│   ├── settings.json              # Hook triggers (generic)
-│   └── hooks/
-│       └── journey-verification.md # Hook behavior spec
-└── CLAUDE.md                      # (add config + hook section)
-```
-
-## Configuration Required
-
-After installing, add project-specific config to your CLAUDE.md:
-
-```markdown
-## Project Configuration
-
-- **Package Manager:** pnpm (or npm/yarn/bun)
-- **Build Command:** `pnpm build`
-- **Test Command:** `pnpm test:e2e`
-- **Test Directory:** `tests/e2e`
-- **Production URL:** `https://www.yourapp.com`
-- **Deploy Platform:** Vercel (90s wait)
-- **Migration Command:** `supabase db push` (if applicable)
-```
-
-## Supported Stacks
-
-| Stack | Build | Test | Migration |
-|-------|-------|------|-----------|
-| Next.js + Vercel | `npm run build` | `npm run test:e2e` | Prisma |
-| Vite + Supabase | `pnpm build` | `pnpm test:e2e` | `supabase db push` |
-| Rails + Heroku | `rails assets:precompile` | `rails test:system` | `rails db:migrate` |
-| Django + Railway | `python manage.py collectstatic` | `pytest` | `python manage.py migrate` |
-| Go + Fly.io | `go build` | `go test ./...` | `goose up` |
-| SvelteKit + Cloudflare | `npm run build` | `npm run test` | Drizzle |
-
-## Key Principle
-
-**Ticket discovery is AUTOMATIC:**
-- From active tasks (TaskList)
-- From wave execution context
-- From recent git commits
-
-You do NOT need to mention ticket numbers explicitly. Claude discovers context automatically.
-
-## Example Flow
-
-```
-User: "Execute Wave 3"
-
-Claude:
-> "Starting Wave 3. Issues: #325, #326, #327
-> Checking journey contracts...
-> Found: J-USER-SIGNUP (CRITICAL)
->
-> PRE-BUILD baseline: 12/20 tests passing
-> Building..."
-
-[Build succeeds]
-
-> "POST-BUILD: 18/20 passing (+6)
-> Committing..."
-
-[Commit succeeds]
-
-> "POST-COMMIT: Production 20/20 passing
-> Wave 3 journeys verified."
+# Or manually
+mkdir -p .claude/hooks
+cp Specflow/hooks/*.sh .claude/hooks/
+cp Specflow/hooks/settings.json .claude/settings.json
+chmod +x .claude/hooks/*.sh
 ```
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `journey-verification.md` | Detailed hook behavior spec |
-| `settings.json` | Claude Code hook configuration (generic patterns) |
-| `README.md` | This file |
+| `settings.json` | Claude Code hook configuration |
+| `post-build-check.sh` | Detects build/commit commands, triggers tests |
+| `run-journey-tests.sh` | Finds issues → journeys → runs relevant tests |
+| `session-start.sh` | Placeholder (silent) |
 
-## Requirements
+## Flow
 
-Your project needs:
-1. E2E tests (Playwright, Cypress, etc.)
-2. Tickets with journey contract references (`## Journey` section)
-3. CLAUDE.md with project configuration
+```
+pnpm build (success)
+    ↓
+PostToolUse hook fires (matcher: Bash)
+    ↓
+post-build-check.sh
+    - Parses JSON input for command
+    - Detects "build" or "commit"
+    - Calls run-journey-tests.sh
+    ↓
+run-journey-tests.sh
+    - git log -5 → extract #issue numbers
+    - gh issue view → find J-XXX journey
+    - Convert J-SIGNUP-FLOW → journey_signup_flow.spec.ts
+    - Run: pnpm test:e2e <files>
+    ↓
+Exit 0 (pass) or Exit 2 (fail → show to model)
+```
+
+## Deferring Tests
+
+If tests are slow or you need to skip temporarily:
+
+```bash
+# Defer tests
+touch .claude/.defer-tests
+
+# Re-enable tests
+rm .claude/.defer-tests
+```
+
+## Issue Format
+
+For the hook to find journey tests, issues need:
+
+```markdown
+## Journey Contract
+J-SIGNUP-FLOW (CRITICAL)
+
+## Acceptance Criteria
+...
+```
+
+The hook extracts `J-SIGNUP-FLOW` and maps it to `tests/e2e/journey_signup_flow.spec.ts`.
+
+## Commit Format
+
+Include issue numbers in commits:
+
+```
+feat: add signup validation (#375)
+fix: handle edge case (#375, #376)
+```
+
+The hook extracts `#375` and `#376` from recent commits.
+
+## Customization
+
+### Different test directory
+
+Edit `run-journey-tests.sh`:
+```bash
+# Change this line
+echo "tests/e2e/journey_${test_name}.spec.ts"
+# To your pattern
+echo "e2e/journeys/${test_name}.test.ts"
+```
+
+### Different test command
+
+The script auto-detects package manager. Override by editing:
+```bash
+get_test_command() {
+    echo "your-custom-test-command"
+}
+```
+
+### More build commands
+
+Edit `post-build-check.sh`:
+```bash
+is_build_command() {
+    echo "$cmd" | grep -qE '(your|custom|commands)'
+}
+```
+
+## Troubleshooting
+
+**"No issues found in recent commits"**
+- Commits need `#123` format
+- Check: `git log -5 --oneline`
+
+**"No journey contract found"**
+- Issue body needs `J-FEATURE-NAME`
+- Check: `gh issue view 123`
+
+**"Test file not found"**
+- Naming mismatch
+- J-SIGNUP-FLOW expects `journey_signup_flow.spec.ts`
+
+**Tests not running at all**
+- Check hook is registered: `/hooks` in Claude Code
+- Check scripts are executable: `ls -la .claude/hooks/`
