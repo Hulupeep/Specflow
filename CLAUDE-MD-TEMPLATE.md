@@ -386,6 +386,29 @@ Sequential would take [A] days, parallel took [B] days
 
 ---
 
+## Agent Teams
+
+| Goal | Command |
+|------|---------|
+| Execute with agent teams | "Execute waves with agent teams" |
+| Standard execution (subagents) | "Execute waves" |
+| Run journey gate for an issue | "Run journey gate tier 1 for issue #50" |
+| Run wave gate | "Run journey gate tier 2 for issues #50 #51 #52" |
+| Run regression check | "Run journey gate tier 3" |
+
+Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` for agent teams mode.
+
+## Journey Gates
+
+| Gate | Scope | Blocks | When |
+|------|-------|--------|------|
+| Tier 1: Issue | J-* tests from one issue | Issue closure | After implementing issue |
+| Tier 2: Wave | All J-* tests from all wave issues | Next wave | After all issues pass Tier 1 |
+| Tier 3: Regression | Full E2E suite vs baseline | Merge to main | After wave passes Tier 2 |
+
+Deferrals: `.claude/.defer-journal` (scoped by J-ID with tracking issue).
+Baseline: `.specflow/baseline.json` (updated only on clean Tier 3 pass).
+
 ## [REST OF YOUR CLAUDE.MD CONTENT]
 <!-- Your existing CLAUDE.md content goes here -->
 ```

@@ -410,6 +410,52 @@ The waves-controller will pick up where it left off.
 
 ---
 
+---
+
+## Agent Teams Configuration
+
+```yaml
+execution_mode: agent_teams  # or "subagents" for legacy mode
+journey_gates:
+  tier_1: hard    # blocks issue closure
+  tier_2: hard    # blocks next wave
+  tier_3: hard    # blocks merge to main
+  defer_journal: .claude/.defer-journal
+  baseline: .specflow/baseline.json
+```
+
+When `execution_mode: agent_teams`:
+- Each issue gets its own `issue-lifecycle` teammate (full context, hot fix loops)
+- `db-coordinator` manages shared DB resources (migration numbers, conflict detection)
+- `quality-gate` runs tests on request (contracts, Tier 2, Tier 3)
+- Sequential phases 3-7 are replaced by parallel teammate execution
+- Communication via structured messages (see agents/PROTOCOL.md)
+
+### Agent Teams Commands
+
+| Goal | Command |
+|------|---------|
+| Execute with agent teams | "Execute waves with agent teams" |
+| Standard execution (subagents) | "Execute waves" |
+| Run journey gate for an issue | "Run journey gate tier 1 for issue #50" |
+| Run wave gate | "Run journey gate tier 2 for issues #50 #51 #52" |
+| Run regression check | "Run journey gate tier 3" |
+
+Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` for agent teams mode.
+
+### Journey Gates
+
+| Gate | Scope | Blocks | When |
+|------|-------|--------|------|
+| Tier 1: Issue | J-* tests from one issue | Issue closure | After implementing issue |
+| Tier 2: Wave | All J-* tests from all wave issues | Next wave | After all issues pass Tier 1 |
+| Tier 3: Regression | Full E2E suite vs baseline | Merge to main | After wave passes Tier 2 |
+
+Deferrals: `.claude/.defer-journal` (scoped by J-ID with tracking issue).
+Baseline: `.specflow/baseline.json` (updated only on clean Tier 3 pass).
+
+---
+
 ## This Protocol Ensures
 
 1. **Contract compliance** - Every feature has YAML contracts enforced by tests
@@ -420,3 +466,5 @@ The waves-controller will pick up where it left off.
 6. **Traceability** - Commits reference issues, contracts link to tests
 7. **Quality gates** - Build/test failures block progression
 8. **Documentation** - Contracts serve as living specs
+9. **Regression safety** - Tier 3 baseline prevents wave-over-wave regressions
+10. **Inter-agent coordination** - Agent teams communicate via structured protocol

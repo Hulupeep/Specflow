@@ -31,7 +31,7 @@ Result: you can let the LLM explore, but the rules + flows can't be broken witho
 This README covers quick start. The docs site covers:
 - Step-by-step getting started guide
 - Core concepts (contracts, journeys, agents)
-- Agent system reference (18 agents)
+- Agent system reference (23+ agents)
 - Advanced topics (hooks, CI/CD, manual setup)
 - Background and academic foundation
 
@@ -213,7 +213,7 @@ graph LR
 - ✅ **0 Critical E2E Anti-Patterns** (down from 117) - Tests FAIL when features break (no silent passes)
 - ✅ **Autonomous Wave Execution** - Say "Execute waves" → controller orchestrates everything
 - ✅ **CI Quality Gates** - PRs blocked if test quality violations detected
-- ✅ **18 Agent Library** - Complete end-to-end delivery automation
+- ✅ **23+ Agent Library** - Complete end-to-end delivery automation
 - ✅ **280+ Issues Delivered** - Production-validated across 30 waves
 
 ### Quick Extraction (< 5 minutes)
@@ -228,7 +228,8 @@ bash extract-to-project.sh /path/to/your/project
 **What gets copied:**
 - Quality contract system (QUALITY-001 to QUALITY-004)
 - Wave execution framework (8-phase autonomous protocol)
-- 18 specialized agents (specflow-writer, waves-controller, journey-enforcer, etc.)
+- 23+ specialized agents (specflow-writer, waves-controller, journey-enforcer, etc.)
+- Agent Teams infrastructure (5 new coordination agents)
 - CI/CD integration templates (E2E quality gates)
 - CLAUDE.md enhancements (auto-trigger rules, test execution gate)
 
@@ -250,6 +251,64 @@ AFTER:  "Execute waves" → Autonomous end-to-end execution with dependency calc
 - **[install-hooks.sh](install-hooks.sh)** - Install Claude Code hooks
 
 **These improvements transform Specflow from a specification framework into a complete platform engineering capability.**
+
+---
+
+## Agent Teams (Claude Code 4.6+)
+
+Agent Teams is an alternative execution model that uses Claude Code's TeammateTool API for persistent, peer-to-peer agent coordination. Instead of stateless subagents that are spawned, do work, and terminate, Agent Teams creates persistent teammates that maintain context across their entire lifecycle and communicate directly with each other.
+
+### How It Differs from Subagents
+
+| Aspect | Subagent Model (Task Tool) | Agent Teams (TeammateTool) |
+|--------|---------------------------|---------------------------|
+| **Lifecycle** | Stateless: spawn, execute, terminate | Persistent: agents live for the session |
+| **Communication** | Hub-and-spoke: all results flow through orchestrator | Peer-to-peer: agents message each other directly |
+| **Error recovery** | Orchestrator must re-spawn on failure | Agent fixes its own bugs (retains context) |
+| **Coordination** | Sequential handoffs via orchestrator | Direct coordination between agents |
+| **Context** | Lost between invocations | Maintained for the full session |
+
+### Three-Tier Journey Enforcement
+
+Agent Teams introduces a `journey-gate` agent that enforces journey contracts at three tiers:
+
+| Tier | Gate | When It Runs | What It Checks |
+|------|------|--------------|----------------|
+| **Tier 1: Issue Gate** | Before implementation starts | Issue has journey contract, Gherkin criteria, data-testid selectors |
+| **Tier 2: Wave Gate** | After a wave completes | All journey tests for the wave pass, no regressions in completed waves |
+| **Tier 3: Regression Gate** | Before release/merge | Full journey suite passes, no critical journey failures across all waves |
+
+### Quick Start
+
+1. **Enable Agent Teams:**
+   ```bash
+   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true
+   ```
+
+2. **New agents available in teams mode:**
+   - `journey-gate` - Three-tier journey enforcement (issue, wave, regression)
+   - `issue-lifecycle` - Full lifecycle management per issue (spec, implement, test, close)
+   - `db-coordinator` - Migration number management and conflict prevention
+   - `quality-gate` - Test execution service with pass/fail coordination
+   - `PROTOCOL` - Communication protocol definition (see `agents/PROTOCOL.md`)
+
+3. **Same command to execute:**
+   ```
+   Execute waves
+   ```
+   The `waves-controller` auto-detects whether Agent Teams is enabled and uses the appropriate execution model.
+
+### Key Benefits
+
+- **Persistent context** - Agents retain full context, so they can fix their own bugs without re-explaining the problem
+- **Parallel execution with coordination** - Agents work in parallel but coordinate directly (e.g., `db-coordinator` prevents migration number collisions)
+- **Regression protection** - The three-tier journey gate catches regressions at every stage, not just at the end
+
+### Backward Compatible
+
+Agent Teams is fully backward compatible. Without the environment variable, Specflow falls back to the standard subagent model using Claude Code's Task tool. No changes to your existing setup are required.
+
+See **[agents/PROTOCOL.md](agents/PROTOCOL.md)** for the full communication protocol between teammates.
 
 ---
 
@@ -352,7 +411,7 @@ See [QUICKSTART.md](QUICKSTART.md) for more prompt variations and detailed paths
 
 ## Easy Way: Subagents (Recommended)
 
-The fastest way to use Specflow is with Claude Code's Task tool and the 18 pre-built subagents.
+The fastest way to use Specflow is with Claude Code's Task tool and the 23+ pre-built agents.
 
 ### Step 1: Install the Agents
 
@@ -901,6 +960,12 @@ You're doing it right when:
 │   "Run journey-enforcer"    Check journey coverage      │
 │   "Run board-auditor"       Check issue compliance      │
 │                                                         │
+│ Agent Teams Commands:                                   │
+│   "Execute waves" (auto-detects)  Agent teams if        │
+│                                   env var set           │
+│   CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true             │
+│                                   Enable teams mode     │
+│                                                         │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -923,7 +988,8 @@ Specflow is a methodology—it works with your existing tools.
 | **Skills** | Create a `/specflow` skill that sets up contracts for any project |
 | **Hooks** | Run contract tests on `post-edit` to catch violations immediately |
 | **CLAUDE.md** | Add contract rules so Claude checks before modifying protected files |
-| **Task Tool Agents** | 18 reusable subagents for parallel, dependency-ordered implementation |
+| **Task Tool Agents** | 23+ reusable agents for parallel, dependency-ordered implementation |
+| **Agent Teams** | Persistent teammate coordination via TeammateTool API (Claude Code 4.6+) |
 
 See [context/CLAUDE-CODE-SKILL.md](context/CLAUDE-CODE-SKILL.md) for skill setup instructions and hook examples.
 
@@ -959,10 +1025,14 @@ When every GitHub issue has executable SQL contracts (`CREATE TABLE`, `REFERENCE
 
 ### The Agent Library
 
-**18 subagent definitions** in [`agents/`](agents/) that form a complete pipeline:
+**23+ agent definitions** in [`agents/`](agents/) that form a complete pipeline:
 
 ```
 waves-controller         MASTER ORCHESTRATOR: "execute waves" runs everything
+  --> issue-lifecycle    NEW: Full lifecycle per issue (agent teams mode)
+  --> db-coordinator     NEW: Migration number management (agent teams mode)
+  --> quality-gate       NEW: Test execution service (agent teams mode)
+  --> journey-gate       NEW: Three-tier journey enforcement
   --> specflow-writer    Raw issues --> full-stack specs with SQL + Gherkin
   --> board-auditor      Compliance audit (which issues are build-ready?)
   --> specflow-uplifter  Fix gaps in partial specs

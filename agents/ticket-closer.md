@@ -15,6 +15,40 @@ You are a GitHub issue lifecycle manager for your project. You map implementatio
 
 ## Process
 
+### Step 0: Verify Journey Gate (MANDATORY -- runs before all other steps)
+
+1. Determine if issue is UI-facing. Check for ANY of:
+   - Label: `Frontend Interface` or `UI`
+   - Body contains `TSi=Y` or `Tid=Y`
+   - Body contains `data-testid`
+   - Body references any `J-*` journey ID
+
+2. If UI-facing:
+   a. Search for a Tier 1 pass certificate in:
+      - Issue comments (posted by journey-gate)
+      - Current agent session output
+   b. Certificate must contain:
+      - `JOURNEY GATE TIER 1: PASS`
+      - `Issue: #<this issue number>`
+      - `Commit: <SHA>` where SHA matches `git rev-parse HEAD`
+   c. If certificate is MISSING:
+      ```
+      Cannot close #<N>: No Tier 1 journey gate pass certificate found.
+      Run: "run journey gate tier 1 for issue #<N>"
+      ```
+      STOP. Do not proceed to Step 1.
+   d. If certificate commit SHA does NOT match current HEAD:
+      ```
+      Cannot close #<N>: Tier 1 certificate is stale.
+      Certificate commit: <cert SHA>
+      Current HEAD: <current SHA>
+      Re-run: "run journey gate tier 1 for issue #<N>"
+      ```
+      STOP. Do not proceed to Step 1.
+   e. If certificate is valid and current: proceed to Step 1.
+
+3. If NOT UI-facing: proceed to Step 1.
+
 ### Step 1: Gather Implementation Evidence
 1. Run `git log --oneline <range>` to get commits
 2. Run `git diff <range> --stat` to get changed files

@@ -138,7 +138,16 @@ The agents know the patterns. You provide direction.
 ### Closing
 | Agent | What it does |
 |-------|--------------|
-| **ticket-closer** | Posts implementation summaries, links commits, closes validated issues |
+| **ticket-closer** | Posts implementation summaries, links commits, closes validated issues (requires Tier 1 pass certificate for UI issues) |
+
+### Agent Teams (Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true`)
+| Agent | What it does |
+|-------|--------------|
+| **journey-gate** | Three-scope journey enforcement: Tier 1 (issue), Tier 2 (wave), Tier 3 (regression). Hard gates that block progress. |
+| **issue-lifecycle** | TEAMMATE that owns full lifecycle of a single GitHub issue: contract -> build -> test -> fix -> close |
+| **db-coordinator** | TEAMMATE that manages shared DB resources: migration numbers, table registry, conflict detection |
+| **quality-gate** | TEAMMATE that runs tests on request: contracts, Tier 2 wave gate, Tier 3 regression gate |
+| **PROTOCOL** | Inter-agent communication protocol: message format, message types, coordination rules |
 
 ---
 
@@ -258,8 +267,12 @@ Phase 6: CLOSE
 | Goal | Say this |
 |------|----------|
 | **Execute entire backlog** | "Execute waves" |
+| **Execute with agent teams** | "Execute waves with agent teams" |
 | **Execute specific issues** | "Execute issues #A, #B, #C" |
 | **Execute by filter** | "Execute waves for milestone v1.0" |
+| **Run journey gate (issue)** | "Run journey gate tier 1 for issue #50" |
+| **Run journey gate (wave)** | "Run journey gate tier 2 for issues #50 #51 #52" |
+| **Run regression check** | "Run journey gate tier 3" |
 | Make issues spec-ready | "Run specflow-writer on issues #X-#Y" |
 | Check compliance | "Run board-auditor on all open issues" |
 | Fill spec gaps | "Run specflow-uplifter on issues missing RLS" |
@@ -286,6 +299,17 @@ A SQL `REFERENCES` clause is a dependency. A TypeScript interface import is a de
 No manual linking. No Gantt charts. The code tells us what depends on what.
 
 ---
+
+## Journey Gates (Three-Tier Enforcement)
+
+| Gate | Scope | Blocks | When |
+|------|-------|--------|------|
+| Tier 1: Issue | J-* tests from one issue | Issue closure | After implementing issue |
+| Tier 2: Wave | All J-* tests from all wave issues | Next wave | After all issues pass Tier 1 |
+| Tier 3: Regression | Full E2E suite vs baseline | Merge to main | After wave passes Tier 2 |
+
+Deferrals: `.claude/.defer-journal` (scoped by J-ID with tracking issue).
+Baseline: `.specflow/baseline.json` (updated only on clean Tier 3 pass).
 
 ## Adding Agents
 

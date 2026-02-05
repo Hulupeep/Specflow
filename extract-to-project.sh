@@ -75,6 +75,7 @@ mkdir -p "$TARGET_DIR/scripts/agents"
 ESSENTIAL_AGENTS=(
   "README.md"
   "WORKFLOW.md"
+  "PROTOCOL.md"
   "waves-controller.md"
   "specflow-writer.md"
   "contract-validator.md"
@@ -82,6 +83,10 @@ ESSENTIAL_AGENTS=(
   "playwright-from-specflow.md"
   "journey-tester.md"
   "journey-enforcer.md"
+  "journey-gate.md"
+  "issue-lifecycle.md"
+  "db-coordinator.md"
+  "quality-gate.md"
   "e2e-test-auditor.md"
   "ticket-closer.md"
 )
@@ -96,6 +101,48 @@ for agent in "${ESSENTIAL_AGENTS[@]}"; do
 done
 
 echo -e "${GREEN}✓${NC} Agent library copied ($COPIED_COUNT/${#ESSENTIAL_AGENTS[@]} agents)"
+echo ""
+
+# ============================================================================
+# 3b. Agent Teams Supporting Files
+# ============================================================================
+
+echo -e "${BLUE}[3b/6]${NC} Setting up Agent Teams infrastructure..."
+
+# Baseline for regression detection
+mkdir -p "$TARGET_DIR/.specflow"
+if [ ! -f "$TARGET_DIR/.specflow/baseline.json" ]; then
+  echo '{"version":1,"last_updated":null,"last_wave":null,"last_commit":null,"tests":{}}' \
+    > "$TARGET_DIR/.specflow/baseline.json"
+  echo "  Created .specflow/baseline.json"
+fi
+
+# Scoped defer journal (replaces deprecated .defer-tests)
+mkdir -p "$TARGET_DIR/.claude"
+if [ ! -f "$TARGET_DIR/.claude/.defer-journal" ]; then
+  cat > "$TARGET_DIR/.claude/.defer-journal" <<'DEFER_EOF'
+# Scoped journey deferrals -- each requires a tracking issue
+# Format: J-ID: reason (#tracking-issue)
+#
+# Rules:
+# - Only listed J-IDs are skipped by journey-gate
+# - Every deferral MUST reference a tracking issue
+# - Review and prune monthly
+# - .defer-tests is IGNORED (deprecated)
+DEFER_EOF
+  echo "  Created .claude/.defer-journal"
+fi
+
+# Remove deprecated defer mechanism
+if [ -f "$TARGET_DIR/.claude/.defer-tests" ]; then
+  rm -f "$TARGET_DIR/.claude/.defer-tests"
+  echo "  Removed deprecated .claude/.defer-tests"
+fi
+
+# Regression comparison script
+cp "$SOURCE_DIR/scripts/compare-baseline.js" "$TARGET_DIR/scripts/" 2>/dev/null || echo "  compare-baseline.js not found"
+
+echo -e "${GREEN}✓${NC} Agent Teams infrastructure set up"
 echo ""
 
 # ============================================================================

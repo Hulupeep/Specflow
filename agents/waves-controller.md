@@ -402,3 +402,106 @@ Wait for all to complete, then proceed to next phase.
 - **Tests must map to contract rules**
 
 **This agent orchestrates the entire wave execution. User invokes it once.**
+
+---
+
+## Process (AGENT TEAMS MODE)
+
+### Detection
+If `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` is set, use agent teams mode.
+Otherwise, fall back to subagent mode (existing behavior above).
+
+### Phase 1: Discovery (unchanged)
+Fetch issues, build dependency graph, calculate waves, score priorities,
+output ASCII report, prompt for approval.
+
+### Phase 2: Spawn Team via TeammateTool
+
+Load agent prompts, then create a named team using `spawnTeam`:
+
+```bash
+# Load prompts
+Read scripts/agents/issue-lifecycle.md
+Read scripts/agents/db-coordinator.md
+Read scripts/agents/quality-gate.md
+Read scripts/agents/journey-gate.md
+Read scripts/agents/PROTOCOL.md
+```
+
+Spawn the team:
+```
+TeammateTool(operation: "spawnTeam", name: "wave-<N>", config: {
+  agents: [
+    { name: "issue-50", prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=50 WAVE_NUMBER=<N>" },
+    { name: "issue-51", prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=51 WAVE_NUMBER=<N>" },
+    { name: "issue-52", prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=52 WAVE_NUMBER=<N>" },
+    { name: "db-coord",  prompt: "<db-coordinator prompt>\n\nWAVE_NUMBER=<N>" },
+    { name: "qa-gate",   prompt: "<quality-gate prompt>\n\nWAVE_NUMBER=<N>" }
+  ]
+})
+```
+
+Create shared tasks for each issue:
+```
+TaskCreate(subject: "Implement #50", description: "Full lifecycle", activeForm: "Implementing #50")
+TaskCreate(subject: "Implement #51", description: "Full lifecycle", activeForm: "Implementing #51")
+TaskCreate(subject: "Implement #52", description: "Full lifecycle", activeForm: "Implementing #52")
+```
+
+Set dependencies between tasks using `addBlockedBy` where issues depend on each other.
+
+### Phases 3-7: REPLACED by teammate self-coordination
+
+Teammates work independently. The leader monitors incoming `write` messages:
+- `BLOCKED #N <reason>`: Assess situation, reassign or defer
+- `READY_FOR_CLOSURE #N <cert>`: Record, check if all teammates ready
+
+All inter-agent communication uses TeammateTool `write` (direct) and
+`broadcast` (notifications). See `agents/PROTOCOL.md` for full message catalog.
+
+### Phase 6b: Wave Gate (after ALL teammates report READY_FOR_CLOSURE)
+1. Collect all J-* IDs across the wave (from teammate certificates).
+2. Send to quality-gate:
+   ```
+   TeammateTool(write, to: "qa-gate", message: "RUN_JOURNEY_TIER2 issues:[50, 51, 52]")
+   ```
+3. If FAIL:
+   - Identify interaction bug from quality-gate report.
+   - Notify affected teammates via `write` to fix.
+   - Re-run Tier 2 after fixes.
+4. If PASS: proceed.
+
+### Phase 6c: Regression Gate
+1. Send to quality-gate:
+   ```
+   TeammateTool(write, to: "qa-gate", message: "RUN_REGRESSION wave:<N>")
+   ```
+2. If new failures: STOP, identify regression, notify affected teammates via `write`.
+3. If PASS: update baseline, proceed.
+
+### Phase 7: Issue Closure
+Close all issues that have:
+- `READY_FOR_CLOSURE` from their issue-lifecycle teammate
+- Wave gate (Tier 2) pass
+- Regression gate (Tier 3) pass
+
+### Phase 7b: Graceful Shutdown
+```
+TeammateTool(operation: "requestShutdown")
+```
+Wait for all teammates to finish current work before proceeding.
+
+### Phase 8: Wave Report (unchanged)
+ASCII summary, next wave or EXIT.
+
+---
+
+## Communication Protocol (Agent Teams Mode)
+
+All inter-agent communication uses Claude Code's **TeammateTool** API:
+- **`write`** — direct message to a named teammate
+- **`broadcast`** — notify all teammates (use sparingly)
+- **Shared TaskList** — issue tracking with dependency management
+
+See `agents/PROTOCOL.md` for the full message catalog, agent roles,
+environment variables, and fallback behavior.
