@@ -23,8 +23,9 @@ From my answers:
 2. Create contract YAML files in docs/contracts/
 3. Create contract tests in src/__tests__/contracts/ (pattern scanning)
 4. Create journey tests in tests/e2e/ (Playwright E2E)
-5. Show me how to add to CI
-6. Update this project's CLAUDE.md with contract rules
+5. Install journey verification hooks (bash install-hooks.sh .)
+6. Show me how to add to CI
+7. Update this project's CLAUDE.md with contract rules and hook config
 
 I'll describe things in plain English. You structure it.
 ```
@@ -97,8 +98,9 @@ From my answers:
 2. Create contract YAML files in docs/contracts/
 3. Create contract tests in src/__tests__/contracts/ (pattern scanning)
 4. Create journey tests in tests/e2e/ (Playwright E2E)
-5. Show me how to add to CI
-6. Update this project's CLAUDE.md with contract rules
+5. Install journey verification hooks (bash install-hooks.sh .)
+6. Show me how to add to CI
+7. Update this project's CLAUDE.md with contract rules and hook config
 
 I'll describe things in plain English. You structure it.
 ```

@@ -15,6 +15,7 @@
 | **Write specs** | [SPEC-FORMAT.md](../SPEC-FORMAT.md) |
 | **Create contracts** | [CONTRACT-SCHEMA.md](../CONTRACT-SCHEMA.md) |
 | **Set up CI** | [CI-INTEGRATION.md](../CI-INTEGRATION.md) |
+| **Automate test verification** | [JOURNEY-VERIFICATION-HOOKS.md](JOURNEY-VERIFICATION-HOOKS.md) |
 | **Use with Claude Code** | [context/CLAUDE-CODE-SKILL.md](../context/CLAUDE-CODE-SKILL.md) |
 
 ---
@@ -42,9 +43,10 @@
 
 | Order | Document | Purpose | Priority |
 |-------|----------|---------|----------|
-| 8 | [CI-INTEGRATION.md](../CI-INTEGRATION.md) | GitHub Actions, GitLab CI setup | **SHOULD** |
-| 9 | [MID-PROJECT-ADOPTION.md](../MID-PROJECT-ADOPTION.md) | Adding to existing projects | **SHOULD** |
-| 10 | [CLAUDE.md](../CLAUDE.md) | Project CLAUDE.md for LLM guardrails | **SHOULD** |
+| 8 | [JOURNEY-VERIFICATION-HOOKS.md](JOURNEY-VERIFICATION-HOOKS.md) | Auto-run E2E tests at build boundaries | **SHOULD** |
+| 9 | [CI-INTEGRATION.md](../CI-INTEGRATION.md) | GitHub Actions, GitLab CI setup | **SHOULD** |
+| 10 | [MID-PROJECT-ADOPTION.md](../MID-PROJECT-ADOPTION.md) | Adding to existing projects | **SHOULD** |
+| 11 | [CLAUDE.md](../CLAUDE.md) | Project CLAUDE.md for LLM guardrails | **SHOULD** |
 
 ### Phase 4: Advanced (reference)
 

@@ -122,6 +122,63 @@ See `META-INSTRUCTION.md` for infrastructure setup.
 
 ---
 
+## 🔄 Journey Verification Hooks
+
+### Why Hooks Exist
+
+**Option A: Manual** - You tell Claude "run tests" every time (you'll forget)
+**Option B: Hooks** - Tests run automatically at build boundaries (can't forget)
+
+### Project Configuration
+
+<!-- UPDATE THESE VALUES for your project -->
+
+- **Package Manager:** [npm | yarn | pnpm | bun]
+- **Build Command:** `[package_manager] run build`
+- **Test Command:** `[package_manager] run test:e2e`
+- **Test Directory:** `tests/e2e`
+- **Local URL:** `http://localhost:[port]`
+- **Production URL:** `https://[your-domain.com]`
+- **Deploy Platform:** [vercel | netlify | railway | none]
+- **Deploy Wait:** [90] seconds
+- **Migration Command:** [supabase db push | prisma migrate | N/A]
+
+### Trigger Points
+
+| Trigger | Environment | Action |
+|---------|-------------|--------|
+| PRE-BUILD | LOCAL | Run baseline E2E tests |
+| POST-BUILD | LOCAL | Run E2E tests, compare to baseline |
+| POST-COMMIT | **PRODUCTION** | Wait for deploy, verify production |
+| POST-MIGRATION | **PRODUCTION** | Test APIs, run E2E |
+
+### Mandatory Reporting
+
+Claude MUST report for EVERY test run:
+
+1. **WHERE** - "Tests passed against LOCAL/PRODUCTION (URL)"
+2. **WHICH** - "Ran: signup.spec.ts, login.spec.ts, ..."
+3. **HOW MANY** - "12/12 passed (0 failed, 0 skipped)"
+4. **SKIPPED explained** - Every skip needs a reason
+
+```
+❌ BAD:  "Tests passed"
+✅ GOOD: "Tests passed against PRODUCTION (https://yourapp.com)
+         Ran: signup.spec.ts, login.spec.ts
+         Results: 12/12 passed (0 failed, 0 skipped)"
+```
+
+### Anti-Patterns
+
+- ❌ "Tests mostly passed" (vague)
+- ❌ "10/12 passed, 2 skipped" (skips unexplained)
+- ❌ "E2E tests passed" (no environment)
+- ✅ Explicit WHERE, WHAT, HOW MANY, SKIPPED reasons
+
+**See:** `.claude/hooks/journey-verification.md` for detailed behavior.
+
+---
+
 ## 🌊 Wave Execution & Orchestration (Optional)
 
 <!-- INCLUDE THIS SECTION if your project uses wave-based GitHub issue orchestration -->

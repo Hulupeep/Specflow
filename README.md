@@ -16,9 +16,24 @@ You write three kinds of invariants (what must be true in your product):
     b) Features (what must be true about features)
     c)  Journeys (what users must be able to accomplish)
 
-Result: you can let the LLM explore, but the rules + flows can’t be broken without being caught
+Result: you can let the LLM explore, but the rules + flows can't be broken without being caught
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+---
+
+## 📖 Documentation
+
+**For a more comfortable reading experience, visit the docs site:**
+
+**[specflow-help.vercel.app](https://specflow-help.vercel.app)** — Full documentation with navigation, search, and better formatting
+
+This README covers quick start. The docs site covers:
+- Step-by-step getting started guide
+- Core concepts (contracts, journeys, agents)
+- Agent system reference (18 agents)
+- Advanced topics (hooks, CI/CD, manual setup)
+- Background and academic foundation
 
 ---
 
