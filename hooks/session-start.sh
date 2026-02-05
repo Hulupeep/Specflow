@@ -1,8 +1,9 @@
 #!/bin/bash
 # Fires at session start - reminds Claude of critical CLAUDE.md rules
+# Uses exit 2 + stderr to ensure output is shown to the model
 # Customize this for your project
 
-cat <<'EOF'
+cat >&2 <<'EOF'
 ══════════════════════════════════════════════════════════════
 SPECFLOW ENVIRONMENT ACTIVE
 ══════════════════════════════════════════════════════════════
@@ -34,4 +35,5 @@ Read CLAUDE.md for full project-specific details.
 ══════════════════════════════════════════════════════════════
 EOF
 
-exit 0
+# Exit 2 = show stderr to model
+exit 2
