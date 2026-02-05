@@ -1,0 +1,38 @@
+{
+  "hooks": {
+    "post-tool-use": [
+      {
+        "tool": "Bash",
+        "pattern": "git commit",
+        "command": "echo '[HOOK] Commit detected. Journey verification should run.'"
+      },
+      {
+        "tool": "Bash",
+        "pattern": "supabase db push",
+        "command": "echo '[HOOK] Migration pushed. Verify RPCs and run Playwright.'"
+      },
+      {
+        "tool": "Bash",
+        "pattern": "pnpm build",
+        "command": "echo '[HOOK] Build passed. Run journey tests before claiming done.'"
+      },
+      {
+        "tool": "Bash",
+        "pattern": "npm run build",
+        "command": "echo '[HOOK] Build passed. Run journey tests before claiming done.'"
+      }
+    ]
+  },
+  "instructions": {
+    "journey-verification": {
+      "enabled": true,
+      "description": "Automatically verify journey contracts after builds, commits, and migrations",
+      "triggers": [
+        "After 'pnpm build' passes → Run relevant Playwright tests",
+        "After 'git commit' → Wait for Vercel, verify production",
+        "After 'supabase db push' → Test RPCs, run E2E tests",
+        "When ticket mentioned → Check for journey contracts, run baseline"
+      ]
+    }
+  }
+}

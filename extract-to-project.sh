@@ -37,7 +37,7 @@ echo ""
 # 1. Quality Contract System
 # ============================================================================
 
-echo -e "${BLUE}[1/5]${NC} Copying Quality Contract System..."
+echo -e "${BLUE}[1/6]${NC} Copying Quality Contract System..."
 
 mkdir -p "$TARGET_DIR/docs/contracts"
 mkdir -p "$TARGET_DIR/docs/testing"
@@ -55,7 +55,7 @@ echo ""
 # 2. Wave Execution Framework
 # ============================================================================
 
-echo -e "${BLUE}[2/5]${NC} Copying Wave Execution Framework..."
+echo -e "${BLUE}[2/6]${NC} Copying Wave Execution Framework..."
 
 cp "$SOURCE_DIR/docs/WAVE_EXECUTION_PROTOCOL.md" "$TARGET_DIR/docs/" 2>/dev/null || echo "  ⚠️  WAVE_EXECUTION_PROTOCOL.md not found"
 cp "$SOURCE_DIR/docs/promptright.md" "$TARGET_DIR/docs/" 2>/dev/null || echo "  ⚠️  promptright.md not found"
@@ -67,7 +67,7 @@ echo ""
 # 3. Agent Library
 # ============================================================================
 
-echo -e "${BLUE}[3/5]${NC} Copying Agent Library..."
+echo -e "${BLUE}[3/6]${NC} Copying Agent Library..."
 
 mkdir -p "$TARGET_DIR/scripts/agents"
 
@@ -102,7 +102,7 @@ echo ""
 # 4. Specflow Core (if not already present)
 # ============================================================================
 
-echo -e "${BLUE}[4/5]${NC} Copying Specflow Core Files..."
+echo -e "${BLUE}[4/6]${NC} Copying Specflow Core Files..."
 
 mkdir -p "$TARGET_DIR/Specflow"
 
@@ -128,10 +128,29 @@ echo -e "${GREEN}✓${NC} Specflow core files copied"
 echo ""
 
 # ============================================================================
-# 5. CI/CD Integration Template
+# 5. Journey Verification Hooks
 # ============================================================================
 
-echo -e "${BLUE}[5/5]${NC} Creating CI/CD integration template..."
+echo -e "${BLUE}[5/6]${NC} Installing Journey Verification Hooks..."
+
+mkdir -p "$TARGET_DIR/.claude/hooks"
+
+if [ -d "$SOURCE_DIR/hooks" ]; then
+  cp "$SOURCE_DIR/hooks/journey-verification.md" "$TARGET_DIR/.claude/hooks/" 2>/dev/null || echo "  ⚠️  journey-verification.md not found"
+  cp "$SOURCE_DIR/hooks/settings.json" "$TARGET_DIR/.claude/settings.json" 2>/dev/null || echo "  ⚠️  settings.json not found"
+  cp "$SOURCE_DIR/hooks/README.md" "$TARGET_DIR/.claude/hooks/" 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Journey verification hooks installed"
+else
+  echo -e "${YELLOW}⚠️${NC}  hooks/ directory not found, skipping"
+fi
+
+echo ""
+
+# ============================================================================
+# 6. CI/CD Integration Template
+# ============================================================================
+
+echo -e "${BLUE}[6/6]${NC} Creating CI/CD integration template..."
 
 mkdir -p "$TARGET_DIR/.github/workflows"
 
@@ -187,14 +206,22 @@ echo "3. Integrate CI gate:"
 echo "   - Copy content from .github/workflows/e2e-quality-gate.yml.template"
 echo "   - Add to your CI workflow BEFORE E2E test execution"
 echo ""
-echo "4. Update CLAUDE.md with agent library sections:"
+echo "4. Update CLAUDE.md:"
 echo "   - Add Subagent Library section"
 echo "   - Add Auto-Trigger Rules"
-echo "   - Add Test Execution Gate"
+echo "   - Add Journey Verification Hook section (see .claude/hooks/README.md)"
 echo ""
-echo "5. Test the extraction:"
+echo "5. Configure journey hooks for your project:"
+echo "   - Review .claude/settings.json hook triggers"
+echo "   - Update production URL in .claude/hooks/journey-verification.md"
+echo "   - Ensure Playwright tests exist at tests/e2e/journey_*.spec.ts"
+echo ""
+echo "6. Test the extraction:"
 echo "   bash scripts/check-test-antipatterns.sh"
+echo "   pnpm build  # Should trigger hook reminder"
 echo ""
 
-echo -e "${BLUE}Documentation:${NC} Specflow/FRONTIER_IMPROVEMENTS.md"
+echo -e "${BLUE}Documentation:${NC}"
+echo "  - Specflow/FRONTIER_IMPROVEMENTS.md"
+echo "  - .claude/hooks/README.md"
 echo ""
