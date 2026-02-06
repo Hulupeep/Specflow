@@ -2,12 +2,16 @@
 
 ## What This Is
 
-These agents make Specflow work with Claude Code's **Task tool as the orchestrator**. They ensure your GitHub issues have **ARCH**, **FEAT**, and **JOURNEY** contracts that can be executed:
+These agents make Specflow work with Claude Code as the orchestrator. They ensure your GitHub issues have **ARCH**, **FEAT**, and **JOURNEY** contracts that can be executed:
 
 - **At build time** — Jest pattern tests catch architectural violations (`npm test -- contracts`)
 - **Post-build** — Playwright tests verify user journeys work end-to-end
 
 This three-layer approach reduces architectural drift and ensures work meets Definition of Done.
+
+**Two execution modes:**
+- **Subagent mode** (default) — Claude Code's Task tool spawns one-shot agents that do work and return. Works everywhere.
+- **[Agent Teams mode](#agent-teams-mode-claude-code-46)** (Claude Code 4.6+) — Persistent peer-to-peer teammates coordinate via TeammateTool API with three-tier journey gates. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` to enable.
 
 ```
 ARCH contracts  → Build fails if: forbidden patterns in code
