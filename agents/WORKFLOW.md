@@ -245,6 +245,75 @@ You're directing traffic, not writing code.
 
 ---
 
+## Agent Teams Mode (Claude Code 4.6+)
+
+> **Requires:** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true`
+
+The default workflow above uses **subagent mode** — Claude Code spawns one-shot Task agents that do work and return. This is the standard approach and works everywhere.
+
+**Agent Teams mode** adds a second option: **persistent peer-to-peer teammates** via the TeammateTool API. Instead of spawning disposable subagents, you spawn long-lived teammates that can communicate with each other.
+
+### When to Use Which
+
+| Mode | Best For | How It Works |
+|------|----------|--------------|
+| **Subagent** (default) | Most workflows | Task tool spawns agents → they work → they return results |
+| **Agent Teams** | Complex multi-issue waves | Persistent teammates coordinate via `sendMessage` |
+
+### Team Agents
+
+Agent Teams mode introduces 5 additional agent prompts:
+
+| Agent | Role | File |
+|-------|------|------|
+| `PROTOCOL` | Inter-agent communication rules | `agents/PROTOCOL.md` |
+| `journey-gate` | Three-tier journey enforcement | `agents/journey-gate.md` |
+| `issue-lifecycle` | Full issue lifecycle teammate | `agents/issue-lifecycle.md` |
+| `db-coordinator` | Shared database resource manager | `agents/db-coordinator.md` |
+| `quality-gate` | Test execution and quality checks | `agents/quality-gate.md` |
+
+These agents exist alongside the standard subagents. In subagent mode they work as regular Task agents. In teams mode they become persistent teammates.
+
+### Three-Tier Journey Gates
+
+Agent Teams introduces a three-tier quality gate system enforced by `journey-gate`:
+
+| Tier | Scope | When | Blocks |
+|------|-------|------|--------|
+| **Tier 1** | Single issue | Before closing an issue | Issue closure |
+| **Tier 2** | All wave issues | Before starting next wave | Next wave |
+| **Tier 3** | Full regression | Before merging to main | Merge |
+
+Tier 3 uses `.specflow/baseline.json` for regression detection — comparing current test results against a known-good baseline.
+
+### Infrastructure Files
+
+Agent Teams mode uses two additional files:
+
+- **`.specflow/baseline.json`** — Regression detection baseline (test pass/fail snapshot)
+- **`.claude/.defer-journal`** — Deferred test journal (replaces deprecated `.defer-tests`)
+
+### CI Pipeline
+
+For teams mode, a 5-gate CI pipeline is available at `.github/workflows/specflow-ci.yml`:
+
+```
+Gate 1: Contracts → Gate 2: Build → Gate 3: Tier 2 → Gate 4: Tier 3 → Gate 5: Deploy
+```
+
+See `agents/PROTOCOL.md` for inter-agent communication patterns and `agents/journey-gate.md` for gate enforcement details.
+
+### Backward Compatibility
+
+Agent Teams mode is fully backward compatible:
+
+- Without the env var, everything works as subagent mode (default)
+- All team agents work as regular Task agents in subagent mode
+- No changes needed to existing workflows
+- Existing `waves-controller` supports both modes
+
+---
+
 ## When Things Go Wrong
 
 **ARCH violation (build fails):**
@@ -287,6 +356,11 @@ Step 3: Profile updated successfully → FAILED
 **Before release:**
 - [ ] `npm test -- contracts` passes (ARCH + FEAT)
 - [ ] All critical journey tests exist and pass
+
+**Agent Teams (if using teams mode):**
+- [ ] `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` set
+- [ ] `.specflow/baseline.json` exists with known-good state
+- [ ] Tier 3 regression gate passes before merge
 
 ---
 
