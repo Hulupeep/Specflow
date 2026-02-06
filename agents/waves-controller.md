@@ -417,7 +417,7 @@ output ASCII report, prompt for approval.
 
 ### Phase 2: Spawn Team via TeammateTool
 
-Load agent prompts, then create a named team using `spawnTeam`:
+Load agent prompts and team naming system:
 
 ```bash
 # Load prompts
@@ -426,17 +426,27 @@ Read scripts/agents/db-coordinator.md
 Read scripts/agents/quality-gate.md
 Read scripts/agents/journey-gate.md
 Read scripts/agents/PROTOCOL.md
+Read scripts/agents/team-names.md
 ```
+
+#### Name Assignment
+
+1. Pick a **team name** based on wave character (see `team-names.md`):
+   - Fianna (general), Tuatha (architecture), Red Branch (bug fixes), Brigid's Forge (features), Tir na nOg (migrations)
+2. Pick an **issue-lifecycle name pool** based on wave type:
+   - Writers (contract-heavy), Builders (implementation), Warriors (bug fixes), Explorers (infrastructure)
+3. Assign names round-robin from the pool. Singletons always use fixed names:
+   - db-coordinator → Hamilton, quality-gate → Keane, journey-gate → Scathach
 
 Spawn the team:
 ```
-TeammateTool(operation: "spawnTeam", name: "wave-<N>", config: {
+TeammateTool(operation: "spawnTeam", name: "Fianna", config: {
   agents: [
-    { name: "issue-50", prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=50 WAVE_NUMBER=<N>" },
-    { name: "issue-51", prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=51 WAVE_NUMBER=<N>" },
-    { name: "issue-52", prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=52 WAVE_NUMBER=<N>" },
-    { name: "db-coord",  prompt: "<db-coordinator prompt>\n\nWAVE_NUMBER=<N>" },
-    { name: "qa-gate",   prompt: "<quality-gate prompt>\n\nWAVE_NUMBER=<N>" }
+    { name: "Yeats",    prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=50 WAVE_NUMBER=<N>" },
+    { name: "Swift",    prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=51 WAVE_NUMBER=<N>" },
+    { name: "Beckett",  prompt: "<issue-lifecycle prompt>\n\nISSUE_NUMBER=52 WAVE_NUMBER=<N>" },
+    { name: "Hamilton", prompt: "<db-coordinator prompt>\n\nWAVE_NUMBER=<N>" },
+    { name: "Keane",    prompt: "<quality-gate prompt>\n\nWAVE_NUMBER=<N>" }
   ]
 })
 ```
@@ -491,8 +501,47 @@ TeammateTool(operation: "requestShutdown")
 ```
 Wait for all teammates to finish current work before proceeding.
 
-### Phase 8: Wave Report (unchanged)
-ASCII summary, next wave or EXIT.
+### Phase 8: Wave Report (with named completion)
+
+Generate an ASCII summary that references each agent's mythic name and maps their
+"powers" to what they actually accomplished. See `team-names.md` for the flavor mapping.
+
+```
+═══════════════════════════════════════════════════════════════
+WAVE <N> COMPLETE — Team <team_name>
+═══════════════════════════════════════════════════════════════
+
+<Name> (#<issue>) — <what they did>, with <mythic power flavor>
+<Name> (#<issue>) — <what they did>, with <mythic power flavor>
+<Name> (#<issue>) — <what they did>, with <mythic power flavor>
+
+<Singleton> held <resource> steady.
+<Singleton> let nothing past the gate.
+Finn McCool orchestrated from above.
+
+<N> issues closed. <N> regressions. All tiers <status>.
+═══════════════════════════════════════════════════════════════
+```
+
+Example:
+```
+═══════════════════════════════════════════════════════════════
+WAVE 3 COMPLETE — Team Fianna
+═══════════════════════════════════════════════════════════════
+
+Yeats (#325)  — crafted WhatsApp notification contracts with symbolic precision
+Swift (#326)  — enforced no-show alert rules with razor rhetoric
+Pearse (#327) — built the coverage request system with theatrical intensity
+
+Hamilton held the schema steady across 3 migrations.
+Keane let nothing past the gate — 47 tests, 0 failures.
+Finn McCool orchestrated the wave from above.
+
+3 issues closed. 0 regressions. All tiers green.
+═══════════════════════════════════════════════════════════════
+```
+
+Then prompt for next wave or EXIT.
 
 ---
 

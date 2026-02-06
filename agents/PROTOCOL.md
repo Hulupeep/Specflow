@@ -31,24 +31,39 @@ when dependencies complete. File-locking prevents race conditions on claims.
 ## Environment Variables (set automatically on each teammate)
 
 ```
-CLAUDE_CODE_TEAM_NAME       # Team identifier
+CLAUDE_CODE_TEAM_NAME       # Team identifier (mythic name, e.g., "Fianna")
 CLAUDE_CODE_AGENT_ID        # Unique agent session ID
-CLAUDE_CODE_AGENT_NAME      # Human-readable name (e.g., "issue-50")
-CLAUDE_CODE_AGENT_TYPE      # Role (e.g., "issue-lifecycle")
+CLAUDE_CODE_AGENT_NAME      # Human-readable name (mythic name, e.g., "Yeats")
+CLAUDE_CODE_AGENT_TYPE      # Role (functional, e.g., "issue-lifecycle")
 CLAUDE_CODE_PARENT_SESSION_ID  # Lead session that spawned this agent
 ```
+
+## Team Naming
+
+Agent Teams uses **mythic Irish names** instead of functional IDs. This makes
+completion messages memorable without affecting behavior.
+
+- **Team names** (`CLAUDE_CODE_TEAM_NAME`): Fianna, Tuatha, Red Branch, Brigid's Forge, Tir na nOg
+- **Agent names** (`CLAUDE_CODE_AGENT_NAME`): Yeats, Swift, Goibniu, Hamilton, Keane, etc.
+- **Agent types** (`CLAUDE_CODE_AGENT_TYPE`): Still functional (issue-lifecycle, db-coordinator, etc.)
+
+Names are **cosmetic only**. Behavior is defined entirely by the agent prompt.
+Singleton roles have fixed names (Hamilton = db-coordinator, Keane = quality-gate).
+Issue-lifecycle agents draw from themed pools (Writers, Builders, Warriors, Explorers).
+
+See `agents/team-names.md` for the full naming system, pools, and completion message templates.
 
 ## Team Lifecycle
 
 ### 1. Leader creates team (`spawnTeam`)
-The waves-controller (lead session) creates a named team:
+The waves-controller (lead session) creates a named team with mythic names:
 ```
-TeammateTool(operation: "spawnTeam", name: "wave-1", config: {
+TeammateTool(operation: "spawnTeam", name: "Fianna", config: {
   agents: [
-    { name: "issue-50", prompt: "<issue-lifecycle prompt for #50>" },
-    { name: "issue-51", prompt: "<issue-lifecycle prompt for #51>" },
-    { name: "db-coord",  prompt: "<db-coordinator prompt>" },
-    { name: "qa-gate",   prompt: "<quality-gate prompt>" }
+    { name: "Yeats",    prompt: "<issue-lifecycle prompt for #50>" },
+    { name: "Swift",    prompt: "<issue-lifecycle prompt for #51>" },
+    { name: "Hamilton", prompt: "<db-coordinator prompt>" },
+    { name: "Keane",    prompt: "<quality-gate prompt>" }
   ]
 })
 ```

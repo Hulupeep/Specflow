@@ -141,13 +141,14 @@ The agents know the patterns. You provide direction.
 | **ticket-closer** | Posts implementation summaries, links commits, closes validated issues (requires Tier 1 pass certificate for UI issues) |
 
 ### Agent Teams (Requires `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true`)
-| Agent | What it does |
-|-------|--------------|
-| **journey-gate** | Three-scope journey enforcement: Tier 1 (issue), Tier 2 (wave), Tier 3 (regression). Hard gates that block progress. |
-| **issue-lifecycle** | TEAMMATE that owns full lifecycle of a single GitHub issue: contract -> build -> test -> fix -> close |
-| **db-coordinator** | TEAMMATE that manages shared DB resources: migration numbers, table registry, conflict detection |
-| **quality-gate** | TEAMMATE that runs tests on request: contracts, Tier 2 wave gate, Tier 3 regression gate |
-| **PROTOCOL** | Inter-agent communication protocol: message format, message types, coordination rules |
+| Agent | Team Name | What it does |
+|-------|-----------|--------------|
+| **journey-gate** | Scathach | Three-scope journey enforcement: Tier 1 (issue), Tier 2 (wave), Tier 3 (regression). Hard gates that block progress. |
+| **issue-lifecycle** | *(from pool)* | TEAMMATE that owns full lifecycle of a single GitHub issue: contract -> build -> test -> fix -> close |
+| **db-coordinator** | Hamilton | TEAMMATE that manages shared DB resources: migration numbers, table registry, conflict detection |
+| **quality-gate** | Keane | TEAMMATE that runs tests on request: contracts, Tier 2 wave gate, Tier 3 regression gate |
+| **PROTOCOL** | — | Inter-agent communication protocol: message format, message types, coordination rules |
+| **team-names** | — | Mythic Irish naming system: team names, name pools, flavor mapping, completion message templates |
 
 ---
 
