@@ -18,6 +18,10 @@ You write three kinds of invariants (what must be true in your product):
 
 Result: you can let the LLM explore, but the rules + flows can't be broken without being caught
 
+**Two execution modes:**
+- **Subagent mode** (default) — Claude Code Task tool spawns 23+ one-shot agents in parallel waves
+- **Agent Teams mode** (Claude Code 4.6+) — Persistent peer-to-peer teammates coordinate via TeammateTool API with three-tier journey gates. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` to enable.
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ---
@@ -31,8 +35,8 @@ Result: you can let the LLM explore, but the rules + flows can't be broken witho
 This README covers quick start. The docs site covers:
 - Step-by-step getting started guide
 - Core concepts (contracts, journeys, agents)
-- Agent system reference (23+ agents)
-- Advanced topics (hooks, CI/CD, manual setup)
+- Agent system reference (23+ agents, including Agent Teams)
+- Advanced topics (hooks, CI/CD, Agent Teams, manual setup)
 - Background and academic foundation
 
 ---
