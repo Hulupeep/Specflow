@@ -428,6 +428,80 @@ The agent will reference this section when generating specs to ensure consistenc
 
 ---
 
+## Step 10: Generate Contract Artifacts (MANDATORY)
+
+**After creating GitHub issues, you MUST also create these artifacts. Tickets without contracts are incomplete.**
+
+### Required Outputs Per Ticket
+
+For EVERY ticket that has a UI journey or user-facing acceptance criteria:
+
+1. **Journey Contract YAML** — `docs/contracts/journey_{snake_case_name}.yml`
+   ```yaml
+   journey_meta:
+     id: J-{UPPER-KEBAB-NAME}
+     from_spec: "docs/product/{spec}.md"
+     covers_reqs: [REQ-IDS]
+     type: "e2e"
+     dod_criticality: critical|important|future
+     status: not_tested
+     last_verified: null
+     issue: "#{number}"
+   preconditions: [...]
+   timing: {modal_animation: 300, toast_display: 3000, ...}
+   steps: [...]
+   test_hooks:
+     e2e_test_file: "tests/e2e/journey_{name}.spec.ts"
+   acceptance_criteria: [...]
+   ```
+
+2. **Feature Contract YAML** (if new feature area) — `docs/contracts/feature_{name}.yml`
+   - Non-negotiable rules with `required_patterns` and `forbidden_patterns`
+   - `compliance_checklist` for human/LLM reference
+   - `test_hooks.tests[].file` pointing to the contract test
+
+3. **CONTRACT_INDEX.yml update** — Add entries for:
+   - New feature contract in `contracts:` section
+   - New journey contracts in `contracts:` section (with `dod_criticality`, `e2e_test`, `issue`)
+   - Requirements in `requirements_coverage:` section
+   - Test files in `test_files:` section (with `status: not_created` if test not yet written)
+
+4. **Contract test stub** (if new feature area) — `src/__tests__/contracts/{name}_contract.test.ts`
+   - Pattern-scanning tests for each non-negotiable rule
+   - Tests will initially fail — that's correct (they verify the implementation when it's built)
+
+### Self-Check Before Finishing
+
+```
+MANDATORY CHECKLIST — do NOT skip:
+[ ] Every ticket with UI has a journey_*.yml in docs/contracts/
+[ ] Every new feature area has a feature_*.yml in docs/contracts/
+[ ] CONTRACT_INDEX.yml version incremented
+[ ] CONTRACT_INDEX.yml total_contracts and total_journeys updated
+[ ] Every journey YAML is listed in CONTRACT_INDEX contracts section
+[ ] Every new requirement (PROG-001, etc.) is in requirements_coverage
+[ ] Test files listed in test_files section (status: not_created is OK)
+[ ] GitHub issues commented with journey ID + contract file path
+```
+
+### What Happens If You Skip This
+
+The `contract_completeness.test.ts` audit test will fail with messages like:
+
+```
+FAIL: Journey file missing for CONTRACT_INDEX entry J-DEFAULT-PROGRAM
+  → Create: docs/contracts/journey_default_program.yml
+  → Template: Copy an existing journey_*.yml and update journey_meta
+
+FAIL: CONTRACT_INDEX entry missing for journey file journey_programs_ux.yml
+  → Add entry to docs/contracts/CONTRACT_INDEX.yml under contracts section
+  → Include: id, file, status, type, dod_criticality, covers_reqs, e2e_test, issue
+```
+
+The CI pipeline will also block the PR at the "Contract Completeness" gate.
+
+---
+
 ## Quality Gates
 
 Before creating any issue, verify:

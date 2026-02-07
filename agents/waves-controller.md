@@ -149,6 +149,42 @@ Proceed? (yes/override)
 
 ---
 
+### Phase 2b: Contract Completeness Gate (MANDATORY)
+
+**Goal:** Verify that Phase 2 actually produced ALL required artifacts — not just tickets.
+
+**Actions:**
+```bash
+# Run the completeness check
+node scripts/check-contract-completeness.mjs
+```
+
+**If it fails:**
+```
+STOP: Contract completeness check failed.
+
+The script output tells you exactly what's missing and how to fix it.
+Common issues after Phase 2:
+
+  1. ORPHAN_FILE — You created a journey_*.yml but forgot to add it to CONTRACT_INDEX.yml
+     → Open CONTRACT_INDEX.yml, add the entry, increment version
+
+  2. MISSING_FILE — CONTRACT_INDEX references a journey that has no YAML file
+     → Create the missing docs/contracts/journey_*.yml file
+     → Copy an existing journey_*.yml as template
+
+  3. COUNT_MISMATCH — total_contracts or total_journeys is wrong
+     → Update the numbers in CONTRACT_INDEX.yml metadata
+
+Do NOT proceed to Phase 3 until this gate passes.
+```
+
+**Quality Gate:**
+- Exit code 0 → proceed to Phase 3
+- Exit code 1 → STOP, fix all listed issues, re-run Phase 2b
+
+---
+
 ### Phase 3: Contract Audit
 
 **Goal:** Validate all contracts before implementation.
@@ -160,7 +196,7 @@ Proceed? (yes/override)
   Task("Validate contract for #53", "{contract-validator prompt}\n\n---\n\nSPECIFIC TASK: Validate docs/contracts/feature_admin_dashboard.yml", "general-purpose")
 
 [Sequential - Run contract tests]:
-  Bash: npm test -- contracts
+  Bash: pnpm test -- contracts
 ```
 
 **Quality Gate:**
