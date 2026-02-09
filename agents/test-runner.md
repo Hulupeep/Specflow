@@ -287,6 +287,54 @@ npx cypress open
 npx cypress run --spec "cypress/e2e/checkout.cy.ts"
 ```
 
+### Step 10: Report Fix Outcomes to Pattern Store
+
+If the test run follows a heal-loop fix attempt, update the fix pattern store with outcomes.
+
+**When to run this step:** The heal-loop agent passes a `fix_report` containing the pattern ID(s) and fix strategy used. If no `fix_report` is provided, skip this step.
+
+**Process:**
+
+1. Load `.specflow/fix-patterns.json`
+2. For each pattern ID in the `fix_report`:
+   - Find the pattern in the store by `id`
+   - Check the corresponding contract test result from Step 4
+   - **If test passes (fix successful):**
+     ```
+     pattern.success_count += 1
+     pattern.applied_count += 1
+     pattern.confidence = min(1.00, pattern.confidence + 0.05)
+     pattern.last_applied = "YYYY-MM-DD"
+     Recalculate pattern.tier:
+       >= 0.95 → platinum
+       >= 0.85 → gold
+       >= 0.75 → silver
+       < 0.70  → bronze
+     ```
+   - **If test fails (fix unsuccessful):**
+     ```
+     pattern.failure_count += 1
+     pattern.applied_count += 1
+     pattern.confidence = max(0.00, pattern.confidence - 0.10)
+     pattern.last_applied = "YYYY-MM-DD"
+     Recalculate pattern.tier
+     If pattern.confidence < 0.30:
+       Move pattern to archived_patterns[]
+       Set archived_date and archive_reason = "repeated_failures"
+     ```
+3. Write the updated store back to `.specflow/fix-patterns.json`
+4. Include pattern score changes in the test report:
+
+```markdown
+### Fix Pattern Updates
+| Pattern | Rule | Result | Confidence | Tier Change |
+|---------|------|--------|------------|-------------|
+| fix-auth-middleware-missing | AUTH-001 | pass | 0.90 -> 0.95 | gold -> platinum |
+| fix-sec-001-hardcoded-secret | SEC-001 | fail | 0.50 -> 0.40 | silver -> bronze |
+```
+
+**If no pattern store exists** (`fix-patterns.json` not found), skip this step silently.
+
 ## Integration with Other Agents
 
 ### After journey-enforcer
@@ -304,6 +352,14 @@ Ticket-closer should refuse to close if test-runner reports failures.
 ```
 build → test-runner → journey-enforcer (release check) → deploy
 ```
+
+### Fix pattern feedback loop
+```
+heal-loop (applies fix, records pattern ID)
+    → test-runner (runs tests, updates pattern score in Step 10)
+    → heal-loop (reads updated scores on next invocation)
+```
+This creates a self-learning cycle: successful fixes gain confidence, failed fixes lose confidence, and the heal-loop agent prioritizes higher-confidence patterns over time.
 
 ## Quality Gates
 - [ ] All specified tests executed (none silently skipped)

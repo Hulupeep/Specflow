@@ -452,3 +452,284 @@ describe('Parallel Coordination Contract', () => {
 - [ ] All: Update CONTRACT-SCHEMA.md with new sections
 - [ ] All: Update WAVE_EXECUTION_PROTOCOL.md with new phases
 - [ ] All: Add examples to existing contracts (feature_architecture.yml)
+
+---
+
+## Extension 4: Confidence-Tiered Fix Patterns (Self-Learning)
+
+> Directly inspired by the confidence-tiered fix pattern system in [forge](https://github.com/ikennaokpala/forge) by [Ikenna N. Okpala](https://github.com/ikennaokpala). Forge scores fix patterns from Platinum (>=0.95, auto-apply) to Bronze (<0.70, learning-only), with +0.05 for successes and -0.10 for failures.
+
+**Prevents:** Repeated manual investigation of contract violations that have known fixes
+**Enables:** Self-learning fix loop where successful strategies gain confidence over time
+
+### Overview
+
+The fix pattern store (`.specflow/fix-patterns.json`) records fix strategies for contract violations. Each pattern tracks its historical success rate and is assigned a confidence tier that determines whether the `heal-loop` agent may auto-apply, suggest, or simply observe.
+
+### File Location
+
+```
+.specflow/fix-patterns.json    # Project-specific pattern store (gitignored or committed per team policy)
+templates/fix-patterns.json    # Starter template with example patterns
+```
+
+### Schema: `.specflow/fix-patterns.json`
+
+```json
+{
+  "schema_version": 1,
+  "description": "Confidence-tiered fix patterns for self-healing contract violations",
+  "tiers": {
+    "platinum": { "min_confidence": 0.95, "behavior": "auto_apply_immediately" },
+    "gold":     { "min_confidence": 0.85, "behavior": "auto_apply_flag_for_review" },
+    "silver":   { "min_confidence": 0.75, "behavior": "suggest_only" },
+    "bronze":   { "max_confidence": 0.70, "behavior": "learning_only" }
+  },
+  "score_evolution": {
+    "on_success": 0.05,
+    "on_failure": -0.10,
+    "new_pattern_start": 0.50,
+    "decay_after_days_unused": 90,
+    "decay_rate_per_week": -0.01,
+    "archive_below": 0.30
+  },
+  "patterns": [ ]
+}
+```
+
+### Pattern Object Schema
+
+Each entry in the `patterns` array has this structure:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `id` | string | Yes | Unique identifier, format: `fix-{rule_id_lower}-{short_description}` |
+| `contract_rule` | string | Yes | The contract rule ID this pattern fixes (e.g., `SEC-001`) |
+| `violation_signature` | string | Yes | The violation message text this pattern matches against |
+| `fix_strategy` | string | Yes | One of: `add_import`, `remove_pattern`, `wrap_with`, `replace_with`, `add_attribute` |
+| `fix_template` | object | Yes | Strategy-specific template (see below) |
+| `confidence` | number | Yes | Current confidence score (0.00 to 1.00) |
+| `tier` | string | Yes | Current tier: `platinum`, `gold`, `silver`, or `bronze` |
+| `applied_count` | integer | Yes | Total number of times this pattern was applied |
+| `success_count` | integer | Yes | Number of successful applications (test passed after fix) |
+| `failure_count` | integer | Yes | Number of failed applications (test still failed after fix) |
+| `last_applied` | string/null | Yes | ISO date of last application, or `null` if never applied |
+| `created` | string | Yes | ISO date when the pattern was first recorded |
+
+### Fix Template Structures by Strategy
+
+**`add_import`:**
+```json
+{
+  "import_line": "import { authMiddleware } from '@/middleware/auth'",
+  "instructions": "Add this import if not already present."
+}
+```
+
+**`remove_pattern`:**
+```json
+{
+  "find": "pattern to locate",
+  "instructions": "Remove the matched line(s)."
+}
+```
+
+**`wrap_with`:**
+```json
+{
+  "find": "pattern to locate the target code",
+  "wrap_pattern": "wrapper code with {captured} placeholder",
+  "add_import": "optional import to add",
+  "instructions": "Wrap the matched expression with the wrapper."
+}
+```
+
+**`replace_with`:**
+```json
+{
+  "find": "pattern to locate",
+  "replace_pattern": "replacement text",
+  "instructions": "Replace matched text with the replacement."
+}
+```
+
+**`add_attribute`:**
+```json
+{
+  "find": "pattern to locate the element",
+  "add": "attribute to add",
+  "instructions": "Add the attribute to the matched element."
+}
+```
+
+### Tier System
+
+| Tier | Confidence Score | Behavior |
+|------|------------------|----------|
+| Platinum | >= 0.95 | Auto-apply immediately by heal-loop agent |
+| Gold | >= 0.85 | Auto-apply, flag in commit message for review |
+| Silver | >= 0.75 | Suggest to agent but do not auto-apply |
+| Bronze | < 0.70 | Learning-only -- never apply, track for analysis |
+
+**Tier is recalculated after every score change** using the thresholds above. A pattern that reaches Platinum through repeated successes can drop back to Gold or lower after failures.
+
+### Score Evolution Rules
+
+| Event | Score Change | Example |
+|-------|-------------|---------|
+| Successful fix (test passes after applying pattern) | +0.05 | 0.50 becomes 0.55 |
+| Failed fix (test still fails after applying pattern) | -0.10 | 0.50 becomes 0.40 |
+| New pattern created | Starts at 0.50 | New pattern enters as Silver |
+| Unused for 90+ days | -0.01 per week | 0.90 becomes 0.89 after 1 week of decay |
+
+### Decay and Cleanup Rules
+
+**Decay trigger:** A pattern that has not been applied (i.e., `last_applied` is more than 90 days ago) begins decaying at a rate of -0.01 per week.
+
+**Decay calculation:** When the heal-loop or test-runner reads the pattern store, it checks each pattern's `last_applied` date. If more than 90 days have elapsed:
+
+```
+weeks_since_last_use = floor((today - last_applied - 90 days) / 7)
+decayed_confidence = confidence - (weeks_since_last_use * 0.01)
+```
+
+The decayed confidence is written back to the store. Decay is applied lazily (on read) rather than by a scheduled job.
+
+**Archive threshold:** When a pattern's confidence drops below 0.30 (after decay or repeated failures), the pattern is archived:
+
+1. Move the pattern from `patterns[]` to an `archived_patterns[]` array
+2. Add an `archived_date` field with the current ISO date
+3. Add an `archive_reason` field: `"confidence_below_threshold"` or `"repeated_failures"`
+
+**Archived patterns are never applied** but remain in the file for historical analysis. They can be manually restored by moving them back to `patterns[]` and resetting their confidence.
+
+**Manual cleanup:** Teams may periodically review archived patterns and remove entries that are no longer relevant (e.g., for rules that no longer exist in any contract).
+
+### Integration Points
+
+| Agent | Role | How It Uses Patterns |
+|-------|------|---------------------|
+| `heal-loop` | Consumer + updater | Reads patterns before attempting fixes; applies decay; updates scores after fix attempts |
+| `test-runner` | Reporter | After test execution, reports fix outcomes (pass/fail) back to the pattern store |
+| `waves-controller` | Observer | Logs pattern evolution (promotions, demotions, archives) in wave reports |
+| `specflow-writer` | Reference | Can reference known patterns when writing contract `auto_fix` hints |
+
+### How heal-loop Uses Patterns
+
+Before attempting a fix, the heal-loop agent:
+
+1. Loads `.specflow/fix-patterns.json`
+2. Applies lazy decay to all patterns
+3. Searches for patterns matching the current `violation_signature`
+4. If a matching pattern exists:
+   - **Platinum/Gold:** Auto-apply the fix template, then re-test
+   - **Silver:** Suggest the fix template to the calling agent but do not auto-apply
+   - **Bronze:** Log the match for analysis, proceed with standard fix logic
+5. If no matching pattern exists, proceed with standard contract-based fix logic
+6. After fix attempt, update the pattern's score and tier
+
+### How test-runner Reports Outcomes
+
+After executing tests that follow a heal-loop fix:
+
+1. Load `.specflow/fix-patterns.json`
+2. For each fix that was applied (tracked via heal-loop output):
+   - If the test now **passes**: increment `success_count`, add +0.05 to `confidence`
+   - If the test still **fails**: increment `failure_count`, subtract -0.10 from `confidence`
+3. Update `applied_count`, `last_applied`, and recalculate `tier`
+4. Write the updated store back to `.specflow/fix-patterns.json`
+5. Include pattern score changes in the test report
+
+### Example: Pattern Lifecycle
+
+```
+Day 1:  New pattern created for SEC-001 violation
+        confidence: 0.50, tier: silver (suggest only)
+
+Day 5:  heal-loop suggests it, agent applies manually, test passes
+        confidence: 0.55, tier: silver
+
+Day 12: Applied again, test passes
+        confidence: 0.60, tier: silver
+
+...after 7 more successes (0 failures)...
+
+Day 60: confidence: 0.95, tier: platinum (auto-apply)
+
+Day 61: Auto-applied, but test fails (edge case)
+        confidence: 0.85, tier: gold
+
+Day 62: Auto-applied (gold allows), test passes
+        confidence: 0.90, tier: gold
+
+...unused for 90 days, decay begins...
+
+Day 160: confidence: 0.80, tier: silver (decayed from gold)
+```
+
+### Template File
+
+The starter template at `templates/fix-patterns.json` includes 3 example patterns:
+
+1. **`fix-sec-001-hardcoded-secret`** (SEC-001) -- Replace hardcoded secrets with `process.env` references
+2. **`fix-sec-003-unsanitized-innerhtml`** (SEC-003) -- Wrap unsanitized `dangerouslySetInnerHTML` with `DOMPurify.sanitize()`
+3. **`fix-a11y-002-button-aria-label`** (A11Y-002) -- Add `aria-label` to icon-only buttons
+
+Copy this template to initialize your project's pattern store:
+
+```bash
+mkdir -p .specflow
+cp templates/fix-patterns.json .specflow/fix-patterns.json
+```
+
+### Test Hook
+
+```typescript
+// src/__tests__/contracts/fix_patterns.test.ts
+import fs from 'fs'
+
+describe('Fix Patterns Store', () => {
+  const storePath = '.specflow/fix-patterns.json'
+
+  it('should have valid JSON structure', () => {
+    if (!fs.existsSync(storePath)) return // Store is optional
+    const store = JSON.parse(fs.readFileSync(storePath, 'utf8'))
+    expect(store.schema_version).toBe(1)
+    expect(store.patterns).toBeInstanceOf(Array)
+  })
+
+  it('should have valid tier assignments', () => {
+    if (!fs.existsSync(storePath)) return
+    const store = JSON.parse(fs.readFileSync(storePath, 'utf8'))
+    for (const pattern of store.patterns) {
+      if (pattern.confidence >= 0.95) expect(pattern.tier).toBe('platinum')
+      else if (pattern.confidence >= 0.85) expect(pattern.tier).toBe('gold')
+      else if (pattern.confidence >= 0.75) expect(pattern.tier).toBe('silver')
+      else expect(pattern.tier).toBe('bronze')
+    }
+  })
+
+  it('should not have patterns below archive threshold in active list', () => {
+    if (!fs.existsSync(storePath)) return
+    const store = JSON.parse(fs.readFileSync(storePath, 'utf8'))
+    for (const pattern of store.patterns) {
+      expect(pattern.confidence).toBeGreaterThanOrEqual(0.30)
+    }
+  })
+
+  it('should have required fields on every pattern', () => {
+    if (!fs.existsSync(storePath)) return
+    const store = JSON.parse(fs.readFileSync(storePath, 'utf8'))
+    const requiredFields = [
+      'id', 'contract_rule', 'violation_signature', 'fix_strategy',
+      'fix_template', 'confidence', 'tier', 'applied_count',
+      'success_count', 'failure_count', 'last_applied', 'created'
+    ]
+    for (const pattern of store.patterns) {
+      for (const field of requiredFields) {
+        expect(pattern).toHaveProperty(field)
+      }
+    }
+  })
+})
+```

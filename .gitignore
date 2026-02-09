@@ -18,6 +18,7 @@ tmp/
 temp/
 
 # Node modules
+node_modules/
 sample_spec/node_modules
 gemini_version/node_modules
 

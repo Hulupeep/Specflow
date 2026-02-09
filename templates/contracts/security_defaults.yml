@@ -67,9 +67,9 @@ rules:
         - "src/**/*.{tsx,jsx}"
       behavior:
         forbidden_patterns:
-          - pattern: /dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html:\s*(?!sanitize|DOMPurify|purify)/
+          - pattern: /dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html:(?!\s*(sanitize|DOMPurify|purify))/
             message: "XSS risk — sanitize HTML before dangerouslySetInnerHTML"
-          - pattern: /\.innerHTML\s*=\s*(?!['"`]<)/
+          - pattern: /\.innerHTML\s*=(?!\s*['"`]<)/
             message: "XSS risk — use textContent or sanitize input"
         example_violation: |
           <div dangerouslySetInnerHTML={{ __html: userInput }} />

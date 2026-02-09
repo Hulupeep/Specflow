@@ -1,0 +1,17 @@
+{
+  "name": "specflow-test-harness",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Truth tests for Specflow contract patterns and hooks",
+  "scripts": {
+    "test": "jest --no-coverage",
+    "test:contracts": "jest tests/contracts/ --no-coverage",
+    "test:hooks": "jest tests/hooks/ --no-coverage",
+    "test:schema": "jest tests/schema/ --no-coverage",
+    "test:verbose": "jest --verbose --no-coverage"
+  },
+  "devDependencies": {
+    "jest": "^29.7.0",
+    "js-yaml": "^4.1.0"
+  }
+}

@@ -806,6 +806,120 @@ Then you may proceed with changes that violate the contract, but you should:
 
 ---
 
+## Recording Fix Patterns
+
+> Directly inspired by the confidence-tiered fix pattern system in [forge](https://github.com/ikennaokpala/forge) by [Ikenna N. Okpala](https://github.com/ikennaokpala). Forge scores fix patterns from Platinum (>=0.95, auto-apply) to Bronze (<0.70, learning-only), with +0.05 for successes and -0.10 for failures.
+
+When you fix a contract violation, **record the fix as a pattern** so the heal-loop agent can reuse it automatically in the future.
+
+### When to Record a Pattern
+
+Record a new fix pattern whenever:
+1. You fix a contract violation (CONTRACT VIOLATION output)
+2. The fix follows a repeatable strategy (add import, replace pattern, wrap code, etc.)
+3. The fix is not highly specific to one file's business logic
+
+Do NOT record patterns for:
+- One-off fixes that depend on business context
+- Journey (E2E) test failures
+- Build/compilation errors
+- Fixes that required significant manual reasoning
+
+### How to Record a Pattern
+
+After successfully fixing a contract violation and verifying tests pass:
+
+1. **Load or create the pattern store:**
+   ```bash
+   # If store doesn't exist, initialize from template
+   mkdir -p .specflow
+   test -f .specflow/fix-patterns.json || cp templates/fix-patterns.json .specflow/fix-patterns.json
+   ```
+
+2. **Create the pattern entry** with these fields:
+   ```json
+   {
+     "id": "fix-{rule_id_lower}-{short_description}",
+     "contract_rule": "AUTH-001",
+     "violation_signature": "Must import and use authMiddleware",
+     "fix_strategy": "add_import",
+     "fix_template": {
+       "import_line": "import { authMiddleware } from '@/middleware/auth'",
+       "instructions": "Add this import if not already present."
+     },
+     "confidence": 0.50,
+     "tier": "silver",
+     "applied_count": 1,
+     "success_count": 1,
+     "failure_count": 0,
+     "last_applied": "YYYY-MM-DD",
+     "created": "YYYY-MM-DD"
+   }
+   ```
+
+3. **Append to the `patterns` array** in `.specflow/fix-patterns.json`
+
+### Pattern ID Naming Convention
+
+Format: `fix-{rule_id_lowercase}-{short_kebab_description}`
+
+Examples:
+- `fix-auth-001-missing-middleware`
+- `fix-sec-001-hardcoded-secret`
+- `fix-a11y-002-button-aria-label`
+- `fix-arch-003-direct-supabase-call`
+
+### Available Fix Strategies
+
+| Strategy | Use When | fix_template Keys |
+|----------|----------|-------------------|
+| `add_import` | Missing import statement | `import_line`, `instructions` |
+| `remove_pattern` | Forbidden pattern present with known removal | `find`, `instructions` |
+| `wrap_with` | Code needs to be wrapped (e.g., sanitization) | `find`, `wrap_pattern`, `add_import`, `instructions` |
+| `replace_with` | Direct substitution possible | `find`, `replace_pattern`, `instructions` |
+| `add_attribute` | HTML/JSX element missing attribute | `find`, `add`, `instructions` |
+
+### Score Rules (Reference)
+
+- New patterns start at confidence **0.50** (Silver tier)
+- Each successful application: **+0.05**
+- Each failed application: **-0.10**
+- Unused for 90+ days: decay **-0.01/week**
+- Below **0.30**: archived automatically
+
+### Tier Behaviors
+
+| Tier | Confidence | heal-loop Behavior |
+|------|------------|-------------------|
+| Platinum | >= 0.95 | Auto-apply immediately |
+| Gold | >= 0.85 | Auto-apply, flag in commit for review |
+| Silver | >= 0.75 | Suggest only, do not auto-apply |
+| Bronze | < 0.70 | Learning-only, track for analysis |
+
+### Example Workflow
+
+```
+1. Contract test fails:
+   CONTRACT VIOLATION: SEC-001 - Hardcoded secret detected
+   File: src/config/api.ts
+
+2. You fix it:
+   Replace: const KEY = "sk_live_abc123"
+   With:    const KEY = process.env.STRIPE_SECRET_KEY
+
+3. Tests pass. Record the pattern:
+   id: fix-sec-001-hardcoded-secret
+   strategy: replace_with
+   confidence: 0.50 (new pattern)
+
+4. Next time SEC-001 fires, heal-loop finds this pattern
+   and suggests (silver) or auto-applies (if promoted to gold/platinum)
+```
+
+See `CONTRACT-SCHEMA-EXTENSIONS.md` (Extension 4) for the full schema and decay rules.
+
+---
+
 ## Tips for Success
 
 1. **Always read contracts first** before modifying protected code.

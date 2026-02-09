@@ -35,7 +35,7 @@ rules:
         - "src/**/*.{tsx,jsx}"
       behavior:
         forbidden_patterns:
-          - pattern: /<button[^>]*>\s*<(?:svg|img|Icon)[^>]*\/?\s*>\s*<\/button>/
+          - pattern: /<button(?![^>]*aria-label)[^>]*>\s*<(?:svg|img|[A-Z]\w*)[^>]*\/?\s*>\s*<\/button>/
             message: "Icon-only button needs aria-label for screen readers"
         example_violation: |
           <button><TrashIcon /></button>

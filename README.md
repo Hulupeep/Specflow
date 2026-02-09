@@ -258,6 +258,142 @@ AFTER:  "Execute waves" → Autonomous end-to-end execution with dependency calc
 
 ---
 
+## Default Security, Accessibility & Production Gates
+
+Specflow ships with contract templates that enforce OWASP Top 10 security, WCAG AA accessibility, production readiness, and test integrity out of the box. Copy them into any project and get immediate protection.
+
+```bash
+cp Specflow/templates/contracts/*.yml docs/contracts/
+```
+
+| Template | Rules | What It Catches |
+|----------|-------|-----------------|
+| `security_defaults.yml` | SEC-001..005 | Hardcoded secrets, SQL injection, XSS via innerHTML, eval(), path traversal |
+| `accessibility_defaults.yml` | A11Y-001..004 | Missing alt text, icon buttons without aria-label, unlabeled inputs, broken tab order |
+| `production_readiness_defaults.yml` | PROD-001..003 | Demo/mock data in production, placeholder domains (localhost, example.com), hardcoded UUIDs |
+| `test_integrity_defaults.yml` | TEST-001..005 | Mocking in E2E/journey tests, swallowed errors, placeholder tests, suspicious assertions |
+
+All 17 rules are enforced as `non_negotiable` by default. The `specflow-writer` agent references these templates when generating new contracts.
+
+> Security and accessibility gate concepts adapted from [forge](https://github.com/ikennaokpala/forge) by Ikenna N. Okpala, which enforces 7 quality gates including security (zero tolerance for critical/high findings) and WCAG AA compliance.
+
+See **[agents/README.md](agents/README.md)** for the full seven enforcement layers table.
+
+---
+
+## Model Routing
+
+Each agent is routed to the optimal Claude model tier for cost efficiency. Lightweight agents (auditors, runners, closers) use Haiku; generation agents use Sonnet; the `heal-loop` agent uses Opus for deep fix reasoning.
+
+**Typical savings:** ~40-60% token cost reduction vs running all agents on Opus.
+
+| Tier | Agents |
+|------|--------|
+| **Haiku** | board-auditor, contract-validator, journey-enforcer, test-runner, e2e-test-auditor, ticket-closer |
+| **Sonnet** | waves-controller, specflow-writer, specflow-uplifter, contract-generator, contract-test-generator, dependency-mapper, sprint-executor, migration-builder, frontend-builder, edge-function-builder, playwright-from-specflow, journey-tester |
+| **Opus** | heal-loop |
+
+Override per-project in `.specflow/config.json`:
+
+```json
+{
+  "model_routing": {
+    "default": "sonnet",
+    "overrides": {
+      "heal-loop": "opus",
+      "test-runner": "haiku"
+    }
+  }
+}
+```
+
+See **[agents/README.md](agents/README.md)** for the full routing table with per-agent reasoning.
+
+> Model routing inspired by [forge](https://github.com/ikennaokpala/forge) by Ikenna N. Okpala, adapted from the TinyDancer pattern in V3 QE Skill by Mondweep Chakravorty.
+
+---
+
+## Self-Healing Fix Loops
+
+When contract tests fail during Phase 6 of wave execution, the `heal-loop` agent attempts automated minimal fixes before escalating. It operates in a tight loop: parse violation, read contract rule, generate fix, apply fix, re-test.
+
+**What it can fix:**
+- Missing `required_patterns` (e.g., add a missing import)
+- `forbidden_patterns` with an `auto_fix` hint in the contract YAML (e.g., replace localStorage with chrome.storage)
+
+**What it escalates:**
+- Journey test failures, build errors, forbidden patterns without `auto_fix` hints
+
+The heal-loop respects a retry budget (default: 3 attempts). After exhaustion, it reverts changes and reports all strategies tried.
+
+### Confidence-Tiered Fix Patterns
+
+The fix pattern store (`.specflow/fix-patterns.json`) records fix strategies and scores them by historical success rate:
+
+| Tier | Confidence | Behavior |
+|------|------------|----------|
+| Platinum | >= 0.95 | Auto-apply immediately |
+| Gold | >= 0.85 | Auto-apply, flag in commit message for review |
+| Silver | >= 0.75 | Suggest only, do not auto-apply |
+| Bronze | < 0.70 | Learning only, track for analysis |
+
+Patterns evolve: +0.05 per success, -0.10 per failure, decay at -0.01/week after 90 days unused. Patterns below 0.30 are archived.
+
+```bash
+# Initialize the fix pattern store from the starter template
+mkdir -p .specflow
+cp Specflow/templates/fix-patterns.json .specflow/fix-patterns.json
+```
+
+Contracts can provide `auto_fix` hints to guide the heal-loop:
+
+```yaml
+auto_fix:
+  strategy: "wrap_with"
+  wrap_pattern: "router.use(authMiddleware)"
+```
+
+See **[agents/heal-loop.md](agents/heal-loop.md)** for the full agent specification and **[CONTRACT-SCHEMA-EXTENSIONS.md](CONTRACT-SCHEMA-EXTENSIONS.md)** for the pattern store schema.
+
+> Self-healing fix loops adapted from [forge](https://github.com/ikennaokpala/forge) by Ikenna N. Okpala. Confidence-tiered fix patterns inspired by V3 QE Skill by Mondweep Chakravorty.
+
+---
+
+## CI Feedback Loop
+
+The `post-push-ci.sh` hook polls CI status after `git push` and reports results back to the Claude Code session. It is advisory (exit 0 always) and does not block.
+
+```
+git push → hook polls GitHub Actions → reports pass/fail with run ID
+```
+
+Install as a Claude Code PostToolUse hook via `install-hooks.sh`, or run standalone:
+
+```bash
+bash Specflow/templates/hooks/post-push-ci.sh
+```
+
+Configuration via environment variables:
+- `SPECFLOW_CI_POLL_INTERVAL` -- seconds between polls (default: 10)
+- `SPECFLOW_CI_MAX_RETRIES` -- max poll attempts (default: 5)
+
+Defer: `touch .claude/.defer-ci-check`
+
+---
+
+## Test Harness
+
+Specflow's own contracts are verified by 407 tests across 8 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
+
+```bash
+npm test                   # All 407 tests
+npm run test:contracts     # Contract template pattern tests (SEC, A11Y, PROD, TEST)
+npm run test:hooks         # Hook behavior tests (post-build, post-push-ci, journey runner)
+npm run test:schema        # Contract YAML schema validation
+```
+
+---
+
 ## Agent Teams (Claude Code 4.6+)
 
 Agent Teams is an alternative execution model that uses Claude Code's TeammateTool API for persistent, peer-to-peer agent coordination. Instead of stateless subagents that are spawned, do work, and terminate, Agent Teams creates persistent teammates that maintain context across their entire lifecycle and communicate directly with each other.
@@ -457,6 +593,7 @@ master orchestrator — invoke it once, it handles everything.
 | `e2e-test-auditor` | Find tests that silently pass when broken |
 | `journey-enforcer` | Verify journey coverage, release readiness |
 | `ticket-closer` | Close validated issues with summaries |
+| `heal-loop` | Autonomous fix loop for contract violations (see [Self-Healing Fix Loops](#self-healing-fix-loops)) |
 
 ### Auto-Trigger: After ANY Code Changes
 Run `test-runner` and `e2e-test-auditor` before marking work complete.
@@ -478,6 +615,7 @@ Execute waves
 4. **Implementation** — `migration-builder`, `frontend-builder`, `edge-function-builder` build code
 5. **Test Generation** — `playwright-from-specflow`, `journey-tester` create E2E tests
 6. **Test Execution** — `test-runner`, `journey-enforcer`, `e2e-test-auditor` verify everything
+6a. **Self-Healing** — `heal-loop` attempts automated fixes for contract violations before escalating
 7. **Issue Closure** — `ticket-closer` closes completed issues
 8. **Wave Report** — Summary + next wave
 
@@ -759,6 +897,7 @@ it('AUTH-001: No localStorage for tokens', () => {
 | [USER-JOURNEY-CONTRACTS.md](USER-JOURNEY-CONTRACTS.md) | E2E journey testing as Definition of Done |
 | [docs/DESIGNER-GUIDE.md](docs/DESIGNER-GUIDE.md) | Designer workflow in LLM dev environments |
 | [docs/MEMORYSPEC.md](docs/MEMORYSPEC.md) | Learning from violations (ruvector integration) |
+| [CONTRACT-SCHEMA-EXTENSIONS.md](CONTRACT-SCHEMA-EXTENSIONS.md) | DPAO extensions: anti-patterns, completion verification, fix patterns |
 
 ### Templates & Examples
 
@@ -783,7 +922,9 @@ it('AUTH-001: No localStorage for tokens', () => {
 | [agents/test-runner.md](agents/test-runner.md) | Execute tests, parse results, report failures |
 | [agents/e2e-test-auditor.md](agents/e2e-test-auditor.md) | Find tests that silently pass when broken |
 | [agents/journey-enforcer.md](agents/journey-enforcer.md) | Verify journey coverage, release readiness |
+| [agents/heal-loop.md](agents/heal-loop.md) | Self-healing fix loop for contract violations |
 | [templates/WAVE_EXECUTION_PROTOCOL.md](templates/WAVE_EXECUTION_PROTOCOL.md) | Wave execution protocol template (copy to your project) |
+| [templates/hooks/post-push-ci.sh](templates/hooks/post-push-ci.sh) | CI feedback loop hook (polls CI status after push) |
 
 ### Deep Dives (Reference)
 
@@ -1046,6 +1187,7 @@ waves-controller         MASTER ORCHESTRATOR: "execute waves" runs everything
   --> contract-validator Verify implementation matches contracts
   --> playwright-from-specflow + journey-tester   Generate e2e tests
   --> test-runner        Execute tests, report failures with file:line details
+  --> heal-loop          Self-healing fix loop for contract violations (Phase 6a)
   --> e2e-test-auditor   Find tests that silently pass when broken
   --> journey-enforcer   Verify journey coverage, release readiness check
   --> ticket-closer      Close validated issues
@@ -1069,6 +1211,7 @@ cp Specflow/templates/WAVE_EXECUTION_PROTOCOL.md your-project/docs/
 4. Implements code (`migration-builder`, `frontend-builder`, `edge-function-builder`)
 5. Generates tests (`playwright-from-specflow`, `journey-tester`)
 6. Runs tests (`test-runner`, `e2e-test-auditor`, `journey-enforcer`)
+6a. Self-heals contract violations (`heal-loop`) before escalating
 7. Closes issues (`ticket-closer`)
 8. Reports wave completion, continues to next wave
 

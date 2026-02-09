@@ -1,0 +1,75 @@
+{
+  "schema_version": 1,
+  "description": "Confidence-tiered fix patterns for self-healing contract violations. Patterns are scored and tiered based on historical success rates.",
+  "tiers": {
+    "platinum": { "min_confidence": 0.95, "behavior": "auto_apply_immediately" },
+    "gold": { "min_confidence": 0.85, "behavior": "auto_apply_flag_for_review" },
+    "silver": { "min_confidence": 0.75, "behavior": "suggest_only" },
+    "bronze": { "max_confidence": 0.70, "behavior": "learning_only" }
+  },
+  "score_evolution": {
+    "on_success": 0.05,
+    "on_failure": -0.10,
+    "new_pattern_start": 0.50,
+    "decay_after_days_unused": 90,
+    "decay_rate_per_week": -0.01,
+    "archive_below": 0.30
+  },
+  "patterns": [
+    {
+      "id": "fix-sec-001-hardcoded-secret",
+      "contract_rule": "SEC-001",
+      "violation_signature": "Hardcoded secret detected — use environment variable",
+      "fix_strategy": "replace_with",
+      "fix_template": {
+        "find": "(password|secret|api_key|apikey|token)\\s*[:=]\\s*['\"][^'\"]{8,}['\"]",
+        "replace_pattern": "process.env.{UPPER_SNAKE_CASE_KEY}",
+        "instructions": "Replace the hardcoded value with a process.env reference. Convert the variable name to UPPER_SNAKE_CASE for the env var name."
+      },
+      "confidence": 0.50,
+      "tier": "silver",
+      "applied_count": 0,
+      "success_count": 0,
+      "failure_count": 0,
+      "last_applied": null,
+      "created": "2026-02-09"
+    },
+    {
+      "id": "fix-sec-003-unsanitized-innerhtml",
+      "contract_rule": "SEC-003",
+      "violation_signature": "XSS risk — sanitize HTML before dangerouslySetInnerHTML",
+      "fix_strategy": "wrap_with",
+      "fix_template": {
+        "find": "dangerouslySetInnerHTML\\s*=\\s*\\{\\s*\\{\\s*__html:\\s*(.+?)\\s*\\}\\s*\\}",
+        "wrap_pattern": "dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize({captured}) }}",
+        "add_import": "import DOMPurify from 'dompurify'",
+        "instructions": "Wrap the __html value with DOMPurify.sanitize(). Add the DOMPurify import if not already present."
+      },
+      "confidence": 0.50,
+      "tier": "silver",
+      "applied_count": 0,
+      "success_count": 0,
+      "failure_count": 0,
+      "last_applied": null,
+      "created": "2026-02-09"
+    },
+    {
+      "id": "fix-a11y-002-button-aria-label",
+      "contract_rule": "A11Y-002",
+      "violation_signature": "Icon-only button needs aria-label for screen readers",
+      "fix_strategy": "add_attribute",
+      "fix_template": {
+        "find": "<button([^>]*)>\\s*<(svg|img|[A-Z]\\w*)",
+        "add": "aria-label=\"{inferred_action}\"",
+        "instructions": "Add aria-label attribute to the <button> tag. Infer the action from the icon component name (e.g., TrashIcon -> 'Delete item', EditIcon -> 'Edit', CloseIcon -> 'Close'). If the icon name is ambiguous, use a generic label and flag for human review."
+      },
+      "confidence": 0.50,
+      "tier": "silver",
+      "applied_count": 0,
+      "success_count": 0,
+      "failure_count": 0,
+      "last_applied": null,
+      "created": "2026-02-09"
+    }
+  ]
+}

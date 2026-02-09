@@ -32,6 +32,94 @@ You are a self-healing fix agent for contract violations. When contract tests fa
 
 ## Process
 
+### Step 0: Load Fix Pattern Store
+
+**Before attempting any fix**, check the fix pattern store for known solutions:
+
+```bash
+# Check if pattern store exists
+ls .specflow/fix-patterns.json 2>/dev/null
+```
+
+If the store exists:
+
+1. **Parse the JSON** and load all active patterns
+2. **Apply lazy decay** to patterns unused for 90+ days:
+   ```
+   For each pattern where last_applied is non-null and > 90 days ago:
+     weeks_since_last_use = floor((today - last_applied - 90 days) / 7)
+     pattern.confidence = pattern.confidence - (weeks_since_last_use * 0.01)
+     Recalculate pattern.tier based on new confidence
+     If pattern.confidence < 0.30: move to archived_patterns[]
+   ```
+3. **Write back** any decay changes to the store
+
+After parsing the violation (Step 1), search for a matching pattern:
+
+```
+Match criteria: pattern.violation_signature matches the violation message
+                AND pattern.contract_rule matches the rule_id
+```
+
+**If a matching pattern is found, apply by tier:**
+
+| Tier | Action |
+|------|--------|
+| **Platinum** (>= 0.95) | Auto-apply the `fix_template` immediately. Skip standard fix logic. Proceed to Step 6 (Apply Fix) using the template. |
+| **Gold** (>= 0.85) | Auto-apply the `fix_template`. Add `[fix-pattern: {pattern.id}]` to the commit message for review. Proceed to Step 6. |
+| **Silver** (>= 0.75) | Log the suggestion: `HEAL-LOOP: Known pattern "{pattern.id}" (silver, {confidence}) suggests: {fix_strategy}`. Do NOT auto-apply. Proceed with standard fix logic (Steps 2-5) but use the pattern's `fix_template` as a reference. |
+| **Bronze** (< 0.70) | Log for analysis only: `HEAL-LOOP: Learning pattern "{pattern.id}" (bronze, {confidence}) exists but is not applied.` Proceed with standard fix logic entirely. |
+
+**If no matching pattern is found**, proceed with standard fix logic (Steps 1-5).
+
+### Step 0.1: Update Pattern Store After Fix Attempt
+
+After Step 8 (Evaluate Result), update the pattern store:
+
+**If a pattern was applied (Platinum/Gold) or used as reference (Silver):**
+
+- **Test passed (fix successful):**
+  ```json
+  pattern.success_count += 1
+  pattern.applied_count += 1
+  pattern.confidence += 0.05
+  pattern.last_applied = "YYYY-MM-DD"
+  ```
+  Recalculate `pattern.tier` based on new confidence.
+
+- **Test failed (fix unsuccessful):**
+  ```json
+  pattern.failure_count += 1
+  pattern.applied_count += 1
+  pattern.confidence -= 0.10
+  pattern.last_applied = "YYYY-MM-DD"
+  ```
+  Recalculate `pattern.tier`. If confidence drops below 0.30, archive the pattern.
+
+**If no pattern existed and the fix succeeded using standard logic:**
+
+Create a new pattern entry:
+```json
+{
+  "id": "fix-{rule_id_lower}-{short_description}",
+  "contract_rule": "{rule_id}",
+  "violation_signature": "{violation_message}",
+  "fix_strategy": "{strategy_used}",
+  "fix_template": { ... },
+  "confidence": 0.50,
+  "tier": "silver",
+  "applied_count": 1,
+  "success_count": 1,
+  "failure_count": 0,
+  "last_applied": "YYYY-MM-DD",
+  "created": "YYYY-MM-DD"
+}
+```
+
+Append to `patterns[]` in `.specflow/fix-patterns.json`. If the file does not exist, create it using the template structure from `templates/fix-patterns.json`.
+
+Write the updated store back to disk.
+
 ### Step 1: Parse Violation Output
 
 Extract structured data from the contract test failure:
@@ -182,9 +270,12 @@ HEAL-LOOP: FIX APPLIED SUCCESSFULLY
   Strategy: wrap_with (authMiddleware)
   Attempts: 1/3
   Fix: Added authMiddleware parameter to route handler at line 42
+  Pattern: fix-auth-middleware-missing (gold, 0.90 -> 0.95, promoted to platinum)
 ```
 
 Report the fix and continue to the next violation (if any).
+
+Update the pattern store as described in Step 0.1. If the fix used a known pattern, update its score. If it used standard logic and succeeded, record a new pattern.
 
 **If test still fails:**
 ```
@@ -207,6 +298,7 @@ HEAL-LOOP: ESCALATION REQUIRED
     1. Added authMiddleware import → still missing in route handler
     2. Wrapped route with authMiddleware → regex pattern mismatch
     3. Restructured route declaration → introduced syntax error (reverted)
+  Pattern: fix-auth-middleware-missing (gold, 0.90 -> 0.80, demoted to silver)
 
   Recommendation: Manual review required. The route at line 42 uses a
   non-standard handler pattern that the auto_fix strategies cannot address.

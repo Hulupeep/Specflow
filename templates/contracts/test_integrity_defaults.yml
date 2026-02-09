@@ -94,7 +94,7 @@ rules:
             message: "Swallowed error — test will silently pass on failure"
           - pattern: /test\.skip\s*\(\s*true\s*\)/
             message: "Unconditional skip — use test.fixme('Blocked by #XXX') with tracking issue"
-          - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*$/
+          - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*(\/\/.*)?$/m
             message: "Suspicious test — only checks array length, not content"
           - pattern: /\/\/\s*(placeholder|will be enhanced|todo.*later)/i
             message: "Placeholder test — implement real assertions or remove"
@@ -122,13 +122,13 @@ rules:
         - "src/__tests__/**/*.{ts,js}"
       behavior:
         forbidden_patterns:
-          - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*$/
+          - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*(\/\/.*)?$/m
             message: "Suspicious test — only checks array length, not content. Verify array contents with toEqual or toContain."
-          - pattern: /expect\(\w+\)\.toBe\(\d{2,}\)\s*$/
+          - pattern: /expect\(\w+\)\.toBe\(\d{2,}\)\s*(\/\/.*)?$/m
             message: "Suspicious test — hardcoded expected value with no visible setup. Ensure expected values come from test fixtures or documented constants."
-          - pattern: /expect\(\w+\)\.toEqual\(\[\]\)\s*$/
+          - pattern: /expect\(\w+\)\.toEqual\(\[\]\)\s*(\/\/.*)?$/m
             message: "Suspicious test — asserts empty array. Verify this is intentional and not masking missing data."
-          - pattern: /expect\(\w+\)\.toBeDefined\(\)\s*$/
+          - pattern: /expect\(\w+\)\.toBeDefined\(\)\s*(\/\/.*)?$/m
             message: "Weak assertion — only checks existence, not correctness. Add specific value checks."
         example_violation: |
           test('loads users', async () => {
@@ -138,7 +138,6 @@ rules:
         example_compliant: |
           test('loads users', async () => {
             const users = await getUsers()
-            expect(users).toHaveLength(3)
             expect(users).toEqual(expect.arrayContaining([
               expect.objectContaining({ name: 'Alice', role: 'admin' })
             ]))
