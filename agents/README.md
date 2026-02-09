@@ -300,14 +300,15 @@ Phase 6: CLOSE
 
 ---
 
-## Six Enforcement Layers
+## Seven Enforcement Layers
 
 | Layer | Contract Type | When | What it catches |
 |-------|---------------|------|-----------------|
 | **ARCH** | `feature_architecture.yml` | `npm test` (build) | Structural violations — wrong imports, forbidden patterns |
 | **SEC** | `security_defaults.yml` | `npm test` (build) | OWASP Top 10 — secrets, injection, XSS, eval, path traversal |
 | **A11Y** | `accessibility_defaults.yml` | `npm test` (build) | WCAG AA — missing alt text, labels, focus order |
-| **TEST** | `test_integrity_defaults.yml` | `npm test` (build) | No-mock in E2E/journey, silent anti-patterns |
+| **TEST** | `test_integrity_defaults.yml` | `npm test` (build) | No-mock in E2E/journey, suspicious patterns, placeholder markers |
+| **PROD** | `production_readiness_defaults.yml` | `npm test` (build) | Demo/mock data in production, placeholder domains, hardcoded IDs |
 | **FEAT** | `feature_*.yml` | `npm test` (build) | Feature rule violations — missing validation, wrong auth |
 | **JOURNEY** | `journey_*.yml` | Playwright (post-build) | User flow failures — can't complete checkout, broken flow |
 
@@ -315,7 +316,9 @@ Phase 6: CLOSE
 
 **A11Y catches:** Images without alt, icon buttons without aria-label, inputs without labels.
 
-**TEST catches:** jest.mock in E2E tests, swallowed errors, placeholder tests, unconditional skips.
+**TEST catches:** jest.mock in E2E tests, swallowed errors, placeholder tests, suspicious assertions, unconditional skips.
+
+**PROD catches:** DEMO_USER/DEMO_PLAN constants, localhost/example.com URLs, hardcoded UUIDs and user IDs.
 
 **ARCH catches:** `localStorage` in service workers, direct DB calls in components, hardcoded secrets.
 
@@ -323,7 +326,7 @@ Phase 6: CLOSE
 
 **JOURNEY catches:** User can't complete registration, checkout flow broken, data not syncing.
 
-**test-runner** executes all three layers and produces actionable failure reports with file:line references.
+**test-runner** executes all layers and produces actionable failure reports with file:line references.
 
 ---
 
@@ -384,7 +387,8 @@ Specflow ships with contract templates in `templates/contracts/`:
 |----------|-------|---------|
 | `security_defaults.yml` | SEC-001 to SEC-005 | Always enforced |
 | `accessibility_defaults.yml` | A11Y-001 to A11Y-004 | Always enforced |
-| `test_integrity_defaults.yml` | TEST-001 to TEST-003 | Configurable (no-mock ON for E2E/journey) |
+| `test_integrity_defaults.yml` | TEST-001 to TEST-005 | Configurable (no-mock ON for E2E/journey) |
+| `production_readiness_defaults.yml` | PROD-001 to PROD-003 | Always enforced |
 
 Install to any project:
 ```bash

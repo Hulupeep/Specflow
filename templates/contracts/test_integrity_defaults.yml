@@ -1,11 +1,13 @@
 contract_meta:
   id: test_integrity_defaults
-  version: 1
+  version: 2
   created_from_spec: "Specflow default — test integrity and no-mock enforcement"
   covers_reqs:
     - TEST-001
     - TEST-002
     - TEST-003
+    - TEST-004
+    - TEST-005
   owner: "specflow-defaults"
 
 llm_policy:
@@ -111,6 +113,70 @@ rules:
             ]))
           })
 
+    - id: TEST-004
+      title: "No suspicious test patterns"
+      enabled_by_default: true
+      configurable: false
+      scope:
+        - "tests/e2e/**/*.{ts,js,spec.ts}"
+        - "src/__tests__/**/*.{ts,js}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*$/
+            message: "Suspicious test — only checks array length, not content. Verify array contents with toEqual or toContain."
+          - pattern: /expect\(\w+\)\.toBe\(\d{2,}\)\s*$/
+            message: "Suspicious test — hardcoded expected value with no visible setup. Ensure expected values come from test fixtures or documented constants."
+          - pattern: /expect\(\w+\)\.toEqual\(\[\]\)\s*$/
+            message: "Suspicious test — asserts empty array. Verify this is intentional and not masking missing data."
+          - pattern: /expect\(\w+\)\.toBeDefined\(\)\s*$/
+            message: "Weak assertion — only checks existence, not correctness. Add specific value checks."
+        example_violation: |
+          test('loads users', async () => {
+            const users = await getUsers()
+            expect(users).toHaveLength(3)  // Only checks count, not content
+          })
+        example_compliant: |
+          test('loads users', async () => {
+            const users = await getUsers()
+            expect(users).toHaveLength(3)
+            expect(users).toEqual(expect.arrayContaining([
+              expect.objectContaining({ name: 'Alice', role: 'admin' })
+            ]))
+          })
+
+    - id: TEST-005
+      title: "No placeholder test markers"
+      enabled_by_default: true
+      configurable: false
+      scope:
+        - "tests/e2e/**/*.{ts,js,spec.ts}"
+        - "src/__tests__/**/*.{ts,js}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /\/\/\s*placeholder/i
+            message: "Placeholder test — implement real assertions or remove"
+          - pattern: /\/\/\s*will be enhanced/i
+            message: "Deferred test — implement now or create a tracking issue"
+          - pattern: /\/\/\s*TODO:?\s*real test/i
+            message: "TODO marker for test — implement the real test before merging"
+          - pattern: /\/\/\s*TODO:?\s*add (more )?assertions/i
+            message: "Missing assertions — add them before merging"
+          - pattern: /\/\/\s*FIXME:?\s*test/i
+            message: "FIXME in test — resolve before merging"
+          - pattern: /test\(['"].*placeholder.*['"]/i
+            message: "Test name indicates placeholder — implement real test or remove"
+        example_violation: |
+          test('user registration', async () => {
+            // placeholder — will be enhanced later
+            expect(true).toBe(true)
+          })
+        example_compliant: |
+          test('user registration', async () => {
+            const response = await register({ email: 'test@example.com', password: 'secure123' })
+            expect(response.status).toBe(201)
+            expect(response.body.user.email).toBe('test@example.com')
+          })
+
 compliance_checklist:
   before_editing_files:
     - question: "Are you adding a mock/stub to an E2E or journey test?"
@@ -119,11 +185,15 @@ compliance_checklist:
       if_yes: "Use expect().rejects or let the error propagate — tests should fail visibly."
     - question: "Are you skipping a test?"
       if_yes: "Use test.fixme('Blocked by #XXX') — never test.skip(true)."
+    - question: "Does your test only check array length or existence?"
+      if_yes: "Add content assertions — verify values, not just counts."
+    - question: "Does your test contain placeholder comments or TODO markers?"
+      if_yes: "Implement real assertions now. If not possible, create a tracking issue and use test.fixme()."
 
 test_hooks:
   tests:
     - file: "src/__tests__/contracts/test_integrity_defaults.test.ts"
-      description: "Pattern checks for TEST-001 through TEST-003"
+      description: "Pattern checks for TEST-001 through TEST-005"
   tooling:
     checker_script: "scripts/check-contracts.js"
 

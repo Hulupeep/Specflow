@@ -1,0 +1,127 @@
+contract_meta:
+  id: production_readiness_defaults
+  version: 1
+  created_from_spec: "Specflow default — production readiness enforcement"
+  covers_reqs:
+    - PROD-001
+    - PROD-002
+    - PROD-003
+  owner: "specflow-defaults"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: production_readiness_defaults"
+
+rules:
+  non_negotiable:
+    - id: PROD-001
+      title: "No demo or mock data in production code"
+      scope:
+        - "src/**/*.{ts,js,tsx,jsx}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+        - "!src/**/*.spec.*"
+        - "!src/**/fixtures/**"
+        - "!src/**/mocks/**"
+        - "!src/**/seeds/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /DEMO_USER/
+            message: "Demo user reference in production code — remove or gate behind feature flag"
+          - pattern: /DEMO_PLAN/
+            message: "Demo plan reference in production code — remove or gate behind feature flag"
+          - pattern: /MOCK_[A-Z_]{3,}/
+            message: "Mock constant in production code — use real values or environment variables"
+          - pattern: /['"]demo[@.].*['"]/i
+            message: "Demo email or domain in production code — use environment-configured values"
+          - pattern: /['"]test_user['"]/i
+            message: "Test user reference in production code — remove or gate behind feature flag"
+          - pattern: /fake(User|Data|Account|Email|Name)/i
+            message: "Fake data reference in production code — use real values"
+          - pattern: /seed(User|Data|Account)s?\s*=/i
+            message: "Seed data assignment in production code — move to seed scripts"
+        example_violation: |
+          const DEFAULT_USER = DEMO_USER
+          const plan = DEMO_PLAN
+          const email = "demo@example.com"
+        example_compliant: |
+          const DEFAULT_USER = process.env.DEFAULT_USER_ID
+          const plan = await getPlanFromDatabase(userId)
+          const email = user.email
+
+    - id: PROD-002
+      title: "Domain allowlist enforcement"
+      scope:
+        - "src/**/*.{ts,js,tsx,jsx}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+        - "!src/**/*.spec.*"
+      behavior:
+        forbidden_patterns:
+          - pattern: /https?:\/\/example\.com/
+            message: "Placeholder domain example.com in production code — use real domain"
+          - pattern: /https?:\/\/localhost[:\/"']/
+            message: "Localhost reference in production code — use environment variable for base URL"
+          - pattern: /https?:\/\/127\.0\.0\.1/
+            message: "Loopback address in production code — use environment variable for base URL"
+          - pattern: /https?:\/\/placeholder\./i
+            message: "Placeholder domain in production code — use real domain"
+          - pattern: /https?:\/\/todo\./i
+            message: "TODO domain in production code — replace with actual domain"
+          - pattern: /https?:\/\/changeme\./i
+            message: "Changeme domain in production code — replace with actual domain"
+        example_violation: |
+          const API_URL = "https://example.com/api"
+          const BASE_URL = "http://localhost:3000"
+        example_compliant: |
+          const API_URL = process.env.API_URL
+          const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL
+
+    - id: PROD-003
+      title: "No hardcoded IDs in production code"
+      scope:
+        - "src/**/*.{ts,js,tsx,jsx}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+        - "!src/**/*.spec.*"
+        - "!src/**/fixtures/**"
+        - "!src/**/migrations/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /['"][0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}['"]/
+            message: "Hardcoded UUID in production code — use configuration or database lookup"
+          - pattern: /user_id\s*[:=]\s*['"][a-zA-Z0-9_-]{10,}['"]/
+            message: "Hardcoded user ID in production code — use authenticated session or lookup"
+          - pattern: /tenant_id\s*[:=]\s*['"][a-zA-Z0-9_-]{10,}['"]/
+            message: "Hardcoded tenant ID in production code — use session context or lookup"
+          - pattern: /org_id\s*[:=]\s*['"][a-zA-Z0-9_-]{10,}['"]/
+            message: "Hardcoded org ID in production code — use session context or lookup"
+        example_violation: |
+          const adminUser = "550e8400-e29b-41d4-a716-446655440000"
+          const tenant_id = "acme_corp_12345"
+        example_compliant: |
+          const adminUser = await getAdminUser(orgId)
+          const tenant_id = session.tenantId
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you referencing a specific user, tenant, or org ID?"
+      if_yes: "Use environment variables, database lookups, or session context — never hardcode IDs."
+    - question: "Are you adding a URL or domain reference?"
+      if_yes: "Use environment variables for base URLs. Verify the domain is in your project's allowlist."
+    - question: "Are you adding demo or test data?"
+      if_yes: "Move to seed scripts, fixtures, or test files. Production code must not contain mock/demo data."
+
+test_hooks:
+  tests:
+    - file: "src/__tests__/contracts/production_readiness_defaults.test.ts"
+      description: "Pattern checks for PROD-001 through PROD-003"
+  tooling:
+    checker_script: "scripts/check-contracts.js"
+
+# Attribution
+# Default production readiness patterns for Specflow projects.
+# Post-mortem learning system: catches demo data, placeholder domains,
+# and hardcoded IDs that commonly leak into production deployments.
+# Patterns derived from real production incidents across Specflow-managed projects.

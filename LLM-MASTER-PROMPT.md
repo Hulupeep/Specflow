@@ -87,21 +87,28 @@ Summarize:
 
 **Before writing any contracts, install the default contract templates.**
 
-Specflow ships with security, accessibility, and test integrity defaults:
+Specflow ships with security, accessibility, test integrity, and production readiness defaults:
 
 ```bash
 # Copy defaults to your project
 cp Specflow/templates/contracts/security_defaults.yml docs/contracts/
 cp Specflow/templates/contracts/accessibility_defaults.yml docs/contracts/
 cp Specflow/templates/contracts/test_integrity_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/production_readiness_defaults.yml docs/contracts/
 ```
 
 These provide:
 - **SEC-001 through SEC-005**: OWASP Top 10 pattern detection (secrets, injection, XSS)
 - **A11Y-001 through A11Y-004**: WCAG AA baseline (alt text, labels, focus order)
-- **TEST-001 through TEST-003**: Test integrity (no-mock in E2E, anti-pattern detection)
+- **TEST-001 through TEST-005**: Test integrity (no-mock in E2E, suspicious patterns, placeholder markers)
+- **PROD-001 through PROD-003**: Production readiness (no demo/mock data, domain allowlist, no hardcoded IDs)
 
 Update `scope` patterns in each file to match your project structure, then move on to architecture contracts.
+
+**Production readiness checks** are especially important during Phase 3 (Implementation). Before marking any implementation complete, verify:
+- No demo/mock data constants leaked into production code paths
+- All URL/domain references use environment variables or match the project's domain allowlist
+- No hardcoded UUIDs or user/tenant IDs remain in source files
 
 ---
 
@@ -833,6 +840,7 @@ Then you may proceed with changes that violate the contract, but you should:
 │   - Install security_defaults.yml (SEC-xxx)             │
 │   - Install accessibility_defaults.yml (A11Y-xxx)       │
 │   - Install test_integrity_defaults.yml (TEST-xxx)      │
+│   - Install production_readiness_defaults.yml (PROD-xxx)│
 │                                                          │
 │ Phase 0.5: Architecture First (new projects)            │
 │   - Create feature_architecture.yml BEFORE features    │

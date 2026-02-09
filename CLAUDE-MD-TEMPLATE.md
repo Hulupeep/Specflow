@@ -164,7 +164,8 @@ Then you may proceed, but should:
 |----------|-------|----------------|
 | `security_defaults.yml` | SEC-001..005 | Hardcoded secrets, SQL injection, XSS, eval, path traversal |
 | `accessibility_defaults.yml` | A11Y-001..004 | Missing alt text, aria-labels, form labels, tabindex |
-| `test_integrity_defaults.yml` | TEST-001..003 | Mocking in E2E/journey tests, silent test anti-patterns |
+| `test_integrity_defaults.yml` | TEST-001..005 | Mocking in E2E/journey tests, suspicious patterns, placeholder markers |
+| `production_readiness_defaults.yml` | PROD-001..003 | Demo/mock data in production, placeholder domains, hardcoded IDs |
 
 Install: `cp Specflow/templates/contracts/*.yml docs/contracts/`
 
@@ -213,6 +214,7 @@ See `META-INSTRUCTION.md` for infrastructure setup.
 | PRE-BUILD | LOCAL | Run baseline E2E tests |
 | POST-BUILD | LOCAL | Run E2E tests, compare to baseline |
 | POST-COMMIT | **PRODUCTION** | Wait for deploy, verify production |
+| POST-PUSH | LOCAL | Check CI status, report pass/fail |
 | POST-MIGRATION | **PRODUCTION** | Test APIs, run E2E |
 
 ### Mandatory Reporting

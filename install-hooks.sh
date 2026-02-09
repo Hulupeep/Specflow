@@ -47,12 +47,18 @@ else
   HOOKS_DIR="$TEMP_DIR"
 
   BASE_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/hooks"
+  TEMPLATES_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/templates/hooks"
 
   for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh README.md; do
     curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
       echo -e "${YELLOW}Warning: Could not download $file${NC}"
     }
   done
+
+  # Download template hooks (post-push-ci.sh)
+  curl -fsSL "$TEMPLATES_URL/post-push-ci.sh" -o "$HOOKS_DIR/post-push-ci.sh" 2>/dev/null || {
+    echo -e "${YELLOW}Warning: Could not download post-push-ci.sh${NC}"
+  }
 
   echo -e "${GREEN}Source:${NC} GitHub (downloaded)"
 fi
@@ -103,6 +109,19 @@ for script in post-build-check.sh run-journey-tests.sh session-start.sh; do
     echo -e "${GREEN}✓${NC} Installed .claude/hooks/$script"
   fi
 done
+
+# Copy template hooks (post-push-ci.sh)
+TEMPLATES_HOOKS_DIR="$SCRIPT_DIR/templates/hooks"
+if [ -f "$TEMPLATES_HOOKS_DIR/post-push-ci.sh" ]; then
+  cp "$TEMPLATES_HOOKS_DIR/post-push-ci.sh" "$TARGET_DIR/.claude/hooks/"
+  chmod +x "$TARGET_DIR/.claude/hooks/post-push-ci.sh"
+  echo -e "${GREEN}✓${NC} Installed .claude/hooks/post-push-ci.sh"
+elif [ -f "$HOOKS_DIR/post-push-ci.sh" ]; then
+  # Fallback: downloaded via curl into HOOKS_DIR
+  cp "$HOOKS_DIR/post-push-ci.sh" "$TARGET_DIR/.claude/hooks/"
+  chmod +x "$TARGET_DIR/.claude/hooks/post-push-ci.sh"
+  echo -e "${GREEN}✓${NC} Installed .claude/hooks/post-push-ci.sh"
+fi
 
 # Copy README for reference
 if [ -f "$HOOKS_DIR/README.md" ]; then
@@ -158,17 +177,24 @@ echo -e "${GREEN}Installed files:${NC}"
 echo "  .claude/settings.json              - Hook configuration"
 echo "  .claude/hooks/post-build-check.sh  - Detects build/commit"
 echo "  .claude/hooks/run-journey-tests.sh - Runs targeted tests"
+echo "  .claude/hooks/post-push-ci.sh      - CI status after push"
 echo "  .claude/hooks/README.md            - Documentation"
 echo ""
 
 echo -e "${YELLOW}How it works:${NC}"
 echo ""
+echo "  Build/commit hooks:"
 echo "  1. After 'pnpm build' or 'git commit' succeeds"
 echo "  2. Hook extracts issue numbers from recent commits (#123)"
 echo "  3. Fetches each issue to find journey contract (J-SIGNUP-FLOW)"
 echo "  4. Maps to test file (journey_signup_flow.spec.ts)"
 echo "  5. Runs only those tests"
 echo "  6. Blocks on failure (exit 2)"
+echo ""
+echo "  Push hook:"
+echo "  1. After 'git push' succeeds"
+echo "  2. Polls GitHub Actions for latest CI run status"
+echo "  3. Reports pass/fail (advisory, does not block)"
 echo ""
 
 echo -e "${YELLOW}Requirements:${NC}"
@@ -178,10 +204,12 @@ echo "  - Issues have journey contract: 'J-FEATURE-NAME' in body"
 echo "  - Test files named: 'journey_feature_name.spec.ts'"
 echo ""
 
-echo -e "${YELLOW}To defer tests:${NC}"
+echo -e "${YELLOW}To defer hooks:${NC}"
 echo ""
-echo "  touch .claude/.defer-tests    # Skip tests"
-echo "  rm .claude/.defer-tests       # Re-enable tests"
+echo "  touch .claude/.defer-tests       # Skip journey tests"
+echo "  rm .claude/.defer-tests          # Re-enable journey tests"
+echo "  touch .claude/.defer-ci-check    # Skip CI status check"
+echo "  rm .claude/.defer-ci-check       # Re-enable CI status check"
 echo ""
 
 echo -e "${GREEN}Documentation:${NC} .claude/hooks/README.md"

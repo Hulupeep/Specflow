@@ -222,11 +222,33 @@ steps:
 | `scope` | string[] | ✅ | Glob patterns for files this rule applies to |
 | `behavior.forbidden_patterns` | object[] | ⚠️ | Patterns that must NOT appear in code |
 | `behavior.required_patterns` | object[] | ⚠️ | Patterns that MUST appear in code |
+| `behavior.allowed_domains` | string[] | ⚠️ | Lists of domains that URLs in code must reference (allowlist) |
+| `behavior.forbidden_domains` | string[] | ⚠️ | Lists of domains that URLs in code must not reference (blocklist) |
 | `behavior.example_violation` | string | ⚠️ | Code example showing violation |
 | `behavior.example_compliant` | string | ⚠️ | Code example showing compliance |
 | `auto_fix` | object | ⚠️ | Hints for the heal-loop agent to auto-fix violations (see below) |
 
 ⚠️ = Optional but highly recommended
+
+#### Domain Allowlists and Blocklists
+
+Use `allowed_domains` and `forbidden_domains` to enforce which domains may appear in code. This prevents accidental references to deprecated domains, staging environments, or placeholder URLs.
+
+```yaml
+behavior:
+  allowed_domains:
+    - "dash.tabstax.app"
+    - "api.tabstax.app"
+  forbidden_domains:
+    - "app.tabstax.app"
+    - "localhost:3000"
+    - "example.com"
+```
+
+**Semantics:**
+- `allowed_domains`: If specified, any URL in scoped files must reference one of these domains. URLs referencing other domains are violations.
+- `forbidden_domains`: Any URL in scoped files referencing these domains is a violation.
+- Both can be used together: `allowed_domains` acts as a whitelist, `forbidden_domains` acts as a blacklist for known-bad domains.
 
 ### auto_fix (Optional)
 
@@ -302,6 +324,82 @@ rules:
 |-------|------|----------|-------------|
 | `tests` | object[] | ✅ | List of test files that enforce this contract |
 | `tooling.checker_script` | string | ⚠️ | Path to quick checker script |
+
+### test_quality (Optional)
+
+Defines patterns that indicate low-quality or suspicious tests. Used by the `e2e-test-auditor` and contract test runners to flag tests that may silently pass without verifying real behavior.
+
+```yaml
+test_quality:
+  forbidden_test_patterns:
+    - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*$/
+      message: "Suspicious test - only checks array length"
+    - pattern: /\/\/.*placeholder|will be enhanced/i
+      message: "Test marked as placeholder"
+    - pattern: /expect\(\w+\)\.toBe\((true|false)\)\s*$/
+      message: "Suspicious test - only checks boolean without context"
+    - pattern: /expect\(\w+\)\.toBeDefined\(\)\s*$/
+      message: "Weak assertion - only checks existence, not correctness"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `test_quality.forbidden_test_patterns` | object[] | ✅ | Patterns in test files that indicate suspicious or low-quality tests |
+| `test_quality.forbidden_test_patterns[].pattern` | regex | ✅ | Regex to match against test file content |
+| `test_quality.forbidden_test_patterns[].message` | string | ✅ | Explanation of why this pattern is suspicious |
+
+### infrastructure (Optional)
+
+Defines pre-release infrastructure checks that must pass before certain test phases run. Useful for verifying that deployment targets, health endpoints, and external dependencies are reachable before running E2E tests.
+
+```yaml
+infrastructure:
+  pre_release_checks:
+    - id: INFRA-001
+      url: "https://example.com/health"
+      expected_status: [200, 302]
+      run_before: "e2e"
+    - id: INFRA-002
+      url: "https://api.example.com/status"
+      expected_status: [200]
+      run_before: "e2e"
+      timeout_ms: 5000
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `infrastructure.pre_release_checks` | object[] | ✅ | List of infrastructure health checks |
+| `infrastructure.pre_release_checks[].id` | string | ✅ | Unique check ID (e.g. `INFRA-001`) |
+| `infrastructure.pre_release_checks[].url` | string | ✅ | URL to check |
+| `infrastructure.pre_release_checks[].expected_status` | number[] | ✅ | HTTP status codes that indicate success |
+| `infrastructure.pre_release_checks[].run_before` | string | ✅ | Test phase this check must pass before: `e2e`, `integration`, `smoke` |
+| `infrastructure.pre_release_checks[].timeout_ms` | number | ⚠️ | Request timeout in milliseconds (default: 5000) |
+
+### pre_implementation (Optional)
+
+Configures checks that run before implementation begins. If using claude-flow, the `memory_query` section queries the memory system for past failures, contract gaps, and post-mortem learnings related to the current work.
+
+```yaml
+pre_implementation:
+  memory_query:
+    enabled: true
+    warn_on_match:
+      - tag: "contract-gap"
+        action: "Review past failure before proceeding"
+      - tag: "post-mortem"
+        action: "Check if this area had previous production issues"
+      - tag: "regression"
+        action: "Verify regression test exists for this area"
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `pre_implementation.memory_query.enabled` | boolean | ✅ | Whether to query memory before implementation |
+| `pre_implementation.memory_query.warn_on_match` | object[] | ✅ | Tags to search for and actions to take on match |
+| `pre_implementation.memory_query.warn_on_match[].tag` | string | ✅ | Memory tag to search for (e.g. `contract-gap`, `post-mortem`) |
+| `pre_implementation.memory_query.warn_on_match[].action` | string | ✅ | Action to take when a matching memory is found |
+
+**Note:** The `pre_implementation.memory_query` section is optional and only active when using claude-flow with memory enabled. Projects without claude-flow can safely omit this section.
 
 ---
 
@@ -971,15 +1069,16 @@ CONTRACT VIOLATION: AUTH-001 - API route missing authMiddleware
 
 ## 13. Default Contract Templates
 
-Specflow ships default contract templates for security, accessibility, and test integrity. Copy these into your project's `docs/contracts/` directory.
+Specflow ships default contract templates for security, accessibility, test integrity, and production readiness. Copy these into your project's `docs/contracts/` directory.
 
 ### Location
 
 ```
 templates/contracts/
-  security_defaults.yml        # SEC-001 through SEC-005
-  accessibility_defaults.yml   # A11Y-001 through A11Y-004
-  test_integrity_defaults.yml  # TEST-001 through TEST-003
+  security_defaults.yml              # SEC-001 through SEC-005
+  accessibility_defaults.yml         # A11Y-001 through A11Y-004
+  test_integrity_defaults.yml        # TEST-001 through TEST-005
+  production_readiness_defaults.yml  # PROD-001 through PROD-003
 ```
 
 ### Rule ID Prefixes
@@ -991,6 +1090,7 @@ templates/contracts/
 | `SEC-xxx` | Security | OWASP Top 10 patterns (secrets, injection, XSS) |
 | `A11Y-xxx` | Accessibility | WCAG AA compliance (alt text, labels, focus) |
 | `TEST-xxx` | Test integrity | No-mock enforcement, anti-pattern detection |
+| `PROD-xxx` | Production readiness | No demo data, domain allowlists, no hardcoded IDs |
 | `J-xxx` | Journey | User flow DOD (E2E browser tests) |
 
 ### Security Rules (SEC-xxx)
@@ -1019,6 +1119,16 @@ templates/contracts/
 | TEST-001 | Mocking in E2E tests | Yes — default ON |
 | TEST-002 | Mocking in journey tests | Yes — default ON |
 | TEST-003 | Silent test anti-patterns | No — always enforced |
+| TEST-004 | Suspicious test patterns (length-only checks, weak assertions) | No — always enforced |
+| TEST-005 | Placeholder test markers (TODO, placeholder comments) | No — always enforced |
+
+### Production Readiness Rules (PROD-xxx)
+
+| Rule | What it catches |
+|------|----------------|
+| PROD-001 | Demo/mock data in production code (DEMO_USER, DEMO_PLAN, MOCK_*, fake data) |
+| PROD-002 | Placeholder domains (example.com, localhost, changeme.*) |
+| PROD-003 | Hardcoded IDs in production code (UUIDs, user_id, tenant_id, org_id) |
 
 ### Configurable Defaults
 
@@ -1044,6 +1154,7 @@ TEST-001 and TEST-002 can be overridden per-project in `.specflow/config.json`:
 cp Specflow/templates/contracts/security_defaults.yml docs/contracts/
 cp Specflow/templates/contracts/accessibility_defaults.yml docs/contracts/
 cp Specflow/templates/contracts/test_integrity_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/production_readiness_defaults.yml docs/contracts/
 
 # Update scope patterns for your project structure
 # Then run contract tests
@@ -1052,7 +1163,7 @@ npm test -- contracts
 
 ### Attribution
 
-Default security, accessibility, and test integrity gate concepts adapted from
+Default security, accessibility, test integrity, and production readiness gate concepts adapted from
 [forge](https://github.com/ikennaokpala/forge) by Ikenna N. Okpala, which
 enforces 7 quality gates before any commit. Quality gate framework originated in
 V3 QE Skill by Mondweep Chakravorty. No-mock philosophy from Ikenna's Continuous
