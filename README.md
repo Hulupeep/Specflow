@@ -63,6 +63,22 @@ This is the fastest way to setup specflow
 
 ---
 
+## Quick Start with SKILL.md (Single File)
+
+For instant adoption without the full agent library:
+
+```bash
+cp Specflow/SKILL.md your-project/
+```
+
+Then tell Claude Code: `/specflow` -- the skill activates the core methodology.
+
+SKILL.md is a self-contained, portable file that packages the core Specflow loop (contract enforcement, security/accessibility gates, model routing, self-healing fixes, and confidence-tiered fix patterns) into a single drop-in file. No other Specflow files required.
+
+For the full 23+ agent experience, see [agents/README.md](agents/README.md).
+
+---
+
 ## 🔧 Automatic Test Enforcement (Hooks)
 
 Specflow includes Claude Code hooks that **automatically run Playwright tests** after builds and commits.

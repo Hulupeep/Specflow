@@ -399,6 +399,40 @@ The `specflow-writer` agent references these defaults when generating new contra
 
 ---
 
+## SKILL.md vs Full Agent Library
+
+```
+SKILL.md (single file, quick start)
+    |
+    v  graduated adoption
+agents/ (full library, deep customization)
+    |
+    v  enterprise scale
+Agent Teams mode (persistent coordination)
+```
+
+**SKILL.md** packages the core Specflow methodology (contract enforcement, security/accessibility
+gates, model routing, self-healing fix loop, confidence-tiered patterns) into a single portable
+file. Drop it into any project and run `/specflow`. No other Specflow files needed.
+
+**agents/** provides the full 23+ agent library for deep customization: wave orchestration,
+dependency mapping, parallel execution, journey gates, ticket lifecycle management, and
+specialized builders (migration, frontend, edge functions).
+
+**Agent Teams** adds persistent peer-to-peer teammates with context retention, direct
+inter-agent communication, and three-tier journey enforcement. Requires
+`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true`.
+
+**When to use which:**
+
+| Need | Use |
+|------|-----|
+| Quick contract enforcement on any project | SKILL.md |
+| Full backlog execution with dependency waves | agents/ |
+| Multi-agent coordination with persistent context | Agent Teams |
+
+---
+
 ## Adding Agents
 
 Create `agents/{name}.md` with:

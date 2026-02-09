@@ -297,6 +297,149 @@ else
 fi
 
 echo ""
+echo "8. Hook Installation"
+echo "---------------------"
+
+# Check for .claude/hooks/ directory
+if [ -d ".claude/hooks" ]; then
+    check_pass ".claude/hooks/ directory exists"
+
+    # Check for expected hook scripts
+    HOOK_SCRIPTS=("post-build-check.sh" "run-journey-tests.sh" "post-push-ci.sh")
+    HOOKS_FOUND=0
+
+    for hook in "${HOOK_SCRIPTS[@]}"; do
+        if [ -f ".claude/hooks/$hook" ]; then
+            check_pass "Hook script $hook installed"
+            ((HOOKS_FOUND++))
+        else
+            check_warn "Hook script $hook not found"
+        fi
+    done
+
+    if [ "$HOOKS_FOUND" -eq "${#HOOK_SCRIPTS[@]}" ]; then
+        check_info "All ${#HOOK_SCRIPTS[@]} hook scripts installed"
+    fi
+else
+    check_warn ".claude/hooks/ directory not found (run: bash Specflow/install-hooks.sh .)"
+fi
+
+# Check for .claude/settings.json
+if [ -f ".claude/settings.json" ]; then
+    check_pass ".claude/settings.json exists"
+
+    # Check for hook configuration inside settings.json
+    if grep -qi "hook" .claude/settings.json 2>/dev/null; then
+        check_pass "settings.json contains hook configuration"
+    else
+        check_warn "settings.json exists but may not have hook configuration"
+    fi
+else
+    check_warn ".claude/settings.json not found (hooks may not be configured)"
+fi
+
+echo ""
+echo "9. Agent Library"
+echo "-----------------"
+
+# Check for agents directory (scripts/agents/ in target projects, agents/ in Specflow repo)
+AGENT_DIR=""
+if [ -d "scripts/agents" ]; then
+    AGENT_DIR="scripts/agents"
+    check_pass "scripts/agents/ directory exists"
+elif [ -d "agents" ]; then
+    AGENT_DIR="agents"
+    check_pass "agents/ directory exists (Specflow repo layout)"
+else
+    check_warn "No agent library found (expected: scripts/agents/)"
+    check_info "Copy agents with: cp -r Specflow/agents/ scripts/agents/"
+fi
+
+if [ -n "$AGENT_DIR" ]; then
+    # Count agent .md files
+    AGENT_COUNT=$(find "$AGENT_DIR" -maxdepth 1 -name "*.md" 2>/dev/null | wc -l)
+
+    if [ "$AGENT_COUNT" -gt 0 ]; then
+        check_pass "Found $AGENT_COUNT agent file(s) in $AGENT_DIR/"
+    else
+        check_warn "No agent markdown files found in $AGENT_DIR/"
+    fi
+
+    # Check for waves-controller.md (the key orchestrator agent)
+    if [ -f "$AGENT_DIR/waves-controller.md" ]; then
+        check_pass "waves-controller.md found (master orchestrator)"
+    else
+        check_warn "waves-controller.md not found (key agent for wave execution)"
+    fi
+fi
+
+# Check for SKILL.md as a quick-start alternative
+if [ -f "SKILL.md" ]; then
+    check_pass "SKILL.md exists (quick-start agent alternative)"
+else
+    check_info "No SKILL.md found (optional quick-start alternative to agent library)"
+fi
+
+echo ""
+echo "10. Fix Pattern Store & Model Config"
+echo "-------------------------------------"
+
+# Check for .specflow/ directory
+if [ -d ".specflow" ]; then
+    check_pass ".specflow/ directory exists"
+else
+    check_info ".specflow/ directory not found (optional, created by post-mortem learning)"
+fi
+
+# Check for fix-patterns.json
+if [ -f ".specflow/fix-patterns.json" ]; then
+    check_pass ".specflow/fix-patterns.json exists (post-mortem learning active)"
+
+    # Try to count patterns
+    if command -v python3 &> /dev/null; then
+        PATTERN_COUNT=$(python3 -c "import json; data=json.load(open('.specflow/fix-patterns.json')); print(len(data.get('patterns', data)) if isinstance(data, dict) else len(data))" 2>/dev/null)
+        if [ -n "$PATTERN_COUNT" ]; then
+            check_info "Fix pattern store contains $PATTERN_COUNT pattern(s)"
+        fi
+    fi
+else
+    check_info ".specflow/fix-patterns.json not found (optional, auto-created by CI feedback loop)"
+fi
+
+# Check for model routing config
+if [ -f ".specflow/config.json" ]; then
+    check_pass ".specflow/config.json exists"
+
+    if grep -qi "model_routing" .specflow/config.json 2>/dev/null; then
+        check_pass "config.json contains model_routing configuration"
+    else
+        check_info "config.json exists but no model_routing section found"
+    fi
+else
+    check_info ".specflow/config.json not found (optional, for model routing)"
+fi
+
+# Check for default contract templates
+DEFAULT_CONTRACTS=("security_defaults.yml" "accessibility_defaults.yml")
+DEFAULTS_FOUND=0
+
+if [ -n "$CONTRACT_DIR" ]; then
+    for tmpl in "${DEFAULT_CONTRACTS[@]}"; do
+        if [ -f "$CONTRACT_DIR/$tmpl" ]; then
+            ((DEFAULTS_FOUND++))
+        fi
+    done
+
+    if [ "$DEFAULTS_FOUND" -gt 0 ]; then
+        check_pass "Found $DEFAULTS_FOUND default contract template(s) in $CONTRACT_DIR/"
+    else
+        check_info "No default contract templates found (optional: copy from templates/contracts/)"
+    fi
+else
+    check_info "No contracts directory to check for default templates"
+fi
+
+echo ""
 echo "========================================"
 echo "Summary"
 echo "========================================"
@@ -317,6 +460,12 @@ if [ $FAIL -eq 0 ]; then
     echo "  npm run test:contracts  - Run contract tests"
     echo "  npm run test:e2e        - Run E2E journey tests"
     echo "  npm test                - Run all tests"
+    echo ""
+    echo "Sections verified:"
+    echo "  1-7:  Core infrastructure (contracts, tests, CI, E2E)"
+    echo "  8:    Hook installation (.claude/hooks/)"
+    echo "  9:    Agent library (scripts/agents/)"
+    echo "  10:   Fix patterns & model config (.specflow/)"
     exit 0
 else
     echo -e "${RED}❌ Specflow setup has issues that need attention.${NC}"
