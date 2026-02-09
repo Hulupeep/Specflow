@@ -12,6 +12,9 @@ Your outputs feed into planning decisions:
 
 For enforcement (blocking closure, gating waves), see: agents/journey-gate.md
 
+## Recommended Model
+`haiku` — Mechanical task: checks coverage percentages and verifies journey references exist
+
 ## Why This Agent Exists
 
 From Specflow methodology:

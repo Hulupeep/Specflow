@@ -224,8 +224,61 @@ steps:
 | `behavior.required_patterns` | object[] | ⚠️ | Patterns that MUST appear in code |
 | `behavior.example_violation` | string | ⚠️ | Code example showing violation |
 | `behavior.example_compliant` | string | ⚠️ | Code example showing compliance |
+| `auto_fix` | object | ⚠️ | Hints for the heal-loop agent to auto-fix violations (see below) |
 
 ⚠️ = Optional but highly recommended
+
+### auto_fix (Optional)
+
+Provides hints to the `heal-loop` agent for automated contract violation fixes. Only used when the contract provides enough information to generate a safe, minimal fix.
+
+```yaml
+auto_fix:
+  strategy: "add_import"          # Fix strategy (see table below)
+  import_line: "import { authMiddleware } from '@/middleware/auth'"
+  wrap_pattern: "router.use(authMiddleware)"
+  find: "localStorage"            # For replace_with strategy
+  replace: "chrome.storage.local" # For replace_with strategy
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `auto_fix.strategy` | string | ✅ | Fix strategy: `add_import`, `remove_pattern`, `wrap_with`, `replace_with` |
+| `auto_fix.import_line` | string | ⚠️ | Import statement to add (for `add_import` strategy) |
+| `auto_fix.wrap_pattern` | string | ⚠️ | Pattern to wrap existing code with (for `wrap_with` strategy) |
+| `auto_fix.find` | string | ⚠️ | Text to find (for `replace_with` strategy) |
+| `auto_fix.replace` | string | ⚠️ | Replacement text (for `replace_with` strategy) |
+
+**Strategies:**
+
+| Strategy | When to use | Example |
+|----------|-------------|---------|
+| `add_import` | A required import or declaration is missing | Add `import { authMiddleware } from '@/middleware/auth'` |
+| `remove_pattern` | A forbidden pattern should be deleted | Remove `eval(...)` call |
+| `wrap_with` | Existing code needs to be wrapped with a pattern | Add `authMiddleware` parameter to route handler |
+| `replace_with` | A forbidden pattern has a known compliant alternative | Replace `localStorage` with `chrome.storage.local` |
+
+**Example in context:**
+
+```yaml
+rules:
+  non_negotiable:
+    - id: AUTH-001
+      title: "All protected API endpoints require authentication"
+      scope:
+        - "src/routes/**/*.ts"
+      behavior:
+        required_patterns:
+          - pattern: /authMiddleware/
+            message: "Must import and use authMiddleware"
+        example_compliant: |
+          router.get('/api/users', authMiddleware, async (req, res) => { ... })
+      auto_fix:
+        strategy: "add_import"
+        import_line: "import { authMiddleware } from '@/middleware/auth'"
+```
+
+**When NOT to add auto_fix:** If the fix requires understanding business logic, involves complex refactoring, or could break functionality in non-obvious ways. The heal-loop agent will escalate violations without `auto_fix` hints rather than guessing.
 
 ### rules.soft[]
 

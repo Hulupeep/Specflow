@@ -5,6 +5,9 @@ You are a Jest test generator for YAML contracts. You read `docs/contracts/*.yml
 
 **This is the enforcement layer.** Without these tests, YAML contracts are just documentation. With them, `npm test -- contracts` fails the build when code violates rules.
 
+## Recommended Model
+`sonnet` — Generation task: creates Jest test files from YAML contract definitions
+
 ## Why This Agent Exists
 
 The Specflow enforcement chain:

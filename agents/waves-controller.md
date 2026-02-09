@@ -5,6 +5,9 @@ You are a wave execution orchestrator. You take a GitHub project board (or list 
 
 This is the **master orchestrator** — user invokes you once, you handle everything.
 
+## Recommended Model
+`sonnet` — Generation task: orchestration logic for coordinating wave execution and spawning subagents
+
 ## Trigger Conditions
 - User says: "execute waves", "run waves", "process board", "execute all issues", "run the backlog"
 - User provides: GitHub project board URL, milestone name, label filter, or list of issue numbers
@@ -45,6 +48,7 @@ Read scripts/agents/edge-function-builder.md
 Read scripts/agents/playwright-from-specflow.md
 Read scripts/agents/journey-tester.md
 Read scripts/agents/test-runner.md
+Read scripts/agents/heal-loop.md
 Read scripts/agents/journey-enforcer.md
 Read scripts/agents/ticket-closer.md
 ```
@@ -262,13 +266,16 @@ Do NOT proceed to Phase 3 until this gate passes.
 
 ### Phase 6: Test Execution
 
-**Goal:** Run all tests, verify implementation.
+**Goal:** Run all tests, verify implementation. Contract test failures trigger the heal-loop agent for automated fix attempts before escalating.
 
 **Actions:**
 ```
 [Sequential]:
 1. Build: npm run build
 2. Contract tests: npm test -- contracts
+   │
+   ├─ PASS → continue to step 3
+   └─ FAIL → spawn heal-loop agent (see Phase 6a below)
 3. E2E tests: npm run test:e2e (or npx playwright test)
 4. Journey coverage: Task("Run journey-enforcer", "{journey-enforcer prompt}\n\n---\n\nSPECIFIC TASK: Verify coverage for Wave N", "general-purpose")
 ```
@@ -276,14 +283,54 @@ Do NOT proceed to Phase 3 until this gate passes.
 **Output:**
 - Build status
 - Test results (pass/fail counts)
+- Heal-loop results (if triggered): fixes applied, attempts used, escalations
 - Screenshot paths if failures
 - Coverage report
 
 **Quality Gate:**
 - If build fails → STOP, fix, retry Phase 4
-- If contract tests fail → STOP, fix, retry Phase 4
+- If contract tests fail → Spawn heal-loop (Phase 6a), STOP only if heal-loop exhausted
 - If E2E tests fail → STOP, fix, retry Phase 4
 - If coverage missing → Warn, continue (non-blocking)
+
+---
+
+### Phase 6a: Self-Healing Fix Loop (Contract Failures Only)
+
+**Goal:** Automatically fix contract test violations where the contract YAML provides enough information to generate a fix.
+
+**Trigger:** Contract tests fail in Phase 6, step 2.
+
+**Actions:**
+```
+[Sequential]:
+1. Parse contract test failure output for rule IDs, files, and violation messages
+2. For each violation:
+   Task("Heal contract violation", "{heal-loop prompt}\n\n---\n\nSPECIFIC TASK: Fix violation of rule {RULE_ID} in {FILE_PATH}.\n\nTest output:\n{FAILURE_OUTPUT}", "general-purpose")
+3. After heal-loop completes (fix applied or escalated):
+   Re-run: npm test -- contracts
+4. If all contract tests pass → continue to Phase 6, step 3 (E2E tests)
+5. If still failing after heal-loop exhaustion (3 attempts per violation) → STOP as standard failure
+```
+
+**Scope restrictions (enforced by heal-loop agent):**
+- Only contract test failures (pattern violations) — never journey/E2E or build errors
+- Only `required_patterns` missing or `forbidden_patterns` with `auto_fix` hints
+- Max 3 fix attempts per violation (configurable via `HEAL_LOOP_MAX_ITERATIONS`)
+
+**Output:**
+```
+HEAL-LOOP SUMMARY (Wave N, Phase 6a):
+  Violations detected: 3
+  Auto-fixed: 2 (AUTH-001 in src/routes/users.ts, STORAGE-001 in src/background.ts)
+  Escalated: 1 (SEC-004 in src/utils/parser.ts — no auto_fix hint, manual review required)
+  Total attempts: 5/9
+  Contract tests after fixes: PASS (2 fixed) / FAIL (1 escalated)
+```
+
+**Quality Gate:**
+- If all violations fixed → contract tests re-run and pass → continue to E2E tests
+- If any violation escalated → STOP, report as standard failure with heal-loop details
 
 ---
 
@@ -400,15 +447,17 @@ Wave execution is **COMPLETE** when:
 - Phase 4: migration-builder, edge-function-builder, frontend-builder (as needed)
 - Phase 5: playwright-from-specflow, journey-tester (parallel)
 - Phase 6: test-runner, journey-enforcer (sequential then parallel)
+- Phase 6a: heal-loop (on contract test failure, one per violation)
 - Phase 7: ticket-closer (parallel, one per issue)
 
-**Coordination pattern:**
+**Coordination pattern (with model routing):**
 ```
 [Single Message]:
-  Task("Agent 1", "{prompt}\n\n---\n\nTASK: {task}", "general-purpose")
-  Task("Agent 2", "{prompt}\n\n---\n\nTASK: {task}", "general-purpose")
-  Task("Agent 3", "{prompt}\n\n---\n\nTASK: {task}", "general-purpose")
+  Task("Agent 1", "{prompt}\n\n---\n\nTASK: {task}", "general-purpose", model="haiku")
+  Task("Agent 2", "{prompt}\n\n---\n\nTASK: {task}", "general-purpose", model="sonnet")
+  Task("Agent 3", "{prompt}\n\n---\n\nTASK: {task}", "general-purpose", model="sonnet")
 
+Model selection per agent — see agents/README.md "Model Routing" table.
 Wait for all to complete, then proceed to next phase.
 ```
 

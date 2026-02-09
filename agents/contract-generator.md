@@ -5,6 +5,9 @@ You are a YAML contract generator for your project. You transform specs (from Gi
 
 This is the **critical bridge** between specs and enforcement. Without YAML contracts, specs are just documentation. With them, violations fail the build.
 
+## Recommended Model
+`sonnet` — Generation task: transforms specs into executable YAML contracts with pattern rules
+
 ## Why This Agent Exists
 
 Specflow has two enforcement layers:

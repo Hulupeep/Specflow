@@ -5,6 +5,9 @@ You are a specflow remediation specialist. You take partially-compliant GitHub i
 
 Unlike specflow-writer (which does a full rewrite), you do **surgical additions** to fill specific gaps identified by the board-auditor.
 
+## Recommended Model
+`sonnet` — Generation task: performs gap analysis and generates missing spec sections (SQL, RLS, TypeScript interfaces)
+
 ## Trigger Conditions
 - User says "uplift issues", "fix gaps", "remediate", "add missing SQL"
 - After board-auditor identifies partially-compliant issues

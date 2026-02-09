@@ -152,6 +152,61 @@ The agents know the patterns. You provide direction.
 
 ---
 
+## Model Routing
+
+Each agent is routed to the optimal Claude model tier for cost efficiency.
+Override per-project in `.specflow/config.json`.
+
+> Inspired by model routing in forge (github.com/ikennaokpala/forge) by Ikenna N. Okpala,
+> adapted from the TinyDancer pattern in V3 QE Skill by Mondweep Chakravorty
+> (github.com/mondweep/vibe-cast).
+
+### Routing Table
+
+| Agent | Model | Reasoning |
+|---|---|---|
+| **waves-controller** | `sonnet` | Orchestration logic, spawns others |
+| **specflow-writer** | `sonnet` | Complex spec generation (SQL, Gherkin, contracts) |
+| **board-auditor** | `haiku` | Reads issues, checks fields exist |
+| **specflow-uplifter** | `sonnet` | Gap analysis and spec completion |
+| **contract-generator** | `sonnet` | YAML generation from specs |
+| **contract-test-generator** | `sonnet` | Test code generation |
+| **dependency-mapper** | `sonnet` | Graph analysis |
+| **sprint-executor** | `sonnet` | Orchestration logic |
+| **migration-builder** | `sonnet` | SQL migration generation |
+| **frontend-builder** | `sonnet` | Component generation |
+| **edge-function-builder** | `sonnet` | Serverless function generation |
+| **contract-validator** | `haiku` | Pattern matching against rules |
+| **journey-enforcer** | `haiku` | Coverage percentage checks |
+| **playwright-from-specflow** | `sonnet` | Test generation from Gherkin |
+| **journey-tester** | `sonnet` | Cross-feature test generation |
+| **test-runner** | `haiku` | Runs commands, parses output |
+| **e2e-test-auditor** | `haiku` | Pattern scanning for anti-patterns |
+| **ticket-closer** | `haiku` | Posts comment, closes issue |
+| **heal-loop** | `opus` | Deep reasoning for fix generation |
+
+### Cost Savings
+
+Typical wave (10 agents): ~40-60% token cost reduction vs all-Opus.
+
+### Override
+
+```json
+// .specflow/config.json
+{
+  "model_routing": {
+    "default": "sonnet",
+    "overrides": {
+      "heal-loop": "opus",
+      "test-runner": "haiku",
+      "ticket-closer": "haiku"
+    }
+  }
+}
+```
+
+---
+
 ## The Pipeline
 
 ### One-Command Execution (Recommended)
