@@ -30,7 +30,7 @@ Result: you can let the LLM explore, but the rules + flows can't be broken witho
 
 **For a more comfortable reading experience, visit the docs site:**
 
-**[** — Full documentation with navigation, search, and better formatting
+**https://hulupeep.github.io/specflow-help/** — Full documentation with navigation, search, and better formatting
 
 This README covers quick start. The docs site covers:
 - Step-by-step getting started guide
