@@ -158,6 +158,16 @@ Then you may proceed, but should:
 
 <!-- Add more contracts here as you create them -->
 
+##### Default Contracts (shipped with Specflow):
+
+| Contract | Rules | What it catches |
+|----------|-------|----------------|
+| `security_defaults.yml` | SEC-001..005 | Hardcoded secrets, SQL injection, XSS, eval, path traversal |
+| `accessibility_defaults.yml` | A11Y-001..004 | Missing alt text, aria-labels, form labels, tabindex |
+| `test_integrity_defaults.yml` | TEST-001..003 | Mocking in E2E/journey tests, silent test anti-patterns |
+
+Install: `cp Specflow/templates/contracts/*.yml docs/contracts/`
+
 ##### Adding New Contracts:
 
 See `META-INSTRUCTION.md` for infrastructure setup.

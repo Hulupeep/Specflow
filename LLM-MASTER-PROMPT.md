@@ -83,6 +83,28 @@ Summarize:
 
 ---
 
+### Phase 0.25 – Default Contracts (New Projects Only)
+
+**Before writing any contracts, install the default contract templates.**
+
+Specflow ships with security, accessibility, and test integrity defaults:
+
+```bash
+# Copy defaults to your project
+cp Specflow/templates/contracts/security_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/accessibility_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/test_integrity_defaults.yml docs/contracts/
+```
+
+These provide:
+- **SEC-001 through SEC-005**: OWASP Top 10 pattern detection (secrets, injection, XSS)
+- **A11Y-001 through A11Y-004**: WCAG AA baseline (alt text, labels, focus order)
+- **TEST-001 through TEST-003**: Test integrity (no-mock in E2E, anti-pattern detection)
+
+Update `scope` patterns in each file to match your project structure, then move on to architecture contracts.
+
+---
+
 ### Phase 0.5 – Architecture First (New Projects Only)
 
 **Before writing feature contracts, ensure architecture contracts exist.**
@@ -806,6 +828,11 @@ Then you may proceed with changes that violate the contract, but you should:
 │ Phase 0: Understand spec                                │
 │   - Read ARCH, FEAT, JOURNEY requirements               │
 │   - Identify DOD critical journeys                      │
+│                                                          │
+│ Phase 0.25: Default Contracts (new projects)             │
+│   - Install security_defaults.yml (SEC-xxx)             │
+│   - Install accessibility_defaults.yml (A11Y-xxx)       │
+│   - Install test_integrity_defaults.yml (TEST-xxx)      │
 │                                                          │
 │ Phase 0.5: Architecture First (new projects)            │
 │   - Create feature_architecture.yml BEFORE features    │

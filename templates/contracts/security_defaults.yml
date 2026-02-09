@@ -1,0 +1,135 @@
+contract_meta:
+  id: security_defaults
+  version: 1
+  created_from_spec: "Specflow default — OWASP Top 10 coverage"
+  covers_reqs:
+    - SEC-001
+    - SEC-002
+    - SEC-003
+    - SEC-004
+    - SEC-005
+  owner: "specflow-defaults"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: security_defaults"
+
+rules:
+  non_negotiable:
+    - id: SEC-001
+      title: "No hardcoded secrets in source code"
+      scope:
+        - "src/**/*.{ts,js,tsx,jsx}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /(password|secret|api_key|apikey|token)\s*[:=]\s*['"][^'"]{8,}['"]/i
+            message: "Hardcoded secret detected — use environment variable"
+          - pattern: /sk_live_[a-zA-Z0-9]{20,}/
+            message: "Stripe live key hardcoded — use env var STRIPE_SECRET_KEY"
+          - pattern: /sk_test_[a-zA-Z0-9]{20,}/
+            message: "Stripe test key hardcoded — use env var STRIPE_SECRET_KEY"
+          - pattern: /-----BEGIN (RSA |EC )?PRIVATE KEY-----/
+            message: "Private key in source code — use secrets manager"
+          - pattern: /ghp_[a-zA-Z0-9]{36}/
+            message: "GitHub personal access token hardcoded"
+          - pattern: /xoxb-[0-9]{10,}-[a-zA-Z0-9]{20,}/
+            message: "Slack bot token hardcoded"
+        example_violation: |
+          const API_KEY = "sk_live_abc123def456ghi789"
+        example_compliant: |
+          const API_KEY = process.env.STRIPE_SECRET_KEY
+
+    - id: SEC-002
+      title: "No raw SQL string concatenation"
+      scope:
+        - "src/**/*.{ts,js}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /query\s*\(\s*['"`].*\$\{/
+            message: "SQL injection risk — use parameterized queries"
+          - pattern: /query\s*\(\s*['"`].*\+\s*\w/
+            message: "SQL string concatenation — use parameterized queries"
+          - pattern: /execute\s*\(\s*['"`].*\$\{/
+            message: "SQL injection via execute() — use parameterized queries"
+        example_violation: |
+          db.query(`SELECT * FROM users WHERE id = '${userId}'`)
+        example_compliant: |
+          db.query('SELECT * FROM users WHERE id = $1', [userId])
+
+    - id: SEC-003
+      title: "No innerHTML with unsanitized dynamic content"
+      scope:
+        - "src/**/*.{tsx,jsx}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /dangerouslySetInnerHTML\s*=\s*\{\s*\{\s*__html:\s*(?!sanitize|DOMPurify|purify)/
+            message: "XSS risk — sanitize HTML before dangerouslySetInnerHTML"
+          - pattern: /\.innerHTML\s*=\s*(?!['"`]<)/
+            message: "XSS risk — use textContent or sanitize input"
+        example_violation: |
+          <div dangerouslySetInnerHTML={{ __html: userInput }} />
+        example_compliant: |
+          <div dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(userInput) }} />
+
+    - id: SEC-004
+      title: "No eval or Function constructor with dynamic input"
+      scope:
+        - "src/**/*.{ts,js,tsx,jsx}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /\beval\s*\(/
+            message: "eval() is a code injection risk — use JSON.parse or safe alternatives"
+          - pattern: /new\s+Function\s*\(/
+            message: "Function constructor is equivalent to eval — avoid dynamic code execution"
+        example_violation: |
+          const result = eval(userExpression)
+        example_compliant: |
+          const result = JSON.parse(userInput)
+
+    - id: SEC-005
+      title: "No path traversal in file operations"
+      scope:
+        - "src/**/*.{ts,js}"
+        - "!src/**/*.test.*"
+      behavior:
+        forbidden_patterns:
+          - pattern: /readFile(Sync)?\s*\(\s*(?!path\.join|path\.resolve|__dirname)/
+            message: "Use path.join/resolve to prevent path traversal attacks"
+          - pattern: /writeFile(Sync)?\s*\(\s*(?!path\.join|path\.resolve|__dirname)/
+            message: "Use path.join/resolve to prevent path traversal attacks"
+        example_violation: |
+          fs.readFileSync(req.params.filename)
+        example_compliant: |
+          fs.readFileSync(path.join(__dirname, 'safe-dir', path.basename(req.params.filename)))
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you handling user-provided values in queries?"
+      if_yes: "Use parameterized queries, never string concatenation"
+    - question: "Are you rendering user-provided HTML?"
+      if_yes: "Sanitize with DOMPurify before dangerouslySetInnerHTML"
+    - question: "Are you storing API keys or tokens?"
+      if_yes: "Use environment variables, never hardcode in source"
+    - question: "Are you reading/writing files based on user input?"
+      if_yes: "Use path.join with path.basename to prevent traversal"
+
+test_hooks:
+  tests:
+    - file: "src/__tests__/contracts/security_defaults.test.ts"
+      description: "Pattern checks for SEC-001 through SEC-005"
+  tooling:
+    checker_script: "scripts/check-contracts.js"
+
+# Attribution
+# Default security patterns for Specflow projects.
+# Security gate concept adapted from forge (https://github.com/ikennaokpala/forge)
+# by Ikenna N. Okpala, which enforces 7 quality gates including a Security gate
+# with zero tolerance for critical/high findings.
+# Quality gate framework originated in V3 QE Skill by Mondweep Chakravorty.

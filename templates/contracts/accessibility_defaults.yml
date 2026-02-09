@@ -1,0 +1,108 @@
+contract_meta:
+  id: accessibility_defaults
+  version: 1
+  created_from_spec: "Specflow default — WCAG AA baseline"
+  covers_reqs:
+    - A11Y-001
+    - A11Y-002
+    - A11Y-003
+    - A11Y-004
+  owner: "specflow-defaults"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: accessibility_defaults"
+
+rules:
+  non_negotiable:
+    - id: A11Y-001
+      title: "Images must have alt text"
+      scope:
+        - "src/**/*.{tsx,jsx}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /<img\s+(?![^>]*\balt\s*=)[^>]*\/?>/
+            message: "Image missing alt attribute — add alt text for screen readers"
+        example_violation: |
+          <img src="/avatar.png" />
+        example_compliant: |
+          <img src="/avatar.png" alt="User avatar" />
+
+    - id: A11Y-002
+      title: "Buttons must have accessible labels"
+      scope:
+        - "src/**/*.{tsx,jsx}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /<button[^>]*>\s*<(?:svg|img|Icon)[^>]*\/?\s*>\s*<\/button>/
+            message: "Icon-only button needs aria-label for screen readers"
+        example_violation: |
+          <button><TrashIcon /></button>
+        example_compliant: |
+          <button aria-label="Delete item"><TrashIcon /></button>
+
+    - id: A11Y-003
+      title: "Form inputs must have associated labels"
+      scope:
+        - "src/**/*.{tsx,jsx}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /<input(?![^>]*(?:aria-label|aria-labelledby|id\s*=))[^>]*>/
+            message: "Input missing label association — add aria-label, aria-labelledby, or id with matching <label>"
+        example_violation: |
+          <input type="email" placeholder="Email" />
+        example_compliant: |
+          <input type="email" aria-label="Email address" placeholder="Email" />
+
+    - id: A11Y-004
+      title: "No positive tabindex values"
+      scope:
+        - "src/**/*.{tsx,jsx}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /tabIndex\s*=\s*\{?\s*[1-9]/
+            message: "Positive tabindex disrupts natural tab order — use 0 or -1"
+        example_violation: |
+          <div tabIndex={5}>Important</div>
+        example_compliant: |
+          <div tabIndex={0}>Important</div>
+
+  soft:
+    - id: A11Y-010
+      title: "Interactive elements should have focus-visible styles"
+      suggestion: "Add :focus-visible styles to buttons, links, and inputs for keyboard navigation"
+      llm_may_bend_if:
+        - "Component library provides focus styles"
+        - "Global CSS resets handle focus visibility"
+
+    - id: A11Y-011
+      title: "Color should not be the only differentiator"
+      suggestion: "Use icons, patterns, or text alongside color to convey meaning"
+      llm_may_bend_if:
+        - "Decorative use only, not conveying information"
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you adding an image?"
+      if_yes: "Add descriptive alt text. Use alt='' only for decorative images."
+    - question: "Are you adding an icon-only button?"
+      if_yes: "Add aria-label describing the button action."
+    - question: "Are you adding a form input?"
+      if_yes: "Associate with a <label> via htmlFor/id or add aria-label."
+    - question: "Are you controlling tab order?"
+      if_yes: "Use only tabIndex={0} (focusable) or tabIndex={-1} (programmatic focus). Never positive values."
+
+test_hooks:
+  tests:
+    - file: "src/__tests__/contracts/accessibility_defaults.test.ts"
+      description: "Pattern checks for A11Y-001 through A11Y-004"
+  tooling:
+    checker_script: "scripts/check-contracts.js"
+
+# Attribution
+# Default accessibility patterns for Specflow projects.
+# Accessibility gate concept adapted from forge (https://github.com/ikennaokpala/forge)
+# by Ikenna N. Okpala, which enforces WCAG AA compliance as one of 7 quality gates.
+# Quality gate framework originated in V3 QE Skill by Mondweep Chakravorty.
+# Agentic QE by Dragan Spiridonov provides specialized accessibility-auditor agents.

@@ -1,0 +1,154 @@
+contract_meta:
+  id: test_integrity_defaults
+  version: 1
+  created_from_spec: "Specflow default — test integrity and no-mock enforcement"
+  covers_reqs:
+    - TEST-001
+    - TEST-002
+    - TEST-003
+  owner: "specflow-defaults"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: test_integrity_defaults"
+
+# Configurable defaults — override in .specflow/config.json
+defaults:
+  no_mock_in_e2e: true         # DEFAULT ON — E2E tests hit real services
+  no_mock_in_journey: true     # DEFAULT ON — journey tests verify real behavior
+  no_mock_in_unit: false       # DEFAULT OFF — unit tests may mock freely
+  allowed_mock_patterns: []    # Per-project exceptions (e.g., ["stripe", "twilio"])
+
+rules:
+  non_negotiable:
+    - id: TEST-001
+      title: "No mocking in E2E tests"
+      enabled_by_default: true
+      configurable: true
+      scope:
+        - "tests/e2e/**/*.{ts,js,spec.ts}"
+        - "!tests/e2e/**/*.helper.*"
+        - "!tests/e2e/**/*.fixture.*"
+      behavior:
+        forbidden_patterns:
+          - pattern: /jest\.mock\s*\(/
+            message: "jest.mock() in E2E test — E2E tests must hit real services"
+          - pattern: /vi\.mock\s*\(/
+            message: "vi.mock() in E2E test — E2E tests must hit real services"
+          - pattern: /sinon\.(stub|mock|fake)\s*\(/
+            message: "sinon mocking in E2E test — E2E tests must hit real services"
+          - pattern: /\bnock\s*\(/
+            message: "nock() in E2E test — E2E tests must hit real services"
+          - pattern: /\.mockImplementation\s*\(/
+            message: "mockImplementation in E2E test — E2E tests must hit real services"
+          - pattern: /\.mockReturnValue\s*\(/
+            message: "mockReturnValue in E2E test — E2E tests must hit real services"
+          - pattern: /\.mockResolvedValue\s*\(/
+            message: "mockResolvedValue in E2E test — E2E tests must hit real services"
+        example_violation: |
+          // tests/e2e/checkout.spec.ts
+          jest.mock('../services/stripe')
+          test('checkout completes', async () => { ... })
+        example_compliant: |
+          // tests/e2e/checkout.spec.ts
+          test('checkout completes against real API', async ({ page }) => {
+            await page.goto('/checkout')
+            // Test hits real Stripe test mode
+          })
+
+    - id: TEST-002
+      title: "No mocking in journey tests"
+      enabled_by_default: true
+      configurable: true
+      scope:
+        - "tests/e2e/journey_*.spec.ts"
+        - "tests/e2e/journeys/**/*.spec.ts"
+      behavior:
+        forbidden_patterns:
+          - pattern: /\b(mock|stub|fake|spy)\b.*\b(import|require|from)\b/i
+            message: "Mock import in journey test — journeys verify real user behavior"
+          - pattern: /\b(jest|vi|sinon)\.(mock|stub|fake|spy)/
+            message: "Mocking framework used in journey test — journeys must be real"
+        example_violation: |
+          // tests/e2e/journey_signup.spec.ts
+          vi.mock('@/lib/supabase')
+        example_compliant: |
+          // tests/e2e/journey_signup.spec.ts
+          test('J-SIGNUP: user completes registration', async ({ page }) => {
+            // All calls hit real Supabase
+          })
+
+    - id: TEST-003
+      title: "No silent test anti-patterns"
+      enabled_by_default: true
+      configurable: false
+      scope:
+        - "tests/e2e/**/*.{ts,js,spec.ts}"
+        - "src/__tests__/**/*.{ts,js}"
+      behavior:
+        forbidden_patterns:
+          - pattern: /\.catch\s*\(\s*\(\s*\)\s*=>\s*(false|null|undefined|{})\s*\)/
+            message: "Swallowed error — test will silently pass on failure"
+          - pattern: /test\.skip\s*\(\s*true\s*\)/
+            message: "Unconditional skip — use test.fixme('Blocked by #XXX') with tracking issue"
+          - pattern: /expect\(\w+\)\.toHaveLength\(\d+\)\s*$/
+            message: "Suspicious test — only checks array length, not content"
+          - pattern: /\/\/\s*(placeholder|will be enhanced|todo.*later)/i
+            message: "Placeholder test — implement real assertions or remove"
+        example_violation: |
+          test('loads data', async () => {
+            const data = await fetch('/api').catch(() => false)
+            expect(data).toBeTruthy() // passes even on network error
+          })
+        example_compliant: |
+          test('loads data', async () => {
+            const response = await fetch('/api')
+            expect(response.ok).toBe(true)
+            const data = await response.json()
+            expect(data.users).toEqual(expect.arrayContaining([
+              expect.objectContaining({ name: expect.any(String) })
+            ]))
+          })
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you adding a mock/stub to an E2E or journey test?"
+      if_yes: "STOP. E2E and journey tests must hit real services. Move mock to unit tests."
+    - question: "Are you adding try/catch that swallows errors in tests?"
+      if_yes: "Use expect().rejects or let the error propagate — tests should fail visibly."
+    - question: "Are you skipping a test?"
+      if_yes: "Use test.fixme('Blocked by #XXX') — never test.skip(true)."
+
+test_hooks:
+  tests:
+    - file: "src/__tests__/contracts/test_integrity_defaults.test.ts"
+      description: "Pattern checks for TEST-001 through TEST-003"
+  tooling:
+    checker_script: "scripts/check-contracts.js"
+
+# Override mechanism
+# Per-project override in .specflow/config.json:
+#
+# {
+#   "contract_defaults": {
+#     "test_integrity": {
+#       "no_mock_in_e2e": true,
+#       "no_mock_in_journey": true,
+#       "no_mock_in_unit": false,
+#       "allowed_mock_patterns": ["stripe", "twilio"]
+#     }
+#   }
+# }
+#
+# allowed_mock_patterns: When a forbidden_pattern match contains one of these
+# strings, it is exempted. Use for services where real calls have side effects
+# (payment processors, SMS providers) that cannot be safely tested.
+
+# Attribution
+# No-mock philosophy directly from forge (https://github.com/ikennaokpala/forge)
+# by Ikenna N. Okpala: "Every test hits the real API. Mocks hide integration bugs,
+# create false confidence, and test implementation details instead of behavior."
+# Core thesis from Ikenna's Continuous Behavioral Verification work.
+# Silent test anti-patterns from Specflow's own e2e-test-auditor agent,
+# production-tested across 280+ issues.

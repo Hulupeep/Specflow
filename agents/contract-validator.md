@@ -278,6 +278,30 @@ For each feature area:
 | Control Desk | RoomTile, DispatchDrawer, PaxtonFeed, AlertBar | useRoomSnapshots, useDispatch, usePaxtonFeed | dispatch_staff, acknowledge_dispatch | TBD |
 | Admin Audit | AuditLogViewer | useAuditLog | N/A (trigger-based) | TBD |
 
+## Default Contract Validation
+
+In addition to project-specific contracts, always validate against default contracts if installed:
+
+```
+Default contracts check:
+→ security_defaults.yml present? → Run SEC-001 through SEC-005 pattern scans
+→ accessibility_defaults.yml present? → Run A11Y-001 through A11Y-004 pattern scans
+→ test_integrity_defaults.yml present? → Run TEST-001 through TEST-003 pattern scans
+```
+
+Include default contract results in the validation report under a "Default Contracts" section:
+
+```markdown
+### Default Contracts
+| Contract | Rules Checked | Violations | Status |
+|----------|--------------|------------|--------|
+| security_defaults | SEC-001..005 | 0 | PASS |
+| accessibility_defaults | A11Y-001..004 | 1 (A11Y-002) | FAIL |
+| test_integrity_defaults | TEST-001..003 | 0 | PASS |
+```
+
+---
+
 ## Quality Gates
 - [ ] Every Data Contract entity (table, RLS, trigger, view, RPC) verified against migrations
 - [ ] Every frontend interface (hook, component) verified against src/

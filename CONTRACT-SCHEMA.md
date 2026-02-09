@@ -25,6 +25,11 @@ All contracts live in `docs/contracts/` and follow this schema.
 - **Journey contracts**: `journey_<name>.yml`
   Example: `journey_auth_register.yml`
 
+- **Default contracts** (shipped with Specflow):
+  - `security_defaults.yml` — SEC-xxx rules
+  - `accessibility_defaults.yml` — A11Y-xxx rules
+  - `test_integrity_defaults.yml` — TEST-xxx rules
+
 One feature contract can cover multiple `REQ` IDs from the spec.
 
 ---
@@ -911,7 +916,99 @@ CONTRACT VIOLATION: AUTH-001 - API route missing authMiddleware
 
 ---
 
-## 13. Extensions for Parallel Execution
+## 13. Default Contract Templates
+
+Specflow ships default contract templates for security, accessibility, and test integrity. Copy these into your project's `docs/contracts/` directory.
+
+### Location
+
+```
+templates/contracts/
+  security_defaults.yml        # SEC-001 through SEC-005
+  accessibility_defaults.yml   # A11Y-001 through A11Y-004
+  test_integrity_defaults.yml  # TEST-001 through TEST-003
+```
+
+### Rule ID Prefixes
+
+| Prefix | Contract Type | Purpose |
+|--------|---------------|---------|
+| `ARCH-xxx` | Architecture | Structural invariants (package boundaries, forbidden APIs) |
+| `FEAT-xxx` | Feature | Business rules (validation, auth, data handling) |
+| `SEC-xxx` | Security | OWASP Top 10 patterns (secrets, injection, XSS) |
+| `A11Y-xxx` | Accessibility | WCAG AA compliance (alt text, labels, focus) |
+| `TEST-xxx` | Test integrity | No-mock enforcement, anti-pattern detection |
+| `J-xxx` | Journey | User flow DOD (E2E browser tests) |
+
+### Security Rules (SEC-xxx)
+
+| Rule | What it catches |
+|------|----------------|
+| SEC-001 | Hardcoded secrets (API keys, tokens, private keys) |
+| SEC-002 | Raw SQL string concatenation (injection risk) |
+| SEC-003 | Unsanitized innerHTML/dangerouslySetInnerHTML (XSS) |
+| SEC-004 | eval() and Function constructor (code injection) |
+| SEC-005 | Path traversal in file operations |
+
+### Accessibility Rules (A11Y-xxx)
+
+| Rule | What it catches |
+|------|----------------|
+| A11Y-001 | Images without alt text |
+| A11Y-002 | Icon-only buttons without aria-label |
+| A11Y-003 | Form inputs without associated labels |
+| A11Y-004 | Positive tabindex values (disrupts tab order) |
+
+### Test Integrity Rules (TEST-xxx)
+
+| Rule | What it catches | Configurable |
+|------|----------------|-------------|
+| TEST-001 | Mocking in E2E tests | Yes — default ON |
+| TEST-002 | Mocking in journey tests | Yes — default ON |
+| TEST-003 | Silent test anti-patterns | No — always enforced |
+
+### Configurable Defaults
+
+TEST-001 and TEST-002 can be overridden per-project in `.specflow/config.json`:
+
+```json
+{
+  "contract_defaults": {
+    "test_integrity": {
+      "no_mock_in_e2e": true,
+      "no_mock_in_journey": true,
+      "no_mock_in_unit": false,
+      "allowed_mock_patterns": ["stripe", "twilio"]
+    }
+  }
+}
+```
+
+### Using Default Templates
+
+```bash
+# Copy defaults to your project
+cp Specflow/templates/contracts/security_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/accessibility_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/test_integrity_defaults.yml docs/contracts/
+
+# Update scope patterns for your project structure
+# Then run contract tests
+npm test -- contracts
+```
+
+### Attribution
+
+Default security, accessibility, and test integrity gate concepts adapted from
+[forge](https://github.com/ikennaokpala/forge) by Ikenna N. Okpala, which
+enforces 7 quality gates before any commit. Quality gate framework originated in
+V3 QE Skill by Mondweep Chakravorty. No-mock philosophy from Ikenna's Continuous
+Behavioral Verification work. Agentic QE by Dragan Spiridonov provides specialized
+accessibility and security auditor agents.
+
+---
+
+## 14. Extensions for Parallel Execution
 
 For projects using **Dependency-Based Parallel Agent Orchestration (DPAO)**, see:
 

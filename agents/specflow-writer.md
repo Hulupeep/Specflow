@@ -428,6 +428,31 @@ The agent will reference this section when generating specs to ensure consistenc
 
 ---
 
+## Step 9b: Reference Default Contracts
+
+When generating contracts for a new project, ensure the default contract templates have been installed:
+
+```bash
+ls docs/contracts/security_defaults.yml docs/contracts/accessibility_defaults.yml docs/contracts/test_integrity_defaults.yml
+```
+
+If missing, copy from Specflow templates:
+```bash
+cp Specflow/templates/contracts/security_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/accessibility_defaults.yml docs/contracts/
+cp Specflow/templates/contracts/test_integrity_defaults.yml docs/contracts/
+```
+
+These defaults provide baseline SEC-xxx, A11Y-xxx, and TEST-xxx rules. When generating
+feature contracts, layer project-specific rules ON TOP of these defaults. Do not duplicate
+rules that are already covered by the defaults.
+
+For example, if `security_defaults.yml` already forbids hardcoded secrets (SEC-001),
+your feature contract does NOT need to repeat that rule. Instead, add feature-specific
+security rules (e.g., "this endpoint requires rate limiting").
+
+---
+
 ## Step 10: Generate Contract Artifacts (MANDATORY)
 
 **After creating GitHub issues, you MUST also create these artifacts. Tickets without contracts are incomplete.**
