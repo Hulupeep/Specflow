@@ -398,17 +398,56 @@ Sequential would take [A] days, parallel took [B] days
 
 ---
 
-## Agent Teams
+## Team Roles & CSV Journeys
+
+### Team Roles
+
+| Role | Responsibility | Format |
+|------|---------------|--------|
+| **Tech Lead** | Define architecture contracts (YAML) | `docs/contracts/feature_*.yml` |
+| **Product Designer** | Define user journeys (CSV) | `journeys.csv` → compiled to YAML |
+| **Developer** | Implement features, fix violations | Code + git |
+| **CI** | Enforce contracts, catch bypasses | GitHub Actions |
+
+### CSV Journey Workflow
+
+Product designers author journeys in CSV (Google Sheets, Excel, or text editor):
+
+```bash
+# Compile CSV to contracts + Playwright stubs
+npm run compile:journeys -- path/to/journeys.csv
+
+# Commit all outputs
+git add journeys.csv docs/contracts/journey_*.yml tests/e2e/journey_*.spec.ts
+git commit -m "feat: add signup + login journeys"
+```
+
+See `templates/journeys-template.csv` for the CSV format.
+
+### CI Enforcement
+
+Copy CI templates to catch violations on PRs and direct pushes:
+
+```bash
+cp Specflow/templates/ci/specflow-compliance.yml .github/workflows/
+cp Specflow/templates/ci/specflow-audit.yml .github/workflows/
+```
+
+---
+
+## Agent Teams (Default)
+
+Agent Teams is the default execution model on Claude Code 4.6+. Detection is automatic — no environment variable needed.
 
 | Goal | Command |
 |------|---------|
-| Execute with agent teams | "Execute waves with agent teams" |
-| Standard execution (subagents) | "Execute waves" |
+| Execute waves (auto-detects mode) | "Execute waves" |
+| View execution dashboard | "/specflow status" |
 | Run journey gate for an issue | "Run journey gate tier 1 for issue #50" |
 | Run wave gate | "Run journey gate tier 2 for issues #50 #51 #52" |
 | Run regression check | "Run journey gate tier 3" |
 
-Requires: `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` for agent teams mode.
+When TeammateTool is unavailable, waves-controller falls back to subagent mode automatically.
 
 ## Journey Gates
 

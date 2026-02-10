@@ -19,8 +19,8 @@ You write three kinds of invariants (what must be true in your product):
 Result: you can let the LLM explore, but the rules + flows can't be broken without being caught
 
 **Two execution modes:**
-- **Subagent mode** (default) — Claude Code Task tool spawns 23+ one-shot agents in parallel waves
-- **Agent Teams mode** (Claude Code 4.6+) — Persistent peer-to-peer teammates coordinate via TeammateTool API with three-tier journey gates. Set `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` to enable.
+- **Agent Teams mode** (default, Claude Code 4.6+) — Persistent peer-to-peer teammates coordinate via TeammateTool API with three-tier journey gates and mandatory execution visualizations
+- **Subagent mode** (fallback) — Claude Code Task tool spawns 23+ one-shot agents in parallel waves when TeammateTool is unavailable
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
@@ -142,6 +142,53 @@ rm .claude/.defer-tests       # Re-enable
 ```
 
 See `hooks/README.md` for full documentation.
+
+---
+
+## Verify It's Working
+
+After setup, Specflow runs **automatically** -- you never say "use specflow" or "check contracts." Claude Code reads `CLAUDE.md` at session start, contract checking triggers on protected file edits, and hooks fire on build/commit. You just work normally.
+
+**Check 1: Contract awareness**
+
+Start a new Claude Code session and ask:
+
+```
+What contracts are active in this project?
+```
+
+If Claude lists contracts from `docs/contracts/`, it is working. If it says "I don't see any contracts," check:
+
+1. Contract rules section is near the **top** of `CLAUDE.md`
+2. File is named exactly `CLAUDE.md` in project root
+3. You started Claude Code in the correct directory
+4. Contract files exist in `docs/contracts/*.yml`
+5. Run `bash verify-setup.sh .` to check all 10 sections
+
+**Check 2: Hook and journey awareness**
+
+Ask Claude:
+
+```
+Are journey contracts being executed? Are hooks running for specflow?
+```
+
+Claude should check `.claude/hooks/`, `docs/contracts/journey_*.yml`, and test directories. If it says "I'm not sure what journey contracts are," setup is broken.
+
+**The litmus test:** If Claude modifies a file in `src/` without mentioning contracts, the `CLAUDE.md` is not being read.
+
+**What you should NOT need to say:** "Re-read CLAUDE.md", "Use specflow for this", "Remember to check contracts." If you find yourself saying these, your setup needs attention.
+
+**Explicit agent commands** (for projects with the full agent library):
+
+| Command | Effect |
+|---------|--------|
+| `"Execute waves"` | Full backlog execution in dependency-ordered waves |
+| `"Run board-auditor"` | Audit issue compliance |
+| `/specflow` | Activate SKILL.md methodology |
+| `/specflow verify` | Run contract verification scan |
+
+For detailed troubleshooting and examples, see the [Verify It's Working guide](https://hulupeep.github.io/specflow-help/getting-started/verify-setup/).
 
 ---
 
@@ -397,26 +444,89 @@ Defer: `touch .claude/.defer-ci-check`
 
 ---
 
-## Test Harness
+## Team Workflows
 
-Specflow's own contracts are verified by 407 tests across 8 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
+Specflow supports team workflows where different roles contribute in different ways:
+
+| Role | Authors | Format | Tool |
+|------|---------|--------|------|
+| **Tech Lead** | Architecture contracts | YAML | Text editor / LLM |
+| **Product Designer** | User journeys | CSV | Google Sheets / Excel |
+| **Developer** | Implementation | Code | IDE + git |
+| **CI** | Enforcement | GitHub Actions | Automated |
+
+### CSV Journey Format
+
+Product designers define user journeys in a simple CSV format:
+
+```csv
+journey_id,journey_name,step,user_does,system_shows,critical,owner,notes
+J-SIGNUP-FLOW,User Signup,1,Clicks "Sign Up",Shows registration form,yes,@alice,
+J-SIGNUP-FLOW,User Signup,2,Fills email + password,Validates in real-time,yes,@alice,
+J-SIGNUP-FLOW,User Signup,3,Clicks submit,Shows success + redirect,yes,@alice,Must send email
+```
+
+See `templates/journeys-template.csv` for a ready-to-use template.
+
+### Compile CSV to Contracts
 
 ```bash
-npm test                   # All 407 tests
-npm run test:contracts     # Contract template pattern tests (SEC, A11Y, PROD, TEST)
-npm run test:hooks         # Hook behavior tests (post-build, post-push-ci, journey runner)
-npm run test:schema        # Contract YAML schema validation
+npm run compile:journeys -- path/to/journeys.csv
+```
+
+This generates:
+- `docs/contracts/journey_*.yml` -- one journey contract per journey_id
+- `tests/e2e/journey_*.spec.ts` -- Playwright test stubs per journey_id
+
+### CI Enforcement Templates
+
+Two GitHub Action templates for team enforcement:
+
+| Template | Trigger | Purpose |
+|----------|---------|---------|
+| `templates/ci/specflow-compliance.yml` | PR to main | Posts compliance report as PR comment, blocks on violations |
+| `templates/ci/specflow-audit.yml` | Push to main | Opens issue if violations found (catches bypass) |
+
+```bash
+cp Specflow/templates/ci/*.yml .github/workflows/
+```
+
+### Local Enforcement Flow
+
+```
+Designer authors journeys.csv
+  --> npm run compile:journeys -- journeys.csv
+  --> Commits CSV + generated contracts + test stubs
+  --> Developer pulls, makes changes, hooks enforce contracts
+  --> PR created --> CI runs specflow-compliance.yml
+  --> Bob pushes to main without Specflow --> audit catches it
 ```
 
 ---
 
-## Agent Teams (Claude Code 4.6+)
+## Test Harness
 
-Agent Teams is an alternative execution model that uses Claude Code's TeammateTool API for persistent, peer-to-peer agent coordination. Instead of stateless subagents that are spawned, do work, and terminate, Agent Teams creates persistent teammates that maintain context across their entire lifecycle and communicate directly with each other.
+Specflow's own contracts are verified by 469 tests across 12 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
+
+```bash
+npm test                   # All 469 tests
+npm run test:contracts     # Contract template pattern tests (SEC, A11Y, PROD, TEST)
+npm run test:hooks         # Hook behavior tests (post-build, post-push-ci, journey runner)
+npm run test:schema        # Contract YAML schema validation
+npm run test:compile       # CSV compile script tests (parsing, YAML, Playwright, validation)
+```
+
+---
+
+## Agent Teams (Default, Claude Code 4.6+)
+
+Agent Teams is the default execution model, using Claude Code's TeammateTool API for persistent, peer-to-peer agent coordination. Instead of stateless subagents that are spawned, do work, and terminate, Agent Teams creates persistent teammates that maintain context across their entire lifecycle and communicate directly with each other.
+
+Detection is automatic — no environment variable needed. When TeammateTool is available, Agent Teams activates. When unavailable, Specflow falls back to subagent mode.
 
 ### How It Differs from Subagents
 
-| Aspect | Subagent Model (Task Tool) | Agent Teams (TeammateTool) |
+| Aspect | Subagent Mode (Fallback) | Agent Teams (Default) |
 |--------|---------------------------|---------------------------|
 | **Lifecycle** | Stateless: spawn, execute, terminate | Persistent: agents live for the session |
 | **Communication** | Hub-and-spoke: all results flow through orchestrator | Peer-to-peer: agents message each other directly |
@@ -426,7 +536,7 @@ Agent Teams is an alternative execution model that uses Claude Code's TeammateTo
 
 ### Three-Tier Journey Enforcement
 
-Agent Teams introduces a `journey-gate` agent that enforces journey contracts at three tiers:
+Agent Teams includes a `journey-gate` agent that enforces journey contracts at three tiers:
 
 | Tier | Gate | When It Runs | What It Checks |
 |------|------|--------------|----------------|
@@ -434,35 +544,46 @@ Agent Teams introduces a `journey-gate` agent that enforces journey contracts at
 | **Tier 2: Wave Gate** | After a wave completes | All journey tests for the wave pass, no regressions in completed waves |
 | **Tier 3: Regression Gate** | Before release/merge | Full journey suite passes, no critical journey failures across all waves |
 
-### Quick Start
+### Mandatory Execution Visualizations
 
-1. **Enable Agent Teams:**
-   ```bash
-   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true
-   ```
+Agent Teams renders 5 ASCII visualizations at specific phases so you can see exactly what is being executed, in what order, and what will be tested:
 
-2. **New agents available in teams mode:**
-   - `journey-gate` - Three-tier journey enforcement (issue, wave, regression)
-   - `issue-lifecycle` - Full lifecycle management per issue (spec, implement, test, close)
-   - `db-coordinator` - Migration number management and conflict prevention
-   - `quality-gate` - Test execution service with pass/fail coordination
-   - `PROTOCOL` - Communication protocol definition (see `agents/PROTOCOL.md`)
+| Visualization | When | What It Shows |
+|--------------|------|---------------|
+| **EXECUTION TIMELINE** | Phase 1, Phase 8 | Progress across all waves |
+| **ENFORCEMENT MAP** | Phase 1 (per wave) | What contract tests and Playwright tests enforce each issue |
+| **DEPENDENCY TREE** | Phase 1 (per wave) | Execution order and blockers |
+| **PARALLEL AGENT MODEL** | Phase 4 | Who is working on what right now |
+| **SPRINT SUMMARY TABLE** | Phase 8 | Cumulative totals across completed waves |
 
-3. **Same command to execute:**
-   ```
-   Execute waves
-   ```
-   The `waves-controller` auto-detects whether Agent Teams is enabled and uses the appropriate execution model.
+Use `/specflow status` to render all 5 visualizations on demand at any point.
+
+### Team Agents
+
+- `issue-lifecycle` - Full lifecycle management per issue (spec, implement, test, close)
+- `db-coordinator` - Migration number management and conflict prevention
+- `quality-gate` - Test execution service with pass/fail coordination
+- `journey-gate` - Three-tier journey enforcement (issue, wave, regression)
+- `PROTOCOL` - Communication protocol definition (see `agents/PROTOCOL.md`)
+
+### Same Command to Execute
+
+```
+Execute waves
+```
+
+The `waves-controller` auto-detects whether TeammateTool is available and uses the appropriate execution model.
 
 ### Key Benefits
 
 - **Persistent context** - Agents retain full context, so they can fix their own bugs without re-explaining the problem
 - **Parallel execution with coordination** - Agents work in parallel but coordinate directly (e.g., `db-coordinator` prevents migration number collisions)
 - **Regression protection** - The three-tier journey gate catches regressions at every stage, not just at the end
+- **Visible execution** - Mandatory visualizations show what's being tested, who's working, and what's next
 
 ### Backward Compatible
 
-Agent Teams is fully backward compatible. Without the environment variable, Specflow falls back to the standard subagent model using Claude Code's Task tool. No changes to your existing setup are required.
+When TeammateTool is not available (Claude Code < 4.6), Specflow falls back to the standard subagent model using Claude Code's Task tool. No changes to your existing setup are required.
 
 See **[agents/PROTOCOL.md](agents/PROTOCOL.md)** for the full communication protocol between teammates.
 
@@ -565,9 +686,9 @@ See [QUICKSTART.md](QUICKSTART.md) for more prompt variations and detailed paths
 
 ---
 
-## Easy Way: Subagents (Recommended)
+## Easy Way: Agents (Recommended)
 
-The fastest way to use Specflow is with Claude Code's Task tool and the 23+ pre-built agents.
+The fastest way to use Specflow is with the 23+ pre-built agents. Agent Teams mode (TeammateTool) is the default when available; subagent mode (Task tool) is the automatic fallback.
 
 ### Step 1: Install the Agents
 
@@ -1121,11 +1242,9 @@ You're doing it right when:
 │   "Run journey-enforcer"    Check journey coverage      │
 │   "Run board-auditor"       Check issue compliance      │
 │                                                         │
-│ Agent Teams Commands:                                   │
-│   "Execute waves" (auto-detects)  Agent teams if        │
-│                                   env var set           │
-│   CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true             │
-│                                   Enable teams mode     │
+│ Agent Teams (default on Claude Code 4.6+):              │
+│   "Execute waves"           Auto-detects TeammateTool   │
+│   "/specflow status"        Full execution dashboard    │
 │                                                         │
 └─────────────────────────────────────────────────────────┘
 ```

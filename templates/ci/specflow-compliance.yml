@@ -1,0 +1,171 @@
+# Specflow PR Compliance Reporter
+#
+# Runs contract tests on pull requests and posts a compliance report
+# as a PR comment with pass/fail status and owner attribution.
+#
+# Copy to: .github/workflows/specflow-compliance.yml
+# Customize: test command, contract directory, and Node version.
+
+name: Specflow Compliance
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: write
+  statuses: write
+
+jobs:
+  compliance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # Run contract tests and capture output
+      - name: Run contract tests
+        id: contracts
+        run: |
+          set +e
+          OUTPUT=$(npm test -- contracts 2>&1)
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          # Save output for the comment step
+          echo "$OUTPUT" > /tmp/contract-results.txt
+          exit 0
+
+      # Parse contract results and build compliance report
+      - name: Build compliance report
+        id: report
+        run: |
+          EXIT_CODE=${{ steps.contracts.outputs.exit_code }}
+          RESULTS=$(cat /tmp/contract-results.txt)
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            STATUS="PASS"
+            EMOJI="✅"
+          else
+            STATUS="FAIL"
+            EMOJI="❌"
+          fi
+
+          # Extract violation count
+          VIOLATIONS=$(echo "$RESULTS" | grep -c "CONTRACT VIOLATION" || echo "0")
+
+          # Build the comment body
+          cat > /tmp/comment-body.md << 'COMMENT_EOF'
+          ## Specflow Compliance Report
+
+          **Status:** PLACEHOLDER_EMOJI PLACEHOLDER_STATUS
+          **Violations:** PLACEHOLDER_VIOLATIONS
+
+          <details>
+          <summary>Contract Test Output</summary>
+
+          ```
+          PLACEHOLDER_RESULTS
+          ```
+
+          </details>
+
+          ---
+          *Enforced by [Specflow](https://github.com/Hulupeep/Specflow) contracts*
+          COMMENT_EOF
+
+          # Replace placeholders
+          sed -i "s/PLACEHOLDER_EMOJI/$EMOJI/g" /tmp/comment-body.md
+          sed -i "s/PLACEHOLDER_STATUS/$STATUS/g" /tmp/comment-body.md
+          sed -i "s/PLACEHOLDER_VIOLATIONS/$VIOLATIONS/g" /tmp/comment-body.md
+
+          # Insert results (handle multi-line)
+          python3 -c "
+          import sys
+          with open('/tmp/comment-body.md', 'r') as f:
+              content = f.read()
+          with open('/tmp/contract-results.txt', 'r') as f:
+              results = f.read()
+          content = content.replace('PLACEHOLDER_RESULTS', results)
+          with open('/tmp/comment-body.md', 'w') as f:
+              f.write(content)
+          "
+
+          echo "status=$STATUS" >> $GITHUB_OUTPUT
+
+      # Post PR comment with compliance report
+      - name: Post compliance comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const body = fs.readFileSync('/tmp/comment-body.md', 'utf8');
+
+            // Find existing Specflow comment to update (avoid duplicates)
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existingComment = comments.find(c =>
+              c.body.includes('Specflow Compliance Report')
+            );
+
+            if (existingComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existingComment.id,
+                body: body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: body,
+              });
+            }
+
+      # Set commit status based on contract results
+      - name: Set commit status
+        if: steps.report.outputs.status == 'FAIL'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'failure',
+              context: 'specflow/compliance',
+              description: 'Contract violations detected',
+            });
+
+      - name: Set commit status (pass)
+        if: steps.report.outputs.status == 'PASS'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.repos.createCommitStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              sha: context.payload.pull_request.head.sha,
+              state: 'success',
+              context: 'specflow/compliance',
+              description: 'All contracts pass',
+            });
+
+      # Fail the job if contracts failed (blocks merge)
+      - name: Enforce compliance gate
+        if: steps.report.outputs.status == 'FAIL'
+        run: |
+          echo "❌ Contract violations detected. See PR comment for details."
+          exit 1

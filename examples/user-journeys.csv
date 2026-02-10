@@ -1,26 +1,11 @@
-Id,Journey,Statestart,User type,Step 1,Step 2,Step 3,Step 4,Step 5,Step 6,Step 7,Step 8,Step 9,Step 10,Expected results,Expected results2,Expected results3,Expected results4
-1,Journey 1: First-Time User,not signed in,,Install extension,Click popup icon,Welcome screen opens in new tab,Re-click popup,See default Stax 'My First Stax #test',"See glowing 'new' button, default name in input box",Edit name/tags,Click Create,Stax saved with current tabs,Browse saved Stax,See default Stax 'My First Stax #test',sees glowing 'new' button,Stax saved locally,Start page tab added to current open tabs
-2,Journey 2: Sign-Up & Auth,not signed in,,Click sync button (shows Sign in status),Redirected to auth screen,Toggle to Sign Up,Enter email/password,Click Sign Up,Check email,Click verification link,Return to extension,Sign in with credentials,Plan fetched - Redirected to Main (pro) /Paywall (free),,,,
-3,Journey 3: Upgrade Flow,not signed in,free,Free user signs in,Paywall screen shown,Click Start Trial,Stripe checkout opens,Enter payment details,Payment succeeds,Redirected to success page,Click Continue,Plan refreshed to Pro/Trial,Main screen unlocked,,,,
-4a,Journey 4a: Cloud sync2,notsigned in,pro,pro user signs in,pro user signs out,adds a new stax,pro user signs in,,,,,,,,,,
-4,Journey 4: Cloud Sync,not signed in,pro,Paid user signs in,Auto-sync triggers,Cloud Stax loaded,Merged with local data,Sync button shows Just now,User makes changes,Click sync button manually,Fetches from Supabase,Updates local cache,Status shows time since sync,,,,
-5,Journey 5: Create/Manage Stax,,,Type name Work Project #dev #urgent,Tags auto-parsed,Click Create,Current tabs saved,Stax appears in list,Click Stax to select,View tabs,Click Open - all tabs open,Modify tabs,Unsaved changes indicator,,,,
-5b,Journey 5b: Delete stax,not signed in,,click delete button,Confirm deletion,deleted locally,user signs,same stax deleted from cloud,,,,,,Stax deleted locally,stax deleted in cloud when signed in,No other stax deleted,
-5c,Journey 5c: Update stax,not signed in,,click save,,updated locally,user signs in,Nothing. No sync happens for free users,,,,,,Stax deleted locally,user created Stax should not be in cloud,No other stax deleted,
-5d,Journey 5d: Delete one  stax,signedin,pro/free,select one stax,Click delete button,,,,,,,,,only 1 stax marked for deletion or selected,Stax deleted,No other stax deleted,
-5e,Journey 5e: Update stax,signedin,pro/free,click save,,,,,,,,,,,,,
-6,Journey 6: Share Stax (Sharer),,pro,Must be paid user pro,Select Stax,Click Share,If not synced - error shown,Sync Stax to cloud,Share modal opens,Confirm public access,Link generated,Copy share URL,Send to recipient,,,,
-6a,Journey 6a: receive shared stax,signed in,free,Receive link,Open in browser,Content script detects share,Extension activates,Share import preview shown,Validates share,Import executes,Name made unique,Saved to cloud,Appears in Stax list,,,,
-6b,Journey 6: Share Stax (Importer),,,Receive link,Open in browser,Content script detects share,Extension activates,Share import preview shown,Validates share,Import executes,Name made unique,Saved to local,Appears in Stax list,,,,
-7,Journey 7: Next Actions,,,Select Stax,Next Actions preview appears,Type action text,Click add,Action saved to current Stax,Mark action as done,Delete completed,Switch to different Stax,See different actions,,,,,
-8,Journey 8: Error Recovery - Auth,,,Invalid credentials,Error message shown,Email not confirmed,Resend button appears,Session expired,Redirected to auth screen,,,,,,,,
-8a,Journey 8a: Error Recovery - Sync,,,Network failure,Degraded banner shown,Supabase unreachable,Falls back to local,Error logged,,,,,,,,,
-8b,Journey 8b: Error Recovery - Storage,,,Popup boot,runStorageMigration called,Validates storage structure,Repairs malformed data,,,,,,,,,,
-9,Journey 9: Filter/Search,,,See tag strip with all tags,Click tag chip,Stax list filters to matches,Use filter bar for advanced,Click clear,All Stax shown again,,,,,,,,
-10,Journey 10: Sync - No Account,,,Click sync button (pulsing),No user detected,Redirected to auth screen,Toggle to Sign Up,Enter email/password,Click Sign Up,Email verification,Return and sign in,Plan fetched,Redirected to Main/Paywall,,,,
-11,Journey 11: Sync - Free User (Path A),,,Free user clicks sync (pulsing),User exists but not paid,Redirected to paywall,See benefits and pricing,Click Start Trial,Stripe checkout opens,Enter payment details,Payment succeeds,Plan upgraded,Main screen unlocked,,,,
-11b,Journey 11b: Sync - Free User (Path B),,,Free user clicks sync,Redirected to paywall,Click Maybe Later,MaybeLaterScreen shown,See limitations (4 points),See annual deal $20/year,Click Sure Let's do this,Stripe annual checkout,Payment succeeds,Pro unlocked,,,,
-11c,Journey 11c: Sync - Free User (Path C),,,Free user clicks sync,Redirected to paywall,Click Maybe Later,MaybeLaterScreen shown,See limitations,Click I'll stick with free,Returns to main popup,Remains on free plan,Local-only features,,,,,
-12,Journey 12: Plan - Free,,,Local-only storage,See upgrade prompts,Click upgrade,Paywall screen,Choose plan,Payment,Unlock features,,,,,,,
-12,Journey 12: Plan - Trial,,,Full features enabled,Time-limited access,Treated as pro,Auto-sync enabled,Can share,,,,,,,,,
-12,Journey 12: Plan - Pro,,,All features unlocked,No limitations,Auto-sync active,Full sharing enabled,Cross-device support,,,,,,,,,
+journey_id,journey_name,step,user_does,system_shows,critical,owner,notes
+J-SIGNUP-FLOW,User Signup,1,Clicks "Sign Up",Shows registration form,yes,@alice,
+J-SIGNUP-FLOW,User Signup,2,Fills email + password,Validates in real-time,yes,@alice,
+J-SIGNUP-FLOW,User Signup,3,Clicks submit,Shows success + redirect to dashboard,yes,@alice,Must receive welcome email
+J-LOGIN-FLOW,User Login,1,Clicks "Log In",Shows login form,no,@bob,
+J-LOGIN-FLOW,User Login,2,Enters credentials,Authenticates,yes,@bob,
+J-LOGIN-FLOW,User Login,3,Clicks submit,Redirects to dashboard,yes,@bob,Session cookie set
+J-PASSWORD-RESET,Password Reset,1,Clicks "Forgot Password",Shows email input,yes,@bob,
+J-PASSWORD-RESET,Password Reset,2,Enters email,Sends reset link,yes,@bob,
+J-PASSWORD-RESET,Password Reset,3,Clicks link in email,Shows new password form,yes,@bob,Link expires after 1 hour
+J-PASSWORD-RESET,Password Reset,4,Enters new password,Validates strength + confirms reset,yes,@bob,Must meet password policy

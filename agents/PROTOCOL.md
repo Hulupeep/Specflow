@@ -5,8 +5,11 @@
 This protocol defines how Specflow agents communicate in Agent Teams mode.
 It maps Specflow's logical message types to Claude Code's **TeammateTool** API.
 
-When `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=true` is NOT set, these agents
-fall back to Task tool subagents with no inter-agent messaging.
+**Agent Teams is the default execution model.** Detection is automatic:
+- TeammateTool available (Claude Code 4.6+) → Agent Teams mode
+- TeammateTool unavailable → fall back to Task tool subagents with no inter-agent messaging
+
+No environment variable is needed.
 
 ## Claude Code TeammateTool API
 
@@ -162,8 +165,8 @@ During parallel execution, DO NOT modify `index.ts` barrel files. Instead:
 
 ## Fallback: Subagent Mode
 
-When `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is NOT set:
-- waves-controller uses Task tool subagents (existing hub-and-spoke)
+When TeammateTool is not available (Claude Code < 4.6):
+- waves-controller uses Task tool subagents (hub-and-spoke)
 - No TeammateTool messages — agents are stateless
 - Sequential phase execution (Phases 2-7)
 - All existing behavior preserved

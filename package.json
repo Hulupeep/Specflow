@@ -8,7 +8,9 @@
     "test:contracts": "jest tests/contracts/ --no-coverage",
     "test:hooks": "jest tests/hooks/ --no-coverage",
     "test:schema": "jest tests/schema/ --no-coverage",
-    "test:verbose": "jest --verbose --no-coverage"
+    "test:verbose": "jest --verbose --no-coverage",
+    "test:compile": "jest tests/compile/ --no-coverage",
+    "compile:journeys": "node scripts/specflow-compile.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",

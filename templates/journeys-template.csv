@@ -1,0 +1,14 @@
+journey_id,journey_name,step,user_does,system_shows,critical,owner,notes
+J-SIGNUP-FLOW,User Signup,1,Clicks "Sign Up",Shows registration form,yes,@alice,
+J-SIGNUP-FLOW,User Signup,2,Fills email + password,Validates in real-time,yes,@alice,
+J-SIGNUP-FLOW,User Signup,3,Clicks submit,Shows success + redirect to dashboard,yes,@alice,Must receive welcome email
+J-LOGIN-FLOW,User Login,1,Clicks "Log In",Shows login form,yes,@bob,
+J-LOGIN-FLOW,User Login,2,Enters credentials,Authenticates,yes,@bob,
+J-LOGIN-FLOW,User Login,3,Clicks submit,Redirects to dashboard,yes,@bob,Session cookie set
+J-CHECKOUT-FLOW,Checkout,1,Adds item to cart,Shows cart with item,yes,@carol,
+J-CHECKOUT-FLOW,Checkout,2,Clicks checkout,Shows payment form,yes,@carol,
+J-CHECKOUT-FLOW,Checkout,3,Enters payment details,Validates card,yes,@carol,
+J-CHECKOUT-FLOW,Checkout,4,Clicks pay,Processes payment + shows confirmation,yes,@carol,Must send receipt email
+J-PROFILE-EDIT,Profile Edit,1,Navigates to profile,Shows profile form with current data,no,@alice,
+J-PROFILE-EDIT,Profile Edit,2,Edits display name,Updates field in real-time,no,@alice,
+J-PROFILE-EDIT,Profile Edit,3,Clicks save,Shows success message,no,@alice,Changes reflected on reload

@@ -514,6 +514,7 @@ scope:
 | `dod_criticality` | string | ✅ | DOD level: `critical`, `important`, `future` |
 | `status` | string | ✅ | Test status: `passing`, `failing`, `not_tested` |
 | `last_verified` | string | ⚠️ | Date of last test run (ISO format) |
+| `owner` | string | ⚠️ | Team or person responsible (e.g. `@alice`, `design-team`) |
 
 ### preconditions[]
 
@@ -587,6 +588,41 @@ timing:
 - type: "element_visible"
   selector: "[data-testid='success-message']"
 ```
+
+---
+
+## CSV Source Format (Team Workflows)
+
+Journey contracts can be authored in CSV format by product designers, then compiled to YAML + Playwright stubs using `specflow-compile`.
+
+### CSV Column Schema
+
+```csv
+journey_id,journey_name,step,user_does,system_shows,critical,owner,notes
+```
+
+| Column | Maps To | Required | Validation |
+|--------|---------|----------|------------|
+| `journey_id` | `journey_meta.id` | Yes | Must match `/^J-[A-Z][A-Z0-9-]+$/` |
+| `journey_name` | Step group display name | Yes | Non-empty |
+| `step` | `steps[].step` | Yes | Sequential integers starting at 1 per journey |
+| `user_does` | `steps[].name` + action description | Yes | Non-empty |
+| `system_shows` | `steps[].expected` description | Yes | Non-empty |
+| `critical` | `journey_meta.dod_criticality` | Yes | `yes` = critical, `no` = important |
+| `owner` | `journey_meta.owner` | Yes | Non-empty (e.g. `@alice`) |
+| `notes` | `acceptance_criteria[]` | No | Free text, added as acceptance criteria |
+
+### Compile Command
+
+```bash
+npm run compile:journeys -- path/to/journeys.csv
+```
+
+**Output:**
+- `docs/contracts/journey_*.yml` — one journey contract per `journey_id`
+- `tests/e2e/journey_*.spec.ts` — Playwright test stubs per `journey_id`
+
+See `templates/journeys-template.csv` for a ready-to-use template.
 
 ---
 

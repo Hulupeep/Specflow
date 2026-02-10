@@ -1,0 +1,121 @@
+# Specflow Post-Merge Audit
+#
+# Scans files changed in a push to main against contract patterns.
+# If violations are found, opens a GitHub issue tagging the author.
+# This is the "Bob pushes to main without Specflow" safety net.
+#
+# Copy to: .github/workflows/specflow-audit.yml
+# Customize: test command, contract directory, and Node version.
+
+name: Specflow Audit
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit for diff
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+
+      # Get list of changed files
+      - name: Get changed files
+        id: changed
+        run: |
+          FILES=$(git diff --name-only HEAD~1 HEAD -- 'src/**' | tr '\n' ' ')
+          echo "files=$FILES" >> $GITHUB_OUTPUT
+          if [ -z "$FILES" ]; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      # Run contract tests if source files changed
+      - name: Run contract tests
+        id: contracts
+        if: steps.changed.outputs.has_changes == 'true'
+        run: |
+          set +e
+          OUTPUT=$(npm test -- contracts 2>&1)
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> $GITHUB_OUTPUT
+          echo "$OUTPUT" > /tmp/audit-results.txt
+          exit 0
+
+      # Get commit author info
+      - name: Get commit info
+        id: commit
+        if: steps.contracts.outputs.exit_code != '0' && steps.contracts.outputs.exit_code != ''
+        run: |
+          AUTHOR=$(git log -1 --format='%an')
+          EMAIL=$(git log -1 --format='%ae')
+          SHA=$(git log -1 --format='%h')
+          MSG=$(git log -1 --format='%s')
+          echo "author=$AUTHOR" >> $GITHUB_OUTPUT
+          echo "email=$EMAIL" >> $GITHUB_OUTPUT
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+          echo "message=$MSG" >> $GITHUB_OUTPUT
+
+      # Open GitHub issue for violations
+      - name: Open violation issue
+        if: steps.contracts.outputs.exit_code != '0' && steps.contracts.outputs.exit_code != ''
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('/tmp/audit-results.txt', 'utf8');
+            const author = '${{ steps.commit.outputs.author }}';
+            const sha = '${{ steps.commit.outputs.sha }}';
+            const message = '${{ steps.commit.outputs.message }}';
+            const files = '${{ steps.changed.outputs.files }}';
+
+            const body = `## Contract Violation Detected
+
+            **Commit:** \`${sha}\` — ${message}
+            **Author:** ${author}
+            **Changed files:** ${files}
+
+            ### Contract Test Output
+
+            \`\`\`
+            ${results}
+            \`\`\`
+
+            ### What to do
+
+            1. Check the violations listed above
+            2. Fix the code to comply with contracts in \`docs/contracts/\`
+            3. Run \`npm test -- contracts\` locally to verify
+            4. Push the fix
+
+            ### Why this happened
+
+            This push to \`main\` modified files protected by Specflow contracts
+            but the changes violate one or more contract rules. This audit runs
+            automatically on every push to catch violations that bypass local
+            enforcement.
+
+            ---
+            *Opened automatically by [Specflow](https://github.com/Hulupeep/Specflow) post-merge audit*`;
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Contract violation in commit ${sha}`,
+              body: body,
+              labels: ['specflow-violation', 'bug'],
+            });

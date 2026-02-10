@@ -357,6 +357,8 @@ Fix patterns are stored in `.specflow/fix-patterns.json` and scored by historica
 /specflow verify       Contract validation only against existing contracts
 /specflow spec         Generate spec with REQ IDs for current issue or feature
 /specflow heal         Run fix loop on failing contract tests
+/specflow status       Render full execution dashboard (all 5 visualizations)
+/specflow compile      Compile CSV journeys to YAML contracts + Playwright stubs
 ```
 
 ### /specflow (Full Loop)
@@ -396,6 +398,26 @@ Fix patterns are stored in `.specflow/fix-patterns.json` and scored by historica
    c. Apply minimal fix
    d. Re-test
 3. Report: fixed, escalated, or exhausted
+
+### /specflow compile
+
+1. Find CSV journey files (user provides path, or search for `*.csv` with journey headers)
+2. Validate CSV: journey_id format, sequential steps, owner present, critical yes/no
+3. Run `node scripts/specflow-compile.js <csv-file>`
+4. Report: journeys compiled, contracts generated, test stubs generated
+5. Remind user to commit the CSV + generated files
+
+### /specflow status
+
+Render the full execution dashboard with all 5 mandatory visualizations:
+
+1. **EXECUTION TIMELINE** — where you are, what's done, what's next
+2. **ENFORCEMENT MAP** — what gets tested, by what mechanism, and when (the trust layer)
+3. **DEPENDENCY TREE** — execution order and what blocks what
+4. **PARALLEL AGENT MODEL** — who is working on what right now
+5. **SPRINT SUMMARY TABLE** — cumulative totals across all completed waves
+
+This command works at any point during wave execution. See `agents/waves-controller.md` for full visualization templates.
 
 ---
 
