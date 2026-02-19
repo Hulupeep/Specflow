@@ -1,0 +1,190 @@
+contract_meta:
+  id: component_library_defaults
+  version: 1
+  created_from_spec: "Specflow default — Living component library enforcement"
+  covers_reqs:
+    - COMP-001
+    - COMP-002
+    - COMP-003
+    - COMP-004
+  owner: "specflow-defaults"
+
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: component_library_defaults"
+
+rules:
+  non_negotiable:
+    # ═══════════════════════════════════════════════════════════════
+    # COMP-001: All UI imports must come from the project library
+    # Pages and screens must only import UI from /components/ui/.
+    # No direct imports from external UI libraries in page files.
+    # ═══════════════════════════════════════════════════════════════
+    - id: COMP-001
+      title: "UI imports must come from /components/ui/ — not external libraries"
+      scope:
+        - "src/app/**/*.{tsx,jsx}"
+        - "src/pages/**/*.{tsx,jsx}"
+        - "app/**/*.{tsx,jsx}"
+        - "pages/**/*.{tsx,jsx}"
+        - "!src/components/ui/**"
+        - "!components/ui/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /import\s+.*from\s+['"]@radix-ui\//
+            message: "Import from @/components/ui/ instead of @radix-ui directly (COMP-001)"
+          - pattern: /import\s+.*from\s+['"]@headlessui\//
+            message: "Import from @/components/ui/ instead of @headlessui directly (COMP-001)"
+          - pattern: /import\s+.*from\s+['"]@chakra-ui\//
+            message: "Import from @/components/ui/ instead of @chakra-ui directly (COMP-001)"
+          - pattern: /import\s+.*from\s+['"]@mui\//
+            message: "Import from @/components/ui/ instead of @mui directly (COMP-001)"
+          - pattern: /import\s+.*from\s+['"]@mantine\//
+            message: "Import from @/components/ui/ instead of @mantine directly (COMP-001)"
+          - pattern: /import\s+.*from\s+['"]antd/
+            message: "Import from @/components/ui/ instead of antd directly (COMP-001)"
+          - pattern: /import\s+.*from\s+['"]react-bootstrap/
+            message: "Import from @/components/ui/ instead of react-bootstrap directly (COMP-001)"
+        example_violation: |
+          // In a page file:
+          import { Dialog } from '@radix-ui/react-dialog'
+          import { Button } from '@chakra-ui/react'
+          import { Switch } from '@headlessui/react'
+        example_compliant: |
+          // In a page file:
+          import { Dialog } from '@/components/ui/dialog'
+          import { Button } from '@/components/ui/button'
+          import { Switch } from '@/components/ui/switch'
+
+    # ═══════════════════════════════════════════════════════════════
+    # COMP-002: No raw shadcn imports in pages
+    # shadcn components must be pulled into the library first.
+    # Pages never import from shadcn directly.
+    # ═══════════════════════════════════════════════════════════════
+    - id: COMP-002
+      title: "No direct shadcn/registry imports in pages — pull into library first"
+      scope:
+        - "src/app/**/*.{tsx,jsx}"
+        - "src/pages/**/*.{tsx,jsx}"
+        - "app/**/*.{tsx,jsx}"
+        - "pages/**/*.{tsx,jsx}"
+        - "!src/components/ui/**"
+        - "!components/ui/**"
+      behavior:
+        forbidden_patterns:
+          - pattern: /import\s+.*from\s+['"]@shadcn\//
+            message: "Pull shadcn component into /components/ui/ first, then import from there (COMP-002)"
+        example_violation: |
+          import { Button } from '@shadcn/ui/button'
+        example_compliant: |
+          // First: npx shadcn@latest add button
+          // Then in your page:
+          import { Button } from '@/components/ui/button'
+
+    # ═══════════════════════════════════════════════════════════════
+    # COMP-003: No hardcoded color values
+    # All colors must use design tokens (CSS variables via Tailwind).
+    # No hex codes, rgb(), hsl() or arbitrary Tailwind color values.
+    # ═══════════════════════════════════════════════════════════════
+    - id: COMP-003
+      title: "No hardcoded color values — use design tokens only"
+      scope:
+        - "src/**/*.{tsx,jsx,ts}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+        - "!**/globals.css"
+        - "!**/tailwind.config.*"
+      behavior:
+        forbidden_patterns:
+          - pattern: /style\s*=\s*\{\s*\{[^}]*color\s*:\s*['"]#[0-9a-fA-F]{3,8}['"]/
+            message: "Hardcoded hex color in inline style — use Tailwind token class (COMP-003)"
+          - pattern: /style\s*=\s*\{\s*\{[^}]*color\s*:\s*['"]rgb/
+            message: "Hardcoded rgb() color in inline style — use Tailwind token class (COMP-003)"
+          - pattern: /style\s*=\s*\{\s*\{[^}]*color\s*:\s*['"]hsl/
+            message: "Hardcoded hsl() color in inline style — use Tailwind token class (COMP-003)"
+          - pattern: /style\s*=\s*\{\s*\{[^}]*background\s*:\s*['"]#[0-9a-fA-F]{3,8}['"]/
+            message: "Hardcoded hex background in inline style — use Tailwind token class (COMP-003)"
+          - pattern: /className="[^"]*(?:text|bg|border|ring|fill|stroke)-\[#[0-9a-fA-F]{3,8}\]/
+            message: "Arbitrary Tailwind color value — use token class like bg-primary, text-muted-foreground (COMP-003)"
+        example_violation: |
+          <div style={{ color: '#3B82F6' }}>Hello</div>
+          <div style={{ backgroundColor: 'rgb(59, 130, 246)' }}>Hello</div>
+          <p className="text-[#3B82F6]">Hello</p>
+          <div className="bg-[#F3F4F6]">Card</div>
+        example_compliant: |
+          <div className="text-primary">Hello</div>
+          <div className="bg-muted">Card</div>
+          <p className="text-muted-foreground">Hello</p>
+          <div className="bg-destructive text-destructive-foreground">Error</div>
+
+    # ═══════════════════════════════════════════════════════════════
+    # COMP-004: No hardcoded spacing, font-size, or radius values
+    # Use Tailwind's built-in scale and token variables.
+    # ═══════════════════════════════════════════════════════════════
+    - id: COMP-004
+      title: "No hardcoded spacing, font-size, or radius — use Tailwind scale and tokens"
+      scope:
+        - "src/**/*.{tsx,jsx,ts}"
+        - "!src/**/*.test.*"
+        - "!src/**/__tests__/**"
+        - "!**/globals.css"
+        - "!**/tailwind.config.*"
+      behavior:
+        forbidden_patterns:
+          - pattern: /style\s*=\s*\{\s*\{[^}]*(?:padding|margin)\s*:\s*['"]?\d+px/
+            message: "Hardcoded px spacing in inline style — use Tailwind class like p-4, m-2 (COMP-004)"
+          - pattern: /style\s*=\s*\{\s*\{[^}]*fontSize\s*:\s*['"]?\d+px/
+            message: "Hardcoded px font-size in inline style — use Tailwind class like text-sm, text-lg (COMP-004)"
+          - pattern: /style\s*=\s*\{\s*\{[^}]*borderRadius\s*:\s*['"]?\d+px/
+            message: "Hardcoded px border-radius — use Tailwind class like rounded-md or token --radius (COMP-004)"
+          - pattern: /className="[^"]*(?:p|m|px|py|mx|my|mt|mb|ml|mr|pt|pb|pl|pr|gap)-\[\d+px\]/
+            message: "Arbitrary Tailwind spacing — use scale value like p-4, gap-2 instead of p-[17px] (COMP-004)"
+          - pattern: /className="[^"]*text-\[\d+px\]/
+            message: "Arbitrary Tailwind font-size — use text-sm, text-base, text-lg etc. (COMP-004)"
+          - pattern: /className="[^"]*rounded-\[\d+px\]/
+            message: "Arbitrary Tailwind radius — use rounded-md, rounded-lg or token --radius (COMP-004)"
+        example_violation: |
+          <div style={{ padding: '17px', fontSize: '13px' }}>Content</div>
+          <div className="p-[37px] text-[13px] rounded-[7px]">Content</div>
+        example_compliant: |
+          <div className="p-4 text-sm rounded-md">Content</div>
+          <div className="mt-6 gap-4 text-base rounded-lg">Content</div>
+
+anti_patterns:
+  libraries:
+    forbidden:
+      - name: "Direct @radix-ui in pages"
+        reason: "Must be wrapped in /components/ui/ first"
+      - name: "Direct @headlessui in pages"
+        reason: "Must be wrapped in /components/ui/ first"
+      - name: "Direct @chakra-ui in pages"
+        reason: "Must be wrapped in /components/ui/ first"
+  patterns:
+    forbidden:
+      - pattern: "style={{ color: '#...' }}"
+        reason: "Use Tailwind token classes (text-primary, bg-muted, etc.)"
+      - pattern: "className=\"text-[#...]\" or bg-[#...]"
+        reason: "Use Tailwind token classes, not arbitrary color values"
+      - pattern: "style={{ padding: '17px' }}"
+        reason: "Use Tailwind spacing scale (p-4, m-2, gap-6)"
+      - pattern: "className=\"p-[37px]\""
+        reason: "Use Tailwind spacing scale, not arbitrary values"
+
+compliance_checklist:
+  before_editing_files:
+    - question: "Are you building a new page or screen?"
+      if_yes: "Import ALL UI components from @/components/ui/ — never from external libraries directly"
+    - question: "Do you need a component that isn't in /components/ui/?"
+      if_yes: "Check if shadcn has it (npx shadcn@latest add [name]). If not, build it and add to /components/ui/"
+    - question: "Are you adding colors to a component?"
+      if_yes: "Use Tailwind token classes (bg-primary, text-muted-foreground) — never hardcode hex/rgb/hsl"
+    - question: "Are you setting spacing, font sizes, or border radius?"
+      if_yes: "Use Tailwind scale (p-4, text-sm, rounded-md) — never arbitrary values like p-[17px]"
+
+test_hooks:
+  tests:
+    - file: "src/__tests__/contracts/component_library_defaults.test.ts"
+      description: "Pattern checks for COMP-001 through COMP-004"
+  tooling:
+    checker_script: "scripts/check-contracts.js"
