@@ -309,9 +309,11 @@ if [ -d ".claude/hooks" ]; then
     HOOKS_FOUND=0
 
     for hook in "${HOOK_SCRIPTS[@]}"; do
-        if [ -f ".claude/hooks/$hook" ]; then
-            check_pass "Hook script $hook installed"
+        if [ -x ".claude/hooks/$hook" ]; then
+            check_pass "Hook script $hook installed and executable"
             ((HOOKS_FOUND++))
+        elif [ -f ".claude/hooks/$hook" ]; then
+            check_fail "Hook script $hook exists but is not executable (run: chmod +x .claude/hooks/$hook)"
         else
             check_warn "Hook script $hook not found"
         fi

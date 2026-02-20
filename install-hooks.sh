@@ -72,8 +72,11 @@ echo ""
 echo -e "${BLUE}[1/4]${NC} Checking requirements..."
 
 if ! command -v jq &> /dev/null; then
-  echo -e "${YELLOW}⚠️${NC}  jq not found. Install with: brew install jq (mac) or apt install jq (linux)"
+  echo -e "${RED}✗${NC}  jq not found — required for hook JSON parsing"
+  echo -e "    Install: brew install jq (mac) or apt install jq (linux)"
+  exit 1
 fi
+echo -e "${GREEN}✓${NC} jq found"
 
 if ! command -v gh &> /dev/null; then
   echo -e "${YELLOW}⚠️${NC}  gh CLI not found. Install with: brew install gh"
@@ -102,7 +105,7 @@ echo ""
 echo -e "${BLUE}[3/4]${NC} Installing hook files..."
 
 # Copy main hook scripts
-for script in post-build-check.sh run-journey-tests.sh session-start.sh; do
+for script in post-build-check.sh run-journey-tests.sh; do
   if [ -f "$HOOKS_DIR/$script" ]; then
     cp "$HOOKS_DIR/$script" "$TARGET_DIR/.claude/hooks/"
     chmod +x "$TARGET_DIR/.claude/hooks/$script"
@@ -134,11 +137,23 @@ if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
   echo -e "${YELLOW}⚠️${NC}  Existing settings.json found - merging hooks..."
 
   if command -v jq &> /dev/null; then
-    # Merge using jq
+    # Merge using jq — concatenate hook arrays, don't replace
     TEMP_SETTINGS=$(mktemp)
-    jq -s '.[0] * .[1]' "$TARGET_DIR/.claude/settings.json" "$HOOKS_DIR/settings.json" > "$TEMP_SETTINGS"
-    mv "$TEMP_SETTINGS" "$TARGET_DIR/.claude/settings.json"
-    echo -e "${GREEN}✓${NC} Merged hooks into existing settings.json"
+    if jq -s '
+      (.[0].hooks.PostToolUse // []) as $existing |
+      (.[1].hooks.PostToolUse // []) as $new |
+      .[0] * .[1] |
+      .hooks.PostToolUse = ($existing + $new | unique_by(.hooks[0].command))
+    ' "$TARGET_DIR/.claude/settings.json" "$HOOKS_DIR/settings.json" > "$TEMP_SETTINGS"; then
+      mv "$TEMP_SETTINGS" "$TARGET_DIR/.claude/settings.json"
+      echo -e "${GREEN}✓${NC} Merged hooks into existing settings.json (preserved existing hooks)"
+    else
+      rm -f "$TEMP_SETTINGS"
+      echo -e "${YELLOW}⚠️${NC}  jq merge failed — backing up and replacing settings.json"
+      cp "$TARGET_DIR/.claude/settings.json" "$TARGET_DIR/.claude/settings.json.backup"
+      cp "$HOOKS_DIR/settings.json" "$TARGET_DIR/.claude/settings.json"
+      echo -e "${GREEN}✓${NC} Installed .claude/settings.json (backup: settings.json.backup)"
+    fi
   else
     echo -e "${YELLOW}⚠️${NC}  jq not found - backing up and replacing settings.json"
     cp "$TARGET_DIR/.claude/settings.json" "$TARGET_DIR/.claude/settings.json.backup"
@@ -168,9 +183,28 @@ fi
 # Summary
 # ============================================================================
 
-echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║                 Installation Complete                     ║${NC}"
-echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
+# Verify critical files were actually installed
+INSTALL_OK=true
+for expected in post-build-check.sh run-journey-tests.sh; do
+  if [ ! -x "$TARGET_DIR/.claude/hooks/$expected" ]; then
+    INSTALL_OK=false
+  fi
+done
+if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
+  INSTALL_OK=false
+fi
+
+if [ "$INSTALL_OK" = true ]; then
+  echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${BLUE}║                 Installation Complete                     ║${NC}"
+  echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
+else
+  echo -e "${RED}╔═══════════════════════════════════════════════════════════╗${NC}"
+  echo -e "${RED}║              Installation Incomplete                      ║${NC}"
+  echo -e "${RED}╚═══════════════════════════════════════════════════════════╝${NC}"
+  echo ""
+  echo -e "${RED}Some required files failed to install. Review warnings above.${NC}"
+fi
 echo ""
 
 echo -e "${GREEN}Installed files:${NC}"

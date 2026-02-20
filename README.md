@@ -32,6 +32,8 @@ Result: you can let the LLM explore, but the rules + flows can't be broken witho
 
 **https://hulupeep.github.io/specflow-help/** — Full documentation with navigation, search, and better formatting
 
+**[Release Notes](docs/RELEASES.md)** — Version history and changelogs
+
 This README covers quick start. The docs site covers:
 - Step-by-step getting started guide
 - Core concepts (contracts, journeys, agents)
@@ -506,12 +508,12 @@ Designer authors journeys.csv
 
 ## Test Harness
 
-Specflow's own contracts are verified by 469 tests across 12 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
+Specflow's own contracts are verified by 542 tests across 14 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
 
 ```bash
-npm test                   # All 469 tests
+npm test                   # All 542 tests
 npm run test:contracts     # Contract template pattern tests (SEC, A11Y, PROD, TEST)
-npm run test:hooks         # Hook behavior tests (post-build, post-push-ci, journey runner)
+npm run test:hooks         # Hook behavior tests (post-build, post-push-ci, journey runner, installer)
 npm run test:schema        # Contract YAML schema validation
 npm run test:compile       # CSV compile script tests (parsing, YAML, Playwright, validation)
 ```

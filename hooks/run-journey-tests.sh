@@ -7,6 +7,7 @@
 # Exit 2 = tests failed (blocks with error message to model)
 
 set -e
+trap 'echo "Hook error at line $LINENO" >&2; exit 2' ERR
 
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 DEFER_FILE="$PROJECT_DIR/.claude/.defer-tests"
@@ -15,6 +16,18 @@ DEFER_FILE="$PROJECT_DIR/.claude/.defer-tests"
 if [ -f "$DEFER_FILE" ]; then
     echo "Tests deferred. Run 'rm $DEFER_FILE' to re-enable." >&2
     exit 0
+fi
+
+# Pre-flight: verify gh CLI is installed and authenticated
+if ! command -v gh &> /dev/null; then
+    echo "Warning: gh CLI not installed. Cannot fetch journey contracts from issues." >&2
+    echo "  Install: brew install gh && gh auth login" >&2
+    exit 2
+fi
+if ! gh auth status &> /dev/null; then
+    echo "Warning: gh CLI not authenticated. Cannot fetch journey contracts." >&2
+    echo "  Run: gh auth login" >&2
+    exit 2
 fi
 
 # Function to extract issue numbers from recent git commits
@@ -27,11 +40,12 @@ get_recent_issues() {
 # Function to get journey contracts from an issue
 get_journey_for_issue() {
     local issue_num="$1"
-
-    # Try to get issue body and extract journey references
-    if command -v gh &> /dev/null; then
-        gh issue view "$issue_num" --json body -q '.body' 2>/dev/null | grep -oE 'J-[A-Z0-9-]+' | head -1
-    fi
+    local body
+    body=$(gh issue view "$issue_num" --json body -q '.body' 2>&1) || {
+        echo "  Warning: Could not fetch issue #$issue_num" >&2
+        return 0
+    }
+    echo "$body" | grep -oE 'J-[A-Z0-9]+(-[A-Z0-9]+)*' | head -1
 }
 
 # Function to convert journey ID to test file

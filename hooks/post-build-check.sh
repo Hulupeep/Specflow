@@ -19,8 +19,9 @@ fi
 # Check if this was a build command
 is_build_command() {
     local cmd="$1"
-    # Match common build commands
-    echo "$cmd" | grep -qE '(npm run build|pnpm build|yarn build|pnpm run build|npm build|make build|vite build|next build|turbo build)'
+    # Match common build commands (multi-word patterns + single-word with -w for word boundaries)
+    echo "$cmd" | grep -qE '(npm run build|pnpm( run)? build|yarn build|npm build|vite build|next build|turbo( run)? build|make build|cargo build|go build|gradle build|mvn (package|compile))' \
+    || echo "$cmd" | grep -qwE '(make|tsc|webpack)'
 }
 
 # Check if this was a commit command

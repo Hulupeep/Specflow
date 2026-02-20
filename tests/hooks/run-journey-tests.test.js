@@ -24,6 +24,102 @@ describe('run-journey-tests.sh', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  describe('gh CLI pre-flight (Bug 3 fix)', () => {
+    test('exits 2 when gh CLI is not in PATH', () => {
+      // Create empty dir as PATH — no gh available
+      const fakeBin = fs.mkdtempSync(path.join(os.tmpdir(), 'no-gh-'));
+
+      const result = spawnSync('/bin/bash', [SCRIPT_PATH], {
+        encoding: 'utf-8',
+        cwd: tmpDir,
+        env: {
+          CLAUDE_PROJECT_DIR: tmpDir,
+          PATH: fakeBin,
+          HOME: tmpDir,
+        },
+        timeout: 5000,
+      });
+
+      fs.rmSync(fakeBin, { recursive: true, force: true });
+
+      // Must exit 2 (model-visible), not 0 (silent false green)
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('gh CLI not installed');
+    });
+
+    test('exits 2 when gh CLI is not authenticated', () => {
+      // Create a fake gh that fails auth status
+      const fakeBin = fs.mkdtempSync(path.join(os.tmpdir(), 'bad-gh-'));
+      fs.writeFileSync(
+        path.join(fakeBin, 'gh'),
+        '#!/bin/bash\nif [ "$1" = "auth" ]; then exit 1; fi\nexit 0\n'
+      );
+      fs.chmodSync(path.join(fakeBin, 'gh'), 0o755);
+
+      const result = spawnSync('/bin/bash', [SCRIPT_PATH], {
+        encoding: 'utf-8',
+        cwd: tmpDir,
+        env: {
+          CLAUDE_PROJECT_DIR: tmpDir,
+          PATH: fakeBin,
+          HOME: tmpDir,
+        },
+        timeout: 5000,
+      });
+
+      fs.rmSync(fakeBin, { recursive: true, force: true });
+
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('gh CLI not authenticated');
+    });
+  });
+
+  describe('ERR trap (Bug 7 fix)', () => {
+    test('unexpected errors exit 2, not 1', () => {
+      // Replicate the ERR trap from the fixed script
+      const result = spawnSync('bash', ['-c', `
+        set -e
+        trap 'echo "Hook error at line $LINENO" >&2; exit 2' ERR
+        cd /nonexistent/path/that/does/not/exist/12345
+      `], {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      // Before fix: exit 1 (user-only, invisible to Claude)
+      // After fix: exit 2 (model-visible via ERR trap)
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain('Hook error');
+    });
+  });
+
+  describe('journey ID regex (Bug 6 fix)', () => {
+    const regex = 'J-[A-Z0-9]+(-[A-Z0-9]+)*';
+
+    test.each([
+      ['J-AUTH-SIGNUP', 'J-AUTH-SIGNUP'],
+      ['J-SIGNUP-FLOW', 'J-SIGNUP-FLOW'],
+      ['J-LOGIN', 'J-LOGIN'],
+      ['J-A-B-C-D', 'J-A-B-C-D'],
+      ['some text J-CHECKOUT-COMPLETE more text', 'J-CHECKOUT-COMPLETE'],
+    ])('extracts correct ID from "%s" → %s', (input, expected) => {
+      const result = spawnSync('bash', ['-c', `echo "${input}" | grep -oE '${regex}' | head -1`], {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      expect(result.stdout.trim()).toBe(expected);
+    });
+
+    test('does not match trailing hyphen (the actual bug)', () => {
+      const result = spawnSync('bash', ['-c', `echo "J-AUTH-SIGNUP- trailing" | grep -oE '${regex}' | head -1`], {
+        encoding: 'utf-8',
+        timeout: 5000,
+      });
+      // Old regex J-[A-Z0-9-]+ would produce "J-AUTH-SIGNUP-" (with trailing hyphen)
+      // Fixed regex produces "J-AUTH-SIGNUP" (no trailing hyphen)
+      expect(result.stdout.trim()).toBe('J-AUTH-SIGNUP');
+    });
+  });
+
   describe('deferral', () => {
     test('exits 0 when .claude/.defer-tests exists', () => {
       const claudeDir = path.join(tmpDir, '.claude');

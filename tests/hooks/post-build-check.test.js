@@ -29,6 +29,19 @@ describe('post-build-check.sh', () => {
       'next build',
       'vite build',
       'turbo build',
+      // Bug 10: non-Node build commands
+      'make build',
+      'cargo build',
+      'go build',
+      'gradle build',
+      'mvn package',
+      'mvn compile',
+      'tsc',
+      'tsc --noEmit',
+      'webpack',
+      'webpack --mode production',
+      'pnpm run build && echo done',
+      'turbo run build',
     ])('detects "%s" as a build command', (cmd) => {
       const input = buildBashInput(cmd, 0);
       const result = runHook('post-build-check.sh', {
