@@ -508,10 +508,10 @@ Designer authors journeys.csv
 
 ## Test Harness
 
-Specflow's own contracts are verified by 542 tests across 14 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
+Specflow's own contracts are verified by 558 tests across 14 suites. Every regex pattern in every contract template is tested for correct matches and correct non-matches.
 
 ```bash
-npm test                   # All 542 tests
+npm test                   # All 558 tests
 npm run test:contracts     # Contract template pattern tests (SEC, A11Y, PROD, TEST)
 npm run test:hooks         # Hook behavior tests (post-build, post-push-ci, journey runner, installer)
 npm run test:schema        # Contract YAML schema validation

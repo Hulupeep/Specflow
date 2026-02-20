@@ -6,7 +6,7 @@
 
 ### Hook System Bug Fixes
 
-Ten bugs fixed across the hook installation and runtime system. All fixes are covered by 73 new and updated tests (542 total, 14 suites).
+Ten bugs fixed across the hook installation and runtime system. All fixes are covered by 73 new and updated tests (558 total, 14 suites).
 
 #### Fixes
 
@@ -37,7 +37,7 @@ Ten bugs fixed across the hook installation and runtime system. All fixes are co
 - `tests/hooks/post-build-check.test.js` — 11 new build detection cases (bug 10)
 - `tests/hooks/run-journey-tests.test.js` — 10 new tests for bugs 3, 6, 7
 
-**Total: 542 tests across 14 suites (up from 469 across 12 suites).**
+**Total: 558 tests across 14 suites (up from 469 across 12 suites).**
 
 ---
 
