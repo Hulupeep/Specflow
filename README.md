@@ -26,13 +26,20 @@ Contract tests scan your source code for forbidden patterns. Break a rule → CI
 
 ---
 
-## Try It (2 minutes)
+## Get Started
 
 ```bash
-cd demo && npm install && npm run demo
+cp -r Specflow/ your-project/docs/Specflow/
 ```
 
-A working app. An LLM "optimisation" that breaks it. Contract tests catching what unit tests missed.
+Then tell Claude Code:
+
+```
+Read Specflow/README.md and set up my project with Specflow agents including
+updating my CLAUDE.md. Then make my issues compliant and execute my backlog in waves.
+```
+
+One prompt. Claude installs agents, updates your CLAUDE.md, makes issues specflow-compliant, and executes your backlog in parallel waves.
 
 ---
 
@@ -54,23 +61,6 @@ Delivered 280+ GitHub issues on a production project using Specflow. 0 critical 
 
 ---
 
-## Get Started
-
-```bash
-cp -r Specflow/ your-project/docs/Specflow/
-```
-
-Then tell Claude Code:
-
-```
-Read Specflow/README.md and set up my project with Specflow agents including
-updating my CLAUDE.md. Then make my issues compliant and execute my backlog in waves.
-```
-
-One prompt. Claude installs agents, updates your CLAUDE.md, makes issues specflow-compliant, and executes your backlog in parallel waves.
-
----
-
 ## Where Do You Want to Go?
 
 | I want to... | Go here |
@@ -87,3 +77,13 @@ One prompt. Claude installs agents, updates your CLAUDE.md, makes issues specflo
 
 *Made for developers who want specs that actually matter.*
 [Colm Byrne](https://www.linkedin.com/in/colmbyrne/) · [GitHub](https://github.com/Hulupeep) · [MIT License](https://opensource.org/licenses/MIT) · [Issues / Ideas](https://github.com/Hulupeep/Specflow/issues)
+
+---
+
+## Try It (2 minutes)
+
+```bash
+cd demo && npm install && npm run demo
+```
+
+A working app. An LLM "optimisation" that breaks it. Contract tests catching what unit tests missed.
