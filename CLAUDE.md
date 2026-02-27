@@ -110,13 +110,26 @@ After `pnpm build` or `git commit`, hooks automatically:
 
 ### Rule 1: No Ticket = No Code
 
-All work requires a GitHub issue with:
-- Gherkin acceptance criteria
-- data-testid requirements
-- Contract references
-- E2E test file name
+All work requires a GitHub issue before writing any code.
 
-### Rule 2: Contracts Are Non-Negotiable
+### Rule 2: Commits Must Reference an Issue
+
+**NEVER run `git commit` without a `#<issue-number>` in the message.**
+
+If you don't know the issue number, **ASK** before committing. Multiple issues are fine.
+
+```bash
+# ✅ single issue
+git commit -m "feat: add signup validation (#375)"
+
+# ✅ multiple issues
+git commit -m "feat: add auth + profile (#375 #376)"
+
+# ❌ no number — journey tests silently skip, nothing verified
+git commit -m "feat: add signup validation"
+```
+
+### Rule 3: Contracts Are Non-Negotiable
 
 Check `docs/contracts/` before modifying protected files.
 
@@ -126,7 +139,7 @@ npm test -- contracts    # Must pass
 
 Violation = build fails = PR blocked.
 
-### Rule 3: Tests Must Pass Before Closing
+### Rule 4: Tests Must Pass Before Closing
 
 ```bash
 npm test -- contracts    # Contract tests
