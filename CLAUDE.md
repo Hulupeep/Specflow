@@ -49,13 +49,18 @@ Or point me to a CLAUDE.md with project context already filled in.
 
 ### ⚠️ Commit Message Format (Critical for Hooks)
 
-**Specflow hooks only work if commits reference issues:**
+**RULE: NEVER run `git commit` without a `#<issue-number>` in the message.**
+
+If you don't know the issue number, **ASK** before committing. Do not guess, do not omit it.
 
 ```bash
 # ✅ GOOD - hooks find #375 and run its journey tests
 git commit -m "feat: add signup validation (#375)"
 
-# ❌ BAD - hooks find nothing, no tests run
+# ✅ GOOD - bare number works too
+git commit -m "feat: add signup validation #375"
+
+# ❌ BAD - hooks find nothing, no tests run, no enforcement
 git commit -m "feat: add signup validation"
 ```
 
@@ -64,6 +69,8 @@ After `pnpm build` or `git commit`, hooks automatically:
 2. Fetch each issue for journey contract (`J-SIGNUP-FLOW`)
 3. Run only relevant Playwright tests
 4. Block on failure (exit 2)
+
+**Without an issue number, journey tests are silently skipped — the commit succeeds but nothing is verified.**
 
 **Install hooks:** `bash Specflow/install-hooks.sh .`
 

@@ -78,6 +78,39 @@ Replace placeholders in [brackets] with your project-specific information.
 
 ---
 
+## Specflow Rules
+
+### Rule 1: No Ticket = No Code
+
+All work requires a GitHub issue before writing any code.
+
+### Rule 2: Commits Must Reference an Issue
+
+**NEVER run `git commit` without a `#<issue-number>` in the message.**
+
+If you don't know the issue number, **ASK** before committing. Do not guess, do not omit it.
+
+```bash
+# ✅ GOOD
+git commit -m "feat: add signup validation (#375)"
+
+# ❌ BAD — journey tests silently skip, nothing is verified
+git commit -m "feat: add signup validation"
+```
+
+Without an issue number, hooks cannot find the journey contract and tests are silently skipped.
+
+### Rule 3: Tests Must Pass Before Closing
+
+```bash
+npm test -- contracts    # Contract tests
+npm run test:e2e         # E2E journey tests
+```
+
+Work is NOT complete if tests fail.
+
+---
+
 ## 🚨 CRITICAL: Architectural Contracts - READ THIS FIRST
 
 ### MANDATORY: Check Contracts Before ANY Code Changes

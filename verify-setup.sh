@@ -304,8 +304,8 @@ echo "---------------------"
 if [ -d ".claude/hooks" ]; then
     check_pass ".claude/hooks/ directory exists"
 
-    # Check for expected hook scripts
-    HOOK_SCRIPTS=("post-build-check.sh" "run-journey-tests.sh" "post-push-ci.sh")
+    # Check for expected hook scripts (file presence + executable bit)
+    HOOK_SCRIPTS=("post-build-check.sh" "run-journey-tests.sh" "post-push-ci.sh" "session-start.sh")
     HOOKS_FOUND=0
 
     for hook in "${HOOK_SCRIPTS[@]}"; do
@@ -330,11 +330,37 @@ fi
 if [ -f ".claude/settings.json" ]; then
     check_pass ".claude/settings.json exists"
 
-    # Check for hook configuration inside settings.json
-    if grep -qi "hook" .claude/settings.json 2>/dev/null; then
-        check_pass "settings.json contains hook configuration"
+    # Check that PostToolUse hooks are actually registered (not just the word "hook" present)
+    if command -v jq &> /dev/null; then
+        REGISTERED_HOOKS=$(jq -r '.hooks.PostToolUse[]?.hooks[]?.command // empty' .claude/settings.json 2>/dev/null)
+
+        if [ -z "$REGISTERED_HOOKS" ]; then
+            check_warn "settings.json has no PostToolUse hook commands registered"
+        else
+            # Check each required hook is actually wired up
+            for required in "post-build-check.sh" "post-push-ci.sh"; do
+                if echo "$REGISTERED_HOOKS" | grep -q "$required"; then
+                    check_pass "settings.json wires up $required"
+                else
+                    check_fail "settings.json does NOT register $required in PostToolUse"
+                fi
+            done
+
+            # run-journey-tests.sh is invoked by post-build-check.sh, not directly — inform rather than fail
+            if echo "$REGISTERED_HOOKS" | grep -q "run-journey-tests.sh"; then
+                check_pass "settings.json wires up run-journey-tests.sh directly"
+            else
+                check_info "run-journey-tests.sh is called by post-build-check.sh (not registered directly — this is normal)"
+            fi
+        fi
     else
-        check_warn "settings.json exists but may not have hook configuration"
+        # Fallback without jq: check for PostToolUse key at minimum
+        if grep -q "PostToolUse" .claude/settings.json 2>/dev/null; then
+            check_pass "settings.json contains PostToolUse hook configuration"
+            check_warn "Install jq for deeper settings.json verification: apt install jq / brew install jq"
+        else
+            check_warn "settings.json exists but PostToolUse hooks may not be configured"
+        fi
     fi
 else
     check_warn ".claude/settings.json not found (hooks may not be configured)"
