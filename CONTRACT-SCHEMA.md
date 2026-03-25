@@ -967,7 +967,170 @@ grep -A5 "critical_journeys" docs/contracts/CONTRACT_INDEX.yml
 
 ---
 
-## 11. Quick Reference
+## 11. Waivers
+
+When a MUST rule cannot be enforced yet, the gap must be recorded as an explicit waiver — not silently downgraded to a warning via threshold logic.
+
+### Schema
+
+Add a `waivers` section to any contract YAML:
+
+```yaml
+waivers:
+  - invariant_id: SEC-003
+    reason: "Legacy template uses dangerouslySetInnerHTML with DOMPurify — requires refactor"
+    tracking_issue: "#234"
+    owner: "@username"
+    expires: "2026-06-01"
+    approved_by: "human (override_contract: security_defaults)"
+```
+
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `invariant_id` | Yes | The rule ID being waived |
+| `reason` | Yes | Why the waiver exists |
+| `tracking_issue` | Yes | Issue number tracking the fix |
+| `owner` | Yes | Who is responsible for resolving it |
+| `expires` | Yes | Date the waiver must be revisited |
+| `approved_by` | Yes | Who approved the waiver (must be human) |
+
+### Rules
+
+- A MUST test that allows N violations **must** have a waiver entry for each
+- Tests without waiver entries must hard-fail on any MUST violation
+- Expired waivers should be treated as failures by the graph validator
+- The graph validator (#449) checks waiver entries exist for threshold-based tests
+
+---
+
+## 12. Monorepo Strategy
+
+For monorepo projects with multiple packages (e.g., `backend/`, `frontend/`):
+
+### Option A: Single Root (Recommended)
+
+One `docs/contracts/` at the repo root. All contracts live there. Per-package tests reference the shared contracts.
+
+```
+repo/
+  docs/contracts/         ← single source of truth
+    feature_auth.yml
+    journey_login.yml
+    CONTRACT_INDEX.yml
+  backend/
+    src/__tests__/contracts/   ← tests reference ../../../docs/contracts/
+  frontend/
+    src/__tests__/contracts/
+```
+
+**Pros:** No drift. One CONTRACT_INDEX.yml. One place to update.
+**Cons:** Per-package contract isolation lost.
+
+### Option B: Per-Package with Sync Check
+
+Each package has its own `docs/contracts/` with package-specific contracts. Shared defaults are copied from a template and validated by hash.
+
+```
+repo/
+  docs/contracts/                  ← shared defaults template
+    security_defaults.yml
+    CONTRACT_INDEX.yml             ← references all packages
+  backend/docs/contracts/          ← backend-specific + copied defaults
+    feature_api.yml
+    security_defaults.yml          ← must match root hash
+  frontend/docs/contracts/         ← frontend-specific + copied defaults
+    journey_login.yml
+    security_defaults.yml          ← must match root hash
+```
+
+Add a sync check to CI:
+
+```bash
+# Verify shared defaults haven't drifted
+for pkg in backend frontend; do
+  for default in security_defaults.yml accessibility_defaults.yml; do
+    if [ -f "$pkg/docs/contracts/$default" ]; then
+      diff -q "docs/contracts/$default" "$pkg/docs/contracts/$default" || {
+        echo "DRIFT: $pkg/docs/contracts/$default differs from root"
+        exit 1
+      }
+    fi
+  done
+done
+```
+
+### CONTRACT_INDEX.yml for Monorepos
+
+```yaml
+metadata:
+  project: my-monorepo
+  packages:
+    - name: backend
+      contracts_dir: backend/docs/contracts/
+    - name: frontend
+      contracts_dir: frontend/docs/contracts/
+
+contracts:
+  - id: feature_api
+    file: backend/docs/contracts/feature_api.yml
+    package: backend
+  - id: journey_login
+    file: frontend/docs/contracts/journey_login.yml
+    package: frontend
+```
+
+---
+
+## 13. ADR Frontmatter Schema
+
+To make Architecture Decision Records first-class nodes in the contract graph, ADRs should carry YAML frontmatter:
+
+```yaml
+---
+adr_id: ADR-001
+title: "Use chrome.storage.local instead of localStorage in service worker"
+status: accepted  # proposed | accepted | deprecated | superseded
+date: 2026-03-01
+invariants:
+  - I-SEC-001
+  - I-PAR-002
+feature_contracts:
+  - feature_auth.yml
+journey_contracts:
+  - journey_login.yml
+superseded_by: null  # ADR-xxx if superseded
+---
+
+## Context
+...
+```
+
+### Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `adr_id` | Yes | Unique ADR identifier (e.g., `ADR-001`) |
+| `title` | Yes | One-line summary of the decision |
+| `status` | Yes | `proposed`, `accepted`, `deprecated`, `superseded` |
+| `date` | Yes | Date the decision was made |
+| `invariants` | No | Invariant IDs this ADR establishes or enforces |
+| `feature_contracts` | No | Contract files that implement this decision |
+| `journey_contracts` | No | Journey files that verify this decision |
+| `superseded_by` | No | ADR ID if this decision has been replaced |
+
+### Graph Validator Checks
+
+When the graph validator runs, it should verify:
+- All `invariants` listed exist in CONTRACT_INDEX.yml
+- All `feature_contracts` and `journey_contracts` point to real files
+- `deprecated` ADRs have a `superseded_by` reference
+- Invariants claimed by ADRs actually appear in the referenced contracts
+
+---
+
+## 14. Quick Reference
 
 ```
 ┌─────────────────────────────────────────────────────────┐
@@ -1000,7 +1163,7 @@ grep -A5 "critical_journeys" docs/contracts/CONTRACT_INDEX.yml
 
 ---
 
-## 12. Contract → Test Transformation
+## 15. Contract → Test Transformation
 
 This section shows how to transform contract rules into executable tests. The pseudocode is language-agnostic.
 

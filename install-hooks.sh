@@ -132,6 +132,22 @@ if [ -f "$HOOKS_DIR/README.md" ]; then
   echo -e "${GREEN}✓${NC} Installed .claude/hooks/README.md"
 fi
 
+# Install git commit-msg hook (enforces issue numbers in commit messages)
+if [ -d "$TARGET_DIR/.git" ]; then
+  mkdir -p "$TARGET_DIR/.git/hooks"
+  if [ -f "$HOOKS_DIR/commit-msg" ]; then
+    if [ -f "$TARGET_DIR/.git/hooks/commit-msg" ]; then
+      echo -e "${YELLOW}⚠️${NC}  Existing .git/hooks/commit-msg found — backing up"
+      cp "$TARGET_DIR/.git/hooks/commit-msg" "$TARGET_DIR/.git/hooks/commit-msg.backup"
+    fi
+    cp "$HOOKS_DIR/commit-msg" "$TARGET_DIR/.git/hooks/commit-msg"
+    chmod +x "$TARGET_DIR/.git/hooks/commit-msg"
+    echo -e "${GREEN}✓${NC} Installed .git/hooks/commit-msg (enforces issue numbers)"
+  fi
+else
+  echo -e "${YELLOW}⚠️${NC}  Not a git repo — skipping .git/hooks/commit-msg"
+fi
+
 # Handle settings.json - merge if exists, create if not
 if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
   echo -e "${YELLOW}⚠️${NC}  Existing settings.json found - merging hooks..."

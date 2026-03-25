@@ -326,6 +326,19 @@ else
     check_warn ".claude/hooks/ directory not found (run: bash Specflow/install-hooks.sh .)"
 fi
 
+# Check for git commit-msg hook (enforces issue numbers)
+if [ -d ".git/hooks" ]; then
+    if [ -x ".git/hooks/commit-msg" ]; then
+        if grep -q '#\[0-9\]' .git/hooks/commit-msg 2>/dev/null; then
+            check_pass ".git/hooks/commit-msg enforces issue numbers"
+        else
+            check_warn ".git/hooks/commit-msg exists but may not enforce issue numbers"
+        fi
+    else
+        check_warn ".git/hooks/commit-msg not found (commits without issue numbers won't be blocked)"
+    fi
+fi
+
 # Check for .claude/settings.json
 if [ -f ".claude/settings.json" ]; then
     check_pass ".claude/settings.json exists"
@@ -468,6 +481,38 @@ else
 fi
 
 echo ""
+echo "11. Contract Metadata Integrity"
+echo "--------------------------------"
+
+if [ -n "$CONTRACT_DIR" ] && [ "$CONTRACT_COUNT" -gt 0 ]; then
+    BROKEN_REFS=0
+    CHECKED_REFS=0
+
+    for contract in "$CONTRACT_DIR"/*.yml "$CONTRACT_DIR"/*.yaml; do
+        [ -f "$contract" ] || continue
+        # Extract e2e_test_file from test_hooks section
+        TEST_REF=$(grep -A1 'test_hooks' "$contract" 2>/dev/null | grep 'e2e_test_file' | sed 's/.*e2e_test_file:[[:space:]]*//' | tr -d '"' | tr -d "'" | xargs)
+        if [ -n "$TEST_REF" ]; then
+            ((CHECKED_REFS++))
+            if [ -f "$TEST_REF" ]; then
+                check_pass "$(basename "$contract") → $TEST_REF exists"
+            else
+                check_fail "$(basename "$contract") → $TEST_REF NOT FOUND"
+                ((BROKEN_REFS++))
+            fi
+        fi
+    done
+
+    if [ "$CHECKED_REFS" -eq 0 ]; then
+        check_info "No contracts define test_hooks.e2e_test_file (optional)"
+    elif [ "$BROKEN_REFS" -eq 0 ]; then
+        check_pass "All $CHECKED_REFS contract test references resolve to real files"
+    fi
+else
+    check_info "No contracts to validate metadata for"
+fi
+
+echo ""
 echo "========================================"
 echo "Summary"
 echo "========================================"
@@ -491,9 +536,10 @@ if [ $FAIL -eq 0 ]; then
     echo ""
     echo "Sections verified:"
     echo "  1-7:  Core infrastructure (contracts, tests, CI, E2E)"
-    echo "  8:    Hook installation (.claude/hooks/)"
+    echo "  8:    Hook installation (.claude/hooks/, .git/hooks/)"
     echo "  9:    Agent library (scripts/agents/)"
     echo "  10:   Fix patterns & model config (.specflow/)"
+    echo "  11:   Contract metadata integrity (test file references)"
     exit 0
 else
     echo -e "${RED}❌ Specflow setup has issues that need attention.${NC}"

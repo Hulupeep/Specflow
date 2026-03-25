@@ -1,0 +1,20 @@
+#!/bin/bash
+# Specflow commit-msg hook
+# Rejects commits without an issue number (#123)
+#
+# Install: copy to .git/hooks/commit-msg
+# Or: bash install-hooks.sh /path/to/project
+
+if ! grep -qE '#[0-9]+' "$1"; then
+    echo "" >&2
+    echo "❌ Commit rejected: message must reference an issue (#123)" >&2
+    echo "" >&2
+    echo "  Examples:" >&2
+    echo "    git commit -m \"feat: add signup validation (#375)\"" >&2
+    echo "    git commit -m \"fix: auth + profile (#375 #376)\"" >&2
+    echo "" >&2
+    echo "  Without an issue number, Specflow journey tests cannot run." >&2
+    echo "  To bypass (not recommended): git commit --no-verify" >&2
+    echo "" >&2
+    exit 1
+fi
