@@ -10,7 +10,8 @@
     "test:schema": "jest tests/schema/ --no-coverage",
     "test:verbose": "jest --verbose --no-coverage",
     "test:compile": "jest tests/compile/ --no-coverage",
-    "compile:journeys": "node scripts/specflow-compile.js"
+    "compile:journeys": "node scripts/specflow-compile.js",
+    "verify:graph": "node scripts/verify-graph.js"
   },
   "devDependencies": {
     "jest": "^29.7.0",

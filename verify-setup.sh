@@ -275,6 +275,20 @@ if [ "$CI_FOUND" = false ]; then
     check_warn "No CI configuration detected (recommended for enforcing contracts)"
 fi
 
+# Check specifically for Specflow CI workflows
+if [ -d ".github/workflows" ]; then
+    if [ -f ".github/workflows/specflow-compliance.yml" ]; then
+        check_pass "specflow-compliance.yml workflow installed (PR gate)"
+    else
+        check_warn "specflow-compliance.yml not found (install with: bash Specflow/install-hooks.sh . --ci)"
+    fi
+    if [ -f ".github/workflows/specflow-audit.yml" ]; then
+        check_pass "specflow-audit.yml workflow installed (post-merge audit)"
+    else
+        check_warn "specflow-audit.yml not found (install with: bash Specflow/install-hooks.sh . --ci)"
+    fi
+fi
+
 echo ""
 echo "7. E2E Test Setup (Optional)"
 echo "----------------------------"
@@ -513,6 +527,41 @@ else
 fi
 
 echo ""
+echo "12. Graph Validator"
+echo "--------------------"
+
+# Check if verify-graph.js is available (either locally or in Specflow source)
+GRAPH_SCRIPT=""
+if [ -f "scripts/verify-graph.js" ]; then
+    GRAPH_SCRIPT="scripts/verify-graph.js"
+elif [ -f "node_modules/.bin/specflow-verify-graph" ]; then
+    GRAPH_SCRIPT="node_modules/.bin/specflow-verify-graph"
+fi
+
+# Also check Specflow source location
+SPECFLOW_GRAPH=""
+SCRIPT_SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
+if [ -f "$SCRIPT_SELF_DIR/scripts/verify-graph.js" ]; then
+    SPECFLOW_GRAPH="$SCRIPT_SELF_DIR/scripts/verify-graph.js"
+fi
+
+if [ -n "$GRAPH_SCRIPT" ] && command -v node &> /dev/null && [ -n "$CONTRACT_DIR" ]; then
+    check_pass "Graph validator found: $GRAPH_SCRIPT"
+    GRAPH_OUTPUT=$(node "$GRAPH_SCRIPT" "$CONTRACT_DIR" 2>&1)
+    GRAPH_EXIT=$?
+    if [ "$GRAPH_EXIT" -eq 0 ]; then
+        check_pass "Graph validation passed"
+    else
+        check_fail "Graph validation failed — run: node $GRAPH_SCRIPT $CONTRACT_DIR"
+    fi
+elif [ -n "$SPECFLOW_GRAPH" ] && command -v node &> /dev/null && [ -n "$CONTRACT_DIR" ]; then
+    check_info "Graph validator available at $SPECFLOW_GRAPH"
+    check_info "Copy to your project: cp $SPECFLOW_GRAPH scripts/"
+else
+    check_info "Graph validator not found (optional: copy scripts/verify-graph.js from Specflow)"
+fi
+
+echo ""
 echo "========================================"
 echo "Summary"
 echo "========================================"
@@ -540,6 +589,7 @@ if [ $FAIL -eq 0 ]; then
     echo "  9:    Agent library (scripts/agents/)"
     echo "  10:   Fix patterns & model config (.specflow/)"
     echo "  11:   Contract metadata integrity (test file references)"
+    echo "  12:   Graph validator (cross-reference integrity)"
     exit 0
 else
     echo -e "${RED}❌ Specflow setup has issues that need attention.${NC}"

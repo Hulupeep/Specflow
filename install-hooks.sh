@@ -184,10 +184,56 @@ fi
 echo ""
 
 # ============================================================================
-# 4. Show usage instructions
+# 4. Install CI workflows (optional)
 # ============================================================================
 
-echo -e "${BLUE}[4/4]${NC} Setup complete!"
+echo -e "${BLUE}[4/5]${NC} CI workflow installation..."
+
+CI_DIR="$SCRIPT_DIR/templates/ci"
+WORKFLOWS_DIR="$TARGET_DIR/.github/workflows"
+
+if [ -d "$CI_DIR" ]; then
+  # Check if .github/workflows exists or can be created
+  if [ -d "$TARGET_DIR/.github" ] || [ -d "$TARGET_DIR/.git" ]; then
+    INSTALL_CI=false
+
+    # Auto-install if --ci flag passed, otherwise check if workflows dir exists
+    if echo "$@" | grep -q -- "--ci"; then
+      INSTALL_CI=true
+    elif [ ! -d "$WORKFLOWS_DIR" ]; then
+      echo -e "${YELLOW}⚠️${NC}  No .github/workflows/ directory — skipping CI templates"
+      echo -e "    To install CI workflows: bash install-hooks.sh $TARGET_DIR --ci"
+    else
+      INSTALL_CI=true
+    fi
+
+    if [ "$INSTALL_CI" = true ]; then
+      mkdir -p "$WORKFLOWS_DIR"
+      for workflow in specflow-compliance.yml specflow-audit.yml; do
+        if [ -f "$CI_DIR/$workflow" ]; then
+          if [ -f "$WORKFLOWS_DIR/$workflow" ]; then
+            echo -e "${YELLOW}⚠️${NC}  $workflow already exists — skipping (delete to reinstall)"
+          else
+            cp "$CI_DIR/$workflow" "$WORKFLOWS_DIR/$workflow"
+            echo -e "${GREEN}✓${NC} Installed .github/workflows/$workflow"
+          fi
+        fi
+      done
+    fi
+  else
+    echo -e "${YELLOW}⚠️${NC}  Not a git repo — skipping CI workflow installation"
+  fi
+else
+  echo -e "${YELLOW}⚠️${NC}  CI templates not found in Specflow source"
+fi
+
+echo ""
+
+# ============================================================================
+# 5. Show usage instructions
+# ============================================================================
+
+echo -e "${BLUE}[5/5]${NC} Setup complete!"
 echo ""
 
 # Cleanup temp files if downloaded
