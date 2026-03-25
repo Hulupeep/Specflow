@@ -227,6 +227,81 @@ at least one journey showing how the user discovers and uses the feature end-to-
 
 Use `gh issue create` with proper formatting. Always use heredoc for body.
 
+### Step 9a: Pre-Flight Simulation (MANDATORY — neither step is optional)
+
+After formatting the ticket (Step 9 above), you MUST invoke pre-flight-simulator before marking the ticket specflow-compliant. This applies to EVERY write AND edit trigger phrase:
+
+- "write this as a specflow ticket"
+- "update this ticket as a specflow ticket"
+- "edit this ticket as a specflow ticket"
+- "make this ticket specflow-compliant"
+- Any instruction that results in creating OR modifying a ticket body
+
+**This is a two-step sequence. Neither step is optional. A ticket is not compliant until both complete cleanly.**
+
+#### Step 9a-i: Invoke pre-flight-simulator
+
+Pass the ticket in ticket-scope input format:
+
+```json
+{
+  "scope": "ticket",
+  "ticket": {
+    "id": "[issue number or draft ID]",
+    "body": "[full markdown ticket body]",
+    "updated_at": "[current RFC 3339 UTC timestamp]"
+  },
+  "contracts_dir": "docs/contracts/",
+  "schema_files": ["[relevant schema files]"]
+}
+```
+
+pre-flight-simulator is read-only. It returns findings. You receive the findings and decide what to do next per the rules below.
+
+#### Step 9a-ii: Act on findings
+
+**If CRITICAL findings are returned:**
+- Surface them inline to the user
+- Do NOT finalise or post the ticket to GitHub
+- Request resolution before proceeding
+- If the ticket was previously passing and the edit produces new CRITICALs: compliance status reverts — no grandfather clause
+
+**If P1 findings are returned:**
+- Surface them as warnings
+- Pause and confirm with user before proceeding — user confirms or adjusts before you write the ticket
+
+**If P2 only, or clean (no findings):**
+1. Write any P2 findings to `docs/preflight/[ticket-id]-[timestamp].md` before posting the ticket
+2. Append the `## Pre-flight Findings` section to the ticket body (see format below)
+3. Set `simulation_status` to the appropriate enum value
+4. Write the ticket to GitHub:
+   - New ticket: `gh issue create --title "..." --body "[full body including Pre-flight Findings section]"`
+   - Existing ticket: `gh issue edit [N] --body "[full updated body including Pre-flight Findings section]"`
+5. The ticket is now marked compliant
+
+#### Pre-flight Findings section format
+
+Append this section to the ticket body immediately after `## Journey Contract`:
+
+```markdown
+## Pre-flight Findings
+
+**simulation_status:** [passed | passed_with_warnings | blocked | stale | override:reason]
+**simulated_at:** [RFC 3339 UTC timestamp — e.g. 2026-02-19T14:32:00Z]
+**scope:** ticket
+
+### CRITICAL
+[content or "None"]
+
+### P1
+[content or "None"]
+
+### P2
+[logged to docs/preflight/[ticket-id]-[timestamp].md]
+```
+
+`simulation_status` is a strict enum. Valid values: `passed`, `passed_with_warnings`, `blocked`, `stale`, `override:[reason]`. Do not use free text — waves-controller parses this field directly.
+
 ---
 
 ## Output Templates
@@ -365,7 +440,8 @@ Use `gh issue create` with proper formatting. Always use heredoc for body.
 ## Definition of Done
 - [ ] Migration applied with RLS
 - [ ] Admin UI functional
-- [ ] All Gherkin scenarios have passing automated tests
+- [ ] All Gherkin scenarios have Playwright .spec.ts file AND passing test run
+- [ ] Journey gate Tier 1 PASS certificate posted to issue
 ```
 
 ---
@@ -498,11 +574,47 @@ For EVERY ticket that has a UI journey or user-facing acceptance criteria:
    - Pattern-scanning tests for each non-negotiable rule
    - Tests will initially fail — that's correct (they verify the implementation when it's built)
 
+### Step 10b: Generate Playwright Test Skeleton (MANDATORY for UI tickets)
+
+**Every ticket with a Journey section MUST have a corresponding Playwright `.spec.ts` file generated alongside the Gherkin.** This is not optional — tickets without test files are incomplete and will be blocked by journey-gate Tier 1.
+
+1. For each `J-*` journey ID in the ticket, create a test file:
+   ```
+   tests/e2e/journey_{snake_case_name}.spec.ts
+   ```
+   Naming: strip `J-` prefix, lowercase, replace hyphens with underscores, prefix `journey_`.
+   Example: `J-CSV-IMPORT-001` → `tests/e2e/journey_csv_import_001.spec.ts`
+
+2. The skeleton MUST include:
+   ```typescript
+   import { test, expect } from '@playwright/test'
+
+   test.describe('J-{JOURNEY-ID}: {Journey title}', () => {
+     // Step 1: {first journey step}
+     test('{step 1 description}', async ({ page }) => {
+       // TODO: implement — maps to Gherkin: Given/When/Then
+       test.skip(true, 'Skeleton — implement during build phase')
+     })
+
+     // Step N: {last journey step}
+     test('{step N description}', async ({ page }) => {
+       test.skip(true, 'Skeleton — implement during build phase')
+     })
+   })
+   ```
+
+3. Each Gherkin scenario maps to at least one `test()` block. Use `test.skip()` for unimplemented tests — this allows journey-gate to detect coverage gaps.
+
+4. Add the test file path to the journey contract YAML under `test_hooks.e2e_test_file`.
+
+5. Commit the skeleton alongside the ticket creation — NOT as a separate future task.
+
 ### Self-Check Before Finishing
 
 ```
 MANDATORY CHECKLIST — do NOT skip:
 [ ] Every ticket with UI has a journey_*.yml in docs/contracts/
+[ ] Every ticket with a journey has a Playwright .spec.ts skeleton in tests/e2e/
 [ ] Every new feature area has a feature_*.yml in docs/contracts/
 [ ] CONTRACT_INDEX.yml version incremented
 [ ] CONTRACT_INDEX.yml total_contracts and total_journeys updated
@@ -572,6 +684,39 @@ Before creating any issue, verify:
 - [ ] Slice number and total clearly stated
 - [ ] Dependencies on other slices noted
 - [ ] Invariants cross-referenced, not re-defined
+
+---
+
+## Pre-Flight Integration
+
+specflow-writer owns the full format-then-simulate loop. pre-flight-simulator is a read-only tool that returns findings; specflow-writer applies the findings and decides whether to write the ticket to GitHub.
+
+### Trigger phrases that invoke format-then-simulate
+
+ALL of the following trigger both steps — format AND simulate — in that order, every time:
+
+- "write this as a specflow ticket"
+- "update this ticket as a specflow ticket"
+- "edit this ticket as a specflow ticket"
+- "make this ticket specflow-compliant"
+- Any instruction that results in specflow-writer creating or modifying a ticket body
+
+### Write permission
+
+specflow-writer is responsible for the `gh issue edit` call that persists the ticket. pre-flight-simulator never writes to GitHub. specflow-writer writes the `## Pre-flight Findings` section as part of the ticket body after simulation completes.
+
+### Edit to a previously-passing ticket
+
+If an edit produces new CRITICAL findings, compliance status reverts immediately. The ticket was previously `passed` — it is now `blocked`. No grandfather clause. Surface CRITICALs to user and request resolution before rewriting the ticket.
+
+### Override mechanics
+
+If the user invokes `override_preflight: [ticket-id] reason: [reason text]`:
+- Set `simulation_status` to `override:[reason]`
+- Log the override to `docs/preflight/overrides.md` with ticket-id, reason, timestamp, and user
+- Proceed with writing the ticket
+
+See also Step 9a in the Process section for the full per-finding action rules.
 
 ---
 

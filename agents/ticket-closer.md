@@ -103,8 +103,32 @@ For each matched issue, create a comment:
 - `tests/e2e/leave-requests.spec.ts` — Updated with blackout scenarios
 ```
 
+### Step 4b: Verify Playwright Test Execution (MANDATORY for UI issues)
+
+Before closing ANY issue that has UI indicators or `J-*` journey references:
+
+1. Check that Playwright test files exist for ALL referenced `J-*` journeys:
+   ```bash
+   ls tests/e2e/journey_*.spec.ts
+   ```
+2. Check that tests have been run (not just skeletons with `test.skip`):
+   - Read each test file — if ALL tests still contain `test.skip(true, 'Skeleton`, the tests were never implemented
+   - Report: "Tests exist but are all skipped — implementation required before closure"
+3. Check for a Tier 1 journey gate pass certificate:
+   - Search issue comments for `JOURNEY GATE TIER 1: PASS`
+   - Verify the certificate's commit SHA matches current HEAD
+4. If ANY of the above checks fail:
+   ```
+   Cannot close #<N>: Playwright test verification failed.
+   - Test files exist: [YES/NO] (list missing)
+   - Tests implemented (not skipped): [YES/NO] (list skipped)
+   - Tier 1 pass certificate: [YES/NO/STALE]
+   Action required: Run playwright tests and journey gate before closure.
+   ```
+   STOP. Do not proceed to Step 5.
+
 ### Step 5: Close or Update Issues
-- **All criteria met** → Close the issue with the implementation comment
+- **All criteria met AND Playwright tests pass** → Close the issue with the implementation comment
 - **Partially met** → Add comment with "Partially Implemented" and list remaining items
 - **Not started** → Skip (leave open, no comment)
 
@@ -132,16 +156,22 @@ gh issue view <number> --json projectItems
 
 ## Rules
 1. NEVER close an issue if acceptance criteria are not fully met
-2. ALWAYS include specific file names and commit hashes in comments
-3. ALWAYS check for Gherkin scenarios and validate each one
-4. If an issue has subtasks (checkbox list), check each one individually
-5. If unsure whether a criterion is met, mark it as unchecked and explain why
-6. Include test coverage status in every comment
-7. Use the exact issue number format: `#XX` for cross-references
+2. NEVER close a UI issue without a Tier 1 journey gate PASS certificate (Step 0 + Step 4b)
+3. NEVER close a UI issue if Playwright test files are all skipped skeletons
+4. ALWAYS include specific file names and commit hashes in comments
+5. ALWAYS check for Gherkin scenarios and validate each one
+6. ALWAYS include Playwright test execution results in the implementation comment
+7. If an issue has subtasks (checkbox list), check each one individually
+8. If unsure whether a criterion is met, mark it as unchecked and explain why
+9. Include test coverage status in every comment
+10. Use the exact issue number format: `#XX` for cross-references
 
 ## Quality Gates
 - [ ] Every comment references specific commits
 - [ ] Every acceptance criterion is individually addressed
 - [ ] Partially implemented issues are clearly marked
 - [ ] No issue is closed without verifying implementation exists in code
+- [ ] No UI issue is closed without Playwright test execution evidence
+- [ ] No UI issue is closed without Tier 1 journey gate PASS certificate
+- [ ] Implementation comment includes test results (passed/failed/skipped counts)
 - [ ] Project board status matches issue state
