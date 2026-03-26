@@ -537,10 +537,10 @@ echo ""
 echo "12. Graph Validator"
 echo "--------------------"
 
-# Check if verify-graph.js is available (either locally or in Specflow source)
+# Check if verify-graph.cjs is available (either locally or in Specflow source)
 GRAPH_SCRIPT=""
-if [ -f "scripts/verify-graph.js" ]; then
-    GRAPH_SCRIPT="scripts/verify-graph.js"
+if [ -f "scripts/verify-graph.cjs" ]; then
+    GRAPH_SCRIPT="scripts/verify-graph.cjs"
 elif [ -f "node_modules/.bin/specflow-verify-graph" ]; then
     GRAPH_SCRIPT="node_modules/.bin/specflow-verify-graph"
 fi
@@ -548,8 +548,8 @@ fi
 # Also check Specflow source location
 SPECFLOW_GRAPH=""
 SCRIPT_SELF_DIR="$(cd "$(dirname "$0")" 2>/dev/null && pwd)"
-if [ -f "$SCRIPT_SELF_DIR/scripts/verify-graph.js" ]; then
-    SPECFLOW_GRAPH="$SCRIPT_SELF_DIR/scripts/verify-graph.js"
+if [ -f "$SCRIPT_SELF_DIR/scripts/verify-graph.cjs" ]; then
+    SPECFLOW_GRAPH="$SCRIPT_SELF_DIR/scripts/verify-graph.cjs"
 fi
 
 if [ -n "$GRAPH_SCRIPT" ] && command -v node &> /dev/null && [ -n "$CONTRACT_DIR" ]; then
@@ -565,7 +565,7 @@ elif [ -n "$SPECFLOW_GRAPH" ] && command -v node &> /dev/null && [ -n "$CONTRACT
     check_info "Graph validator available at $SPECFLOW_GRAPH"
     check_info "Copy to your project: cp $SPECFLOW_GRAPH scripts/"
 else
-    check_info "Graph validator not found (optional: copy scripts/verify-graph.js from Specflow)"
+    check_info "Graph validator not found (optional: copy scripts/verify-graph.cjs from Specflow)"
 fi
 
 echo ""

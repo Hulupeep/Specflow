@@ -12,8 +12,8 @@
  *   - No orphan contract files missing from CONTRACT_INDEX.yml
  *
  * Usage:
- *   node scripts/verify-graph.js [contracts-dir]
- *   node scripts/verify-graph.js docs/contracts
+ *   node scripts/verify-graph.cjs [contracts-dir]
+ *   node scripts/verify-graph.cjs docs/contracts
  *
  * Exit codes:
  *   0 - No errors (warnings are OK)

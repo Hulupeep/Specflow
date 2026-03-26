@@ -2,7 +2,7 @@
  * Tests for validation logic in specflow-compile.
  */
 
-const { parseCsv, validateRows } = require('../../scripts/specflow-compile');
+const { parseCsv, validateRows } = require('../../scripts/specflow-compile.cjs');
 
 const HEADER = 'journey_id,journey_name,step,user_does,system_shows,critical,owner,notes';
 

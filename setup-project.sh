@@ -103,7 +103,7 @@ echo ""
 echo -e "${BLUE}[4/10]${NC} Copying scripts and examples..."
 
 # Scripts
-for script in specflow-compile.js verify-graph.js; do
+for script in specflow-compile.cjs verify-graph.cjs; do
   if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
     cp "$SCRIPT_DIR/scripts/$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$script"
@@ -151,8 +151,8 @@ if [ ! -f "$TARGET_DIR/package.json" ]; then
     "test:contracts": "jest tests/contracts/ --no-coverage",
     "test:e2e": "echo 'No E2E tests configured yet — add Playwright tests to tests/e2e/'",
     "test:verbose": "jest --verbose --no-coverage",
-    "compile:journeys": "node scripts/specflow-compile.js",
-    "verify:graph": "node scripts/verify-graph.js",
+    "compile:journeys": "node scripts/specflow-compile.cjs",
+    "verify:graph": "node scripts/verify-graph.cjs",
     "verify:contracts": "npm run test:contracts"
   },
   "devDependencies": {

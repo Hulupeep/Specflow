@@ -38,7 +38,7 @@ function listTemplateContracts() {
 
 function listScripts() {
   const dir = path.join(ROOT, 'scripts');
-  return fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
+  return fs.readdirSync(dir).filter((f) => f.endsWith('.js') || f.endsWith('.cjs'));
 }
 
 // ─── PROJ-001: Agent files must have required sections ──────────────────────

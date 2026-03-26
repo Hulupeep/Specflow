@@ -8,7 +8,7 @@
  *   - tests/e2e/journey_*.spec.ts   (Playwright test stubs per journey_id)
  *
  * Usage:
- *   node scripts/specflow-compile.js <csv-file>
+ *   node scripts/specflow-compile.cjs <csv-file>
  *
  * The CSV must have the header:
  *   journey_id,journey_name,step,user_does,system_shows,critical,owner,notes
@@ -369,7 +369,7 @@ function main() {
   const args = process.argv.slice(2);
 
   if (args.length === 0) {
-    console.error('Usage: node scripts/specflow-compile.js <csv-file>');
+    console.error('Usage: node scripts/specflow-compile.cjs <csv-file>');
     process.exit(1);
   }
 

@@ -100,8 +100,8 @@ This installs 5 default contracts:
 
 ```bash
 # Utility scripts
-cp /path/to/Specflow/scripts/specflow-compile.js scripts/
-cp /path/to/Specflow/scripts/verify-graph.js scripts/
+cp /path/to/Specflow/scripts/specflow-compile.cjs scripts/
+cp /path/to/Specflow/scripts/verify-graph.cjs scripts/
 
 # Examples and templates
 cp /path/to/Specflow/examples/* examples/
@@ -126,8 +126,8 @@ cat > package.json << 'EOF'
     "test:contracts": "jest tests/contracts/ --no-coverage",
     "test:e2e": "echo 'No E2E tests configured yet'",
     "test:verbose": "jest --verbose --no-coverage",
-    "compile:journeys": "node scripts/specflow-compile.js",
-    "verify:graph": "node scripts/verify-graph.js",
+    "compile:journeys": "node scripts/specflow-compile.cjs",
+    "verify:graph": "node scripts/verify-graph.cjs",
     "verify:contracts": "npm run test:contracts"
   },
   "devDependencies": {
@@ -408,8 +408,8 @@ This fills in anything Claude missed.
 | `tests/contracts/*.test.js` | Jest tests that validate contracts | setup script / LLM |
 | `tests/helpers/contract-loader.js` | Reads YAML contracts, compiles regex | setup script |
 | `scripts/agents/*.md` | Agent prompts for waves-controller | setup script |
-| `scripts/specflow-compile.js` | Compiles CSV journeys to YAML + Playwright | setup script |
-| `scripts/verify-graph.js` | Validates contract cross-references | setup script |
+| `scripts/specflow-compile.cjs` | Compiles CSV journeys to YAML + Playwright | setup script |
+| `scripts/verify-graph.cjs` | Validates contract cross-references | setup script |
 | `.claude/hooks/*.sh` | Auto-run tests after build/commit/push | install-hooks.sh |
 | `.claude/settings.json` | Wires hooks to Claude Code events | install-hooks.sh |
 | `.git/hooks/commit-msg` | Rejects commits without issue numbers | setup script |

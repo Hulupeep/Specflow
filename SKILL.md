@@ -488,7 +488,7 @@ Fix patterns are stored in `.specflow/fix-patterns.json` and scored by historica
 
 1. Find CSV journey files (user provides path, or search for `*.csv` with journey headers)
 2. Validate CSV: journey_id format, sequential steps, owner present, critical yes/no
-3. Run `node scripts/specflow-compile.js <csv-file>`
+3. Run `node scripts/specflow-compile.cjs <csv-file>`
 4. Report: journeys compiled, contracts generated, test stubs generated
 5. Remind user to commit the CSV + generated files
 

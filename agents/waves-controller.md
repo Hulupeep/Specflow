@@ -62,7 +62,7 @@ ls -la src/__tests__/contracts/ 2>/dev/null || echo "No contract tests yet"
 # Check for CSV journey files to compile
 ls -la *.csv templates/*.csv 2>/dev/null
 # If CSV journey files exist, compile them first:
-#   node scripts/specflow-compile.js <csv-file>
+#   node scripts/specflow-compile.cjs <csv-file>
 
 # Check for existing protocol
 cat docs/WAVE_EXECUTION_PROTOCOL.md 2>/dev/null || echo "No protocol - will use defaults"
