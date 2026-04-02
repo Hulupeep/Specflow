@@ -53,78 +53,35 @@ For all setup paths (manual, SKILL.md, Claude-assisted), see [Getting Started](d
 
 ---
 
-## What "Specflow-Compliant" Actually Means
+## What You Get
 
-An issue or spec is not Specflow-compliant just because it has `REQS` and `JOURNEYS`.
-
-Minimum required sections:
-- `REQS`
-- `INVARIANTS`
-- `Persona Simulation`
-- `JOURNEYS`
-- `TESTS`
-- `DEFINITION OF DONE`
-
-Minimum required traceability:
-- every `MUST` requirement maps to at least one test
-- each ticket/spec declares whether it has a direct UI surface
-- direct UI surfaces must have Playwright coverage or an explicit `N/A` justification
-- docs/discoverability work must either expose a real discovery surface or declare itself repo-only
-- persona simulation must feed structured pre-flight findings (`simulation_status`, `CRITICAL`, `P1`, `P2`)
-
-Test categories can include:
-- feature
-- contract
-- security
-- Playwright / e2e
-- unit / integration when appropriate
-
-If `INVARIANTS` or `TESTS` are missing, the issue/spec is not compliant.
-If a workflow, UI, permissions, or automation ticket is missing `Persona Simulation`, it is not compliant.
+| Layer | What it does |
+|-------|-------------|
+| **Contract tests** | YAML rules scan source for forbidden patterns — break a rule, build fails |
+| **Journey tests** | Playwright tests for critical user flows — if a journey doesn't pass, the feature isn't done |
+| **Hooks** | Auto-trigger tests on build/commit, catch violations on Write/Edit, reject commits without issue numbers |
+| **CI workflows** | PR compliance gate + post-merge audit — no contract violations merge to main |
+| **30+ agents** | Orchestrate wave execution, write contracts, audit boards, simulate specs |
 
 ---
 
 ## FAQ
 
-**Isn't this just more testing?** No. Tests verify behaviour. Contracts verify architecture. "No localStorage for tokens" survives any refactor. "login() returns a token" doesn't.
+**Isn't this just more testing?** No. Tests verify behaviour. Contracts verify architecture. "No localStorage in service workers" survives any refactor.
 
 **What if I don't have a perfect spec?** Start with "document what works today." Your first contract can be: whatever we're doing now, don't break it.
 
-**Can LLMs actually follow contracts?** Yes — and even if they don't, tests catch it in CI. You don't need the LLM to behave. You need it to be checkable.
-
-**How is this different from linting?** Linting: syntax and style. Contracts: architecture and business rules. Both valuable, different problems.
+**Can LLMs actually follow contracts?** Even if they don't, tests catch it. You don't need the LLM to behave. You need it to be checkable.
 
 ---
 
-## Built on Real Projects
+## Links
 
-Delivered 280+ GitHub issues on a production project using Specflow. 0 critical E2E anti-patterns (down from 117). Autonomous wave execution across 30 waves. [Full story →](docs/team-workflows.md#production-track-record)
-
----
-
-## Where Do You Want to Go?
-
-| I want to... | Go here |
+| | |
 |---|---|
-| Decide if Specflow is right for my project | [Should I use Specflow?](docs/should-i-use-specflow.md) |
-| Install and configure Specflow | [Getting Started](docs/getting-started.md) |
-| Understand how it works | [How It Works](docs/how-it-works.md) |
-| Use Specflow with a team | [Team Workflows](docs/team-workflows.md) |
-| Set up CI enforcement | [CI Integration](CI-INTEGRATION.md) |
-| Browse all 23+ agents | [Agent Library](agents/README.md) |
-| Commands and config reference | [Reference](docs/reference.md) |
-
----
-
-*Made for developers who want specs that actually matter.*
-[Colm Byrne](https://www.linkedin.com/in/colmbyrne/) · [GitHub](https://github.com/Hulupeep) · [MIT License](https://opensource.org/licenses/MIT) · [Issues / Ideas](https://github.com/Hulupeep/Specflow/issues)
-
----
-
-## Try It (2 minutes)
-
-```bash
-cd demo && npm install && npm run demo
-```
-
-A working app. An LLM "optimisation" that breaks it. Contract tests catching what unit tests missed.
+| [Getting Started](docs/getting-started.md) | Install, configure, verify |
+| [Agent Library](agents/README.md) | 30+ agents for wave execution |
+| [Contract Schema](CONTRACT-SCHEMA.md) | YAML format for contracts |
+| [CI Integration](CI-INTEGRATION.md) | GitHub Actions setup |
+| [npm package](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
+| [Issues](https://github.com/Hulupeep/Specflow/issues) | Bugs and ideas |
