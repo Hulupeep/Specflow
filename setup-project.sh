@@ -411,6 +411,104 @@ GITIGNORE
   echo -e "${GREEN}✓${NC} Created .gitignore"
 fi
 
+# CLAUDE.md: create or append Specflow sections (never overwrite existing content)
+SPECFLOW_BLOCK='
+---
+
+## Specflow Rules
+
+### Rule 1: No Ticket = No Code
+
+All work requires a GitHub issue before writing any code.
+
+### Rule 2: Commits Must Reference an Issue
+
+**NEVER run `git commit` without a `#<issue-number>` in the message.**
+
+If you don't know the issue number, **ASK** before committing. Multiple issues are fine.
+
+```bash
+# single issue
+git commit -m "feat: add signup validation (#375)"
+
+# multiple issues
+git commit -m "feat: add auth + profile (#375 #376)"
+
+# no number — journey tests silently skip, nothing verified
+git commit -m "feat: add signup validation"
+```
+
+### Rule 3: Contracts Are Non-Negotiable
+
+Check `docs/contracts/` before modifying protected files.
+
+```bash
+npm test -- contracts    # Must pass
+```
+
+Violation = build fails = PR blocked.
+
+### Rule 4: Tests Must Pass Before Closing
+
+```bash
+npm test -- contracts    # Contract tests
+npm run test:e2e         # E2E journey tests
+```
+
+Work is NOT complete if tests fail.
+
+### Contract Locations
+
+| Type | Location |
+|------|----------|
+| Feature contracts | `docs/contracts/feature_*.yml` |
+| Journey contracts | `docs/contracts/journey_*.yml` |
+| Default contracts | `docs/contracts/*_defaults.yml` |
+| Contract tests | `tests/contracts/*.test.js` |
+| E2E tests | `tests/e2e/*.spec.ts` |
+
+### Active Contracts
+
+| Contract | Protects | Rules |
+|----------|----------|-------|
+| `security_defaults` | OWASP baseline | SEC-001 through SEC-005 |
+| `test_integrity_defaults` | Test quality | TEST-001 through TEST-005 |
+| `accessibility_defaults` | WCAG AA baseline | A11Y-001 through A11Y-004 |
+| `production_readiness_defaults` | Production hygiene | PROD-001 through PROD-003 |
+| `component_library_defaults` | UI composition | COMP-001 through COMP-004 |
+
+### Override Protocol
+
+Only humans can override. User must say:
+```
+override_contract: <contract_id>
+```
+'
+
+if [ ! -f "$TARGET_DIR/CLAUDE.md" ]; then
+  # No CLAUDE.md — create with project context header + specflow sections
+  cat > "$TARGET_DIR/CLAUDE.md" <<CLAUDEMD
+# $(basename "$TARGET_DIR") - Development Guide
+
+## Project Context
+
+<!-- REQUIRED: Fill this in so Claude knows the project -->
+
+**Repository:** [org/repo-name]
+**Project Board:** [GitHub Issues | Jira | Linear | Notion | Other]
+**Board CLI:** [gh | jira | linear | other] (must be installed and authenticated)
+**Tech Stack:** [e.g., React, Node, Python, etc.]
+$SPECFLOW_BLOCK
+CLAUDEMD
+  echo -e "${GREEN}✓${NC} Created CLAUDE.md with Specflow rules (fill in Project Context)"
+elif ! grep -q "Specflow Rules" "$TARGET_DIR/CLAUDE.md" 2>/dev/null; then
+  # CLAUDE.md exists but no Specflow sections — append
+  echo "$SPECFLOW_BLOCK" >> "$TARGET_DIR/CLAUDE.md"
+  echo -e "${GREEN}✓${NC} Appended Specflow rules to existing CLAUDE.md"
+else
+  echo -e "${GREEN}✓${NC} CLAUDE.md already has Specflow Rules"
+fi
+
 echo ""
 
 # ============================================================================
@@ -500,6 +598,7 @@ echo -e "${BLUE}╚════════════════════�
 echo ""
 echo -e "${GREEN}Project:${NC} $TARGET_DIR"
 echo ""
+echo "  CLAUDE.md                Specflow rules + contract references"
 echo "  docs/contracts/          $CONTRACT_COUNT default contracts"
 echo "  scripts/agents/          $AGENT_COUNT agents"
 echo "  tests/contracts/         Contract schema tests"
@@ -508,10 +607,10 @@ echo "  .claude/hooks/           Journey verification hooks"
 echo "  .git/hooks/commit-msg    Issue number enforcement"
 echo "  .specflow/baseline.json  Regression baseline"
 echo ""
-echo -e "${YELLOW}Remaining manual steps:${NC}"
+echo -e "${YELLOW}Next steps:${NC}"
 echo ""
-echo "  1. Update CLAUDE.md with your project context:"
-echo "     - Repository, board, tech stack, project description"
+echo "  1. Fill in CLAUDE.md Project Context section:"
+echo "     - Repository, Project Board, Board CLI, Tech Stack"
 echo ""
 echo "  2. Create your first contract:"
 echo "     Tell Claude: \"Create a specflow contract for [your feature]\""

@@ -1,6 +1,6 @@
 {
   "name": "@colmbyrne/specflow",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Specs that enforce themselves. Contract tests, journey hooks, and agent orchestration for LLM-driven development.",
   "license": "MIT",
   "repository": {
@@ -27,7 +27,7 @@
     "LLM-MASTER-PROMPT.md"
   ],
   "scripts": {
-    "postinstall": "echo '' && echo '╔═══════════════════════════════════════════════════════╗' && echo '║  @colmbyrne/specflow installed                       ║' && echo '╠═══════════════════════════════════════════════════════╣' && echo '║                                                       ║' && echo '║  Run this in EACH project you want to enforce:        ║' && echo '║                                                       ║' && echo '║    npx @colmbyrne/specflow init .                     ║' && echo '║                                                       ║' && echo '║  This is per-project (not system-wide) because each   ║' && echo '║  project gets its own hooks, contracts, and CLAUDE.md. ║' && echo '║                                                       ║' && echo '║  After init, update CLAUDE.md with your project info:  ║' && echo '║    Repository, Project Board, Board CLI, Tech Stack    ║' && echo '║                                                       ║' && echo '╚═══════════════════════════════════════════════════════╝' && echo ''",
+    "postinstall": "echo '' && echo '╔═══════════════════════════════════════════════════════╗' && echo '║  @colmbyrne/specflow installed                       ║' && echo '╠═══════════════════════════════════════════════════════╣' && echo '║                                                       ║' && echo '║  Run in EACH project you want to enforce:             ║' && echo '║                                                       ║' && echo '║    npx @colmbyrne/specflow init .                     ║' && echo '║                                                       ║' && echo '║  This creates hooks, contracts, agents, tests, and    ║' && echo '║  CLAUDE.md (or appends rules to your existing one).   ║' && echo '║  Then fill in the Project Context in CLAUDE.md.       ║' && echo '║                                                       ║' && echo '╚═══════════════════════════════════════════════════════╝' && echo ''",
     "test": "jest --no-coverage",
     "test:contracts": "jest tests/contracts/ --no-coverage",
     "test:hooks": "jest tests/hooks/ --no-coverage",
