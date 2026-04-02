@@ -56,6 +56,18 @@ npm test -- compile      # Compiler tests only
 
 Work is NOT complete if tests fail.
 
+### Rule 5: Contracts Are YAML, Not Markdown
+
+**NEVER write contract content (invariants, forbidden patterns, required patterns) into .md files.**
+
+Contracts MUST be YAML files in `docs/contracts/`:
+- Feature contracts: `docs/contracts/feature_*.yml`
+- Journey contracts: `docs/contracts/journey_*.yml`
+- Default contracts: `docs/contracts/*_defaults.yml`
+
+Wrong: `docs/specflow/my-feature-invariants.md`
+Right: `docs/contracts/feature_my_feature.yml`
+
 ### Contract Locations
 
 | Type | Location |
@@ -73,10 +85,11 @@ Work is NOT complete if tests fail.
 |----------|----------|-------|
 | `feature_preflight` | Board-auditor compliance | ARCH-001 through ARCH-008 |
 | `feature_specflow_project` | Project structure & code quality | PROJ-001 through PROJ-004 |
-| `security_defaults` | OWASP patterns | SEC-001 through SEC-005 |
-| `test_integrity_defaults` | Test quality | TEST-001 through TEST-005 |
-| `accessibility_defaults` | A11y patterns | Template default |
-| `production_readiness_defaults` | Production patterns | Template default |
+| `security_defaults` | OWASP baseline patterns | SEC-001 through SEC-005 |
+| `test_integrity_defaults` | Test quality and anti-mock rules | TEST-001 through TEST-005 |
+| `accessibility_defaults` | WCAG AA baseline patterns | A11Y-001 through A11Y-004 |
+| `production_readiness_defaults` | Production hygiene patterns | PROD-001 through PROD-003 |
+| `component_library_defaults` | UI library composition patterns | COMP-001 through COMP-004 |
 
 ### Override Protocol
 
@@ -142,118 +155,33 @@ After `pnpm build` or `git commit`, hooks automatically:
 
 ---
 
-## For Your Project
+## Using Specflow In Another Project
 
-**Add the content below to your project's CLAUDE.md** to enable Specflow enforcement.
+This repository is the source of truth for the reusable Specflow kit. When you are
+applying Specflow to another repository, copy the relevant assets from here rather
+than inventing a fresh layout.
 
-**Two options:**
-1. **Quick start:** Copy the simple version below
-2. **Full template:** Use [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) for complete setup with agents
+### Recommended Adoption Paths
 
----
+1. **Quick start:** Use [SKILL.md](SKILL.md) when you want the minimal agent-facing setup.
+2. **Project CLAUDE setup:** Use [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) when a target repo needs a full, project-specific `CLAUDE.md`.
+3. **Wave execution:** Use [templates/WAVE_EXECUTION_PROTOCOL.md](templates/WAVE_EXECUTION_PROTOCOL.md) when the target repo uses dependency-driven execution across multiple tickets.
 
-# ⬇️ COPY INTO YOUR CLAUDE.md ⬇️
+### What To Copy Into A Target Repository
 
----
+| Asset | Destination in target repo | Purpose |
+|------|----------|---------|
+| `agents/` | `scripts/agents/` | Subagent library for orchestration and execution |
+| `templates/contracts/*.yml` | `docs/contracts/` | Reusable default contracts |
+| `hooks/` via `install-hooks.sh` | `.claude/hooks/` and `.git/hooks/` | Local enforcement and journey verification |
+| `templates/ci/*.yml` | `.github/workflows/` | PR and post-merge contract enforcement |
+| `CLAUDE-MD-TEMPLATE.md` | `CLAUDE.md` | Project-specific operating instructions |
 
-```markdown
-## Project Context
+### Source Repo Maintenance Notes
 
-<!-- REQUIRED: Fill this in so Claude knows the project -->
-
-**Repository:** [org/repo-name]
-**Project Board:** [GitHub Issues | Jira | Linear | Notion | Other]
-**Board CLI:** [gh | jira | linear | other] (must be installed and authenticated)
-**Tech Stack:** [e.g., React, Node, Python, etc.]
-
-<!-- If empty, Claude will ask for context before proceeding -->
-
----
-
-## Specflow Rules
-
-### Rule 1: No Ticket = No Code
-
-All work requires a GitHub issue before writing any code.
-
-### Rule 2: Commits Must Reference an Issue
-
-**NEVER run `git commit` without a `#<issue-number>` in the message.**
-
-If you don't know the issue number, **ASK** before committing. Multiple issues are fine.
-
-```bash
-# ✅ single issue
-git commit -m "feat: add signup validation (#375)"
-
-# ✅ multiple issues
-git commit -m "feat: add auth + profile (#375 #376)"
-
-# ❌ no number — journey tests silently skip, nothing verified
-git commit -m "feat: add signup validation"
-```
-
-### Rule 3: Contracts Are Non-Negotiable
-
-Check `docs/contracts/` before modifying protected files.
-
-```bash
-npm test -- contracts    # Must pass
-```
-
-Violation = build fails = PR blocked.
-
-### Rule 4: Tests Must Pass Before Closing
-
-```bash
-npm test -- contracts    # Contract tests
-npm run test:e2e         # E2E journey tests
-```
-
-Work is NOT complete if tests fail.
-
-### Contract Locations
-
-| Type | Location |
-|------|----------|
-| Feature contracts | `docs/contracts/feature_*.yml` |
-| Journey contracts | `docs/contracts/journey_*.yml` |
-| Contract tests | `src/__tests__/contracts/*.test.ts` |
-| E2E tests | `tests/e2e/*.spec.ts` |
-
-### Override Protocol
-
-Only humans can override. User must say:
-```
-override_contract: <contract_id>
-```
-
-### Active Contracts
-
-<!-- Add your contracts here -->
-_No contracts defined yet. Run specflow-writer to create them._
-```
-
-### Wave Execution & Orchestration (Optional)
-
-If your project uses **wave-based GitHub issue orchestration**, see [CLAUDE-MD-TEMPLATE.md](CLAUDE-MD-TEMPLATE.md) for:
-
-- Progress tracking templates with dependency graphs
-- Autonomous execution requirements (5 parameters)
-- Automatic parallel execution determination
-- Parallelization savings reporting
-
-**Key capabilities:**
-- Parse issue dependencies automatically
-- Determine which issues can run in parallel
-- Execute multiple agents simultaneously (3-4x faster)
-- Report time savings from parallelization
-
----
-
-# ⬆️ END ⬆️
-
----
+- Keep the contracts listed in `docs/contracts/CONTRACT_INDEX.yml` aligned with the files in `docs/contracts/`.
+- Keep `templates/contracts/` as the canonical default-contract source, and mirror the active defaults into `docs/contracts/` for verifier coverage and documentation.
+- Update `CLAUDE.md`, `SKILL.md`, and the CI templates together when the operating model changes so downstream repos receive a coherent kit.
 
 ## About This Repository
 

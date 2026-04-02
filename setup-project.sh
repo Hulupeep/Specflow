@@ -457,6 +457,18 @@ npm run test:e2e         # E2E journey tests
 
 Work is NOT complete if tests fail.
 
+### Rule 5: Contracts Are YAML, Not Markdown
+
+**NEVER write contract content (invariants, forbidden patterns, required patterns) into .md files.**
+
+Contracts MUST be YAML files in `docs/contracts/`:
+- Feature contracts: `docs/contracts/feature_*.yml`
+- Journey contracts: `docs/contracts/journey_*.yml`
+- Default contracts: `docs/contracts/*_defaults.yml`
+
+Wrong: `docs/specflow/my-feature-invariants.md`
+Right: `docs/contracts/feature_my_feature.yml`
+
 ### Contract Locations
 
 | Type | Location |
