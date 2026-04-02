@@ -21,10 +21,16 @@ Four paths depending on how you work. Pick one — they all lead to the same pla
 
 **Best for:** Anyone starting a new project or adding Specflow to an existing one.
 
-One script. Everything installed. Tests pass at the end.
+One command. Everything installed. Tests pass at the end.
 
 ```bash
-bash /path/to/Specflow/setup-project.sh /path/to/your/project
+npx @colmbyrne/specflow init .
+```
+
+Or if you have Specflow cloned locally:
+
+```bash
+bash /path/to/Specflow/setup-project.sh .
 ```
 
 **What it does (in order):**
@@ -450,37 +456,46 @@ bash /path/to/Specflow/verify-setup.sh
 
 ## Updating an Existing Setup
 
-Already have Specflow installed? Paste one of these into Claude Code.
+Already have Specflow installed? Use the CLI or paste a prompt into Claude Code.
 
-### Update everything and verify
+### Via npx (recommended)
 
-```
-Pull the latest Specflow from /path/to/Specflow (or git pull it first).
-Run bash /path/to/Specflow/setup-project.sh . to update my setup.
-Then run bash /path/to/Specflow/verify-setup.sh from my project root.
-Fix every failure — I want 0 failures before we start any tickets.
+```bash
+npx @colmbyrne/specflow update . --ci   # Update hooks + CI workflows
+npx @colmbyrne/specflow verify          # Check everything
 ```
 
-### Hooks only (lighter update)
+### Via Claude Code prompt
+
+**Update everything and verify:**
 
 ```
-Run bash /path/to/Specflow/install-hooks.sh . --ci to install all hooks
-and CI workflows. Then run bash /path/to/Specflow/verify-setup.sh and
-fix every failure. Show me the full verify-setup output when done.
+Run npx @colmbyrne/specflow update . --ci to update hooks and CI workflows.
+Then run npx @colmbyrne/specflow verify and fix every failure.
+I want 0 failures before we start any tickets.
 ```
 
-### Check without changing anything
+**Check without changing anything:**
 
 ```
-Run bash /path/to/Specflow/verify-setup.sh from my project root and
-show me the full output. Don't fix anything yet — I want to see what's
-missing first.
+Run npx @colmbyrne/specflow verify and show me the full output.
+Don't fix anything yet — I want to see what's missing first.
+```
+
+### Other CLI commands
+
+```bash
+npx @colmbyrne/specflow init .          # Full setup (safe to re-run)
+npx @colmbyrne/specflow update . --ci   # Update hooks + CI workflows
+npx @colmbyrne/specflow verify          # 13-section installation check
+npx @colmbyrne/specflow audit 500       # Audit issue #500 for compliance
+npx @colmbyrne/specflow graph           # Validate contract cross-references
 ```
 
 **Notes:**
-- `setup-project.sh` is safe to re-run — it skips files that already exist (package.json, jest.config.js, etc.) and backs up settings.json before merging
-- Replace `/path/to/Specflow` with wherever Specflow lives relative to your project
+- `init` is safe to re-run — skips existing files, backs up settings before merging
 - `--ci` installs GitHub Actions workflows (specflow-compliance.yml + specflow-audit.yml)
+- All commands work with npx (no install needed) or after `npm install -g @colmbyrne/specflow`
 
 ---
 

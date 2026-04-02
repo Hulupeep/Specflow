@@ -1,8 +1,31 @@
 {
-  "name": "specflow-test-harness",
-  "version": "1.0.0",
-  "private": true,
-  "description": "Truth tests for Specflow contract patterns and hooks",
+  "name": "@colmbyrne/specflow",
+  "version": "0.1.0",
+  "description": "Specs that enforce themselves. Contract tests, journey hooks, and agent orchestration for LLM-driven development.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Hulupeep/Specflow.git"
+  },
+  "bin": {
+    "specflow": "bin/specflow.js"
+  },
+  "files": [
+    "bin/",
+    "hooks/",
+    "templates/",
+    "agents/",
+    "scripts/",
+    "setup-project.sh",
+    "install-hooks.sh",
+    "verify-setup.sh",
+    "CLAUDE.md",
+    "CLAUDE-MD-TEMPLATE.md",
+    "CONTRACT-SCHEMA.md",
+    "CONTRACT-SCHEMA-EXTENSIONS.md",
+    "SKILL.md",
+    "LLM-MASTER-PROMPT.md"
+  ],
   "scripts": {
     "test": "jest --no-coverage",
     "test:contracts": "jest tests/contracts/ --no-coverage",
