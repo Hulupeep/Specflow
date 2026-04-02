@@ -19,28 +19,21 @@ temp/
 
 # Node modules
 node_modules/
-sample_spec/node_modules
-gemini_version/node_modules
 
-# Environment files with secrets
-.env.local
+# Environment files
+.env
+.env.*
 *.env.local
-samples/mindsplit/node_modules
-.swarm/*
-
-.claude/*
-
-.claude-flow/*
-.mcp.json
-.hive-mind/*
-
-# Dev tooling
-ruflo/
-
-
 
 # Build artifacts
-/target
 /dist
 /native/target
 *.node
+
+# Dev tooling (ruflo, claude-flow)
+.swarm/
+.claude/
+.claude-flow/
+.mcp.json
+.hive-mind/
+ruflo/

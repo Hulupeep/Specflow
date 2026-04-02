@@ -1,26 +1,20 @@
-.PHONY: build test install clean doctor lint
+.PHONY: build build-native test install clean doctor
 
 build:
-	cargo build --release
+	npx tsc
+
+build-native:
+	cd native && cargo build --release
 
 test:
-	cargo test
+	npx tsc
 	npm test
 
 install:
-	cargo install --path .
+	npm install -g .
 
 clean:
-	cargo clean
+	rm -rf dist native/target
 
 doctor:
-	./target/release/specflow doctor
-
-lint:
-	cargo clippy -- -D warnings
-
-fmt:
-	cargo fmt
-
-check:
-	cargo check
+	node dist/cli.js doctor
