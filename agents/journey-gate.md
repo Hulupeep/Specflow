@@ -1,3 +1,17 @@
+---
+name: journey-gate
+description: Hard enforcement gate for journey tests at issue wave and regression scopes
+category: compliance
+trigger: Run journey gate
+inputs:
+  - issue-number
+  - wave-number
+outputs:
+  - pass-fail-certificate
+  - baseline-updates
+contracts: []
+---
+
 # Agent: journey-gate
 
 ## Role

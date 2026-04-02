@@ -1,3 +1,17 @@
+---
+name: test-runner
+description: Runs E2E and contract tests parsing results with actionable failure details
+category: testing
+trigger: Run tests
+inputs:
+  - test-scope
+  - issue-numbers
+outputs:
+  - test-report
+  - failure-categories
+contracts: []
+---
+
 # Agent: test-runner
 
 ## Role

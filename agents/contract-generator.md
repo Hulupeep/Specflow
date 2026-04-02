@@ -1,3 +1,18 @@
+---
+name: contract-generator
+description: Transforms specs into executable YAML contracts for build-time enforcement
+category: generation
+trigger: Generate contracts
+inputs:
+  - issue-numbers
+  - feature-description
+outputs:
+  - yaml-contracts
+  - contract-index
+contracts:
+  - feature_specflow_project
+---
+
 # Agent: contract-generator
 
 ## Role

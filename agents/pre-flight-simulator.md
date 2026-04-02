@@ -1,3 +1,21 @@
+---
+name: pre-flight-simulator
+description: Read-only simulation agent that detects problems in specs before code is written
+category: compliance
+trigger: Run pre-flight simulation
+inputs:
+  - ticket-json
+  - scope
+outputs:
+  - findings-report
+  - simulation-status
+contracts:
+  - security_defaults
+  - accessibility_defaults
+  - test_integrity_defaults
+  - production_readiness_defaults
+---
+
 # Agent: pre-flight-simulator
 
 ## Role

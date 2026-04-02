@@ -1,3 +1,23 @@
+---
+name: specflow-writer
+description: Full-stack specflow architect producing production-grade ticket specs with BDD and data contracts
+category: generation
+trigger: Write specflow specs
+inputs:
+  - feature-description
+  - issue-number
+outputs:
+  - github-issues
+  - yaml-contracts
+  - test-skeletons
+contracts:
+  - feature_specflow_project
+  - security_defaults
+  - accessibility_defaults
+  - test_integrity_defaults
+  - production_readiness_defaults
+---
+
 # Agent: specflow-writer
 
 ## Role

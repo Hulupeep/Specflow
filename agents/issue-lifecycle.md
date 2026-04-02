@@ -1,3 +1,19 @@
+---
+name: issue-lifecycle
+description: Owns the full lifecycle of a single GitHub issue from contracts to closure
+category: orchestration
+trigger: Spawned by waves-controller
+inputs:
+  - issue-number
+  - wave-number
+outputs:
+  - contracts
+  - implementation
+  - tests
+  - closure-request
+contracts: []
+---
+
 # Agent: issue-lifecycle
 
 ## Role

@@ -1,3 +1,16 @@
+---
+name: journey-enforcer
+description: Audits journey coverage gaps and missing journey contracts across issues
+category: compliance
+trigger: Check journey coverage
+inputs:
+  - issue-numbers
+outputs:
+  - coverage-report
+  - gap-analysis
+contracts: []
+---
+
 # Agent: journey-enforcer
 
 ## Role (UPDATED -- v2)

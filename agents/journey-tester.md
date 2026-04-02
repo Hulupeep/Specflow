@@ -1,3 +1,17 @@
+---
+name: journey-tester
+description: Creates Playwright tests for multi-step user flows spanning multiple features
+category: generation
+trigger: Create journey test
+inputs:
+  - journey-id
+  - issue-number
+outputs:
+  - playwright-test-files
+  - journey-fixtures
+contracts: []
+---
+
 # Agent: journey-tester
 
 ## Role

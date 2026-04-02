@@ -1,3 +1,16 @@
+---
+name: quality-gate
+description: Teammate that runs contract and journey tests and reports structured results
+category: compliance
+trigger: Spawned by waves-controller
+inputs:
+  - test-scope
+outputs:
+  - test-results
+  - baseline-updates
+contracts: []
+---
+
 # Agent: quality-gate
 
 ## Role

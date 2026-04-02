@@ -1,3 +1,18 @@
+---
+name: playwright-from-specflow
+description: Generates Playwright E2E tests with page objects from Gherkin scenarios
+category: generation
+trigger: Generate Playwright tests
+inputs:
+  - issue-numbers
+  - feature-area
+outputs:
+  - playwright-tests
+  - page-objects
+  - coverage-report
+contracts: []
+---
+
 # Agent: playwright-from-specflow
 
 ## Role

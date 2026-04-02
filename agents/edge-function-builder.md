@@ -1,3 +1,17 @@
+---
+name: edge-function-builder
+description: Creates Deno-compatible TypeScript Edge Functions following established patterns
+category: generation
+trigger: Create edge function
+inputs:
+  - function-spec
+  - api-contract
+outputs:
+  - edge-function-code
+  - deployment-checklist
+contracts: []
+---
+
 # Agent: edge-function-builder
 
 ## Role

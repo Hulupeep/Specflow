@@ -1,3 +1,4 @@
+mod agents;
 mod commands;
 mod contracts;
 mod hooks;
@@ -94,6 +95,12 @@ enum Commands {
         #[command(subcommand)]
         mcp_command: McpCommands,
     },
+
+    /// Agent registry subcommands
+    Agent {
+        #[command(subcommand)]
+        agent_command: AgentCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -104,6 +111,32 @@ enum HookCommands {
     Compliance,
     /// Journey test hook: map issues to journey tests
     Journey,
+}
+
+#[derive(Subcommand)]
+enum AgentCommands {
+    /// List all agents, optionally filtered by category
+    List {
+        /// Filter by category
+        #[arg(long)]
+        category: Option<String>,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show full details and prompt for an agent
+    Show {
+        /// Agent name
+        name: String,
+    },
+    /// Search agents by keyword
+    Search {
+        /// Search query
+        query: String,
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -163,6 +196,10 @@ fn main() {
                 return;
             }
         },
+        Commands::Agent { agent_command } => {
+            handle_agent_command(agent_command);
+            return;
+        }
         Commands::Hook { hook_command } => match hook_command {
             HookCommands::PostBuild => {
                 match hooks::post_build::run() {
@@ -197,5 +234,110 @@ fn main() {
     if let Err(e) = result {
         eprintln!("Error: {:?}", e);
         std::process::exit(1);
+    }
+}
+
+fn handle_agent_command(cmd: AgentCommands) {
+    let agents_dir = std::path::Path::new("agents");
+    if !agents_dir.is_dir() {
+        eprintln!("Error: agents/ directory not found. Are you in the specflow root?");
+        std::process::exit(1);
+    }
+
+    let registry = match agents::registry::AgentRegistry::load(agents_dir) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("Error loading agent registry: {}", e);
+            std::process::exit(1);
+        }
+    };
+
+    match cmd {
+        AgentCommands::List { category, json } => {
+            let agents = registry.list(category.as_deref());
+            if json {
+                println!("{}", serde_json::to_string_pretty(&agents).unwrap());
+            } else {
+                let categories = registry.categories();
+                println!(
+                    "{} agents across {} categories\n",
+                    agents.len(),
+                    categories.len()
+                );
+                let mut current_cat = String::new();
+                for agent in &agents {
+                    if agent.category != current_cat {
+                        current_cat = agent.category.clone();
+                        println!(
+                            "{}{}{}",
+                            "\x1b[1;36m",
+                            current_cat.to_uppercase(),
+                            "\x1b[0m"
+                        );
+                    }
+                    println!(
+                        "  {}{:<28}{} {}",
+                        "\x1b[1m", agent.name, "\x1b[0m", agent.description
+                    );
+                }
+            }
+        }
+        AgentCommands::Show { name } => match registry.get(&name) {
+            Some(agent) => {
+                if atty::is(atty::Stream::Stdout) {
+                    println!(
+                        "{}# {}{} ({})\n",
+                        "\x1b[1m", agent.meta.name, "\x1b[0m", agent.meta.category
+                    );
+                    println!("{}", agent.meta.description);
+                    if !agent.meta.inputs.is_empty() {
+                        println!("\nInputs:  {}", agent.meta.inputs.join(", "));
+                    }
+                    if !agent.meta.outputs.is_empty() {
+                        println!("Outputs: {}", agent.meta.outputs.join(", "));
+                    }
+                    if !agent.meta.contracts.is_empty() {
+                        println!("Contracts: {}", agent.meta.contracts.join(", "));
+                    }
+                    println!("\n---\n");
+                }
+                println!("{}", agent.content);
+            }
+            None => {
+                eprintln!("Agent not found: {}", name);
+                let results = registry.search(&name);
+                if !results.is_empty() {
+                    eprintln!("\nDid you mean:");
+                    for r in results.iter().take(3) {
+                        eprintln!("  {}", r.name);
+                    }
+                }
+                std::process::exit(1);
+            }
+        },
+        AgentCommands::Search { query, json } => {
+            let results = registry.search(&query);
+            if json {
+                println!("{}", serde_json::to_string_pretty(&results).unwrap());
+            } else if results.is_empty() {
+                println!("No agents found matching \"{}\"", query);
+            } else {
+                println!(
+                    "{} agents matching \"{}\"\n",
+                    results.len(),
+                    query
+                );
+                for agent in &results {
+                    println!(
+                        "  {}{:<28}{} [{}] {}",
+                        "\x1b[1m",
+                        agent.name,
+                        "\x1b[0m",
+                        agent.category,
+                        agent.description
+                    );
+                }
+            }
+        }
     }
 }

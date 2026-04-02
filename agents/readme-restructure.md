@@ -1,8 +1,15 @@
 ---
 name: readme-restructure
-description: Execute a readme-audit blueprint — shorten the README and create linked docs from existing content
-version: 1.0.0
-invoke: /readme-restructure
+description: Executes a readme-audit blueprint by rewriting the README and creating linked docs
+category: documentation
+trigger: Restructure README
+inputs:
+  - audit-blueprint
+  - readme-path
+outputs:
+  - rewritten-readme
+  - extracted-docs
+contracts: []
 ---
 
 # README Restructure Skill

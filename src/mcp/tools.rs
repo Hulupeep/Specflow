@@ -1,6 +1,7 @@
 use serde_json::{json, Value};
 use std::path::Path;
 
+use crate::agents::registry::AgentRegistry;
 use crate::contracts::loader::{load_contract, load_contracts_from_dir};
 use crate::contracts::scanner;
 
@@ -111,6 +112,33 @@ pub fn tool_definitions() -> Vec<ToolDefinition> {
             }),
         },
         ToolDefinition {
+            name: "specflow_list_agents".into(),
+            description: "List all available agents with their metadata".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "category": {
+                        "type": "string",
+                        "description": "Filter by category (orchestration, compliance, testing, generation, lifecycle, remediation, documentation)"
+                    }
+                }
+            }),
+        },
+        ToolDefinition {
+            name: "specflow_get_agent".into(),
+            description: "Get full agent prompt and metadata by name".into(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "name": {
+                        "type": "string",
+                        "description": "Agent name (e.g. waves-controller, board-auditor)"
+                    }
+                },
+                "required": ["name"]
+            }),
+        },
+        ToolDefinition {
             name: "specflow_defer_journey".into(),
             description: "Defer or undefer a journey contract".into(),
             input_schema: json!({
@@ -151,6 +179,8 @@ pub fn call_tool(name: &str, args: &Value) -> ToolCallResult {
         "specflow_audit_issue" => handle_audit_issue(args),
         "specflow_compile_journeys" => handle_compile_journeys(args),
         "specflow_verify_graph" => handle_verify_graph(args),
+        "specflow_list_agents" => handle_list_agents(args),
+        "specflow_get_agent" => handle_get_agent(args),
         "specflow_defer_journey" => handle_defer_journey(args),
         _ => ToolCallResult::error(format!("Unknown tool: {}", name)),
     }
@@ -545,6 +575,65 @@ fn handle_verify_graph(args: &Value) -> ToolCallResult {
             }
         }
         Err(e) => ToolCallResult::error(format!("Failed to run graph verification: {}", e)),
+    }
+}
+
+fn handle_list_agents(args: &Value) -> ToolCallResult {
+    let category = args["category"].as_str();
+    let agents_dir = Path::new("agents");
+
+    let registry = match AgentRegistry::load(agents_dir) {
+        Ok(r) => r,
+        Err(e) => return ToolCallResult::error(format!("Failed to load agents: {}", e)),
+    };
+
+    let agents = registry.list(category);
+    let agent_list: Vec<Value> = agents
+        .iter()
+        .map(|a| {
+            json!({
+                "name": a.name,
+                "description": a.description,
+                "category": a.category,
+                "trigger": a.trigger
+            })
+        })
+        .collect();
+
+    let result = json!({
+        "agents": agent_list,
+        "total": agent_list.len()
+    });
+    ToolCallResult::text(serde_json::to_string_pretty(&result).unwrap())
+}
+
+fn handle_get_agent(args: &Value) -> ToolCallResult {
+    let name = match args["name"].as_str() {
+        Some(n) => n,
+        None => return ToolCallResult::error("Missing required parameter: name".into()),
+    };
+
+    let agents_dir = Path::new("agents");
+    let registry = match AgentRegistry::load(agents_dir) {
+        Ok(r) => r,
+        Err(e) => return ToolCallResult::error(format!("Failed to load agents: {}", e)),
+    };
+
+    match registry.get(name) {
+        Some(agent) => {
+            let result = json!({
+                "name": agent.meta.name,
+                "description": agent.meta.description,
+                "category": agent.meta.category,
+                "trigger": agent.meta.trigger,
+                "inputs": agent.meta.inputs,
+                "outputs": agent.meta.outputs,
+                "contracts": agent.meta.contracts,
+                "content": agent.content
+            });
+            ToolCallResult::text(serde_json::to_string_pretty(&result).unwrap())
+        }
+        None => ToolCallResult::error(format!("Agent not found: {}", name)),
     }
 }
 

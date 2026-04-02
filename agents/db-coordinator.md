@@ -1,3 +1,16 @@
+---
+name: db-coordinator
+description: Manages shared database resources for a wave preventing migration conflicts
+category: orchestration
+trigger: Spawned by waves-controller
+inputs:
+  - wave-number
+outputs:
+  - migration-assignments
+  - conflict-notifications
+contracts: []
+---
+
 # Agent: db-coordinator
 
 ## Role

@@ -1,3 +1,17 @@
+---
+name: specflow-uplifter
+description: Performs surgical additions to partially-compliant issues to fill missing spec sections
+category: remediation
+trigger: Uplift issues
+inputs:
+  - issue-numbers
+  - missing-sections
+outputs:
+  - uplift-comments
+  - updated-tickets
+contracts: []
+---
+
 # Agent: specflow-uplifter
 
 ## Role

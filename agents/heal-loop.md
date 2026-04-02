@@ -1,3 +1,18 @@
+---
+name: heal-loop
+description: Self-healing fix agent for contract violations using minimal fixes and pattern recognition
+category: remediation
+trigger: Fix contract violations
+inputs:
+  - failed-test-output
+  - contract-yaml
+outputs:
+  - fixed-files
+  - pattern-updates
+  - escalation-report
+contracts: []
+---
+
 # Agent: heal-loop
 
 ## Role

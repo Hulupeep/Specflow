@@ -1,3 +1,19 @@
+---
+name: dependency-mapper
+description: Builds directed dependency graph from GitHub issues and produces sprint waves
+category: orchestration
+trigger: Map dependencies
+inputs:
+  - repo
+  - issue-numbers
+outputs:
+  - dependency-graph
+  - sprint-waves
+  - bottleneck-ranking
+contracts:
+  - feature_specflow_project
+---
+
 # Agent: dependency-mapper
 
 ## Role

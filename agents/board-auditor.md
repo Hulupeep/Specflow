@@ -1,3 +1,20 @@
+---
+name: board-auditor
+description: Scans GitHub issues on a project board and audits specflow compliance
+category: compliance
+trigger: Run board audit
+inputs:
+  - issue-numbers
+  - repo
+  - milestone
+outputs:
+  - compliance-matrix
+  - audit-report
+contracts:
+  - feature_preflight
+  - test_integrity_defaults
+---
+
 # Agent: board-auditor
 
 ## Role

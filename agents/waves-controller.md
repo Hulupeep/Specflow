@@ -1,3 +1,20 @@
+---
+name: waves-controller
+description: Master wave execution orchestrator coordinating all Specflow agents through 8 phases
+category: orchestration
+trigger: Execute waves
+inputs:
+  - project-board
+  - milestone
+  - issue-numbers
+outputs:
+  - wave-execution-results
+  - closed-issues
+contracts:
+  - feature_preflight
+  - feature_specflow_project
+---
+
 # Agent: waves-controller
 
 ## Role

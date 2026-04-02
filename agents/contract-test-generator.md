@@ -1,3 +1,16 @@
+---
+name: contract-test-generator
+description: Creates Jest test files from YAML contract definitions for build-time enforcement
+category: generation
+trigger: Generate contract tests
+inputs:
+  - contract-files
+outputs:
+  - jest-test-files
+  - check-contracts-script
+contracts: []
+---
+
 # Agent: contract-test-generator
 
 ## Role

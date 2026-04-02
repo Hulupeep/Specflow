@@ -1,3 +1,16 @@
+---
+name: migration-builder
+description: Generates production-safe PostgreSQL migrations with RLS triggers and seed data
+category: generation
+trigger: Create migration
+inputs:
+  - issue-number
+  - feature-spec
+outputs:
+  - sql-migration-file
+contracts: []
+---
+
 # Agent: migration-builder
 
 ## Role

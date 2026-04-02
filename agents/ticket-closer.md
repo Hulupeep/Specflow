@@ -1,3 +1,17 @@
+---
+name: ticket-closer
+description: Maps implementation work to GitHub issues adds comments and closes completed issues
+category: lifecycle
+trigger: Close completed issues
+inputs:
+  - commit-range
+  - issue-numbers
+outputs:
+  - implementation-comments
+  - closed-issues
+contracts: []
+---
+
 # Agent: ticket-closer
 
 ## Role

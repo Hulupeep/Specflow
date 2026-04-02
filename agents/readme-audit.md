@@ -1,8 +1,16 @@
 ---
 name: readme-audit
-description: Flow audit a README for a defined target reader and terminal action
-version: 1.0.0
-invoke: /readme-audit
+description: Audits a README as a conversion funnel for target readers and terminal actions
+category: documentation
+trigger: Audit README flow
+inputs:
+  - readme-path
+  - target-reader
+  - terminal-action
+outputs:
+  - audit-table
+  - restructure-blueprint
+contracts: []
 ---
 
 # README Audit Skill

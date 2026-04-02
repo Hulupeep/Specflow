@@ -1,3 +1,18 @@
+---
+name: sprint-executor
+description: Sprint execution coordinator orchestrating parallel implementation waves
+category: orchestration
+trigger: Execute sprint
+inputs:
+  - sprint-wave-plan
+  - issue-list
+outputs:
+  - agent-briefings
+  - completion-tracking
+contracts:
+  - feature_specflow_project
+---
+
 # Agent: sprint-executor
 
 ## Role

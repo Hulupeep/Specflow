@@ -1,3 +1,18 @@
+---
+name: e2e-test-auditor
+description: Scans E2E tests for anti-patterns that silently mask failures
+category: compliance
+trigger: Audit test quality
+inputs:
+  - test-directory
+outputs:
+  - anti-pattern-report
+  - coverage-matrix
+  - health-score
+contracts:
+  - test_integrity_defaults
+---
+
 # Agent: e2e-test-auditor
 
 ## Role

@@ -1,3 +1,19 @@
+---
+name: frontend-builder
+description: Creates React hooks components and feature modules consuming Supabase data
+category: generation
+trigger: Build frontend component
+inputs:
+  - issue-number
+  - feature-spec
+outputs:
+  - hooks
+  - components
+  - barrel-exports
+contracts:
+  - test_integrity_defaults
+---
+
 # Agent: frontend-builder
 
 ## Role

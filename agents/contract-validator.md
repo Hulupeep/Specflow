@@ -1,3 +1,20 @@
+---
+name: contract-validator
+description: Verifies implemented code satisfies Specflow acceptance criteria from GitHub issues
+category: compliance
+trigger: Validate implementation
+inputs:
+  - issue-numbers
+outputs:
+  - validation-report
+  - coverage-matrix
+contracts:
+  - security_defaults
+  - accessibility_defaults
+  - test_integrity_defaults
+  - production_readiness_defaults
+---
+
 # Agent: contract-validator
 
 ## Role
