@@ -210,28 +210,35 @@ echo "--------------------------"
 if [ -f "CLAUDE.md" ]; then
     check_pass "CLAUDE.md exists"
 
+    # Check for Specflow Rules section (the minimum required)
+    if grep -q "Specflow Rules" CLAUDE.md 2>/dev/null; then
+        check_pass "CLAUDE.md has Specflow Rules section"
+    else
+        check_fail "CLAUDE.md is missing Specflow Rules — Claude won't enforce contracts or commit format"
+    fi
+
     # Check for contract-related content
     if grep -qi "contract" CLAUDE.md; then
         check_pass "CLAUDE.md mentions contracts"
     else
-        check_warn "CLAUDE.md should include contract enforcement instructions"
+        check_fail "CLAUDE.md has no contract references — Claude won't check docs/contracts/ before edits"
     fi
 
     # Check for unfilled template placeholders
     if grep -q '\[org/repo-name\]' CLAUDE.md 2>/dev/null || grep -q '\[GitHub Issues | Jira' CLAUDE.md 2>/dev/null; then
-        check_warn "CLAUDE.md still has template placeholders — fill in your project context"
+        check_fail "CLAUDE.md still has template placeholders — fill in Project Context (Repository, Board, CLI, Tech Stack)"
     else
         check_pass "CLAUDE.md has no unfilled template placeholders"
     fi
 
-    # Check for architecture section
-    if grep -qi "architecture\|arch-" CLAUDE.md; then
-        check_pass "CLAUDE.md has architecture guidance"
+    # Check for commit rule
+    if grep -q "NEVER run.*git commit" CLAUDE.md 2>/dev/null || grep -q "Commits Must Reference" CLAUDE.md 2>/dev/null; then
+        check_pass "CLAUDE.md has commit-must-reference-issue rule"
     else
-        check_warn "CLAUDE.md should document architectural constraints"
+        check_warn "CLAUDE.md missing commit rule — Claude may commit without issue numbers"
     fi
 else
-    check_warn "No CLAUDE.md found (recommended for LLM guidance)"
+    check_fail "No CLAUDE.md found — Claude has no Specflow context. Run: npx @colmbyrne/specflow init ."
 fi
 
 echo ""
