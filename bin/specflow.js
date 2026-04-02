@@ -59,7 +59,7 @@ const COMMANDS = {
         { name: 'Journey ID', pattern: /J-[A-Z0-9]+(-[A-Z0-9]+)*/,  },
         { name: 'data-testid', pattern: /data-testid/i,  },
         { name: 'SQL', pattern: /CREATE\s+(TABLE|FUNCTION|OR REPLACE FUNCTION)/i,  },
-        { name: 'RLS', pattern: /CREATE\s+POLICY|ENABLE\s+ROW\s+LEVEL\s+SECURITY|RLS/i,  },
+        { name: 'RLS', pattern: /CREATE\s+POLICY|ENABLE\s+ROW\s+LEVEL\s+SECURITY|ROW\s+LEVEL\s+SECURITY/i,  },
         { name: 'Invariants', pattern: /I-[A-Z]{2,}-\d+/,  },
         { name: 'TypeScript', pattern: /(?:interface|type)\s+\w+/,  },
         { name: 'Scope', pattern: /In Scope|Not In Scope/i,  },
