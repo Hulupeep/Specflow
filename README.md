@@ -14,15 +14,13 @@ LLMs drift. You write a rule; three iterations later the model "helpfully" ignor
 const token = localStorage.getItem('auth') // No crash. Just drift.
 ```
 
-**LLMs don't read. They attend.** Your carefully worded spec competes with millions of training examples. Three hours into a session, the model drifts while presenting itself as knowing exactly what you're working on. You can't fix this with better prompts. You need a gate.
+**LLMs don't read. They attend.** Your spec competes with millions of training examples. You can't fix this with better prompts. You need a gate.
 
 ---
 
 ## The Solution
 
-Contract tests scan your source code for forbidden patterns. Break a rule → CI fails before build. Journey tests run Playwright against your critical flows. If a journey doesn't pass, the feature isn't done.
-
-> *Do what you like — explore, generate, surprise me — but I'm going to type-check you at the end.*
+Contract tests scan your source code for forbidden patterns. Break a rule → build fails. Journey tests run Playwright against your critical flows. If a journey doesn't pass, the feature isn't done.
 
 ---
 
@@ -32,24 +30,17 @@ Contract tests scan your source code for forbidden patterns. Break a rule → CI
 npx @colmbyrne/specflow init .
 ```
 
-That's it. Creates contracts, agents, hooks, tests, CLAUDE.md with Specflow rules, and verifies everything passes. No cloning, no samples, no demo files.
+Creates CLAUDE.md, contracts, hooks, agents, and tests. Then fill in the **Project Context** section in CLAUDE.md (Repository, Board, CLI, Tech Stack).
 
-**Then fill in the Project Context section in CLAUDE.md** and tell Claude Code:
-
-```
-Execute waves
-```
-
-### Other commands
+### Commands
 
 ```bash
+npx @colmbyrne/specflow init .          # Set up Specflow (safe to re-run)
 npx @colmbyrne/specflow verify          # Check installation (13 sections)
 npx @colmbyrne/specflow update . --ci   # Update hooks + install CI workflows
 npx @colmbyrne/specflow audit 500       # Audit issue #500 for compliance
 npx @colmbyrne/specflow graph           # Validate contract cross-references
 ```
-
-For all setup paths (manual, SKILL.md, Claude-assisted), see [Getting Started](docs/getting-started.md).
 
 ---
 
@@ -79,9 +70,9 @@ For all setup paths (manual, SKILL.md, Claude-assisted), see [Getting Started](d
 
 | | |
 |---|---|
-| [Getting Started](docs/getting-started.md) | Install, configure, verify |
+| [Detailed Setup](docs/getting-started.md) | Manual paths, updating, SKILL.md |
 | [Agent Library](agents/README.md) | 30+ agents for wave execution |
 | [Contract Schema](CONTRACT-SCHEMA.md) | YAML format for contracts |
 | [CI Integration](CI-INTEGRATION.md) | GitHub Actions setup |
-| [npm package](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
+| [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
 | [Issues](https://github.com/Hulupeep/Specflow/issues) | Bugs and ideas |
