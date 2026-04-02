@@ -1,8 +1,13 @@
 [package]
 name = "specflow"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 description = "Specs that enforce themselves — contract-driven development CLI"
+license = "MIT"
+repository = "https://github.com/fall-development-rob/Specflow"
+homepage = "https://github.com/fall-development-rob/Specflow"
+keywords = ["specflow", "contracts", "llm", "enforcement", "testing"]
+categories = ["command-line-utilities", "development-tools"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
@@ -14,3 +19,8 @@ glob = "0.3"
 colored = "2"
 walkdir = "2"
 anyhow = "1"
+
+[profile.release]
+strip = true
+lto = true
+opt-level = "z"

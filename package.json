@@ -12,17 +12,23 @@
   },
   "files": [
     "bin/",
+    "src/",
     "hooks/",
     "templates/",
     "agents/",
-    "scripts/",
-    "docs/",
+    "scripts/specflow-compile.cjs",
+    "scripts/verify-graph.cjs",
+    "scripts/install.sh",
+    "examples/",
     "CLAUDE.md",
     "CLAUDE-MD-TEMPLATE.md",
-    "SKILL.md"
+    "SKILL.md",
+    "CI-INTEGRATION.md",
+    "LICENSE"
   ],
   "scripts": {
     "postinstall": "echo '' && echo '╔═══════════════════════════════════════════════════════╗' && echo '║  @colmbyrne/specflow installed                       ║' && echo '╠═══════════════════════════════════════════════════════╣' && echo '║                                                       ║' && echo '║  Run in EACH project you want to enforce:             ║' && echo '║                                                       ║' && echo '║    npx @colmbyrne/specflow init .                     ║' && echo '║                                                       ║' && echo '║  This creates hooks, contracts, agents, tests, and    ║' && echo '║  CLAUDE.md (or appends rules to your existing one).   ║' && echo '║  Then fill in the Project Context in CLAUDE.md.       ║' && echo '║                                                       ║' && echo '╚═══════════════════════════════════════════════════════╝' && echo ''",
+    "build:rust": "cargo build --release",
     "test": "jest --no-coverage",
     "test:contracts": "jest tests/contracts/ --no-coverage",
     "test:hooks": "jest tests/hooks/ --no-coverage",
