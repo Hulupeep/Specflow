@@ -32,9 +32,9 @@ Contract tests scan your source code for forbidden patterns. Break a rule → CI
 npx @colmbyrne/specflow init .
 ```
 
-That's it. Creates contracts, agents, hooks, tests, and verifies everything passes. No cloning, no samples, no demo files.
+That's it. Creates contracts, agents, hooks, tests, CLAUDE.md with Specflow rules, and verifies everything passes. No cloning, no samples, no demo files.
 
-**Then update CLAUDE.md** with your project context and tell Claude Code:
+**Then fill in the Project Context section in CLAUDE.md** and tell Claude Code:
 
 ```
 Execute waves

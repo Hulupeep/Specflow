@@ -43,14 +43,15 @@ bash /path/to/Specflow/setup-project.sh .
 | 4 | Copies scripts and examples | `scripts/`, `examples/` |
 | 5 | Creates `package.json` and `jest.config.js` | npm test scripts configured |
 | 6 | Creates test infrastructure | `tests/helpers/contract-loader.js`, `tests/contracts/contract-schema.test.js` |
-| 7 | Creates `.specflow/baseline.json` and `.defer-journal` | State tracking files |
-| 8 | Initializes git + commit-msg hook | Enforces issue numbers in commits |
-| 9 | Installs Claude Code hooks | `.claude/hooks/`, `.claude/settings.json` |
-| 10 | Runs `npm install`, `npm test`, `verify-setup.sh` | Verifies everything works |
+| 7 | Creates CLAUDE.md with Specflow rules | Or appends rules to existing CLAUDE.md |
+| 8 | Creates `.specflow/baseline.json` and `.defer-journal` | State tracking files |
+| 9 | Initializes git + commit-msg hook | Enforces issue numbers in commits |
+| 10 | Installs Claude Code hooks | `.claude/hooks/`, `.claude/settings.json` |
+| 11 | Runs `npm install`, `npm test`, `verify-setup.sh` | Verifies everything works |
 
 **After the script finishes:**
 
-1. Update `CLAUDE.md` with your project context (repo, board, tech stack)
+1. Fill in the **Project Context** section in `CLAUDE.md` (Repository, Board, CLI, Tech Stack)
 2. Tell Claude: "Create a specflow contract for [your feature]"
 3. Tell Claude: "Execute waves"
 
@@ -320,22 +321,25 @@ This installs:
 - `.claude/hooks/post-push-ci.sh` — polls GitHub Actions after push
 - `.claude/hooks/session-start.sh` — placeholder for session init
 
-### Step 12: Create CLAUDE.md
+### Step 12: Fill in CLAUDE.md
 
-Use the template:
+If you used Path A (`npx init` or `setup-project.sh`), CLAUDE.md was already created with Specflow rules. Fill in the Project Context:
+
+```markdown
+**Repository:** your-org/your-repo
+**Project Board:** GitHub Issues
+**Board CLI:** gh
+**Tech Stack:** React, Node, Supabase
+```
+
+If you followed the manual steps above and don't have CLAUDE.md yet:
 
 ```bash
-cp /path/to/Specflow/CLAUDE-MD-TEMPLATE.md ./CLAUDE-MD-TEMPLATE-REF.md
+npx @colmbyrne/specflow init .
+# This will create CLAUDE.md without overwriting anything else
 ```
 
-Then tell Claude Code:
-
-```
-Use CLAUDE-MD-TEMPLATE-REF.md to create my CLAUDE.md.
-My project is [name], repo is [org/repo], tech stack is [stack].
-```
-
-Or create it manually — the template has clear placeholders to fill in.
+For the full template with wave execution and agent teams, see [CLAUDE-MD-TEMPLATE.md](../CLAUDE-MD-TEMPLATE.md).
 
 ### Step 13: Install dependencies and verify
 
@@ -423,7 +427,7 @@ This fills in anything Claude missed.
 | `.claude/.defer-journal` | Scoped journey test deferrals | setup script |
 | `package.json` | npm scripts for test/verify/compile | setup script |
 | `jest.config.js` | Jest configuration | setup script |
-| `CLAUDE.md` | Project rules, contract refs, agent config | manual / LLM |
+| `CLAUDE.md` | Specflow rules, contract refs, project context | setup script (fill in context) |
 
 ---
 
