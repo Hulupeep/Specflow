@@ -24,8 +24,9 @@ npm test -- contracts       # Contract tests only
 npm test -- journeys        # Journey tests only
 
 # Setup
-bash install-hooks.sh .     # Install Claude Code hooks
-./verify-setup.sh           # Check all 10 setup sections
+npx @colmbyrne/specflow init .   # Full setup (recommended)
+bash install-hooks.sh .          # Install Claude Code hooks only
+./verify-setup.sh                # Check all 13 setup sections
 
 # CSV compilation
 npm run compile:journeys -- path/to/journeys.csv
@@ -80,7 +81,8 @@ tests/
   config.json                   # Model routing, overrides
   fix-patterns.json             # Fix pattern store
 .claude/
-  .defer-tests                  # Touch to skip hook-triggered tests
+  .defer-tests                  # Touch to skip all hook-triggered tests
+  .defer-journal                # Per-journey deferral (J-ID + tracking issue)
   .defer-ci-check               # Touch to skip CI polling
 ```
 

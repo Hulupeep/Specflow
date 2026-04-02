@@ -43,7 +43,10 @@ Exit 0 (pass) or Exit 2 (fail → blocks with error to Claude)
 ## Installation
 
 ```bash
-# From your project root
+# From your project root (recommended)
+npx @colmbyrne/specflow init .
+
+# Or if you have Specflow cloned locally
 bash Specflow/install-hooks.sh .
 
 # Or manually
@@ -112,6 +115,8 @@ rm .claude/.defer-tests
 ```
 
 When deferred, hook outputs: `"Tests deferred. Run 'rm .claude/.defer-tests' to re-enable."`
+
+**Per-journey deferral:** For finer control, use `.claude/.defer-journal` instead. This file lets you defer specific journey IDs (e.g., `J-SIGNUP-FLOW`) rather than all tests. Each deferral must reference a tracking issue. See the journal file for format details.
 
 ---
 
@@ -285,4 +290,5 @@ Claude: [runs ALL tests - slow, noisy]
 | Issue body | `J-XXX` journey contracts define what to test |
 | Test naming | `journey_xxx.spec.ts` maps from contracts |
 | Hooks | Auto-trigger after build/commit |
-| Defer flag | `.claude/.defer-tests` skips when needed |
+| Defer flag | `.claude/.defer-tests` skips all tests when needed |
+| Defer journal | `.claude/.defer-journal` skips specific journey IDs (per-journey deferral) |

@@ -48,7 +48,7 @@ Architecture + Features + Journeys = The Product
 
 | Integration | What It Does |
 |-------------|--------------|
-| **Claude Code** | Skills, hooks, CLAUDE.md enforcement, 23+ Task Tool agents |
+| **Claude Code** | Skills, hooks, CLAUDE.md enforcement, 30+ Task Tool agents |
 | **Agent Teams** | Persistent teammate coordination via TeammateTool API (Claude Code 4.6+) |
 | **Any LLM** | Contracts work with any model — contract tests catch drift regardless |
 

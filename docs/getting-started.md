@@ -365,7 +365,7 @@ Then in Claude Code: `/specflow`
 
 SKILL.md packages the core Specflow loop into a single portable file. No other Specflow files required.
 
-For the full 23+ agent experience, use Path A or see [agents/README.md](../agents/README.md).
+For the full 30+ agent experience, use Path A or see [agents/README.md](../agents/README.md).
 
 ---
 
