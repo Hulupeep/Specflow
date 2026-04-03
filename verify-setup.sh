@@ -215,7 +215,15 @@ if [ -f "CLAUDE.md" ]; then
 
     # Project Context — agents use gh against this repo
     if grep -q '^\*\*Repository:\*\*' CLAUDE.md 2>/dev/null && ! grep -q '\[org/repo-name\]' CLAUDE.md 2>/dev/null; then
-        check_pass "Repository filled in"
+        DECLARED_REPO=$(grep '^\*\*Repository:\*\*' CLAUDE.md 2>/dev/null | sed 's/.*\*\*Repository:\*\*[[:space:]]*//' | tr -d '*' | xargs)
+        GIT_REMOTE=$(git config --get remote.origin.url 2>/dev/null | sed 's|.*github.com[:/]||; s|\.git$||')
+        if [ -n "$GIT_REMOTE" ] && [ -n "$DECLARED_REPO" ] && echo "$GIT_REMOTE" | grep -qi "$DECLARED_REPO"; then
+            check_pass "Repository: $DECLARED_REPO (matches git remote)"
+        elif [ -n "$GIT_REMOTE" ] && [ -n "$DECLARED_REPO" ]; then
+            check_warn "Repository: $DECLARED_REPO — does not match git remote ($GIT_REMOTE)"
+        else
+            check_pass "Repository filled in: $DECLARED_REPO"
+        fi
     elif grep -q '\[org/repo-name\]' CLAUDE.md 2>/dev/null; then
         check_fail "Repository is placeholder [org/repo-name] — agents can't find your issues"
     else
@@ -229,7 +237,15 @@ if [ -f "CLAUDE.md" ]; then
     fi
 
     if grep -q '^\*\*Board CLI:\*\*' CLAUDE.md 2>/dev/null && ! grep -q '\[gh | jira' CLAUDE.md 2>/dev/null; then
-        check_pass "Board CLI filled in"
+        # C1: Also check if the declared CLI is actually installed
+        DECLARED_CLI=$(grep '^\*\*Board CLI:\*\*' CLAUDE.md 2>/dev/null | sed 's/.*\*\*Board CLI:\*\*[[:space:]]*//' | awk '{print $1}' | tr -d '*')
+        if [ -n "$DECLARED_CLI" ] && command -v "$DECLARED_CLI" &> /dev/null; then
+            check_pass "Board CLI: $DECLARED_CLI (installed)"
+        elif [ -n "$DECLARED_CLI" ]; then
+            check_fail "Board CLI: $DECLARED_CLI is declared but NOT INSTALLED — hooks will crash when fetching issues"
+        else
+            check_pass "Board CLI filled in"
+        fi
     else
         check_fail "Board CLI missing or placeholder — all issue automation broken"
     fi

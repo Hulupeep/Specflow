@@ -44,7 +44,11 @@ const COMMANDS = {
       // Fetch and check compliance markers
       const body = execSilent(`gh issue view ${issue} --json title,body,comments`);
       if (!body) {
-        console.error(`Could not fetch issue #${issue}. Is gh authenticated?`);
+        const repo = execSilent('git config --get remote.origin.url')?.trim() || 'unknown';
+        console.error(`Could not fetch issue #${issue}.`);
+        console.error(`  Repo: ${repo}`);
+        console.error(`  Check: gh auth status`);
+        console.error(`  Check: gh issue view ${issue}`);
         process.exit(1);
       }
       const parsed = JSON.parse(body);

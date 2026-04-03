@@ -49,6 +49,7 @@ else
   BASE_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/hooks"
   TEMPLATES_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/templates/hooks"
 
+  # NOTE: This list must be updated when new hooks are added to hooks/
   for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh commit-msg README.md; do
     curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
       echo -e "${YELLOW}Warning: Could not download $file${NC}"
@@ -104,13 +105,13 @@ echo ""
 
 echo -e "${BLUE}[3/5]${NC} Installing hook files..."
 
-# Copy main hook scripts
-for script in post-build-check.sh run-journey-tests.sh check-pipeline-compliance.sh session-start.sh; do
-  if [ -f "$HOOKS_DIR/$script" ]; then
-    cp "$HOOKS_DIR/$script" "$TARGET_DIR/.claude/hooks/"
-    chmod +x "$TARGET_DIR/.claude/hooks/$script"
-    echo -e "${GREEN}✓${NC} Installed .claude/hooks/$script"
-  fi
+# Copy all hook scripts (dynamic — picks up new hooks automatically)
+for script in "$HOOKS_DIR"/*.sh; do
+  [ -f "$script" ] || continue
+  SCRIPT_NAME=$(basename "$script")
+  cp "$script" "$TARGET_DIR/.claude/hooks/"
+  chmod +x "$TARGET_DIR/.claude/hooks/$SCRIPT_NAME"
+  echo -e "${GREEN}✓${NC} Installed .claude/hooks/$SCRIPT_NAME"
 done
 
 # Copy template hooks (post-push-ci.sh)

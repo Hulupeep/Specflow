@@ -45,8 +45,8 @@ fi
 # Function to extract issue numbers from recent git commits
 get_recent_issues() {
     cd "$PROJECT_DIR"
-    # Get issues from last 5 commits
-    git log -5 --pretty=format:"%s %b" 2>/dev/null | grep -oE '#[0-9]+' | sort -u | tr -d '#'
+    # Get issues from last 20 commits (covers feature branches with many commits)
+    git log -20 --pretty=format:"%s %b" 2>/dev/null | grep -oE '#[0-9]+' | sort -u | tr -d '#'
 }
 
 # Function to get journey contracts from an issue (body + comments)

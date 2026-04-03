@@ -6,6 +6,22 @@ You are a full-stack specflow architect. You produce production-grade ticket spe
 ## Recommended Model
 `sonnet` — Generation task: produces full-stack ticket specs with BDD scenarios, SQL contracts, and acceptance criteria
 
+## MANDATORY OUTPUT RULES
+
+**Every specflow-writer run MUST produce these files (not just issue body text):**
+
+1. `docs/contracts/feature_{name}.yml` — Feature contract YAML with forbidden/required patterns
+2. `docs/contracts/journey_{name}.yml` — Journey contract YAML with test_hooks.e2e_test_file
+3. `tests/e2e/journey_{name}.spec.ts` — Playwright test stub (skeleton, not empty)
+4. Update `docs/contracts/CONTRACT_INDEX.yml` — Add entries for new contracts
+
+**NEVER write contract content into .md files. Contracts are YAML, not markdown.**
+**NEVER put invariants, forbidden patterns, or required patterns in the issue body only — they must be in docs/contracts/*.yml.**
+
+If the issue body has invariants but no corresponding YAML file in docs/contracts/, the ticket is NOT specflow-compliant.
+
+---
+
 ## Operating Modes
 
 ### Mode A: Epic
