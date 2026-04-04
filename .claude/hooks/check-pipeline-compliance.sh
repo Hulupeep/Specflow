@@ -15,28 +15,73 @@ set -e
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 VIOLATIONS=()
 
-# ─── Check 1: Playwright tests without journey contracts ───────────────────
-# If tests/e2e/journey_*.spec.ts exists, the matching docs/contracts/journey_*.yml MUST exist
+# ─── Build list of test directories to search ──────────────────────────────
+# Default: tests/e2e/ in project root
+# Monorepo: also search subdirectories and .specflow/config.json paths
+TEST_DIRS=("$PROJECT_DIR/tests/e2e")
 
-for test_file in "$PROJECT_DIR"/tests/e2e/journey_*.spec.ts; do
-    [ -f "$test_file" ] || continue
-    base=$(basename "$test_file" .spec.ts)
-    contract="$PROJECT_DIR/docs/contracts/${base}.yml"
-    if [ ! -f "$contract" ]; then
-        VIOLATIONS+=("PIPELINE SKIP: $test_file exists but $contract is missing. Run: npm run compile:journeys")
-    fi
+# Add subdirectory test dirs (monorepo support)
+for subdir in "$PROJECT_DIR"/*/tests/e2e; do
+    [ -d "$subdir" ] && TEST_DIRS+=("$subdir")
+done
+for subdir in "$PROJECT_DIR"/packages/*/tests/e2e "$PROJECT_DIR"/apps/*/tests/e2e; do
+    [ -d "$subdir" ] && TEST_DIRS+=("$subdir")
+done
+
+# Add paths from .specflow/config.json if it exists
+if [ -f "$PROJECT_DIR/.specflow/config.json" ] && command -v jq &> /dev/null; then
+    extra_dirs=$(jq -r '.e2e_test_dirs[]? // empty' "$PROJECT_DIR/.specflow/config.json" 2>/dev/null)
+    while IFS= read -r dir; do
+        [ -n "$dir" ] && [ -d "$PROJECT_DIR/$dir" ] && TEST_DIRS+=("$PROJECT_DIR/$dir")
+    done <<< "$extra_dirs"
+fi
+
+# Helper: find a test file across all test directories
+find_test_file() {
+    local base="$1"
+    for dir in "${TEST_DIRS[@]}"; do
+        local candidate="$dir/${base}.spec.ts"
+        if [ -f "$candidate" ]; then
+            echo "$candidate"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# ─── Check 1: Playwright tests without journey contracts ───────────────────
+# If journey_*.spec.ts exists in any test dir, the matching docs/contracts/journey_*.yml MUST exist
+
+for dir in "${TEST_DIRS[@]}"; do
+    for test_file in "$dir"/journey_*.spec.ts; do
+        [ -f "$test_file" ] || continue
+        base=$(basename "$test_file" .spec.ts)
+        contract="$PROJECT_DIR/docs/contracts/${base}.yml"
+        if [ ! -f "$contract" ]; then
+            VIOLATIONS+=("PIPELINE SKIP: $test_file exists but $contract is missing. Run: npm run compile:journeys")
+        fi
+    done
 done
 
 # ─── Check 2: Journey contracts without test files ─────────────────────────
-# If docs/contracts/journey_*.yml exists, the matching tests/e2e/journey_*.spec.ts MUST exist
+# If docs/contracts/journey_*.yml exists, check test_hooks.e2e_test_file first, then search all test dirs
 
 for contract in "$PROJECT_DIR"/docs/contracts/journey_*.yml; do
     [ -f "$contract" ] || continue
     base=$(basename "$contract" .yml)
-    test_file="$PROJECT_DIR/tests/e2e/${base}.spec.ts"
-    if [ ! -f "$test_file" ]; then
-        VIOLATIONS+=("ORPHAN CONTRACT: $contract exists but $test_file is missing. Generate stubs: npm run compile:journeys")
+
+    # First: check if contract declares a specific test file path
+    declared_test=$(grep -A1 'test_hooks' "$contract" 2>/dev/null | grep 'e2e_test_file' | sed 's/.*e2e_test_file:[[:space:]]*//' | tr -d '"' | tr -d "'" | xargs)
+    if [ -n "$declared_test" ] && [ -f "$PROJECT_DIR/$declared_test" ]; then
+        continue  # Contract points to a real file — compliant
     fi
+
+    # Second: search all test directories
+    if find_test_file "$base" > /dev/null 2>&1; then
+        continue  # Found in one of the test dirs — compliant
+    fi
+
+    VIOLATIONS+=("ORPHAN CONTRACT: $contract exists but no matching test file found in: ${TEST_DIRS[*]}")
 done
 
 # ─── Check 3: CSV journeys defined but not compiled ────────────────────────
@@ -62,13 +107,15 @@ if [ "$csv_count" -gt 0 ] && [ "$contract_count" -eq 0 ]; then
 fi
 
 # ─── Check 4: Feature contract exists for components ───────────────────────
-# If app/src/components/ has .tsx files, docs/contracts/feature_*.yml must exist
+# Search for .tsx component files across common locations
 
 component_count=0
 feature_contract_count=0
-for comp in "$PROJECT_DIR"/app/src/components/*.tsx; do
-    [ -f "$comp" ] || continue
-    component_count=$((component_count + 1))
+for comp_dir in "$PROJECT_DIR"/app/src/components "$PROJECT_DIR"/src/components "$PROJECT_DIR"/*/src/components "$PROJECT_DIR"/packages/*/src/components; do
+    for comp in "$comp_dir"/*.tsx; do
+        [ -f "$comp" ] || continue
+        component_count=$((component_count + 1))
+    done
 done
 for fc in "$PROJECT_DIR"/docs/contracts/feature_*.yml; do
     [ -f "$fc" ] || continue
@@ -76,17 +123,19 @@ for fc in "$PROJECT_DIR"/docs/contracts/feature_*.yml; do
 done
 
 if [ "$component_count" -gt 0 ] && [ "$feature_contract_count" -eq 0 ]; then
-    VIOLATIONS+=("MISSING CONTRACTS: $component_count component(s) in app/src/components/ but no feature contracts in docs/contracts/")
+    VIOLATIONS+=("MISSING CONTRACTS: $component_count component(s) found but no feature contracts in docs/contracts/")
 fi
 
 # ─── Check 5: Playwright test stubs (TODO markers) ────────────────────────
-# If a journey test file still has // TODO: Implement, it's a stub not a real test
+# Search all test directories for stubs
 
-for test_file in "$PROJECT_DIR"/tests/e2e/journey_*.spec.ts; do
-    [ -f "$test_file" ] || continue
-    if grep -q "// TODO: Implement" "$test_file" 2>/dev/null; then
-        VIOLATIONS+=("STUB TEST: $test_file still has TODO stubs. Fill in real Playwright assertions.")
-    fi
+for dir in "${TEST_DIRS[@]}"; do
+    for test_file in "$dir"/journey_*.spec.ts; do
+        [ -f "$test_file" ] || continue
+        if grep -q "// TODO: Implement" "$test_file" 2>/dev/null; then
+            VIOLATIONS+=("STUB TEST: $test_file still has TODO stubs. Fill in real Playwright assertions.")
+        fi
+    done
 done
 
 # ─── Report ────────────────────────────────────────────────────────────────

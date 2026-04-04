@@ -1,6 +1,6 @@
 {
   "name": "@colmbyrne/specflow",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "Specs that enforce themselves. Contract tests, journey hooks, and agent orchestration for LLM-driven development.",
   "license": "MIT",
   "repository": {
