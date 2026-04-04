@@ -205,11 +205,13 @@ main() {
 
         # Check: test file must not be entirely skipped
         if grep -qE 'test\.skip|test\.fixme|describe\.skip' "$full_path" 2>/dev/null; then
-            # Count total tests vs skipped tests
-            local total_tests=$(grep -cE '^\s*(test|it)\s*\(' "$full_path" 2>/dev/null || echo 0)
-            local skipped_tests=$(grep -cE '^\s*(test|it)\.skip\s*\(' "$full_path" 2>/dev/null || echo 0)
-            if [ "$total_tests" -gt 0 ] && [ "$skipped_tests" -eq "$total_tests" ]; then
-                echo "  ❌ $tf: ALL $total_tests tests are skipped — skipped tests do not satisfy journey contracts" >&2
+            # Count all test declarations (including .skip, .fixme, .only variants)
+            local total_tests=$(grep -cE '^\s*(test|it)(\s*\.skip|\s*\.fixme|\s*\.only)?\s*\(' "$full_path" 2>/dev/null || echo "0")
+            local skipped_tests=$(grep -cE '^\s*(test|it)\.(skip|fixme)\s*\(' "$full_path" 2>/dev/null || echo "0")
+            total_tests="${total_tests// /}"
+            skipped_tests="${skipped_tests// /}"
+            if [ "$total_tests" -gt 0 ] && [ "$skipped_tests" -ge "$total_tests" ]; then
+                echo "  ❌ $tf: ALL $skipped_tests tests are skipped — skipped tests do not satisfy journey contracts" >&2
                 AUDIT_FAILED=1
             elif [ "$skipped_tests" -gt 0 ]; then
                 echo "  ⚠ $tf: $skipped_tests/$total_tests tests skipped" >&2
@@ -230,7 +232,8 @@ main() {
             [ -f "$contract_file" ] || continue
 
             # Extract required_patterns from test_hooks section
-            local req_patterns=$(sed -n '/required_patterns:/,/^[^ ]/p' "$contract_file" 2>/dev/null | grep -E '^\s*-' | sed 's/.*- *//' | tr -d '"' | tr -d "'")
+            # YAML may have double-escaped backslashes (\\.) — convert to single (\.)
+            local req_patterns=$(sed -n '/required_patterns:/,/^[^ ]/p' "$contract_file" 2>/dev/null | grep -E '^\s*-' | sed 's/.*- *//' | tr -d '"' | tr -d "'" | sed 's/\\\\/\\/g')
             while IFS= read -r pattern; do
                 [ -z "$pattern" ] && continue
                 # Strip /regex/ delimiters if present
@@ -242,7 +245,7 @@ main() {
             done <<< "$req_patterns"
 
             # Extract forbidden_patterns from test_hooks section
-            local forb_patterns=$(sed -n '/test_hooks:/,/^[a-z]/p' "$contract_file" 2>/dev/null | sed -n '/forbidden_patterns:/,/^[^ ]/p' | grep -E '^\s*-' | sed 's/.*- *//' | tr -d '"' | tr -d "'")
+            local forb_patterns=$(sed -n '/test_hooks:/,/^[a-z]/p' "$contract_file" 2>/dev/null | sed -n '/forbidden_patterns:/,/^[^ ]/p' | grep -E '^\s*-' | sed 's/.*- *//' | tr -d '"' | tr -d "'" | sed 's/\\\\/\\/g')
             while IFS= read -r pattern; do
                 [ -z "$pattern" ] && continue
                 local bare_pattern=$(echo "$pattern" | sed 's|^/||; s|/$||')
