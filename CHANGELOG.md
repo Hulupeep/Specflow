@@ -2,11 +2,15 @@
 
 All notable changes to `@colmbyrne/specflow`.
 
+**Update:** `npx @colmbyrne/specflow update . --ci` then `npx @colmbyrne/specflow verify`
+
 ---
 
 ## 0.3.0 (2026-04-04)
 
-**Journey test honesty** — Specflow no longer trusts that tests exist. It verifies they exercise the real path.
+**Journey test honesty** — Specflow now checks your tests actually run, not just that the file exists.
+
+If your tests use `test.skip()`, mock everything, or just scan code with regex, the hook will block and tell you why. This came from the HookTunnel canary incident (HOOK-724–727) where 4 test files passed all checks but none exercised the real path. Platform canary was broken for weeks.
 
 - `run-journey-tests.sh` audits test files BEFORE running them:
   - No `page.goto` or `request.*` calls → fail (not a real journey test)
@@ -18,83 +22,58 @@ All notable changes to `@colmbyrne/specflow`.
 - `verify-graph.cjs`: validates new pattern fields compile as valid regex
 - `specflow-writer.md`: MANDATORY OUTPUT RULES at top — always create `.yml` files, never markdown
 
-**Why:** HOOK-724–727 incident. Tests existed, passed all checks, but were regex scans and `test.skip()` — never exercised the real path. Platform canary was broken for weeks.
+Also in this release:
+- Contracts must be YAML in `docs/contracts/` — not markdown. Claude is now blocked from writing invariants into `.md` files.
+- `specflow-writer` agent has MANDATORY OUTPUT RULES at top — always creates `.yml` files
 
 ---
 
 ## 0.2.0 (2026-04-04)
 
-**End-to-end simulation fixes** — 6 critical/high gaps found by running a full user journey simulation.
+**CLAUDE.md is verified properly** — checks your project context is real, not just filled in.
 
-- `verify-setup.sh`: Board CLI checked for actual installation (not just string filled in CLAUDE.md)
-- `verify-setup.sh`: Repository compared against `git remote` URL
-- `run-journey-tests.sh`: `git log` depth increased from 5 to 20 (feature branches with many commits)
-- `bin/specflow.js`: audit error now shows repo URL and diagnostic commands
-- `install-hooks.sh`: copies all `*.sh` from hooks/ dynamically (new hooks picked up automatically)
-- `specflow-writer.md`: MANDATORY OUTPUT RULES added at top
+- Board CLI: checks the binary is actually installed (not just the string in CLAUDE.md)
+- Repository: compared against `git remote` URL — warns if they don't match
+- Feature branches: `git log` depth increased from 5 to 20 (commits with issue numbers weren't found)
+- Audit errors: now show which repo and how to diagnose
+- Hook updates: `install-hooks.sh` copies all `*.sh` dynamically (new hooks auto-installed)
 
 ---
 
 ## 0.1.11 (2026-04-04)
 
-- `verify-setup.sh` section 13: subset match for `settings.json` matchers instead of exact diff
-- Catches "Write wired but Edit missing" — Dominik's exact issue
+**Settings.json matcher check fixed** — was doing an exact diff (always warned if you had custom hooks). Now checks each required Specflow matcher individually. Catches "Write wired but Edit missing" specifically.
 
 ## 0.1.10 (2026-04-04)
 
-- Fix bash syntax error: apostrophe in "don't" broke single-quoted block in `setup-project.sh`
+**Bug fix** — apostrophe in "don't" broke `setup-project.sh` on Mac/Linux.
 
 ## 0.1.9 (2026-04-04)
 
-- All fix commands in `verify-setup.sh` now use `npx @colmbyrne/specflow` instead of raw bash paths
+**Fix commands use npx** — `verify-setup.sh` no longer prints ugly `/Users/x/.npm/_npx/...` cache paths. All suggestions use `npx @colmbyrne/specflow`.
 
 ## 0.1.8 (2026-04-04)
 
-- `specflow audit` gives a copy-pasteable Claude Code prompt instead of vague "Add X section" checklist
+**Audit tells you how to fix** — instead of "Add SQL section to issue #500", now gives a copy-pasteable prompt for Claude Code.
 
 ## 0.1.7 (2026-04-04)
 
-- `verify-setup.sh` section 5 checks every required CLAUDE.md field with severity (CRITICAL/HIGH/MEDIUM)
-- Checks: Repository, Board, CLI, Tech Stack, Rules 2/3/5, Contract Locations, Active Contracts, Override Protocol
+**CLAUDE.md checked field by field** — Repository, Board CLI, Tech Stack, all 5 rules, Contract Locations, Active Contracts, Override Protocol. Each with CRITICAL/HIGH/MEDIUM severity and plain-English impact.
 
 ## 0.1.6 (2026-04-04)
 
-- Added Rule 5: Contracts Are YAML, Not Markdown (to CLAUDE.md, template, and setup-project.sh)
+**Rule 5: Contracts are YAML, not Markdown** — prevents Claude from writing invariants into `.md` files.
 
-## 0.1.5 (2026-04-04)
+## 0.1.5 — 0.1.2 (2026-04-04)
 
-- README tightened: removed demo section, removed misleading "Execute waves" as next step
-
-## 0.1.4 (2026-04-04)
-
-- `verify-setup.sh` treats missing CLAUDE.md as failure (was warning)
-- Missing Specflow Rules section, unfilled placeholders now fail instead of warn
-
-## 0.1.3 (2026-04-04)
-
-- `setup-project.sh` creates CLAUDE.md with Specflow rules (or appends to existing)
-- Postinstall message updated to reflect CLAUDE.md handling
-
-## 0.1.2 (2026-04-04)
-
-- Added postinstall message telling users to run `npx init .` per project
+Docs, postinstall message, CLAUDE.md auto-creation, README cleanup.
 
 ## 0.1.1 (2026-04-04)
 
-- Fixed RLS audit false positive: bare word "RLS" in prose no longer matches
+**Bug fix** — audit RLS check matched the bare word "RLS" in prose text.
 
 ## 0.1.0 (2026-04-04)
 
-**Initial release.**
+**First release.** Published to npm as `@colmbyrne/specflow`.
 
-- CLI with 5 commands: `init`, `verify`, `update`, `audit`, `graph`
-- `init`: full project setup (agents, contracts, hooks, tests, CLAUDE.md)
-- `verify`: 13-section installation check with severity and impact
-- `update`: hooks + CI workflow installation
-- `audit`: issue compliance check (11 items)
-- `graph`: contract cross-reference validation (7 checks)
-- 30+ agent prompts
-- 5 default contract templates
-- 5 hook scripts (build, journey, pipeline compliance, CI, session)
-- Git commit-msg hook (rejects commits without issue numbers)
-- CI workflow templates (PR compliance + post-merge audit)
+5 commands: `init`, `verify`, `update`, `audit`, `graph`. 30+ agents, 5 default contracts, 5 hooks, git commit-msg enforcement, CI workflow templates.
