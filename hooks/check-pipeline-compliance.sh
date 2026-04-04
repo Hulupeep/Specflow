@@ -15,6 +15,15 @@ set -e
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
 VIOLATIONS=()
 
+# ─── Load legacy test allowlist ────────────────────────────────────────────
+# Tests listed in .specflow/legacy-tests.txt are exempt from contract checks.
+# One filename per line (e.g. journey_old_feature.spec.ts)
+LEGACY_FILE="$PROJECT_DIR/.specflow/legacy-tests.txt"
+is_legacy_test() {
+    local base="$1"
+    [ -f "$LEGACY_FILE" ] && grep -qxF "$base" "$LEGACY_FILE" 2>/dev/null
+}
+
 # ─── Build list of test directories to search ──────────────────────────────
 # Default: tests/e2e/ in project root
 # Monorepo: also search subdirectories and .specflow/config.json paths
@@ -55,10 +64,15 @@ find_test_file() {
 for dir in "${TEST_DIRS[@]}"; do
     for test_file in "$dir"/journey_*.spec.ts; do
         [ -f "$test_file" ] || continue
-        base=$(basename "$test_file" .spec.ts)
-        contract="$PROJECT_DIR/docs/contracts/${base}.yml"
+        base=$(basename "$test_file")
+        base_no_ext=$(basename "$test_file" .spec.ts)
+        # Skip legacy/pre-specflow tests
+        if is_legacy_test "$base"; then
+            continue
+        fi
+        contract="$PROJECT_DIR/docs/contracts/${base_no_ext}.yml"
         if [ ! -f "$contract" ]; then
-            VIOLATIONS+=("PIPELINE SKIP: $test_file exists but $contract is missing. Run: npm run compile:journeys")
+            VIOLATIONS+=("PIPELINE SKIP: $test_file exists but $contract is missing. Run: npm run compile:journeys (or add $base to .specflow/legacy-tests.txt)")
         fi
     done
 done
