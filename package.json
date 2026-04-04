@@ -23,6 +23,7 @@
     "CLAUDE-MD-TEMPLATE.md",
     "CONTRACT-SCHEMA.md",
     "CONTRACT-SCHEMA-EXTENSIONS.md",
+    "CHANGELOG.md",
     "SKILL.md",
     "LLM-MASTER-PROMPT.md"
   ],
