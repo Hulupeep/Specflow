@@ -780,7 +780,25 @@ steps:
 
 test_hooks:
   e2e_test_file: "tests/e2e/checkout_journey.spec.ts"
+  required_patterns:
+    - "/page\\.goto|request\\.(get|post|put|delete)/"
+    - "/expect.*to(Contain|Equal|Be)/"
+  forbidden_patterns:
+    - "/test\\.skip/"
+    - "/jest\\.fn|vi\\.fn|mock/"
 ```
+
+### Test Honesty Fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `e2e_test_file` | Yes | Path to the Playwright test file |
+| `required_patterns` | No | Regex patterns the test file MUST contain (e.g., `page.goto`, `expect`) |
+| `forbidden_patterns` | No | Regex patterns the test file MUST NOT contain (e.g., `test.skip`, `mock`) |
+
+**Why:** A test file that exists but skips all tests, mocks everything, or only does regex scans over source code does not satisfy the journey contract. These fields let the hook verify test honesty before and after execution.
+
+`run-journey-tests.sh` checks these patterns before running tests. If a required pattern is missing or a forbidden pattern is found, the hook exits 2 (fail) with a specific error message.
 
 ---
 

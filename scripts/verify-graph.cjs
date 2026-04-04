@@ -160,6 +160,35 @@ function checkTestPaths(files) {
     }
   }
 
+  // Validate required_patterns and forbidden_patterns compile as valid regex
+  for (const filePath of files) {
+    const content = readFileSync(filePath, 'utf8');
+    const name = basename(filePath);
+
+    // Extract patterns from test_hooks section
+    const testHooksMatch = content.match(/test_hooks:[\s\S]*?(?=\n[a-z]|\n---|\Z)/);
+    if (!testHooksMatch) continue;
+    const testHooksSection = testHooksMatch[0];
+
+    for (const field of ['required_patterns', 'forbidden_patterns']) {
+      const fieldMatch = testHooksSection.match(new RegExp(`${field}:[\\s\\S]*?(?=\\n\\s*[a-z]|\\n\\s*$|$)`));
+      if (!fieldMatch) continue;
+
+      const patterns = fieldMatch[0].match(/- "([^"]+)"|- '([^']+)'/g) || [];
+      for (const raw of patterns) {
+        const patStr = raw.replace(/^- ["']|["']$/g, '');
+        // Strip /regex/ delimiters
+        const bare = patStr.replace(/^\/(.*)\/$/, '$1');
+        try {
+          new RegExp(bare);
+        } catch (e) {
+          error(`${name}: ${field} has invalid regex: ${patStr}`);
+          broken++;
+        }
+      }
+    }
+  }
+
   if (checked === 0) {
     info('No contracts define test file paths');
   } else if (broken === 0) {

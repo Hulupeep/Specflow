@@ -190,10 +190,80 @@ main() {
     echo "🧪 Running journey tests: $TEST_FILES" >&2
     echo "" >&2
 
-    # Get the right test command for this project
+    # ── Pre-run: audit test files for anti-patterns ──────────────────────
+    AUDIT_FAILED=0
+
+    for tf in $TEST_FILES; do
+        local full_path="$PROJECT_DIR/$tf"
+        [ -f "$full_path" ] || continue
+
+        # Check: test file must contain navigation or API calls (not just regex scans)
+        if ! grep -qE 'page\.(goto|click|fill|navigate)|request\.(get|post|put|delete|fetch)|\.goto\(' "$full_path" 2>/dev/null; then
+            echo "  ❌ $tf: no page.goto or request.* calls — not a real journey test" >&2
+            AUDIT_FAILED=1
+        fi
+
+        # Check: test file must not be entirely skipped
+        if grep -qE 'test\.skip|test\.fixme|describe\.skip' "$full_path" 2>/dev/null; then
+            # Count total tests vs skipped tests
+            local total_tests=$(grep -cE '^\s*(test|it)\s*\(' "$full_path" 2>/dev/null || echo 0)
+            local skipped_tests=$(grep -cE '^\s*(test|it)\.skip\s*\(' "$full_path" 2>/dev/null || echo 0)
+            if [ "$total_tests" -gt 0 ] && [ "$skipped_tests" -eq "$total_tests" ]; then
+                echo "  ❌ $tf: ALL $total_tests tests are skipped — skipped tests do not satisfy journey contracts" >&2
+                AUDIT_FAILED=1
+            elif [ "$skipped_tests" -gt 0 ]; then
+                echo "  ⚠ $tf: $skipped_tests/$total_tests tests skipped" >&2
+            fi
+        fi
+
+        # Check: no mocking in journey tests
+        if grep -qE 'jest\.fn|vi\.fn|\.mock\(|sinon\.|nock\(' "$full_path" 2>/dev/null; then
+            echo "  ❌ $tf: contains mocking — journey tests must exercise the real path" >&2
+            AUDIT_FAILED=1
+        fi
+
+        # Check: journey contract required_patterns (if contract exists)
+        for dir in "${contract_dirs[@]}"; do
+            [ -d "$PROJECT_DIR/$dir" ] || continue
+            local journey_base=$(basename "$tf" .spec.ts)
+            local contract_file="$PROJECT_DIR/$dir/${journey_base}.yml"
+            [ -f "$contract_file" ] || continue
+
+            # Extract required_patterns from test_hooks section
+            local req_patterns=$(sed -n '/required_patterns:/,/^[^ ]/p' "$contract_file" 2>/dev/null | grep -E '^\s*-' | sed 's/.*- *//' | tr -d '"' | tr -d "'")
+            while IFS= read -r pattern; do
+                [ -z "$pattern" ] && continue
+                # Strip /regex/ delimiters if present
+                local bare_pattern=$(echo "$pattern" | sed 's|^/||; s|/$||')
+                if ! grep -qE "$bare_pattern" "$full_path" 2>/dev/null; then
+                    echo "  ❌ $tf: required pattern not found: $bare_pattern (from $dir/${journey_base}.yml)" >&2
+                    AUDIT_FAILED=1
+                fi
+            done <<< "$req_patterns"
+
+            # Extract forbidden_patterns from test_hooks section
+            local forb_patterns=$(sed -n '/test_hooks:/,/^[a-z]/p' "$contract_file" 2>/dev/null | sed -n '/forbidden_patterns:/,/^[^ ]/p' | grep -E '^\s*-' | sed 's/.*- *//' | tr -d '"' | tr -d "'")
+            while IFS= read -r pattern; do
+                [ -z "$pattern" ] && continue
+                local bare_pattern=$(echo "$pattern" | sed 's|^/||; s|/$||')
+                if grep -qE "$bare_pattern" "$full_path" 2>/dev/null; then
+                    echo "  ❌ $tf: forbidden pattern found: $bare_pattern (from $dir/${journey_base}.yml)" >&2
+                    AUDIT_FAILED=1
+                fi
+            done <<< "$forb_patterns"
+        done
+    done
+
+    if [ "$AUDIT_FAILED" -eq 1 ]; then
+        echo "" >&2
+        echo "❌ Journey test audit FAILED — tests exist but don't exercise the real path" >&2
+        echo "   Fix the tests above, or defer: touch $DEFER_FILE" >&2
+        exit 2
+    fi
+
+    # ── Run the tests ──────────────────────────────────────────────────
     TEST_CMD=$(get_test_command)
 
-    # Run the tests
     if $TEST_CMD $TEST_FILES; then
         echo "" >&2
         echo "✅ Journey tests PASSED" >&2
