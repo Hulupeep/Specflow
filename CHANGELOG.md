@@ -6,6 +6,26 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.4.0 (2026-04-04)
+
+**Pipeline compliance hook is now a regression detector, not a state auditor.**
+
+The hook fired on every Write/Edit and did a full repo scan, reporting historical debt as if every keystroke had introduced it. Worst case: writing an unrelated file like `specs/pr.md` triggered 23 violations against pre-existing journey gaps. The hook also recommended `npm run compile:journeys` even on projects where that script no longer existed.
+
+What changed:
+
+- **Hook reads stdin** to find the file just written. Only files in the journey pipeline are checked. Writing `specs/pr.md`, `package.json`, or `src/components/Button.tsx` exits 0 silently.
+- **Hook self-disables** when Specflow is not active in the project (no `docs/contracts/`, no `.specflow/`, no `scripts/agents/`). Prevents false positives after Specflow is uninstalled.
+- **Remediation messages check the project's actual scripts** before recommending them. If `compile:journeys` is not in `package.json`, the message says "manually create the YAML in `docs/contracts/`" instead of pointing at a dead script.
+- **Contract-first writes get a warning, not a failure.** If you write a contract YAML before its test exists, the hook warns but doesn't block — the test is probably coming next.
+- **Component file checks and TODO stub checks moved to `verify`** — those are debt reports, not regressions, and they belong in the audit command.
+
+For full project audit (the old behavior), run `npx @colmbyrne/specflow verify`.
+
+**Why:** Real user case where `check-pipeline-compliance.sh` fired 23 violations on every unrelated edit, citing a script (`npm run compile:journeys`) that the team had removed weeks earlier. The hook had no concept of state and conflated "did this write introduce a problem?" with "does the project have any problems?"
+
+---
+
 ## 0.3.0 (2026-04-04)
 
 **Journey test honesty** — Specflow now checks your tests actually run, not just that the file exists.

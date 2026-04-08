@@ -1,179 +1,211 @@
 #!/bin/bash
 # Pipeline compliance checker — runs after Write/Edit tool use
-# Catches when the LLM skips steps in the specflow pipeline:
-#   - Playwright tests written without journey contract YAMLs
-#   - Journey contracts without corresponding test files
-#   - Components modified without contract tests passing
-#   - CSV journeys defined but never compiled
+#
+# This hook is a REGRESSION DETECTOR, not a state auditor.
+# It checks whether the file just written introduces a violation,
+# not whether the project has any historical violations.
+#
+# For full audit, use: npx @colmbyrne/specflow verify
 #
 # Exit codes:
-#   0 — compliant
-#   2 — violation (shown to model as error)
+#   0 — file is unrelated, or compliant
+#   2 — the just-written file introduces a violation
 
 set -e
 
+# ─── Read stdin (PostToolUse JSON input) ────────────────────────────────────
+# Claude Code provides JSON like: {"inputs": {"file_path": "..."}, ...}
+# If invoked without input, exit silently — there is nothing to check.
+
+INPUT=$(cat 2>/dev/null || echo "{}")
+
+if ! command -v jq &> /dev/null; then
+    # Without jq we cannot scope the check. Don't false-alarm — exit silently.
+    exit 0
+fi
+
+FILE_PATH=$(echo "$INPUT" | jq -r '.inputs.file_path // .inputs.path // empty' 2>/dev/null || echo "")
+
+if [ -z "$FILE_PATH" ]; then
+    # No file path in the input — likely a non-file operation. Nothing to check.
+    exit 0
+fi
+
 PROJECT_DIR="${CLAUDE_PROJECT_DIR:-$(pwd)}"
-VIOLATIONS=()
 
-# ─── Load legacy test allowlist ────────────────────────────────────────────
-# Tests listed in .specflow/legacy-tests.txt are exempt from contract checks.
-# One filename per line (e.g. journey_old_feature.spec.ts)
-LEGACY_FILE="$PROJECT_DIR/.specflow/legacy-tests.txt"
-is_legacy_test() {
-    local base="$1"
-    [ -f "$LEGACY_FILE" ] && grep -qxF "$base" "$LEGACY_FILE" 2>/dev/null
-}
+# Normalize to relative path (strip project dir prefix if absolute)
+REL_PATH="${FILE_PATH#$PROJECT_DIR/}"
+REL_PATH="${REL_PATH#./}"
 
-# ─── Build list of test directories to search ──────────────────────────────
-# Default: tests/e2e/ in project root
-# Monorepo: also search subdirectories and .specflow/config.json paths
+# ─── Self-disable when Specflow is not active in this project ───────────────
+# A project is "Specflow-active" if it has any of:
+#   - docs/contracts/ with content
+#   - .specflow/ state directory
+#   - scripts/agents/ with agents
+#
+# If none of these exist, this hook is residue from a previous setup —
+# do not enforce a pipeline that does not exist here.
+
+contracts_active=false
+if [ -d "$PROJECT_DIR/docs/contracts" ] && [ -n "$(ls -A "$PROJECT_DIR/docs/contracts" 2>/dev/null)" ]; then
+    contracts_active=true
+fi
+specflow_state=false
+if [ -d "$PROJECT_DIR/.specflow" ]; then
+    specflow_state=true
+fi
+agents_present=false
+if [ -d "$PROJECT_DIR/scripts/agents" ] && [ -n "$(ls -A "$PROJECT_DIR/scripts/agents" 2>/dev/null)" ]; then
+    agents_present=true
+fi
+
+if [ "$contracts_active" = false ] && [ "$specflow_state" = false ] && [ "$agents_present" = false ]; then
+    # Not a Specflow project. Hook is residue. Exit silently.
+    exit 0
+fi
+
+# ─── Build list of test directories (for finding matching tests) ───────────
 TEST_DIRS=("$PROJECT_DIR/tests/e2e")
-
-# Add subdirectory test dirs (monorepo support)
-for subdir in "$PROJECT_DIR"/*/tests/e2e; do
+for subdir in "$PROJECT_DIR"/*/tests/e2e "$PROJECT_DIR"/packages/*/tests/e2e "$PROJECT_DIR"/apps/*/tests/e2e; do
     [ -d "$subdir" ] && TEST_DIRS+=("$subdir")
 done
-for subdir in "$PROJECT_DIR"/packages/*/tests/e2e "$PROJECT_DIR"/apps/*/tests/e2e; do
-    [ -d "$subdir" ] && TEST_DIRS+=("$subdir")
-done
-
-# Add paths from .specflow/config.json if it exists
-if [ -f "$PROJECT_DIR/.specflow/config.json" ] && command -v jq &> /dev/null; then
+if [ -f "$PROJECT_DIR/.specflow/config.json" ]; then
     extra_dirs=$(jq -r '.e2e_test_dirs[]? // empty' "$PROJECT_DIR/.specflow/config.json" 2>/dev/null)
     while IFS= read -r dir; do
         [ -n "$dir" ] && [ -d "$PROJECT_DIR/$dir" ] && TEST_DIRS+=("$PROJECT_DIR/$dir")
     done <<< "$extra_dirs"
 fi
 
-# Helper: find a test file across all test directories
+# ─── Helper: detect the project's compile script (or fallback) ──────────────
+# If npm run compile:journeys exists, use it. Otherwise tell the user how to
+# create the YAML manually instead of pointing at a script that does not exist.
+
+get_compile_command() {
+    if [ -f "$PROJECT_DIR/package.json" ] && grep -q '"compile:journeys"' "$PROJECT_DIR/package.json" 2>/dev/null; then
+        echo "npm run compile:journeys"
+    else
+        echo "manually create the contract YAML in docs/contracts/"
+    fi
+}
+
+# ─── Helper: load legacy test allowlist ────────────────────────────────────
+LEGACY_FILE="$PROJECT_DIR/.specflow/legacy-tests.txt"
+is_legacy_test() {
+    local base="$1"
+    [ -f "$LEGACY_FILE" ] && grep -qxF "$base" "$LEGACY_FILE" 2>/dev/null
+}
+
+# ─── Helper: find a test file matching a journey base name ─────────────────
 find_test_file() {
     local base="$1"
     for dir in "${TEST_DIRS[@]}"; do
         local candidate="$dir/${base}.spec.ts"
-        if [ -f "$candidate" ]; then
-            echo "$candidate"
-            return 0
-        fi
+        [ -f "$candidate" ] && { echo "$candidate"; return 0; }
     done
     return 1
 }
 
-# ─── Check 1: Playwright tests without journey contracts ───────────────────
-# If journey_*.spec.ts exists in any test dir, the matching docs/contracts/journey_*.yml MUST exist
+# ─── Scope the check to the file just written ──────────────────────────────
+# Only files participating in the journey/contract/CSV pipeline are checked.
+# Everything else exits 0 immediately.
 
-for dir in "${TEST_DIRS[@]}"; do
-    for test_file in "$dir"/journey_*.spec.ts; do
-        [ -f "$test_file" ] || continue
-        base=$(basename "$test_file")
-        base_no_ext=$(basename "$test_file" .spec.ts)
-        # Skip legacy/pre-specflow tests
-        if is_legacy_test "$base"; then
-            continue
+VIOLATIONS=()
+WARNINGS=()
+JOURNEY_BASE=""
+
+case "$REL_PATH" in
+    # Journey test file (any test directory)
+    tests/e2e/journey_*.spec.ts | */tests/e2e/journey_*.spec.ts)
+        BASENAME=$(basename "$REL_PATH")
+        JOURNEY_BASE=$(basename "$REL_PATH" .spec.ts)
+
+        # Skip legacy tests
+        if is_legacy_test "$BASENAME"; then
+            exit 0
         fi
-        contract="$PROJECT_DIR/docs/contracts/${base_no_ext}.yml"
+
+        # The just-written test must have a matching contract YAML
+        contract="$PROJECT_DIR/docs/contracts/${JOURNEY_BASE}.yml"
         if [ ! -f "$contract" ]; then
-            VIOLATIONS+=("PIPELINE SKIP: $test_file exists but $contract is missing. Run: npm run compile:journeys (or add $base to .specflow/legacy-tests.txt)")
+            COMPILE_CMD=$(get_compile_command)
+            VIOLATIONS+=("REGRESSION: $REL_PATH was just written but $contract is missing.")
+            VIOLATIONS+=("  Fix: $COMPILE_CMD")
+            VIOLATIONS+=("  Or:  add $BASENAME to .specflow/legacy-tests.txt to exempt")
         fi
-    done
-done
+        ;;
 
-# ─── Check 2: Journey contracts without test files ─────────────────────────
-# If docs/contracts/journey_*.yml exists, check test_hooks.e2e_test_file first, then search all test dirs
+    # Journey contract YAML
+    docs/contracts/journey_*.yml)
+        JOURNEY_BASE=$(basename "$REL_PATH" .yml)
 
-for contract in "$PROJECT_DIR"/docs/contracts/journey_*.yml; do
-    [ -f "$contract" ] || continue
-    base=$(basename "$contract" .yml)
-
-    # First: check if contract declares a specific test file path
-    declared_test=$(grep -A1 'test_hooks' "$contract" 2>/dev/null | grep 'e2e_test_file' | sed 's/.*e2e_test_file:[[:space:]]*//' | tr -d '"' | tr -d "'" | xargs)
-    if [ -n "$declared_test" ] && [ -f "$PROJECT_DIR/$declared_test" ]; then
-        continue  # Contract points to a real file — compliant
-    fi
-
-    # Second: search all test directories
-    if find_test_file "$base" > /dev/null 2>&1; then
-        continue  # Found in one of the test dirs — compliant
-    fi
-
-    VIOLATIONS+=("ORPHAN CONTRACT: $contract exists but no matching test file found in: ${TEST_DIRS[*]}")
-done
-
-# ─── Check 3: CSV journeys defined but not compiled ────────────────────────
-# If docs/journeys/*.csv exists, at least one docs/contracts/journey_*.yml must exist
-
-csv_count=0
-contract_count=0
-for csv in "$PROJECT_DIR"/docs/journeys/*.csv; do
-    [ -f "$csv" ] || continue
-    # Skip index/metadata files — only count journey definition CSVs
-    case "$(basename "$csv")" in
-        *INDEX* | *index* | *README* | *readme*) continue ;;
-    esac
-    csv_count=$((csv_count + 1))
-done
-for yml in "$PROJECT_DIR"/docs/contracts/journey_*.yml; do
-    [ -f "$yml" ] || continue
-    contract_count=$((contract_count + 1))
-done
-
-if [ "$csv_count" -gt 0 ] && [ "$contract_count" -eq 0 ]; then
-    VIOLATIONS+=("CSV NOT COMPILED: Found $csv_count journey CSV(s) but no journey contracts. Run: npm run compile:journeys")
-fi
-
-# ─── Check 4: Feature contract exists for components ───────────────────────
-# Search for .tsx component files across common locations
-
-component_count=0
-feature_contract_count=0
-for comp_dir in "$PROJECT_DIR"/app/src/components "$PROJECT_DIR"/src/components "$PROJECT_DIR"/*/src/components "$PROJECT_DIR"/packages/*/src/components; do
-    for comp in "$comp_dir"/*.tsx; do
-        [ -f "$comp" ] || continue
-        component_count=$((component_count + 1))
-    done
-done
-for fc in "$PROJECT_DIR"/docs/contracts/feature_*.yml; do
-    [ -f "$fc" ] || continue
-    feature_contract_count=$((feature_contract_count + 1))
-done
-
-if [ "$component_count" -gt 0 ] && [ "$feature_contract_count" -eq 0 ]; then
-    VIOLATIONS+=("MISSING CONTRACTS: $component_count component(s) found but no feature contracts in docs/contracts/")
-fi
-
-# ─── Check 5: Playwright test stubs (TODO markers) ────────────────────────
-# Search all test directories for stubs
-
-for dir in "${TEST_DIRS[@]}"; do
-    for test_file in "$dir"/journey_*.spec.ts; do
-        [ -f "$test_file" ] || continue
-        if grep -q "// TODO: Implement" "$test_file" 2>/dev/null; then
-            VIOLATIONS+=("STUB TEST: $test_file still has TODO stubs. Fill in real Playwright assertions.")
+        # Check if a matching test exists anywhere
+        # First: contract may declare its test path explicitly
+        declared_test=$(grep -A1 'test_hooks' "$PROJECT_DIR/$REL_PATH" 2>/dev/null | grep 'e2e_test_file' | sed 's/.*e2e_test_file:[[:space:]]*//' | tr -d '"' | tr -d "'" | xargs)
+        if [ -n "$declared_test" ] && [ -f "$PROJECT_DIR/$declared_test" ]; then
+            exit 0
         fi
-    done
-done
+        if find_test_file "$JOURNEY_BASE" > /dev/null 2>&1; then
+            exit 0
+        fi
+
+        # No test found — this is a SOFT warning, not a hard fail.
+        # The user may be writing the contract first, with the test coming next.
+        WARNINGS+=("Contract $REL_PATH has no matching test file yet.")
+        WARNINGS+=("  Expected: tests/e2e/${JOURNEY_BASE}.spec.ts (or another test dir)")
+        WARNINGS+=("  This is a warning, not an error — create the test next.")
+        ;;
+
+    # CSV journey definition
+    docs/journeys/*.csv)
+        BASENAME=$(basename "$REL_PATH")
+        # Skip index/metadata files
+        case "$BASENAME" in
+            *INDEX* | *index* | *README* | *readme*) exit 0 ;;
+        esac
+
+        # Check that some compiled output exists for this CSV
+        # (We can't know which contract maps to which CSV without parsing it,
+        # so we check that ANY journey contracts exist after the CSV is present.)
+        if ! ls "$PROJECT_DIR"/docs/contracts/journey_*.yml 2>/dev/null | head -1 > /dev/null; then
+            COMPILE_CMD=$(get_compile_command)
+            VIOLATIONS+=("REGRESSION: $REL_PATH was just written but no journey YAMLs have been compiled.")
+            VIOLATIONS+=("  Fix: $COMPILE_CMD")
+        fi
+        ;;
+
+    # Anything else — not part of the journey pipeline. Exit silently.
+    *)
+        exit 0
+        ;;
+esac
 
 # ─── Report ────────────────────────────────────────────────────────────────
 
+# Print warnings to stderr but don't fail
+if [ ${#WARNINGS[@]} -gt 0 ]; then
+    echo "" >&2
+    echo "⚠ SPECFLOW WARNING (not blocking):" >&2
+    for w in "${WARNINGS[@]}"; do
+        echo "  $w" >&2
+    done
+    echo "" >&2
+fi
+
+# Hard violations block with exit 2
 if [ ${#VIOLATIONS[@]} -eq 0 ]; then
     exit 0
 fi
 
 echo "" >&2
 echo "╔═══════════════════════════════════════════════════════════╗" >&2
-echo "║  SPECFLOW PIPELINE VIOLATION                             ║" >&2
+echo "║  SPECFLOW PIPELINE REGRESSION                            ║" >&2
 echo "╚═══════════════════════════════════════════════════════════╝" >&2
 echo "" >&2
-
 for v in "${VIOLATIONS[@]}"; do
     echo "  ✗ $v" >&2
 done
-
 echo "" >&2
-echo "  The correct pipeline is:" >&2
-echo "    CSV → compile:journeys → YAML contracts + stubs → fill in stubs" >&2
+echo "  This is a regression check on the file you just wrote." >&2
+echo "  For a full project audit: npx @colmbyrne/specflow verify" >&2
 echo "" >&2
-echo "  Do not write Playwright tests without journey contracts." >&2
-echo "  Do not write components without feature contracts." >&2
-echo "" >&2
-
 exit 2
