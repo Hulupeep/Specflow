@@ -50,7 +50,7 @@ else
   TEMPLATES_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/templates/hooks"
 
   # NOTE: This list must be updated when new hooks are added to hooks/
-  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh commit-msg README.md; do
+  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh commit-msg pre-push README.md; do
     curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
       echo -e "${YELLOW}Warning: Could not download $file${NC}"
     }
@@ -133,20 +133,28 @@ if [ -f "$HOOKS_DIR/README.md" ]; then
   echo -e "${GREEN}✓${NC} Installed .claude/hooks/README.md"
 fi
 
-# Install git commit-msg hook (enforces issue numbers in commit messages)
+# Install git hooks (commit-msg, pre-push)
+install_git_hook() {
+  local name="$1"
+  local desc="$2"
+  if [ ! -f "$HOOKS_DIR/$name" ]; then
+    return
+  fi
+  if [ -f "$TARGET_DIR/.git/hooks/$name" ]; then
+    echo -e "${YELLOW}⚠️${NC}  Existing .git/hooks/$name found — backing up"
+    cp "$TARGET_DIR/.git/hooks/$name" "$TARGET_DIR/.git/hooks/$name.backup"
+  fi
+  cp "$HOOKS_DIR/$name" "$TARGET_DIR/.git/hooks/$name"
+  chmod +x "$TARGET_DIR/.git/hooks/$name"
+  echo -e "${GREEN}✓${NC} Installed .git/hooks/$name ($desc)"
+}
+
 if [ -d "$TARGET_DIR/.git" ]; then
   mkdir -p "$TARGET_DIR/.git/hooks"
-  if [ -f "$HOOKS_DIR/commit-msg" ]; then
-    if [ -f "$TARGET_DIR/.git/hooks/commit-msg" ]; then
-      echo -e "${YELLOW}⚠️${NC}  Existing .git/hooks/commit-msg found — backing up"
-      cp "$TARGET_DIR/.git/hooks/commit-msg" "$TARGET_DIR/.git/hooks/commit-msg.backup"
-    fi
-    cp "$HOOKS_DIR/commit-msg" "$TARGET_DIR/.git/hooks/commit-msg"
-    chmod +x "$TARGET_DIR/.git/hooks/commit-msg"
-    echo -e "${GREEN}✓${NC} Installed .git/hooks/commit-msg (enforces issue numbers)"
-  fi
+  install_git_hook "commit-msg" "enforces issue numbers"
+  install_git_hook "pre-push" "branch freshness check"
 else
-  echo -e "${YELLOW}⚠️${NC}  Not a git repo — skipping .git/hooks/commit-msg"
+  echo -e "${YELLOW}⚠️${NC}  Not a git repo — skipping .git/hooks/"
 fi
 
 # Handle settings.json - merge if exists, create if not

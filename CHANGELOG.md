@@ -6,6 +6,55 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.5.0 (2026-04-09)
+
+**Pre-push branch freshness hook + pre-code reconnaissance.**
+
+Two new Specflow primitives, both driven by failure patterns observed in real sessions:
+
+### Pre-push hook (mechanical enforcement)
+
+New git hook: `.git/hooks/pre-push` blocks pushes from branches more than 5 commits behind `origin/main`. Prevents the "weeks-old base" failure mode where a stale branch is pushed without rebasing, re-introducing fixed bugs or conflicting with recent work.
+
+- Threshold 5 (not 2) accounts for normal release/CI drift
+- Self-disables if there's no `origin` or no `origin/main`
+- Override with `git push --no-verify` if you know what you're doing
+- Installed automatically by `install-hooks.sh`
+- Checked in `verify-setup.sh` sections 8 and 13
+
+### Reconnaissance step in specflow-writer
+
+`agents/specflow-writer.md` now has a mandatory **Q7 — RECONNAISSANCE** section at the top, before any code generation. It forces the agent to:
+
+1. Trace transitive imports to package boundaries
+2. Survey existing tests in the same directory — copy their patterns
+3. Inspect `jest.config.cjs` for `transformIgnorePatterns` and `moduleNameMapper` — catches ESM crashes before they happen
+4. Search sibling tests for existing `jest.mock()` patterns — reuse, don't re-invent
+5. List existing factory/helper patterns in the workspace — reuse or justify creating new
+6. Enumerate every layer a new string literal value must propagate to
+
+**Why:** four of five common post-code corrections (pino-http stubs, better-auth ESM, cross-layer enum gaps, reflexive stubbing) are prevented at pre-code time by tracing the import graph and harness config before writing.
+
+### Builder guidance — harness triage framework
+
+New doc: `agents/builder-guidance.md`. Not an invocable agent — a decision framework for builder-style agents when a test fails for harness reasons. Instead of reaching reflexively for `jest.mock()`, builders consult five options (stub, existing factory, product refactor, different boundary, shared helper) with a 60-second rule for choosing.
+
+### Optional reviewer-gate template
+
+`templates/hooks/pre-commit-gate-file.sh.example` — opt-in template for projects using a reviewer/builder chat protocol with `specs/agentchat.md` and `[R-NNN]`/`[S-NNN]` tags. Not installed by default; documented in `templates/hooks/README.md`. Most projects don't need this; those that do can customise the configuration variables at the top and copy to `.git/hooks/pre-commit`.
+
+### Why these changes
+
+An LLM is a next-token predictor, not a persistent process. Invariants established in token T are not automatically active in token T+1000. Written rules lose to completion drive. The only changes that work long-term are:
+
+1. **Mechanical enforcement at git-action boundaries** (pre-push is this)
+2. **Re-injecting rules into active context at decision time** (Q7 reconnaissance is this)
+3. **Decision frameworks in agent docs** (builder guidance is this)
+
+Deferred: propagation manifest for cross-layer enum values. The check needs per-project layer path configuration and a per-project ignore-list for import/fixture noise. Shipping it without both would false-positive enough to get disabled. We'll revisit once we have a real project ready to prototype against.
+
+---
+
 ## 0.4.0 (2026-04-04)
 
 **Pipeline compliance hook is now a regression detector, not a state auditor.**

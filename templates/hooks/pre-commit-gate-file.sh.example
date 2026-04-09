@@ -1,0 +1,76 @@
+#!/bin/sh
+# OPTIONAL: Reviewer-ack gate for reviewer/builder protocols
+#
+# ──────────────────────────────────────────────────────────────────────────
+# This is a TEMPLATE — not installed by default.
+#
+# Copy to .git/hooks/pre-commit (or add to .husky/pre-commit) if your project
+# uses a reviewer-gate pattern where a reviewer agent writes acknowledgements
+# to a chat log before the builder commits code.
+#
+# Assumptions this template makes:
+#   - The project has a file like specs/agentchat.md (or similar)
+#   - Reviewers write entries tagged [R-001], [R-002], etc.
+#   - Builders write entries tagged [S-001], [S-002], etc.
+#   - A reviewer "proceed-to-code cleared" acknowledgement is required before
+#     source commits are allowed
+#
+# These assumptions are project-specific. Most projects don't use this pattern.
+# If your project doesn't, don't install this hook.
+# ──────────────────────────────────────────────────────────────────────────
+#
+# What it does:
+#   1. Checks if any source files are staged (adjust SRC_PATTERN for your project)
+#   2. If yes, reads specs/agentchat.md for the latest reviewer entry
+#   3. Fails the commit if the latest reviewer entry doesn't contain an ack
+#
+# Customise: SRC_PATTERN, CHAT_FILE, ACK_PATTERN, REVIEWER_PREFIX
+
+# ─── Configuration ─────────────────────────────────────────────────────────
+CHAT_FILE="specs/agentchat.md"
+SRC_PATTERN='^(packages|src|app)/.*\.(ts|tsx|js|jsx)$'
+REVIEWER_PREFIX="^### \[R-[0-9]+\]"
+ACK_PATTERN="proceed-to-code cleared\|PROCEED-TO-CODE: cleared\|PROCEED-TO-CODE: ACK"
+
+# ─── Skip if no source files staged ───────────────────────────────────────
+STAGED_SRC=$(git diff --cached --name-only --diff-filter=ACM | grep -cE "$SRC_PATTERN" || true)
+if [ "$STAGED_SRC" -eq 0 ]; then
+    exit 0  # No source changes, no gate needed
+fi
+
+# ─── Skip if chat file doesn't exist ──────────────────────────────────────
+if [ ! -f "$CHAT_FILE" ]; then
+    exit 0  # Project not using reviewer-gate pattern
+fi
+
+# ─── Find the latest reviewer entry ───────────────────────────────────────
+LATEST_REVIEWER_LINE=$(grep -n "$REVIEWER_PREFIX" "$CHAT_FILE" | tail -1 | cut -d: -f1)
+if [ -z "$LATEST_REVIEWER_LINE" ]; then
+    echo "" >&2
+    echo "❌ pre-commit: no reviewer entry found in $CHAT_FILE" >&2
+    echo "   Reviewer must post a [R-NNN] entry before source commits." >&2
+    echo "" >&2
+    exit 1
+fi
+
+# ─── Extract the latest reviewer block (from its header to the next header or EOF) ───
+LATEST_REVIEWER_BLOCK=$(tail -n +"$LATEST_REVIEWER_LINE" "$CHAT_FILE" | sed -n '1,/^### \[\(R\|S\)-/p' | head -n -1)
+if [ -z "$LATEST_REVIEWER_BLOCK" ]; then
+    LATEST_REVIEWER_BLOCK=$(tail -n +"$LATEST_REVIEWER_LINE" "$CHAT_FILE")
+fi
+
+# ─── Check for ack ────────────────────────────────────────────────────────
+if ! echo "$LATEST_REVIEWER_BLOCK" | grep -qE "$ACK_PATTERN"; then
+    echo "" >&2
+    echo "❌ pre-commit: latest reviewer entry does not contain a proceed-to-code ack" >&2
+    echo "" >&2
+    echo "   Latest reviewer entry (line $LATEST_REVIEWER_LINE in $CHAT_FILE):" >&2
+    echo "$LATEST_REVIEWER_BLOCK" | head -10 | sed 's/^/     /' >&2
+    echo "" >&2
+    echo "   Reviewer must post an explicit ack matching: $ACK_PATTERN" >&2
+    echo "   Skip: git commit --no-verify (not recommended)" >&2
+    echo "" >&2
+    exit 1
+fi
+
+exit 0

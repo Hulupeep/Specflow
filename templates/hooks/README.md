@@ -13,6 +13,14 @@ These are **templates** -- copy them to your project's `.claude/hooks/` director
 | `session-start.sh` | Session start | No | Placeholder for session initialization |
 | `post-push-ci.sh` | `git push` | No (advisory) | Check CI status after push, report pass/fail |
 
+## Optional templates (not installed by default)
+
+| Template | Purpose | When to use |
+|----------|---------|-------------|
+| `pre-commit-gate-file.sh.example` | Require reviewer ack in a chat log before source commits | Projects using a reviewer/builder agent protocol with `specs/agentchat.md` |
+
+These templates are project-specific. Review the header, customise the configuration variables, and copy to `.git/hooks/` manually if they fit your workflow.
+
 ## Installation
 
 ### Automated (recommended)

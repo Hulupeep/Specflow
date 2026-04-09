@@ -1,0 +1,38 @@
+#!/bin/sh
+# Specflow pre-push hook — branch freshness check
+#
+# Prevents pushes from branches that are significantly behind origin/main.
+# Catches the "weeks-old base" failure mode where a stale branch is pushed
+# without rebasing, re-introducing fixed bugs or conflicting with recent work.
+#
+# Threshold: 5 commits behind. Accounts for normal release/CI drift while
+# still catching genuinely stale branches.
+#
+# Install: copy to .git/hooks/pre-push (handled by install-hooks.sh)
+# Override: git push --no-verify
+
+# Fetch main branch quietly. If no origin is configured, exit silently.
+git fetch origin main --quiet 2>/dev/null || exit 0
+
+# If origin/main doesn't exist (first commit, orphan branch), exit silently.
+if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
+    exit 0
+fi
+
+# Count commits on origin/main that HEAD doesn't have
+BEHIND=$(git rev-list --count HEAD..origin/main 2>/dev/null || echo 0)
+
+if [ "$BEHIND" -gt 5 ]; then
+    echo "" >&2
+    echo "❌ pre-push blocked: branch is $BEHIND commits behind origin/main" >&2
+    echo "" >&2
+    echo "  Your branch base is stale. Pushing now may re-introduce fixed" >&2
+    echo "  bugs or conflict with recent work on main." >&2
+    echo "" >&2
+    echo "  Fix: git fetch origin && git rebase origin/main" >&2
+    echo "  Skip: git push --no-verify  (not recommended)" >&2
+    echo "" >&2
+    exit 1
+fi
+
+exit 0

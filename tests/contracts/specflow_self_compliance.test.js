@@ -20,8 +20,9 @@ const AGENT_UTILITY_FILES = [
   'agentlist.md',
   'agentnames.md',
   'team-names.md',
-  'readme-audit.md',       // Claude Code skill, not a Specflow agent
-  'readme-restructure.md', // Claude Code skill, not a Specflow agent
+  'readme-audit.md',        // Claude Code skill, not a Specflow agent
+  'readme-restructure.md',  // Claude Code skill, not a Specflow agent
+  'builder-guidance.md',    // Decision framework doc, not an invocable agent
 ];
 
 function listAgentFiles() {

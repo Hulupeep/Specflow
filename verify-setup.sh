@@ -444,6 +444,17 @@ if [ -d ".git/hooks" ]; then
     else
         check_warn ".git/hooks/commit-msg not found (commits without issue numbers won't be blocked)"
     fi
+
+    # Check for pre-push branch freshness hook
+    if [ -x ".git/hooks/pre-push" ]; then
+        if grep -qF 'origin/main' .git/hooks/pre-push 2>/dev/null; then
+            check_pass ".git/hooks/pre-push blocks stale-base pushes"
+        else
+            check_warn ".git/hooks/pre-push exists but may not check branch freshness"
+        fi
+    else
+        check_warn ".git/hooks/pre-push not found (stale branches can be pushed silently)"
+    fi
 fi
 
 # Check for .claude/settings.json
@@ -696,18 +707,27 @@ else
         fi
     done
 
-    # commit-msg git hook (different install path)
-    if [ -f ".git/hooks/commit-msg" ] && [ -f "$SPECFLOW_SRC/hooks/commit-msg" ]; then
-        if diff -q ".git/hooks/commit-msg" "$SPECFLOW_SRC/hooks/commit-msg" > /dev/null 2>&1; then
-            printf "  ${GREEN}%-32s %-10s %-10s %s${NC}\n" "commit-msg (.git/hooks)" "✅ current" "HIGH" ""
-        else
-            printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "commit-msg (.git/hooks)" "⚠ OUTDATED" "HIGH" "Commits without #issue accepted — journey tests silently skip"
-            ((OUTDATED++))
+    # Git hooks (different install path)
+    GIT_HOOK_CHECKS=(
+        "commit-msg|HIGH|Commits without #issue accepted — journey tests silently skip"
+        "pre-push|HIGH|Stale-base pushes allowed — stale branches can re-introduce fixed bugs"
+    )
+    for entry in "${GIT_HOOK_CHECKS[@]}"; do
+        IFS='|' read -r name severity impact <<< "$entry"
+        src_path="$SPECFLOW_SRC/hooks/$name"
+        local_path=".git/hooks/$name"
+        if [ -f "$local_path" ] && [ -f "$src_path" ]; then
+            if diff -q "$local_path" "$src_path" > /dev/null 2>&1; then
+                printf "  ${GREEN}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "✅ current" "$severity" ""
+            else
+                printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "⚠ OUTDATED" "$severity" "$impact"
+                ((OUTDATED++))
+            fi
+        elif [ -f "$src_path" ]; then
+            printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "❌ MISSING" "$severity" "$impact"
+            ((MISSING_LOCAL++))
         fi
-    elif [ -f "$SPECFLOW_SRC/hooks/commit-msg" ]; then
-        printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "commit-msg (.git/hooks)" "❌ MISSING" "HIGH" "Commits without #issue accepted — journey tests silently skip"
-        ((MISSING_LOCAL++))
-    fi
+    done
 
     # settings.json hook wiring — subset check (verify each required matcher is present)
     if [ -f ".claude/settings.json" ] && command -v jq &> /dev/null; then

@@ -22,6 +22,34 @@ If the issue body has invariants but no corresponding YAML file in docs/contract
 
 ---
 
+## MANDATORY PRE-CODE RECONNAISSANCE
+
+**Before writing any implementation, you MUST complete reconnaissance and output it as Q7 in the pre-flight packet.**
+
+The LLM is a next-token predictor. It writes code for surfaces it hasn't probed, hits the reality of the codebase through test failures, then patches symptoms instead of understanding the territory. This step forces probing BEFORE writing.
+
+**Q7. RECONNAISSANCE**
+
+For each file you plan to touch or create:
+
+1. **Trace transitive imports to package boundaries.** What does this file actually pull in? Where do those imports go? Stop at the first package boundary (e.g., `@org/shared`, `node_modules/*`).
+
+2. **Survey existing tests in the same directory.** How do they run? What do they mock? What setup do they use? If three sibling tests all follow a pattern, use that pattern.
+
+3. **Inspect `jest.config.cjs` (or equivalent) for this workspace.** Specifically:
+   - **`transformIgnorePatterns`** — controls which node_modules get transformed. The usual source of ESM crashes (e.g., `better-auth/node`, `nanoid`, `uuid`). If your imports will pull in an ESM-only package, this must already handle it, OR you need to add it.
+   - **`moduleNameMapper`** — existing path rewrites. Reuse existing mappings; don't invent new ones for a single test.
+
+4. **Search sibling tests for existing `jest.mock()` / `vi.mock()` patterns for your imports.** If any test in the same workspace already mocks `pino-http`, `better-auth`, or any other dependency you need, copy that pattern. Do not re-invent the mock.
+
+5. **List factory/helper patterns that already exist in this workspace.** Look for `createApp()`, `buildServer()`, `makeTestClient()`, fixture builders, etc. If a factory exists, reuse it. If one doesn't and you need one, propose it before writing the test.
+
+6. **For new string literal values (enum discriminators, status strings, error codes),** enumerate every layer they must propagate to — DB constraint, schema, TS union, Zod, switch statements, fixtures. Declare the propagation explicitly in Q7 so no layer is forgotten.
+
+**This step is skippable in no circumstances.** Skipping it means discovering the codebase through test failures instead of before writing code. Four of five common post-code corrections (pino-http stubs, better-auth ESM, cross-layer enum gaps, reflexive stubbing) are prevented at pre-code time by this single step.
+
+---
+
 ## Operating Modes
 
 ### Mode A: Epic
