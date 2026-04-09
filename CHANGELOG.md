@@ -6,6 +6,20 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.5.1 (2026-04-09)
+
+**Fix settings.json merge dropping Edit matcher when Write already existed.**
+
+`install-hooks.sh` deduped on `.hooks[0].command` alone, so when a project already had `Write → check-pipeline-compliance.sh` wired, the `Edit → check-pipeline-compliance.sh` entry was treated as a duplicate and dropped during merge.
+
+Now dedupes on `[matcher, command]` pair. `Write → X` and `Edit → X` are recognised as distinct entries. Idempotent — re-running the installer doesn't add duplicates.
+
+**Affects:** projects that installed Specflow before 0.3.0 (when the `Edit` matcher was added to `hooks/settings.json`) and have updated since. The update would refresh the hook script but silently leave `Edit` unwired. After 0.5.1, running `npx @colmbyrne/specflow update .` adds the missing matcher automatically.
+
+Verify with `npx @colmbyrne/specflow verify` section 13 — should show both `Write → check-pipeline-compliance.sh ✅ wired` and `Edit → check-pipeline-compliance.sh ✅ wired`.
+
+---
+
 ## 0.5.0 (2026-04-09)
 
 **Pre-push branch freshness hook + pre-code reconnaissance.**

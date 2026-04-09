@@ -162,13 +162,14 @@ if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
   echo -e "${YELLOW}⚠️${NC}  Existing settings.json found - merging hooks..."
 
   if command -v jq &> /dev/null; then
-    # Merge using jq — concatenate hook arrays, don't replace
+    # Merge using jq — concatenate hook arrays, dedupe on (matcher, command) pair
+    # so that Write→X and Edit→X are treated as distinct entries.
     TEMP_SETTINGS=$(mktemp)
     if jq -s '
       (.[0].hooks.PostToolUse // []) as $existing |
       (.[1].hooks.PostToolUse // []) as $new |
       .[0] * .[1] |
-      .hooks.PostToolUse = ($existing + $new | unique_by(.hooks[0].command))
+      .hooks.PostToolUse = ($existing + $new | unique_by([.matcher, (.hooks[0].command // "")]))
     ' "$TARGET_DIR/.claude/settings.json" "$HOOKS_DIR/settings.json" > "$TEMP_SETTINGS"; then
       mv "$TEMP_SETTINGS" "$TARGET_DIR/.claude/settings.json"
       echo -e "${GREEN}✓${NC} Merged hooks into existing settings.json (preserved existing hooks)"
