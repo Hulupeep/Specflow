@@ -40,3 +40,24 @@ appears in the skills list, then test with: `make this story specflow compliant`
 > Future direction: package the full Specflow toolset (agents, hooks, contracts,
 > skills) as a single Claude Code **plugin** so one install wires everything
 > together. This `skills/` directory is the first step toward that.
+
+## specflow-simulate
+
+Runs a story through multiple personas and divergent routes to surface gaps and
+edge cases **before** it's built, then proposes each finding as a concrete story
+addition (new REQ, negative-path AC, Gherkin branch, journey step). The
+high-value exploratory step right after create — distinct from the pre-flight
+gate.
+
+**Triggers on:** "simulate this story", "simulate usage end to end", "find gaps
+and edges", "run personas through this", "stress-test this story", or
+`/specflow-simulate <file-or-issue>`.
+
+Position in the flow:
+
+```
+create (specflow-writer) → simulate (specflow-simulate) → audit/uplift (specflow-audit) → pre-flight gate
+```
+
+Install the same way as specflow-audit (copy to `~/.claude/skills/` or
+`.claude/skills/`).
