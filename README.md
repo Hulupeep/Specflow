@@ -67,9 +67,9 @@ checkmark on it. So put a hostile review *in front* of ticket-writing:
                   + the board-auditor / specflow-uplifter agents.
 ```
 
-**Rule of thumb:** never write a ticket from a PRD that hasn't survived the adversary. The
-adversary makes the spec honest *to begin with*; Specflow then keeps it honest *forever*
-(contracts + journeys).
+**Rule of thumb:** never write a ticket from a PRD that hasn't survived the adversary. **The
+adversary makes the spec honest to begin with; Specflow bakes the truth in** — contracts +
+journey tests enforce it on every build, so it can't drift back.
 
 ---
 
