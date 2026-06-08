@@ -95,6 +95,47 @@ journey tests enforce it on every build, so it can't drift back.
 
 ---
 
+## Addendum: the full execution pipeline (adversary + Specflow + ruflo)
+
+Specflow is **Gates B / B.5 / C** of a larger loop that turns a rough idea into merged code you can
+trust — even when a multi-agent swarm (e.g. [ruflo](https://github.com/ruvnet/ruflo) / claude-flow)
+does the building. The principle:
+
+> **The swarm is muscle *inside* a phase. The gates live *between* phases, and every gate is owned
+> *outside* the swarm. Throughput is delegated; trust never is.**
+
+```
+[0] DISCOVER ─► [1] PRD ─[GATE A]─► [2] TICKETS ─[GATE B][GATE B.5]─► [3] BUILD ─[GATE C]─► merged
+  human+agent     dueling   adversary  specflow      audit+    pre-flight   ruflo      specflow
+  vs real         writer/   verdict    writer        closure   simulation   swarm      CI
+  artifact        adversary (HARD)     (ruflo //)    validator (own gate)  (ruflo //)  (unfakeable)
+```
+
+| Gate | After | What it is | Type |
+|------|-------|------------|------|
+| **A** | the PRD | The **[Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer)** verdict must be `SHIP` / `SHIP WITH STIPULATIONS`, written to a **committed `verdict` artifact**. The controller refuses to spawn ticket-writing unless that artifact says SHIP. | **HARD** |
+| **B** | tickets | `specflow audit` + closure validator — every requirement → journey → test → issue, no orphans, no duplicate IDs. | soft (controller) |
+| **B.5** | tickets | **Pre-flight simulation** — walk real personas through each ticket; a CRITICAL design gap blocks. *Its own gate.* | soft (controller) |
+| **C** | build | **Specflow CI** — contract tests + journey tests against a *real seeded backend* + anti-pattern audit + coverage ratchet. Runs in CI under branch protection: a violation **cannot merge**. | **HARD (unfakeable)** |
+
+**Who does what:** *Discover* — human + agent vs the real artifact (no swarm). *PRD* — dueling
+writer/adversary, strong models. *Tickets* — `specflow-writer` fanned out by ruflo. *Build* — ruflo
+swarm: one implementer per ticket in worktrees, multi-model cost routing (cheap models for
+boilerplate, strong for hard), shared memory, kill-switch dashboard.
+
+**Why it holds:** Gate A is a *single hostile critic*, not the swarm's self-consensus; Gate C is
+*CI*, not an agent's opinion. **Soft front (controller-enforced) + hard backstop (branch-protected
+CI)** means even a gamed soft gate — or a fooled adversary — can't merge a contract violation. And
+because Gate C's journeys run against a real seeded backend, *green-but-broken* can't pass. This is
+how Specflow **bakes the truth in**.
+
+**ruflo's role is throughput, not trust** — use it where work is genuinely parallel (tickets,
+build, triage) for multi-model cost + memory + observability; keep the trust-critical moments
+(Gate A, Gate C) outside the swarm. **No fork needed** — the adversary is a runtime skill the critic
+invokes; Specflow is a CLI + CI the swarm calls.
+
+---
+
 ## Links
 
 | | |
