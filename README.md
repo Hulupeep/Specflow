@@ -44,6 +44,35 @@ npx @colmbyrne/specflow graph           # Validate contract cross-references
 
 ---
 
+## Recommended workflow: harden the PRD *before* you write tickets
+
+Specflow makes tickets **enforceable**. It does not make them **correct** — a perfectly
+specflow-compliant ticket can still encode the wrong thing, or a plausible lie with a green
+checkmark on it. So put a hostile review *in front* of ticket-writing:
+
+```
+1. ADVERSARY      Harden the PRD with the Adversarial PRD Reviewer until it earns a
+   (build spec)   SHIP / SHIP WITH STIPULATIONS verdict. Catches no-JTBD, untestable
+                  requirements, fake backends, no-data loopholes, skip-to-green, and
+                  false claims about the repo — BEFORE any ticket exists.
+                  → https://github.com/Hulupeep/adversarial-prd-reviewer
+
+2. SPECFLOW       Turn the hardened PRD into tickets: Gherkin acceptance criteria,
+   (write)        data-testid selectors, contract references, E2E journey files.
+                  (specflow-writer agent)
+
+3. BOARD AUDITOR  Uplift the tickets to full compliance — fill missing SQL/RLS,
+   (uplift)       TypeScript interfaces, invariants, data-testid coverage — then re-audit.
+                  npx @colmbyrne/specflow audit <issue>
+                  + the board-auditor / specflow-uplifter agents.
+```
+
+**Rule of thumb:** never write a ticket from a PRD that hasn't survived the adversary. The
+adversary makes the spec honest *to begin with*; Specflow then keeps it honest *forever*
+(contracts + journeys).
+
+---
+
 ## What You Get
 
 | Layer | What it does |
@@ -72,6 +101,7 @@ npx @colmbyrne/specflow graph           # Validate contract cross-references
 |---|---|
 | [Detailed Setup](docs/getting-started.md) | Manual paths, updating, SKILL.md |
 | [Agent Library](agents/README.md) | 30+ agents for wave execution |
+| [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Harden the PRD *before* writing tickets (step 1 of the recommended workflow) |
 | [Contract Schema](CONTRACT-SCHEMA.md) | YAML format for contracts |
 | [CI Integration](CI-INTEGRATION.md) | GitHub Actions setup |
 | [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
