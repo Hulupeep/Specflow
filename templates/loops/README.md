@@ -2,7 +2,42 @@
 
 > **Canonical source: Specflow.** This kit was scaffolded by `specflow init` and is refreshed by `specflow init`/`update`. Don't hand-edit it per-project — change it in Specflow (`templates/loops/`) so every project gets the fix.
 
-This folder is the runnable kit for the process in [`../../PROCESS.md`](../../PROCESS.md). Everything you need is here:
+## The problem this solves
+
+The problem isn't that hand-prompting agents is *tedious*. It's that it's **untyped**. An agent hands back *"done," "tests pass," "the file says so"* — claims with nothing enforcing they're true. So plausible-but-wrong flows straight downstream and you find out in production:
+
+- a spec that was **never made honest** becomes tickets, then code;
+- a number someone **guessed** becomes a test assertion;
+- a test that's **green against a mock** becomes a merge;
+- "it ran" gets treated as "it works" — and there's no record of why anything was trusted.
+
+Nothing at the boundaries rejects a wrong-typed artifact. That's the real cost, and it's a *correctness* problem, not a labor one.
+
+## Why this — type-safe practice, not automation
+
+Think of it as a **type system for the whole lifecycle**. Each phase emits a *typed artifact* that the next phase refuses to consume until it conforms:
+
+| Artifact | Its "type" is enforced by |
+|---|---|
+| discovery | a **real artifact** — no grounding, no PRD |
+| PRD | a **hostile critic** (Gate A) — no SHIP verdict, no tickets |
+| tickets | the **specflow auditor** (Gate B) — every requirement→journey→test→issue, no orphans, no dup IDs |
+| an asserted number | the **oracle** — checked against the real calc/source, never guessed |
+| the merge | **CI vs a real backend** (Gate C) — green-but-broken can't typecheck |
+
+The gates **are** the type-checker. The honesty rule — *"it ran / it's green / the file says so" is not evidence* — is just the compiler rule: an untyped claim doesn't cross a boundary. The loop is only *how you run the checker* continuously and hands-off; the point is that **a wrong artifact can't reach production whether a human or an agent produced it.**
+
+## What makes it safe to let it run
+
+- **The producer never certifies its own type** — an outsider does: the hostile critic at Gate A, CI at Gate C. (Muscle does the work; it never approves it.)
+- **Typed values are durable and inspectable** — state lives in committed files (PRD, verdict, contract, evidence), not chat, so nothing can "remember" a green it never proved.
+- **A type error is caught at its boundary, cheaply** — worst case is a branch you don't merge or a PRD that never ships, never polluted live data.
+
+---
+
+## What's in the folder
+
+This is the runnable kit for the process in [`../../PROCESS.md`](../../PROCESS.md):
 
 ```
 spec-build.yaml        feature-build.yaml      ← the PATHS (stages, gates, repair, done_when) — write once
