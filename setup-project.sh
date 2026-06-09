@@ -112,7 +112,7 @@ echo ""
 echo -e "${BLUE}[4/10]${NC} Copying scripts and examples..."
 
 # Scripts
-for script in specflow-compile.cjs verify-graph.cjs; do
+for script in specflow-compile.cjs verify-graph.cjs verify-ticket-journey.cjs verify-seed.cjs adversary-spawn.cjs; do
   if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
     cp "$SCRIPT_DIR/scripts/$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$script"

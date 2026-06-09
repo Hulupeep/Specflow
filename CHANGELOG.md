@@ -6,6 +6,23 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.0 (2026-06-10)
+
+**Pipeline v2: real, mechanical adversary independence — and `init` now ships the gate scripts.**
+
+The spec-build loop's adversary is no longer "same agent, switched hats." It runs in a **fresh context seeded by a fixed template that cannot carry the author's reasoning**, gated before it can launch:
+
+- `scripts/verify-seed.cjs` — byte-checks the spawn seed against `{artifact_paths, tool_grants, mandate_ref}`. Any extra key (`rationale`/`context`/…) — the priming-leak vector — or free-text `mandate_ref` is **rejected**. A primed seed cannot launch.
+- `scripts/adversary-spawn.cjs` — `buildSeed()` reads only the three slots (priming prevented *at construction*); `assertSeedMatchesTemplate()` gates before any spawn.
+- `templates/loops/adversary-mandate.md@v1` — the versioned static mandate the seed references by id.
+- `scripts/verify-ticket-journey.cjs` — Gate B leg 3: the ticket↔journey "→issue" join (`verify-graph.cjs` has no issue-awareness).
+
+`specflow init` now scaffolds these scripts (previously only `specflow-compile`/`verify-graph`). Runtime bindings for the whole pipeline ship too: `PROCESS-CLAUDE.md` (Workflow) alongside `PROCESS-CODEX.md` — run spec-build + feature-build end-to-end on either.
+
+**Get it:** `npx @colmbyrne/specflow init .` (or re-init existing projects). Pairs with the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) skill for Gate A.
+
+---
+
 ## 0.6.0 (2026-06-09)
 
 **Distribute the loop kit + process docs via `specflow init`.**
