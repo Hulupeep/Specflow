@@ -4,7 +4,9 @@
 
 ## The problem this solves
 
-The problem isn't that hand-prompting agents is *tedious*. It's that it's **untyped**. An agent hands back *"done," "tests pass," "the file says so"* — claims with nothing enforcing they're true. So plausible-but-wrong flows straight downstream and you find out in production:
+**Your best thinking becomes invisible to future you.** You think in rich, parallel texture — but the moment you need to *act* on it (retrieve it, build on it, hand it to an agent), there's no schema. It evaporates.
+
+The same gap shows up in the work itself: hand-prompting agents isn't painful because it's *tedious* — it's painful because it's **untyped**. An agent hands back *"done," "tests pass," "the file says so"* — claims with nothing enforcing they're true. So plausible-but-wrong flows straight downstream and you find out in production:
 
 - a spec that was **never made honest** becomes tickets, then code;
 - a number someone **guessed** becomes a test assertion;
@@ -32,6 +34,10 @@ The gates **are** the type-checker. The honesty rule — *"it ran / it's green /
 - **The producer never certifies its own type** — an outsider does: the hostile critic at Gate A, CI at Gate C. (Muscle does the work; it never approves it.)
 - **Typed values are durable and inspectable** — state lives in committed files (PRD, verdict, contract, evidence), not chat, so nothing can "remember" a green it never proved.
 - **A type error is caught at its boundary, cheaply** — worst case is a branch you don't merge or a PRD that never ships, never polluted live data.
+
+## The loop is execution; the practice must be storied
+
+This loop is the *execution* of a practice — it gives your thinking a schema at the moment you act, so a run produces typed, durable artifacts instead of evaporating texture. But execution is only half of it. The practice itself — the decisions, the *why*, the patterns that recur across runs — has to be **storied**: captured and narrated somewhere durable (e.g. [heystax.ai](https://heystax.ai)) so it survives beyond a single loop and future-you can retrieve it. **The loop types the work; the store remembers the practice.**
 
 ---
 
