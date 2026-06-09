@@ -85,6 +85,20 @@ journey tests enforce it on every build, so it can't drift back.
 
 ---
 
+## Two ways to use it
+
+**On its own.** Contracts + journey tests + hooks + CI = your specs enforce themselves. That's everything in "What You Get" above — no adversary, no loop kit required. Specflow is independently useful as the architectural-enforcement layer.
+
+**As part of the end-to-end pipeline.** `specflow init` also scaffolds a runnable loop kit (`QA/loops/`) + process docs that place Specflow as **Gates B / B.5 / C** inside the larger idea→merged-code loop:
+
+```
+DISCOVER → PRD → [GATE A: adversary] → TICKETS → [Specflow: GATE B/B.5] → BUILD → [GATE C] → merged
+```
+
+Gate A (the hostile critic) is a separate skill — the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer). Specflow doesn't require it, but the pipeline pairs them. The loop runs whole on either runtime — Claude Code (`Workflow`) or Codex (automations); see `PROCESS-CLAUDE.md` / `PROCESS-CODEX.md`. The path (`QA/loops/*.yaml`) is the source of truth; each runtime is a binding of it. **Muscle never self-approves — Gate A (a hostile critic) and Gate C (CI on a real backend) decide.**
+
+---
+
 ## FAQ
 
 **Isn't this just more testing?** No. Tests verify behaviour. Contracts verify architecture. "No localStorage in service workers" survives any refactor.
