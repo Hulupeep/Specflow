@@ -151,7 +151,7 @@ echo -e "${BLUE}[4b/10]${NC} Copying loop kit + process docs..."
 if [ -d "$SCRIPT_DIR/templates/loops" ]; then
   mkdir -p "$TARGET_DIR/QA/loops/prompts" "$TARGET_DIR/QA/loops/examples"
   cp "$SCRIPT_DIR/templates/loops/"*.yaml "$TARGET_DIR/QA/loops/" 2>/dev/null || true
-  cp "$SCRIPT_DIR/templates/loops/README.md" "$TARGET_DIR/QA/loops/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/templates/loops/"*.md "$TARGET_DIR/QA/loops/" 2>/dev/null || true   # README + adversary-mandate@v1
   cp "$SCRIPT_DIR/templates/loops/prompts/"*.md "$TARGET_DIR/QA/loops/prompts/" 2>/dev/null || true
   cp "$SCRIPT_DIR/templates/loops/examples/"*.md "$TARGET_DIR/QA/loops/examples/" 2>/dev/null || true
   echo -e "${GREEN}✓${NC} Copied QA/loops/ (paths + prompts + example)"
