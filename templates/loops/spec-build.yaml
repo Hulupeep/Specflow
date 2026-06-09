@@ -1,0 +1,73 @@
+# spec-build.yaml — the reusable PATH for the spec-build loop (PROCESS.md Steps 0–5).
+# The prompt does NOT restate this. The prompt only supplies: goal + inputs + automation.
+# Each tick: load this path, LOCATE the current stage from committed artifacts, advance ONE gate, persist, stop/escalate.
+loop: spec-build
+process_ref: PROCESS.md#steps-0-5
+principle: writers are muscle; trust lives in GATE A (one hostile critic), never self-consensus.
+
+progress_display:             # EMIT this at the START of every tick so the human sees the phase
+  rule: >
+    Re-render the map below with marks: ✓ completed · ▶ current · · pending · ⛔ hard wall.
+    GATE_A stays ⛔ until the verdict artifact says SHIP. Show the one-line "now / next / blocked-on" under it.
+  template: |
+    ┌──────────────────────── SPEC-BUILD ────────────────────────┐
+      DISCOVER ─▶ PRD ═╣⛔A╠═▶ TICKETS ─▶ ╎B╎ ─▶ ╎B.5╎ ─▶ handoff
+         {d}      {p}    {a}     {t}       {b}    {b5}
+    └─────────────────────────────────────────────────────────────┘
+      now: {current_stage}   next: {next_stage}   blocked-on: {blocker_or_none}
+      ╣⛔╠ hard wall (GATE A: committed SHIP verdict)   ╎ ╎ soft gate
+
+inputs:                       # supplied by the invocation, not hard-coded here
+  goal: ${goal}               # e.g. "SHIP the TT-ROLLBACK spec (hardened PRD + audited tickets)"
+  story_slug: ${slug}         # e.g. tt-rollback
+  grounding_ref: ${inputs}    # path to the discovery grounding (real facts + oracle + constraints)
+
+state:                        # where 'where am I?' is read from — durable, never chat
+  prd: PRDs/${slug}-prd.md
+  verdict_artifact: PRDs/${slug}-verdict.md
+  tickets: gh issues labelled ${slug}
+
+stages:
+  - id: discover
+    do: ground against the REAL artifact named in grounding_ref; capture intent + constraints + oracle
+    gate: grounding written; problem + real-data-it-must-satisfy stated
+  - id: draft
+    do: writer → ${prd}
+    gate: JTBD, scope boundary, acceptance, success metrics, deps all present
+  - id: adversary            # one hostile critic
+    do: adversarial-prd-reviewer — 7-pass rubric + Special Mandate
+        (reality-grounding ledger over every repo/schema claim; loophole hunt)
+    do_until: verdict issued; fix each FATAL/SERIOUS in the document, re-review
+  - id: GATE_A               # HARD — the trust gate
+    type: hard
+    gate: verdict ∈ {SHIP, SHIP_WITH_STIPULATIONS} written to ${verdict_artifact}
+    rule: no ticket-writing until SHIP; then human approval before issues are created
+  - id: tickets
+    do: specflow-writer → issues (Gherkin ACs, data-testids, contract refs, e2e filename)
+    gate: every UI story references a journey contract; Gherkin lives once in the catalogue
+  - id: GATE_B               # soft
+    type: soft
+    do: board-auditor + specflow-uplifter — wire every ticket to journey + test + contract
+    gate: requirement→journey→test→issue complete; no orphans; no duplicate IDs
+  - id: GATE_B5              # soft
+    type: soft
+    do: pre-flight-simulator — walk real personas through each ticket before code
+    gate: no CRITICAL design gap survives
+
+repair:
+  on_gate_fail: route back to the owning stage with a targeted prompt
+  within_run: fix fast failures inline
+  across_ticks: slow/blocked state is re-read on the next automation tick
+  budget: adversary cycles ≤ 4; uplift re-audits ≤ 3
+  on_exhausted: escalate with the open FATAL/SERIOUS list
+
+escalate_when:
+  - verdict = DO_NOT_SHIP, or a FATAL cannot be closed in the document
+  - discovery shows the idea is wrong (kill it — don't spec the wrong thing)
+  - an UNRESOLVED gap has no willing owner
+never_without_human: [create issues from a DO_NOT_SHIP PRD, fabricate a green verdict]
+
+done_when:
+  - ${verdict_artifact} = SHIP (or SHIP_WITH_STIPULATIONS) and committed
+  - audited, journey-contracted tickets exist; UNRESOLVED items owner-tagged
+  - handoff: those tickets are the INPUT to feature-build.yaml

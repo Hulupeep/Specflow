@@ -1,0 +1,62 @@
+# feature-build.yaml — the reusable PATH for the feature-build loop (PROCESS.md Step 6→7).
+# The prompt only supplies: goal + issue + automation. Each tick: load this path,
+# LOCATE the current rail from the branch + CI state, advance ONE rail, persist, stop/escalate.
+loop: feature-build
+process_ref: PROCESS.md#step-6-7
+principle: you and any swarm are muscle; trust lives ONLY in GATE C (branch-protected CI vs real data).
+
+progress_display:             # EMIT this at the START of every tick so the human sees the rail
+  rule: >
+    Re-render the map below with marks: ✓ completed · ▶ current · · pending · ⛔ hard wall.
+    GATE_C stays ⛔ until CI is green vs the real seeded backend. Show "now / next / blocked-on" + CI status under it.
+  template: |
+    ┌──────────────────────── FEATURE-BUILD #{issue} ────────────────────────┐
+      ticket ─▶ contract ─▶ e2e ─▶ oracle ─▶ impl ═╣⛔C╠═▶ ready-for-review
+        {r1}      {r2}      {r3}     {r4}    {r5}     {c}
+                  ▲____________ ↺ repair ___________│
+    └─────────────────────────────────────────────────────────────────────────┘
+      now: {current_rail}   next: {next_rail}   CI: {ci_status}   blocked-on: {blocker_or_none}
+      muscle run: /qa {qa_status} · swarm {swarm_used}      ╣⛔╠ GATE C (CI vs real backend)
+
+inputs:
+  goal: ${goal}               # e.g. "branch for #566 green on CI, ready for review"
+  issue: ${issue}             # e.g. 566
+
+state:
+  branch: feat/${issue}-${slug}
+  evidence: an evidence note on the branch/thread (diff, test results, oracle, audit rows)
+  gate_c: branch-protected CI vs a real seeded backend
+
+preconditions:
+  - issue has Gherkin ACs + data-testids + contract ref + e2e filename (Rule 1) else escalate
+  - constraint: slice < 1000 lines (else propose a 4–8 slice split)
+
+rails:                        # advance one per tick, in order
+  - id: 1_ticket    gate: ticket + ACs + journey id confirmed
+  - id: 2_contract  gate: contract YAML stub → full (steps + selectors from catalogue)
+  - id: 3_e2e       gate: real-backend e2e test runs against a real seeded backend
+  - id: 4_oracle    gate: every asserted number traced to the live calc / real source (never guessed)
+  - id: 5_impl      gate: smallest mergeable slice (<1000 lines) makes it pass
+
+muscle:                       # do work, never approve it
+  - /qa (coverage + regression) — run + SPOT-CHECK before trusting
+  - multicheck REVIEWER (different model) for complex slices
+  - ruflo swarm — only if triggered (>1500 lines, 3+ layers, security/invariant-critical, rejected-unsure, new pattern)
+
+GATE_C:                       # HARD, unfakeable — the only trust gate
+  type: hard
+  gate: contract + journey tests green on branch-protected CI vs real seeded backend
+  read: green → ready-for-review; red → repair (inline if fast, next tick if slow)
+
+repair:
+  classify: [coverage, regression, contract, journey, lint, flake]
+  inherited_baseline: not yours — note the tracking ticket, never silent --no-verify
+  budget: 3 attempts/rail, 2 full passes
+  on_exhausted: escalate with classified failure + last diff
+
+escalate_when: [precondition unmet, AC ambiguous (>1 reading), slice can't stay <1000 lines, budget exhausted]
+never_without_human: [git push, open PR, merge, --no-verify, override contract]
+
+done_when:
+  - 5 rails complete, muscle run + spot-checked, GATE C green, evidence note complete
+  - STOP at "branch ready for review" — human opens the PR

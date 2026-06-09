@@ -141,6 +141,37 @@ echo -e "${GREEN}✓${NC} Copied scripts, examples, hook sources"
 echo ""
 
 # ============================================================================
+# 4b. Loop kit + process docs (the runnable pipeline)
+# ============================================================================
+
+echo -e "${BLUE}[4b/10]${NC} Copying loop kit + process docs..."
+
+# QA/loops/ — paths (yaml) + thin prompt templates + example. Canonical source: Specflow.
+# Refreshed on every init/update so projects don't drift from the source of truth.
+if [ -d "$SCRIPT_DIR/templates/loops" ]; then
+  mkdir -p "$TARGET_DIR/QA/loops/prompts" "$TARGET_DIR/QA/loops/examples"
+  cp "$SCRIPT_DIR/templates/loops/"*.yaml "$TARGET_DIR/QA/loops/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/templates/loops/README.md" "$TARGET_DIR/QA/loops/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/templates/loops/prompts/"*.md "$TARGET_DIR/QA/loops/prompts/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/templates/loops/examples/"*.md "$TARGET_DIR/QA/loops/examples/" 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Copied QA/loops/ (paths + prompts + example)"
+fi
+
+# PROCESS*.md — the methodology (canonical + dummies + Codex). Skip if the project already has them.
+if [ -d "$SCRIPT_DIR/templates/process" ]; then
+  for doc in "$SCRIPT_DIR/templates/process/"*.md; do
+    base="$(basename "$doc")"
+    if [ -f "$TARGET_DIR/$base" ]; then
+      echo -e "${YELLOW}⚠️${NC}  $base already exists — not overwritten"
+    else
+      cp "$doc" "$TARGET_DIR/$base"
+      echo -e "${GREEN}✓${NC} $base"
+    fi
+  done
+fi
+echo ""
+
+# ============================================================================
 # 5. Create package.json, jest.config.js
 # ============================================================================
 
