@@ -6,6 +6,21 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.6.0 (2026-06-09)
+
+**Distribute the loop kit + process docs via `specflow init`.**
+
+`specflow init` now scaffolds the runnable pipeline into every project:
+
+- `QA/loops/` — the reusable loop **paths** (`spec-build.yaml`, `feature-build.yaml`), thin invocation **prompt templates** (`prompts/`), a worked **example**, and a README. A loop = path (YAML) + thin prompt (goal + inputs + automation) + the tick + durable state.
+- `PROCESS.md`, `PROCESS-GUIDE.md`, `PROCESS-CODEX.md` — the methodology (canonical / plain-language / Codex-runtime), copied to the project root (skipped if already present).
+
+Specflow is now the **canonical source** of the loop kit — projects stop hand-mirroring it; re-running `init` refreshes it. The kit reframes the practice as **type-safe**: each phase emits a typed artifact the next won't consume until it conforms (the gates *are* the type-checker), and pairs the execution loop with storing the practice durably.
+
+**Get it:** `npx @colmbyrne/specflow init .` (or re-init existing projects). Pairs with the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) skill for Gate A.
+
+---
+
 ## 0.5.1 (2026-04-09)
 
 **Fix settings.json merge dropping Edit matcher when Write already existed.**
