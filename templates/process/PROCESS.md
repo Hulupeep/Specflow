@@ -89,4 +89,15 @@ This process runs as two paired loops plus a meta loop. Each loop is split in tw
 | **Feature-build** | [`QA/loops/feature-build.yaml`](QA/loops/feature-build.yaml) | [`QA/feature-build-loop.md`](QA/feature-build-loop.md) | Step 6 (5 rails) → **Gate C** → a tested slice that survived CI |
 | **Mistake-harvest** (meta) | — (scheduled routine) | `docs/routines/daily-mistake-harvest.md` (timebreez) | reads runs of both, finds skipped gates, updates the skills/contracts the loops depend on |
 
-A loop is **path + thin prompt + automation (the tick) + durable state (committed artifacts)**. The YAML is the source of truth; if a prose explainer ever disagrees with it, the YAML wins. The gates are why the loops are trustworthy: the muscle never approves its own work. (To run in Codex, see [`PROCESS-CODEX.md`](PROCESS-CODEX.md).)
+A loop is **path + thin prompt + automation (the tick) + durable state (committed artifacts)**. The YAML is the source of truth; if a prose explainer ever disagrees with it, the YAML wins. The gates are why the loops are trustworthy: the muscle never approves its own work.
+
+## Path vs runtime — run the whole thing on either
+
+Separate **what** from **how**:
+
+- **The PATH (what)** — `QA/loops/*.yaml`. Runtime-agnostic stages, gates, repair, `done_when`. Single source of truth.
+- **The RUNTIME / binding (how)** — a complete way to execute that path end-to-end on one tool:
+  - [`PROCESS-CLAUDE.md`](PROCESS-CLAUDE.md) — the **whole** pipeline on Claude Code via the `Workflow` tool (`agent(schema)`, `parallel(critics)`, `pipeline()` + worktree).
+  - [`PROCESS-CODEX.md`](PROCESS-CODEX.md) — the **whole** pipeline on Codex via goals + thread-automations.
+
+**You can run the entire pipeline on Claude Code, or the entire pipeline on Codex** — you don't split a run across both. Each tool has strengths (Claude's `Workflow` shines at the judgment fan-outs; Codex's automations shine at long autonomous grind), but strengths are *guidance, not a forced split* — every runtime runs every stage. **Whichever runtime, the muscle never self-approves; Gate C (external CI) decides.**
