@@ -6,6 +6,16 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.3 (2026-06-10)
+
+**Fix: shell scripts shipped with CRLF, breaking `init`/`update` on Linux & Mac.**
+
+`bash` on Linux/Mac chokes on Windows line endings — `setup-project.sh: line 17: $'\r': command not found`, `syntax error near unexpected token $'do\r'`. The scripts are LF in git, but `npm publish` packs from the working tree, so publishing from a Windows checkout (autocrlf) shipped CRLF. Two fixes: a `.gitattributes` forcing `*.sh`/hooks to LF on checkout, and a `prepack` step (`scripts/normalize-eol.cjs`) that strips CR from the shell scripts at pack time on **any** OS — so the published tarball is always LF regardless of who publishes from where.
+
+If you hit this on 0.7.2: install from a fresh Linux/Mac clone (`git clone … && bash setup-project.sh .`) until 0.7.3 is published.
+
+---
+
 ## 0.7.2 (2026-06-10)
 
 **`init` now installs the adversary skill too — one command, not two.**
