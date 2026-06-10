@@ -31,7 +31,11 @@ npx @colmbyrne/specflow init .          # one command — sets up everything (sa
 npx @colmbyrne/specflow update . --ci   # wire the build/commit hooks + CI
 ```
 
-Then open **CLAUDE.md** and fill in the **Project Context** (Repository, Board, CLI, Tech Stack).
+Then open **CLAUDE.md** and fill in the **Project Context** — *only the fields still blank/placeholder; an existing project may already have these:*
+- **Repository** — `your-org/your-repo`
+- **Project Board** — where issues are tracked (e.g. GitHub Issues)
+- **Board CLI** — the command-line tool for that board. For GitHub Issues that's **`gh`** (the [GitHub CLI](https://cli.github.com)); for Jira it'd be the `jira` CLI, etc. Agents use it to read/create issues, so it must be installed + authenticated.
+- **Tech Stack**
 
 **`init` installs the whole thing in one go:**
 - **Specflow** — contracts, hooks, agents, tests
