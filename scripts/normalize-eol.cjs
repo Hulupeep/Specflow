@@ -38,3 +38,10 @@ for (const rel of targets) {
   }
 }
 console.error(`normalize-eol: ${targets.size} shell file(s) checked, ${fixed} fixed`);
+
+// Guard: abort loudly if any CR survives — better to fail the publish than ship CRLF.
+const dirty = [...targets].filter(rel => readFileSync(join(ROOT, rel), 'utf8').includes('\r'));
+if (dirty.length) {
+  console.error(`normalize-eol: ERROR — CR still present in: ${dirty.join(', ')}`);
+  process.exit(1);
+}

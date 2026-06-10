@@ -6,6 +6,16 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.4 (2026-06-10)
+
+**Make the LF fix actually stick — 0.7.3's `prepack` didn't run on the publisher's machine, so it still shipped CRLF.**
+
+`prepack` is unreliable if the publisher has `ignore-scripts` set (or an npm that skips it on publish), so 0.7.3 was published with CRLF anyway and still broke Linux/Mac. Now: `normalize-eol` runs as **`prepack` *and* `prepublishOnly`** (redundant hooks), is exposed as **`npm run normalize`** to run by hand, and **aborts the publish (exit 1) if any CR survives** — so a CRLF tarball can't be published silently again.
+
+**Publishing this package:** `npm run normalize` then `npm publish` (the manual normalize guarantees LF even if your npm skips lifecycle scripts).
+
+---
+
 ## 0.7.3 (2026-06-10)
 
 **Fix: shell scripts shipped with CRLF, breaking `init`/`update` on Linux & Mac.**
