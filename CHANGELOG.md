@@ -6,6 +6,14 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.1 (2026-06-10)
+
+**Fix: `verify-setup` falsely reported every contract as "invalid YAML" when PyYAML wasn't installed.**
+
+Section 3 ran `python3 -c "import yaml; ..."` gated only on `command -v python3` — so a python3 without PyYAML made `import yaml` throw, and (with stderr swallowed) every contract was flagged invalid. Meanwhile the jest contract-schema suite parsed the same files fine. Now `verify-setup` prefers **node + js-yaml** (which the project depends on), falls back to python3 **only if PyYAML actually imports**, and **warns instead of failing** when neither parser is available. No more false "invalid YAML syntax."
+
+---
+
 ## 0.7.0 (2026-06-10)
 
 **Pipeline v2: real, mechanical adversary independence — and `init` now ships the gate scripts.**
