@@ -6,6 +6,14 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.2 (2026-06-10)
+
+**`init` now installs the adversary skill too — one command, not two.**
+
+Setting up spec-build used to be two steps: `specflow init` *and* a separate `git clone` of the adversarial-prd-reviewer skill. Now `init` clones/updates the adversary into your skills dir (`~/.claude/skills/`, and `~/.codex/skills/` if present) as part of setup. The adversary stays its **own repo** (Gate A is still owned outside Specflow — not forked in); `init` just installs it for you. Idempotent (pulls if already there), never fails the install (warns + prints the manual clone if offline), and opt-out with `--no-adversary`.
+
+---
+
 ## 0.7.1 (2026-06-10)
 
 **Fix: `verify-setup` falsely reported every contract as "invalid YAML" when PyYAML wasn't installed.**

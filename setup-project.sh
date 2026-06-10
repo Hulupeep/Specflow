@@ -23,10 +23,18 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# Parse flags out of the args (so the positional target still works).
+SKIP_ADVERSARY=0
+ARGS=()
+for a in "$@"; do
+  if [ "$a" = "--no-adversary" ]; then SKIP_ADVERSARY=1; else ARGS+=("$a"); fi
+done
+set -- "${ARGS[@]}"
+
 TARGET_DIR="$1"
 
 if [ -z "$TARGET_DIR" ]; then
-  echo "Usage: bash setup-project.sh /path/to/your/project"
+  echo "Usage: bash setup-project.sh /path/to/your/project [--no-adversary]"
   exit 1
 fi
 
@@ -168,6 +176,44 @@ if [ -d "$SCRIPT_DIR/templates/process" ]; then
       echo -e "${GREEN}✓${NC} $base"
     fi
   done
+fi
+echo ""
+
+# ============================================================================
+# 4c. Adversary skill (Gate A critic) — install once per machine
+# ============================================================================
+# spec-build's Gate A is a hostile critic that lives in its OWN repo (the source of
+# truth — not forked into Specflow). We just clone/update it into your skills dir so
+# it's ONE command, not two. Skip with --no-adversary. Never fails the install.
+
+echo -e "${BLUE}[4c/10]${NC} Installing the adversary skill (Gate A critic)..."
+if [ "$SKIP_ADVERSARY" -eq 1 ]; then
+  echo -e "${YELLOW}⚠️${NC}  skipped (--no-adversary)"
+else
+  ADV_REPO="https://github.com/Hulupeep/adversarial-prd-reviewer"
+  install_adversary_into() {
+    local skills_dir="$1" dest
+    dest="$skills_dir/adversarial-prd-reviewer"
+    mkdir -p "$skills_dir" 2>/dev/null || return 0
+    if [ -d "$dest/.git" ]; then
+      if git -C "$dest" pull --ff-only --quiet 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} updated $dest"
+      else
+        echo -e "${YELLOW}⚠️${NC}  kept existing $dest (couldn't update — offline?)"
+      fi
+    elif [ -d "$dest" ]; then
+      echo -e "${YELLOW}⚠️${NC}  $dest exists but isn't a git clone — left as-is"
+    else
+      if git clone --quiet "$ADV_REPO" "$dest" 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} installed $dest"
+      else
+        echo -e "${YELLOW}⚠️${NC}  could not clone — install manually: git clone $ADV_REPO $dest"
+      fi
+    fi
+  }
+  # Claude Code (primary) always; Codex too if you use it.
+  install_adversary_into "$HOME/.claude/skills"
+  [ -d "$HOME/.codex" ] && install_adversary_into "$HOME/.codex/skills"
 fi
 echo ""
 
