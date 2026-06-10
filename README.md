@@ -24,20 +24,29 @@ Contract tests scan your source code for forbidden patterns. Break a rule → bu
 
 ---
 
-## Get Started
+## Install
 
 ```bash
-npx @colmbyrne/specflow init .
+npx @colmbyrne/specflow init .          # one command — sets up everything (safe to re-run)
+npx @colmbyrne/specflow update . --ci   # wire the build/commit hooks + CI
 ```
 
-Creates CLAUDE.md, contracts, hooks, agents, and tests. Then fill in the **Project Context** section in CLAUDE.md (Repository, Board, CLI, Tech Stack).
+Then open **CLAUDE.md** and fill in the **Project Context** (Repository, Board, CLI, Tech Stack).
+
+**`init` installs the whole thing in one go:**
+- **Specflow** — contracts, hooks, agents, tests
+- the **spec-build loop kit** (`QA/loops/`) + the gate scripts (`verify-seed`, `adversary-spawn`, `verify-ticket-journey`)
+- the **adversary critic** skill (Gate A) into `~/.claude/skills/` (and `~/.codex/skills/` if you use Codex) — add `--no-adversary` to skip
+- the **process docs** (`PROCESS.md` / `-GUIDE` / `-CLAUDE` / `-CODEX`)
+
+> **Windows:** run these in **Git Bash**, not PowerShell or WSL. The scripts target Git Bash; PowerShell's `bash` is usually WSL, which can't see your `C:\` paths and will error with "No such file or directory".
 
 ### Commands
 
 ```bash
-npx @colmbyrne/specflow init .          # Set up Specflow (safe to re-run)
-npx @colmbyrne/specflow verify          # Check installation (13 sections)
+npx @colmbyrne/specflow init .          # Set up everything (safe to re-run)
 npx @colmbyrne/specflow update . --ci   # Update hooks + install CI workflows
+npx @colmbyrne/specflow verify          # Check installation (13 sections)
 npx @colmbyrne/specflow audit 500       # Audit issue #500 for compliance
 npx @colmbyrne/specflow graph           # Validate contract cross-references
 ```
