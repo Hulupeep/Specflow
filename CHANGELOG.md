@@ -6,6 +6,20 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.8.1 (2026-06-10)
+
+**daily-use-teardown hardened after adversarial review — DO NOT SHIP → fixed.**
+
+An independent fresh-context adversary attacked the 0.8.0 loop and found the design self-attesting:
+
+- **F1 — the HITL gate was self-signable**: "confirmation written into the journey map" is a line the *agent* writes. Fixed with `scripts/teardown-gate.cjs`: the human runs `sign`, which writes a **hash-bound sign-off** (SHA of the map at confirmation time) — a forged `confirmed-by` line counts for nothing, and editing the map after sign-off fails `check`. Tested both attacks.
+- **F2 — every gate was prose checked by the entity it constrains**: `teardown-gate check` is now the deep-dive/done gate — mechanical: valid sign-offs (map *and* do-list), every mapped journey has findings (none silently skipped), every finding references evidence files that exist.
+- **S-fixes**: committed Playwright walk script required (reproducible, not narrated); URL bar visible in screenshots; env named + human-confirmed at sign-off; `bugs.md` so found bugs land immediately; CONFUSING verdicts marked **[hypothesis]** (a simulated persona is not a real user); do-list approval is a signed artifact, not chat; the example's precedent claim corrected (timebreez #673 ran *spec-build* with walkthrough discovery — the teardown's distinctive stages are new and unproven until a first real run).
+
+`specflow init` now ships `teardown-gate.cjs` with the rest of the gate scripts.
+
+---
+
 ## 0.8.0 (2026-06-10)
 
 **New loop: `daily-use-teardown` — the front door for products that are already built.**
