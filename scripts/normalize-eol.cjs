@@ -45,3 +45,5 @@ if (dirty.length) {
   console.error(`normalize-eol: ERROR — CR still present in: ${dirty.join(', ')}`);
   process.exit(1);
 }
+
+module.exports = { targets };
