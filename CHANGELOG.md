@@ -6,6 +6,22 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.8.0 (2026-06-10)
+
+**New loop: `daily-use-teardown` — the front door for products that are already built.**
+
+For a shipped product, the question isn't "what should we build" — it's *"are the journeys confusing, and are they doing the right thing?"* The new loop (`QA/loops/daily-use-teardown.yaml` + prompt + a filled Claim Alert example):
+
+1. **INVESTIGATE** — map the live app's main routes, each with its *purpose* + proposed personas. Inventory, not critique.
+2. **⛔ GATE HITL (hard, human)** — *you* confirm/correct the journey map before any judging. The agent can only infer what the product is for; you know. A teardown of the wrong journeys is worse than none.
+3. **DEEP DIVE** — top-thinker persona walks of the live app (real backend), judging clarity *and* correctness per journey: **WORKS / CONFUSING / BROKEN**, every verdict with screenshot evidence.
+4. **DO-LIST** — prioritized observations (not solutions), each traceable to a screenshot; you approve priorities.
+5. **HANDOFF** — the do-list becomes spec-build's `grounding_ref`: PRD → adversary → tickets → done.
+
+Schedulable (monthly/quarterly): the product re-generates its own backlog from observed friction. Precedent: timebreez EPIC #673 (3-persona walkthrough → PRD survived Gate A → 9 sliced tickets + a live bug found mid-walk).
+
+---
+
 ## 0.7.6 (2026-06-10)
 
 **spec-build: two-touch personas — a persona/simulation lens joins the adversary panel.**

@@ -59,6 +59,8 @@ The path lives in the YAML. The prompt only carries *goal + inputs + automation*
    Copy [`prompts/spec-build.prompt.md`](prompts/spec-build.prompt.md), fill `goal` / `slug` / `grounding_ref`, paste into your agent (or set it as a thread automation). It runs discover → PRD → adversary → **Gate A (SHIP)** → tickets → Gate B/B.5. Output: audited, journey-contracted tickets.
 2. **Feature-build** — turn each ready ticket into a tested slice.
    For every ticket the spec-build loop produced, copy [`prompts/feature-build.prompt.md`](prompts/feature-build.prompt.md), fill `issue`, paste/automate. It builds on the 5 rails → **Gate C (CI on real data)**. Output: a branch ready for review.
+
+**Already-built product?** Start one loop earlier: **daily-use-teardown** ([`daily-use-teardown.yaml`](daily-use-teardown.yaml), prompt in [`prompts/`](prompts/)) — investigate the app's main journeys + their purpose, **you confirm the map (hard human gate)**, then top-thinker persona walks judge each journey WORKS / CONFUSING / BROKEN with screenshot evidence, ending in a prioritized do-list that becomes spec-build's `grounding_ref`. Filled example: [`examples/claim-alert.daily-use-teardown.md`](examples/claim-alert.daily-use-teardown.md).
 3. **Mistake-harvest** (meta, optional) — schedule `docs/routines/daily-mistake-harvest.md` (timebreez). It reads runs of both loops and improves the skills/contracts they depend on.
 
 ```
