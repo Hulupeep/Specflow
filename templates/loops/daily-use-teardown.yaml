@@ -40,12 +40,20 @@ state:                        # durable, never chat
   do_list: docs/teardown/${slug}/do-list.md               # prioritized; becomes spec-build's grounding_ref
   dolist_signoff: docs/teardown/${slug}/do-list.md.signoff.json    # second HUMAN sign-off, same mechanism
 
+walk_mandate: teardown-walkthrough-mandate@v1   # the METHOD for investigate + deep_dive: JTBD persona
+                                                # construction, the 4 cognitive-walkthrough questions,
+                                                # findings vocabulary. Referenced by id, never inlined —
+                                                # same pattern as the adversary's mandate. A richer local
+                                                # UX skill (e.g. a jtbd-ux-designer) may EXCEED this floor,
+                                                # never replace its output discipline.
+
 stages:
   - id: investigate           # what ARE the journeys?
     do: >
       Explore the app (nav, routes, screens) + the repo. Enumerate the MAIN routes, each as a
       parseable line "- J: <id> — <purpose>" (what is a user trying to achieve here?), with entry
-      points and who uses it. Propose the personas if not supplied, and state the env (URL +
+      points and who uses it. Propose the personas if not supplied — constructed per the
+      walk_mandate (JTBD: a persona is a job, not a profile) — and state the env (URL +
       backend) the walk will use. Output: a ONE-PAGE journey map a human can review in five
       minutes. No judgments yet — inventory, not critique.
     gate: journey map committed — routes + purpose + personas + env, human-readable AND machine-parseable
@@ -67,8 +75,11 @@ stages:
   - id: deep_dive             # tier: judge — top thinkers, never tiered down
     do: >
       For each CONFIRMED journey × persona: walk the CONFIRMED env via a COMMITTED Playwright
-      script (walk_script — reproducible, not narrated) as that persona doing their normal task.
-      Judge BOTH: (a) clarity — where does the persona stall, squint, mis-click? and (b)
+      script (walk_script — reproducible, not narrated) as that persona doing their normal task,
+      applying the walk_mandate's method: at EVERY step, the 4 cognitive-walkthrough questions
+      (knows the goal? action visible? action↔goal connection? feedback?), findings named with
+      its vocabulary (discoverability / affordance / feedback / mental-model / slip-vs-mistake /
+      dead end). Judge BOTH: (a) clarity — where does the persona stall, squint, mis-click? and (b)
       correctness — does the journey achieve its purpose, doing the right thing? Capture a
       screenshot at every stall/surprise/dead-end, URL BAR VISIBLE, saved under evidence/ and
       referenced from the journey's findings entry. Verdict per journey ("## J: <id>"):
