@@ -6,6 +6,16 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.6 (2026-06-10)
+
+**spec-build: two-touch personas — a persona/simulation lens joins the adversary panel.**
+
+Persona walkthroughs now run **twice**: (1) at the adversary stage, in parallel with the structural review, walking real personas through the *PRD's* journeys on paper — design flaws get caught while only the PRD exists (the lens informs the verdict; the adversary still decides); (2) Gate B.5 unchanged, walking the *tickets* — catches ticketization flaws (a journey sliced wrong, a missing step). Both are top-thinker work: a shallow persona walk launders design gaps into a green check. Encoded in `templates/loops/spec-build.yaml` + the PROCESS docs.
+
+(Note for upgraders: re-run `specflow init .` to refresh `QA/loops/` — it's refreshed on every init.)
+
+---
+
 ## 0.7.5 (2026-06-10)
 
 **The CLI now self-heals CRLF at runtime — works on Linux/Mac even if the tarball shipped with Windows line endings.**

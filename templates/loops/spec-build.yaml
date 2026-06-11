@@ -34,9 +34,17 @@ stages:
   - id: draft
     do: writer → ${prd}
     gate: JTBD, scope boundary, acceptance, success metrics, deps all present
-  - id: adversary            # one hostile critic
+  - id: adversary            # one hostile critic, informed by parallel lenses
     do: adversarial-prd-reviewer — 7-pass rubric + Special Mandate
         (reality-grounding ledger over every repo/schema claim; loophole hunt)
+    persona_lens: |           # runs IN PARALLEL with the structural review — first persona touch
+      A fresh-context persona/simulation lens walks real personas through the PRD's
+      journeys ON PAPER ("can a human actually do this?") and returns CRITICAL design
+      gaps, each with a repro. Top-thinker work — never a cheap model; a shallow walk
+      launders design gaps into a green check. The lens INFORMS the verdict; the
+      adversary still DECIDES (one critic, not a committee).
+      Why here: persona walks find PRD-level design flaws — catching them now costs a
+      PRD edit; catching them at B.5 costs redone tickets, audit, and uplift.
     do_until: verdict issued; fix each FATAL/SERIOUS in the document, re-review
   - id: GATE_A               # HARD — the trust gate
     type: hard
@@ -49,9 +57,12 @@ stages:
     type: soft
     do: board-auditor + specflow-uplifter — wire every ticket to journey + test + contract
     gate: requirement→journey→test→issue complete; no orphans; no duplicate IDs
-  - id: GATE_B5              # soft
+  - id: GATE_B5              # soft — SECOND persona touch (first ran at the adversary stage)
     type: soft
-    do: pre-flight-simulator — walk real personas through each ticket before code
+    do: pre-flight-simulator — walk real personas through each TICKET before code.
+        Different artifact than the adversary's persona lens — that walked the PRD
+        (design flaws); this walks the tickets (ticketization flaws — a journey sliced
+        wrong, a missing step, a walk that breaks at a ticket boundary). Top-thinker work.
     gate: no CRITICAL design gap survives
 
 repair:

@@ -20,6 +20,7 @@ One agent **drafts** the PRD; a second **attacks** it with the `adversarial-prd-
 
 - **The rubric (7 passes):** JTBD coherence, requirement→implementation traceability, the two-engineer test, scope boundary, dependency/ordering, success-metrics audit, willingness-to-pay — plus a banned-language scan and a Ramen test.
 - **The Special Mandate** (honesty-critical specs): a **reality-grounding ledger** (open every concrete repo claim the author makes and verify it) + a **loophole hunt** (actively try to find the gamed gate / fake backend / skip-to-green / always-green metric *surviving*).
+- **The persona/simulation lens** (in parallel with the structural review): walk real personas through the PRD's journeys *on paper* — "can a human actually do this?" — returning CRITICAL design gaps with a repro. An experiential way to fail that the structural passes can't see. The lens *informs* the verdict; the adversary still *decides*. (Personas get a **second touch** at Gate B.5, against the tickets.) Top-thinker work, like the adversary itself.
 
 *Output:* a hardened PRD. (Where the adversary catches "a real backend with nobody home," "all-green smuggled in as the metric," etc.)
 
@@ -39,7 +40,7 @@ The critic issues `SHIP` / `SHIP WITH STIPULATIONS` / `DO NOT SHIP`, written to 
 
 ## Step 5 — GATE B.5 (soft, its own gate) — pre-flight simulation
 
-`pre-flight-simulator` walks real personas through each ticket *before* code. A CRITICAL design gap blocks. (Cheaper to find "new staff land at zero balance" here than in the build.)
+`pre-flight-simulator` walks real personas through each ticket *before* code. A CRITICAL design gap blocks. (Cheaper to find "new staff land at zero balance" here than in the build.) This is the **second** persona touch — the first ran at Step 1 against the *PRD* (design flaws); this one walks the *tickets* (ticketization flaws: a journey sliced wrong, a missing step, a walk that breaks at a ticket boundary).
 
 ## Step 6 — Build (the 5 rails, one journey at a time)
 

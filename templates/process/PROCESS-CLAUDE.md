@@ -31,8 +31,10 @@ phase('Adversary');
 // 1. Build the seed from the fixed template and BYTE-CHECK it (the independence gate, #50/N2). Abort if it carries anything but {artifact_paths, tool_grants, mandate_ref}.
 const seed = buildSeed({artifact_paths:[prdPath], tool_grants:['read','grep','bash'], mandate_ref:'adversary-mandate@v1'})
 assertSeedMatchesTemplate(seed)   // a primed seed cannot launch
-// 2. Perspective panel (lens coverage — NOT a U2 substitute):
-const lenses = ['schema-reality','loophole-security','contradicts-contracts']
+// 2. Perspective panel (lens coverage — NOT a U2 substitute). 'persona-walkthrough' is the
+//    experiential lens: walk real personas through the PRD's journeys on paper, CRITICAL gaps
+//    with repro. Top-thinker work — never tier this lens down. (Second persona touch = B.5, vs tickets.)
+const lenses = ['schema-reality','loophole-security','contradicts-contracts','persona-walkthrough']
 const verdicts = await parallel(lenses.map(l => () => agent(seed.for(l), {schema:VERDICT})))
 // 3. If correctness-critical (U2 trigger list) → a pass that does NOT share Claude's training.
 //    NOTE: `model:` only selects Anthropic tiers (opus/sonnet/haiku) — same family, SHARED blind spots.
