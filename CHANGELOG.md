@@ -6,6 +6,14 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.8.2 (2026-06-10)
+
+**Teardown gets a method: `teardown-walkthrough-mandate@v1` (JTBD personas + cognitive walkthrough).**
+
+The investigate/deep-dive stages now reference a versioned UX method by id (same pattern as the adversary's mandate): personas are constructed as **JTBD jobs**, not demographic profiles; every walk step answers the **4 cognitive-walkthrough questions** (knows the goal? action visible? action↔goal connection? feedback?); findings are named with a fixed vocabulary (discoverability / affordance / feedback / mental-model / slip-vs-mistake / dead-end) — so a CONFUSING verdict says *which* question failed instead of vibes. A richer local UX skill may exceed this floor; it never replaces the output discipline. Ships via `specflow init`.
+
+---
+
 ## 0.8.1 (2026-06-10)
 
 **daily-use-teardown hardened after adversarial review — DO NOT SHIP → fixed.**
