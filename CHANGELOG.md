@@ -6,6 +6,14 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.7.5 (2026-06-10)
+
+**The CLI now self-heals CRLF at runtime — works on Linux/Mac even if the tarball shipped with Windows line endings.**
+
+0.7.3/0.7.4 still shipped CRLF because the publisher's npm skipped the normalize hooks *and* the manual step wasn't run. Rather than keep depending on a clean publish, `bin/specflow.js` (which always runs — it's the node entry point, not an npm lifecycle script) now strips CR from the shell scripts **right before it invokes bash**. So `npx @colmbyrne/specflow init/update/verify` works on Linux/Mac regardless of how the package was published. The publish-time hooks remain as a secondary measure.
+
+---
+
 ## 0.7.4 (2026-06-10)
 
 **Make the LF fix actually stick — 0.7.3's `prepack` didn't run on the publisher's machine, so it still shipped CRLF.**
