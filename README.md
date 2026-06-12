@@ -39,9 +39,11 @@ Then open **CLAUDE.md** and fill in the **Project Context** — *only the fields
 
 **`init` installs the whole thing in one go:**
 - **Specflow** — contracts, hooks, agents, tests
-- the **spec-build loop kit** (`QA/loops/`) + the gate scripts (`verify-seed`, `adversary-spawn`, `verify-ticket-journey`)
+- the **loop kit** (`QA/loops/`) — **three loops** (see below) + the gate scripts (`verify-graph`, `verify-seed`, `adversary-spawn`, `verify-ticket-journey`, `verify-falsification`, `verify-seams`, `teardown-gate`)
 - the **adversary critic** skill (Gate A) into `~/.claude/skills/` (and `~/.codex/skills/` if you use Codex) — add `--no-adversary` to skip
 - the **process docs** (`PROCESS.md` / `-GUIDE` / `-CLAUDE` / `-CODEX`)
+
+On **Mac/Linux** any terminal works.
 
 > **Windows:** run these in **Git Bash**, not PowerShell or WSL. The scripts target Git Bash; PowerShell's `bash` is usually WSL, which can't see your `C:\` paths and will error with "No such file or directory".
 
@@ -110,6 +112,16 @@ DISCOVER → PRD → [GATE A: adversary] → TICKETS → [Specflow: GATE B/B.5] 
 
 Gate A (the hostile critic) is a separate skill — the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer). Specflow doesn't require it, but the pipeline pairs them. The loop runs whole on either runtime — Claude Code (`Workflow`) or Codex (automations); see `PROCESS-CLAUDE.md` / `PROCESS-CODEX.md`. The path (`QA/loops/*.yaml`) is the source of truth; each runtime is a binding of it. **Muscle never self-approves — Gate A (a hostile critic) and Gate C (CI on a real backend) decide.**
 
+### The three loops (`QA/loops/`)
+
+| Loop | For | In one line |
+|------|-----|-------------|
+| **spec-build** | a new feature / rough idea | discover → PRD → **Gate A** (adversary + persona lens + falsification artifact) → tickets → **Gate B** (audit + seam-lite) → **B.5** (persona walk vs tickets) → defensible, journey-contracted tickets |
+| **feature-build** | a ready ticket → tested slice | the 5 rails (ticket → contract → real-backend e2e → oracle-anchored → impl) → **Gate C** (CI vs a real seeded backend); an epic isn't done until **Gate D** — the persona walk on the *merged* tree (catches seam bugs per-slice green is blind to) |
+| **daily-use-teardown** | an *already-built* product | investigate the live app → **human confirms the map (hash-bound sign-off)** → top-thinker persona walks (WORKS/CONFUSING/BROKEN + evidence) → prioritized do-list → feeds spec-build |
+
+Start at `QA/loops/README.md`. **Maturity:** spec-build + feature-build are battle-tested on real epics; **daily-use-teardown is newer** — its distinctive stages were unproven until their first real run, so treat its output as a strong draft.
+
 ---
 
 ## FAQ
@@ -143,7 +155,10 @@ does the building. The principle:
 | **A** | the PRD | The **[Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer)** verdict must be `SHIP` / `SHIP WITH STIPULATIONS`, written to a **committed `verdict` artifact**. The controller refuses to spawn ticket-writing unless that artifact says SHIP. | **HARD** |
 | **B** | tickets | `specflow audit` + closure validator — every requirement → journey → test → issue, no orphans, no duplicate IDs. | soft (controller) |
 | **B.5** | tickets | **Pre-flight simulation** — walk real personas through each ticket; a CRITICAL design gap blocks. *Its own gate.* | soft (controller) |
-| **C** | build | **Specflow CI** — contract tests + journey tests against a *real seeded backend* + anti-pattern audit + coverage ratchet. Runs in CI under branch protection: a violation **cannot merge**. | **HARD (unfakeable)** |
+| **C** | each build/slice | **Specflow CI** — contract tests + journey tests against a *real seeded backend* + anti-pattern audit + coverage ratchet. Runs in CI under branch protection: a violation **cannot merge**. | **HARD (unfakeable)** |
+| **D** | the *merged* epic | **Persona-walk integration gate** — per-slice green is blind to seam bugs (vertical slices, horizontal collisions). GATE D walks personas across the merged tree; a red hop is dispositioned `bug` or a *human-countersigned* `stale-oracle` — the agent can't reconcile its own oracle. An epic isn't done until D is green. | **HARD** |
+
+Gate A also now carries a **persona/simulation lens** (parallel to the structural review, against the PRD) and a required **falsification artifact** (hash-bound to the PRD); personas walk **twice** — the PRD at Gate A, the tickets at B.5.
 
 **Who does what:** *Discover* — human + agent vs the real artifact (no swarm). *PRD* — dueling
 writer/adversary, strong models. *Tickets* — `specflow-writer` fanned out by ruflo. *Build* — ruflo
@@ -165,12 +180,14 @@ invokes; Specflow is a CLI + CI the swarm calls.
 
 ## Links
 
+<!-- absolute URLs so links resolve on the npm page too, not just GitHub -->
 | | |
 |---|---|
-| [Detailed Setup](docs/getting-started.md) | Manual paths, updating, SKILL.md |
-| [Agent Library](agents/README.md) | 30+ agents for wave execution |
-| [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Harden the PRD *before* writing tickets (step 1 of the recommended workflow) |
-| [Contract Schema](CONTRACT-SCHEMA.md) | YAML format for contracts |
-| [CI Integration](CI-INTEGRATION.md) | GitHub Actions setup |
+| [The loop kit](https://github.com/Hulupeep/Specflow/blob/main/templates/loops/README.md) | Run the pipeline — paths, prompts, the three loops |
+| [Detailed Setup](https://github.com/Hulupeep/Specflow/blob/main/docs/getting-started.md) | Manual paths, updating, SKILL.md |
+| [Agent Library](https://github.com/Hulupeep/Specflow/blob/main/agents/README.md) | 30+ agents for wave execution |
+| [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Harden the PRD *before* writing tickets (Gate A) |
+| [Contract Schema](https://github.com/Hulupeep/Specflow/blob/main/CONTRACT-SCHEMA.md) | YAML format for contracts |
+| [CI Integration](https://github.com/Hulupeep/Specflow/blob/main/CI-INTEGRATION.md) | GitHub Actions setup |
 | [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
 | [Issues](https://github.com/Hulupeep/Specflow/issues) | Bugs and ideas |
