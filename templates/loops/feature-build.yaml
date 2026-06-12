@@ -3,7 +3,9 @@
 # LOCATE the current rail from the branch + CI state, advance ONE rail, persist, stop/escalate.
 loop: feature-build
 process_ref: PROCESS.md#step-6-7
-principle: you and any swarm are muscle; trust lives ONLY in GATE C (branch-protected CI vs real data).
+principle: you and any swarm are muscle; per-slice trust lives ONLY in GATE C (branch-protected
+  CI vs real data); EPIC-level trust lives in GATE D (epic_gate below) — a slice's contract test
+  is necessary but not sufficient; the gate of record is the persona walk on the merged tree.
 
 progress_display:             # EMIT this at the START of every tick so the human sees the rail
   rule: >
@@ -32,16 +34,24 @@ preconditions:
   - constraint: slice < 1000 lines (else propose a 4–8 slice split)
 
 rails:                        # advance one per tick, in order
-  - id: 1_ticket    gate: ticket + ACs + journey id confirmed
-  - id: 2_contract  gate: contract YAML stub → full (steps + selectors from catalogue)
-  - id: 3_e2e       gate: real-backend e2e test runs against a real seeded backend
-  - id: 4_oracle    gate: every asserted number traced to the live calc / real source (never guessed)
-  - id: 5_impl      gate: smallest mergeable slice (<1000 lines) makes it pass
+  - id: 1_ticket
+    gate: ticket + ACs + journey id confirmed
+  - id: 2_contract
+    gate: contract YAML stub → full (steps + selectors from catalogue)
+  - id: 3_e2e
+    gate: real-backend e2e test runs against a real seeded backend
+  - id: 4_oracle
+    gate: every asserted number traced to the live calc / real source (never guessed)
+  - id: 5_impl
+    gate: smallest mergeable slice (<1000 lines) makes it pass
 
 muscle:                       # do work, never approve it
   - /qa (coverage + regression) — run + SPOT-CHECK before trusting
   - multicheck REVIEWER (different model) for complex slices
   - ruflo swarm — only if triggered (>1500 lines, 3+ layers, security/invariant-critical, rejected-unsure, new pattern)
+  - db_serialization: >
+      parallel AUTHORING is fine; DB VERIFICATION is serial — one verification slot,
+      claimed in the epic checklist before any e2e run (non-teams path; teams keep db-coordinator)
 
 GATE_C:                       # HARD, unfakeable — the only trust gate
   type: hard
@@ -50,7 +60,9 @@ GATE_C:                       # HARD, unfakeable — the only trust gate
 
 repair:
   classify: [coverage, regression, contract, journey, lint, flake]
-  inherited_baseline: not yours — note the tracking ticket, never silent --no-verify
+  inherited_baseline: >
+    not yours — but PROVE it before claiming it: run the failing test on the BASE branch first;
+    only a base-branch red may be classified inherited. File the tracking ticket. Never silent --no-verify.
   budget: 3 attempts/rail, 2 full passes
   on_exhausted: escalate with classified failure + last diff
 
@@ -60,3 +72,46 @@ never_without_human: [git push, open PR, merge, --no-verify, override contract]
 done_when:
   - 5 rails complete, muscle run + spot-checked, GATE C green, evidence note complete
   - STOP at "branch ready for review" — human opens the PR
+  - NOTE (slice-done ≠ epic-done): the EPIC is not done until GATE D (epic_gate below) is green.
+
+merge_notes:                  # stacked branches
+  - squash-merging a stacked branch DUPLICATES the base slice's commits in the next PR's diff;
+    escape = merge-commit (no squash) for stacks, or rebase the stack after each squash lands.
+
+# ============================================================================
+# epic_gate: GATE D — the persona-walk INTEGRATION gate (pipeline-hardening #60)
+# ============================================================================
+# GUARD: this section is NOT a rail. Per-issue feature-build ticks IGNORE it — their
+# done_when fires before slices merge, so no per-issue instance can ever reach this.
+# GATE D is ITS OWN INVOCATION: "Run GATE D for epic #N" (prompts/gate-d.prompt.md),
+# fired by the epic runner when a wave/epic's slices have merged.
+epic_gate:
+  id: GATE_D
+  type: hard                  # for EPIC-done — slices still merge on GATE C alone
+  why: >
+    Epics slice vertically; coherence bugs live horizontally where slices share a surface.
+    Per-slice green is structurally blind to seams — the walk tests along the axis the
+    decomposition cut across. (Worked example: timebreez #673 — 3 cross-slice oracle
+    conflicts on /my-leave and /dashboard, invisible to 22/22-green GATE C runs.)
+  trigger: per wave when waves merge to main, else per epic-close (U2)
+  env: the same real seeded backend tier GATE C names — never a mock
+  do: >
+    A SCOPED TEARDOWN RUN against merged main: journey map := the hop tables
+    (PRDs/<slug>-hops.md, pinned at GATE A) + the seam-derived hops (GATE B; seams
+    RECOMPUTED here from final ticket state). The gate-d prompt MATERIALIZES the hop
+    artifact into teardown format (each hop a "- J:" entry; findings per hop; evidence
+    per finding) so teardown-gate.cjs check validates it unchanged.
+  evidence: >
+    every hop has a findings entry referencing evidence files that exist; VALUE-BEARING
+    hops must attach the oracle re-read output itself (.txt/.json or a screenshot showing
+    the value) — a decorative screenshot does not satisfy a value hop.
+  disposition: >               # closes the ungoverned-reconciliation loophole (PR #724 exhibit)
+    a red hop MUST be dispositioned `bug` or `stale-oracle`. stale-oracle = an amendment to
+    PRDs/<slug>-hops.md requiring HUMAN COUNTERSIGN (teardown-gate.cjs sign) — the build
+    agent can never reconcile its own oracle. On `bug`: the LAST-MERGED writer of the seam
+    reopens (it changed already-walked state); the failure names the seam pair + tiebreak.
+    Shared-module case: the disposition names the module commit, not page blame.
+  proof: >
+    teardown-gate.cjs check passes on the gate-d dir AND the human signs map + result
+    (2 sign actions). The epic cannot close without this signed artifact.
+  never_without_human: [sign, stale-oracle amendment, closing the epic on a red GATE D]

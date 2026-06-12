@@ -285,3 +285,7 @@ tests/
 - [ ] Steps use test.step() for clear reporting
 - [ ] Cross-session auth handled correctly
 - [ ] Failure at step N correctly reports root cause
+
+## Assertion identity rule (pipeline-hardening #60)
+
+**Never key an assertion on a per-call-generated id** (row ids, UUIDs minted during the run, auto-increment values) — they differ every run and force the test to either flake or assert nothing. Key on a **stable identity**: the entity's domain id, its stable name, or the **type multiset** (e.g. "the room set contains {Baby Room, Wobblers, Preschool}" — compare by name, not by `droppable-room-tile` ids that carry no room identity). If the only available key is per-call, that is a missing-testid finding against the implementation, not a reason to weaken the assertion.

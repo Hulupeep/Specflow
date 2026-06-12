@@ -498,3 +498,7 @@ npm test -- contracts (runs at build time)
        ↓
 CI blocks merge on failure
 ```
+
+## Assertion identity rule (pipeline-hardening #60)
+
+Generated assertions must key on **stable identities** — entity/domain id, stable name, or type multiset — **never on per-call-generated ids** (run-minted UUIDs, auto-increments, ephemeral DOM ids). A generated test that can only target a per-call id should emit a `data-testid` requirement for the implementation instead of a weakened assertion.

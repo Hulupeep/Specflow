@@ -75,3 +75,36 @@ describe('teardown-gate', () => {
     expect(run(['check', dir])).toBe(1);
   });
 });
+
+describe('teardown-gate — GATE D extensions (#60)', () => {
+  let dir;
+  beforeEach(() => { dir = mkdtempSync(join(tmpdir(), 'td-')); });
+  afterEach(() => { rmSync(dir, { recursive: true, force: true }); });
+
+  test('value-bearing evidence: .json/.txt oracle output satisfies the evidence check', () => {
+    mkdirSync(join(dir, 'evidence'), { recursive: true });
+    writeFileSync(join(dir, 'evidence/balance-query.json'), '{"balance":"20 days"}');
+    writeFileSync(join(dir, 'journey-map.md'), '- J: HOP1 — balance re-read on /my-leave\n');
+    writeFileSync(join(dir, 'findings.md'), '## J: HOP1\nVerdict: WORKS\nevidence/balance-query.json\n');
+    run(['sign', join(dir, 'journey-map.md'), '--by', 'Colm'], dir);
+    expect(run(['check', dir])).toBe(0);
+  });
+
+  test('dangling .json evidence still fails (existence is checked for text artifacts too)', () => {
+    mkdirSync(join(dir, 'evidence'), { recursive: true });
+    writeFileSync(join(dir, 'journey-map.md'), '- J: HOP1 — x\n');
+    writeFileSync(join(dir, 'findings.md'), '## J: HOP1\nevidence/missing.json\n');
+    run(['sign', join(dir, 'journey-map.md'), '--by', 'Colm'], dir);
+    expect(run(['check', dir])).toBe(1);
+  });
+
+  test('check-sign: valid sign-off → 0; edit-after-sign → 1; no sign-off → 1', () => {
+    const f = join(dir, 'pipeline-hardening-prd.md');
+    writeFileSync(f, '# PRD v1\n');
+    expect(run(['check-sign', f])).toBe(1);               // unsigned
+    run(['sign', f, '--by', 'Colm'], dir);
+    expect(run(['check-sign', f])).toBe(0);               // valid
+    writeFileSync(f, '# PRD v1 — edited after PASS\n');
+    expect(run(['check-sign', f])).toBe(1);               // stale (the falsify stale-PASS hole)
+  });
+});
