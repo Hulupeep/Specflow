@@ -35,9 +35,15 @@ stages:
   - id: draft
     do: writer → ${prd}
     gate: JTBD, scope boundary, acceptance, success metrics, deps all present
-  - id: adversary            # one hostile critic, informed by parallel lenses
-    do: adversarial-prd-reviewer — 7-pass rubric + Special Mandate
+  - id: adversary            # one hostile critic (adversary-mandate@v2), informed by parallel lenses
+    do: adversarial-prd-reviewer @v2 — 7-pass rubric + Special Mandate
         (reality-grounding ledger over every repo/schema claim; loophole hunt)
+    falsify_subrun: |         # @v2 added output — runs like the persona lens: PARALLEL, fresh-context
+      A fresh-context falsification sub-run (NOT bundled into the structural pass's depth budget)
+      tries to DISPROVE the premise, typed claim inventory, dependency graph, acceptance gates,
+      and source claims. It writes PRDs/${slug}-falsification.md (from falsification-template.md);
+      corrections are APPLIED to the PRD or recorded as owned stipulations in the verdict — chat
+      doesn't count. The 7 banned modes each disqualify a PASS. Informs the single verdict.
     persona_lens: |           # runs IN PARALLEL with the structural review — first persona touch
       A fresh-context persona/simulation lens walks real personas through the PRD's
       journeys ON PAPER ("can a human actually do this?") and returns CRITICAL design
@@ -55,6 +61,10 @@ stages:
       From → URL → required control → EXPECTED VALUE (re-read) → oracle/source.
       A pre-committed integration oracle, pinned BEFORE code exists (post-hoc tests get
       unconsciously shaped to pass). Assertion bar = a re-read value, never element presence.
+      AND PRDs/${slug}-falsification.md exists, passes `verify-falsification.cjs` (every
+      section filled, recognized verdict), and its PASS is HASH-BOUND to the current PRD —
+      `teardown-gate.cjs check-sign ${prd}` must be green (a PRD edited after PASS fails
+      until re-falsified; a typo-only edit needs a human re-sign, not full re-falsification).
     rule: >
       no ticket-writing until SHIP; then human approval before issues are created.
       The hops artifact is HUMAN-SIGNED at pin time (teardown-gate.cjs sign); post-SHIP
