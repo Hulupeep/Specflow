@@ -6,6 +6,16 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.9.1 (2026-06-12)
+
+**Conditional ADR-conformance + universal component-reuse check (#68).**
+
+- **`verify-adr.cjs`** — model-free, **conditional**: detects an ADR folder (`docs/adr|adrs|ard|architecture/decisions`, or a CLAUDE.md `ADR Location`) and **exits 0 silently when there isn't one**. When present, GATE B requires each ticket to cite a **resolving** ADR id (or `adrNone: <reason>`) and declare `reuses` (or a justified new component); a phantom ADR citation is an ERROR. IDs normalize (`ADR-006 ≡ ADR-6 ≡ 0006-foo.md`).
+- **adversary-mandate@v3** — universal *reuse-don't-reinvent* (reinventing an existing component is FATAL) + conditional ADR conformance.
+- spec-build tickets declare `adrs`/`reuses`; `init` scaffolds the script; `CLAUDE-MD-TEMPLATE.md` gains an optional **ADR Location** field.
+
+---
+
 ## 0.9.0 (2026-06-12)
 
 **Pipeline hardening (EPIC) + docs overhaul.** The integration-gate / seam-awareness / falsification work, plus a README + CLI-help refresh so the front door matches reality.
