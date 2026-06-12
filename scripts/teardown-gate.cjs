@@ -21,7 +21,15 @@
  *    Exit 0 = pass, 1 = gate fails, 2 = usage/IO error.
  *
  * Journeys are recognised by id lines like `- J: <id> — <purpose>` (map) and `## J: <id>` or
- * `- J: <id>` (findings). Evidence refs = any `evidence/<name>.png` mention in the entry.
+ * `- J: <id>` (findings). Evidence refs = any `evidence/<name>.(png|jpg|jpeg|webp|txt|json)`
+ * mention in the entry — text/JSON included so value-bearing hops can attach the oracle
+ * re-read output itself (GATE D, pipeline-hardening #60), not just a screenshot.
+ *
+ * 3. CHECK-SIGN (generic, single-file):
+ *      node scripts/teardown-gate.cjs check-sign <file>
+ *    Validates one hash-bound sign-off (exists, parses, hash matches, has signer).
+ *    Used by GATE_A for the falsification PASS binding and by GATE D for hop-table
+ *    amendments — same sign/check pattern, any artifact. Exit 0 = valid, 1 = invalid.
  */
 
 const { createHash } = require('crypto');
@@ -81,8 +89,8 @@ function check(dir) {
     const sections = findContent.split(/^#+\s*J:/m).slice(1);
     sections.forEach(sec => {
       const id = (sec.match(/^\s*([A-Za-z0-9][A-Za-z0-9_-]*)/) || [])[1] || '?';
-      const refs = [...sec.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp)/g)].map(m => m[0]);
-      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/*.png — "I walked it" is not evidence`);
+      const refs = [...sec.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp|txt|json)/g)].map(m => m[0]);
+      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json) — "I walked it" is not evidence`);
       for (const r of refs) if (!existsSync(join(dir, r))) errs.push(`dangling evidence: ${r} referenced for ${id} but file does not exist`);
     });
   } else if (existsSync(map)) {
@@ -111,8 +119,13 @@ if (require.main === module) {
     sign(target, by);
   } else if (cmd === 'check' && target) {
     check(target);
+  } else if (cmd === 'check-sign' && target) {
+    const err = checkSignoff(target);
+    if (err) { console.error(`✗ ${err}`); process.exit(1); }
+    console.error(`✓ valid sign-off for ${basename(target)} (hash matches current content)`);
+    process.exit(0);
   } else {
-    console.error('Usage: teardown-gate.cjs sign <file> --by "<name>" | check <teardown-dir>');
+    console.error('Usage: teardown-gate.cjs sign <file> --by "<name>" | check <teardown-dir> | check-sign <file>');
     process.exit(2);
   }
 }

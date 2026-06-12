@@ -25,6 +25,7 @@ inputs:                       # supplied by the invocation, not hard-coded here
 state:                        # where 'where am I?' is read from — durable, never chat
   prd: PRDs/${slug}-prd.md
   verdict_artifact: PRDs/${slug}-verdict.md
+  hops_artifact: PRDs/${slug}-hops.md   # pre-committed integration oracle (GATE A output, consumed by GATE D)
   tickets: gh issues labelled ${slug}
 
 stages:
@@ -48,8 +49,17 @@ stages:
     do_until: verdict issued; fix each FATAL/SERIOUS in the document, re-review
   - id: GATE_A               # HARD — the trust gate
     type: hard
-    gate: verdict ∈ {SHIP, SHIP_WITH_STIPULATIONS} written to ${verdict_artifact}
-    rule: no ticket-writing until SHIP; then human approval before issues are created
+    gate: >
+      verdict ∈ {SHIP, SHIP_WITH_STIPULATIONS} written to ${verdict_artifact}
+      AND ${hops_artifact} exists with per-persona hop tables:
+      From → URL → required control → EXPECTED VALUE (re-read) → oracle/source.
+      A pre-committed integration oracle, pinned BEFORE code exists (post-hoc tests get
+      unconsciously shaped to pass). Assertion bar = a re-read value, never element presence.
+    rule: >
+      no ticket-writing until SHIP; then human approval before issues are created.
+      The hops artifact is HUMAN-SIGNED at pin time (teardown-gate.cjs sign); post-SHIP
+      changes only via countersigned amendment — never unilaterally by the build agent
+      (it is the party the oracle constrains). Consumed by GATE D (feature-build epic_gate).
   - id: tickets
     do: specflow-writer → issues (Gherkin ACs, data-testids, contract refs, e2e filename)
     gate: every UI story references a journey contract; Gherkin lives once in the catalogue
