@@ -161,11 +161,19 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   for (const [name, cmd] of Object.entries(COMMANDS)) {
     console.log(`  ${cmd.usage.padEnd(40)} ${cmd.desc}`);
   }
-  console.log(`\n  specflow help                          Show this help\n`);
+  console.log(`\n  specflow help                            Show this help\n`);
+  console.log('`init` scaffolds, in one command:');
+  console.log('  • contracts, hooks, agents, tests (the enforcement layer)');
+  console.log('  • the loop kit QA/loops/ — 3 loops: spec-build · feature-build · daily-use-teardown');
+  console.log('  • gate scripts: verify-graph, verify-seed, adversary-spawn, verify-ticket-journey,');
+  console.log('    verify-falsification, verify-seams, teardown-gate');
+  console.log('  • the adversary critic skill (Gate A) into ~/.claude|.codex/skills  (--no-adversary to skip)');
+  console.log('  • process docs: PROCESS.md / -GUIDE / -CLAUDE / -CODEX');
+  console.log('  → then read QA/loops/README.md to run the pipeline.\n');
   console.log('Examples:');
-  console.log('  npx @colmbyrne/specflow init .');
-  console.log('  npx @colmbyrne/specflow verify');
+  console.log('  npx @colmbyrne/specflow init .            # Mac/Linux any terminal; Windows = Git Bash');
   console.log('  npx @colmbyrne/specflow update . --ci');
+  console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow graph\n');
   process.exit(0);

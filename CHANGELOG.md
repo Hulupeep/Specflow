@@ -6,6 +6,20 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.9.0 (2026-06-12)
+
+**Pipeline hardening (EPIC) + docs overhaul.** The integration-gate / seam-awareness / falsification work, plus a README + CLI-help refresh so the front door matches reality.
+
+- **GATE D — persona-walk integration gate** (`feature-build.yaml` `epic_gate`, `prompts/gate-d.prompt.md`): per-slice green is blind to seam bugs (vertical slices, horizontal collisions); GATE D walks personas across the *merged* tree. Red hops are dispositioned `bug` (last-merged writer reopens) or a **human-countersigned** `stale-oracle` — the agent can't reconcile its own oracle. An epic isn't done until D is green.
+- **Hop tables at GATE A** — pinned, value-bearing (re-read oracle) integration oracle in `PRDs/<slug>-hops.md`, human-signed; amendments countersigned.
+- **Falsification folded into adversary-mandate@v2** — a required falsification artifact (parallel fresh-context sub-run), `verify-falsification.cjs` (rejects a stub), hash-bound PASS at GATE A (`teardown-gate.cjs check-sign`).
+- **Seam-lite** — tickets declare `writes/reads`; `verify-seams.cjs` computes writer×writer + writer×reader seams at GATE B (errors on unresolved surfaces) and derives GATE D hops.
+- **Hardening rules** — inherited-baseline *proof* (run on base branch first), DB-verification serialization, stacked-merge note, stable-key assertions (`journey-tester`, `contract-test-generator`).
+- **Docs** — README overhaul (the three loops named; gate list current; GATE D in the table; persona two-touch; absolute links so they resolve on npm); CLI `help` now describes what `init` actually delivers.
+- Drive-by: fixed long-standing invalid YAML in `feature-build.yaml` rails.
+
+---
+
 ## 0.8.2 (2026-06-10)
 
 **Teardown gets a method: `teardown-walkthrough-mandate@v1` (JTBD personas + cognitive walkthrough).**
