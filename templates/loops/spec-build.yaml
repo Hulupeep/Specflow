@@ -73,10 +73,20 @@ stages:
   - id: tickets
     do: specflow-writer → issues (Gherkin ACs, data-testids, contract refs, e2e filename)
     gate: every UI story references a journey contract; Gherkin lives once in the catalogue
+    declares: |             # seam-lite (#61): each ticket declares the surfaces it touches
+      writes: [<surface>...]   # surfaces this slice CHANGES (route literal or data-testid, EXACTLY as in code)
+      reads:  [<surface>...]   # surfaces this slice DEPENDS ON
   - id: GATE_B               # soft
     type: soft
-    do: board-auditor + specflow-uplifter — wire every ticket to journey + test + contract
-    gate: requirement→journey→test→issue complete; no orphans; no duplicate IDs
+    do: >
+      board-auditor + specflow-uplifter — wire every ticket to journey + test + contract.
+      PLUS seam-lite: `verify-seams.cjs <tickets.json> --repo-root .` computes the seam graph
+      (writer×writer AND writer×reader pairs on shared surfaces) and ERRORS on any declared
+      surface not found in the repo (no silent zero-seam runs). Derived hops are appended to
+      ${hops_artifact} — the integration walk is DERIVED from seams, not remembered.
+    gate: >
+      requirement→journey→test→issue complete; no orphans; no duplicate IDs;
+      all declared surfaces resolve; seam-derived hops written to ${hops_artifact}.
   - id: GATE_B5              # soft — SECOND persona touch (first ran at the adversary stage)
     type: soft
     do: pre-flight-simulator — walk real personas through each TICKET before code.
