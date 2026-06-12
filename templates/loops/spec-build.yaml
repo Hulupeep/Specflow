@@ -73,9 +73,12 @@ stages:
   - id: tickets
     do: specflow-writer → issues (Gherkin ACs, data-testids, contract refs, e2e filename)
     gate: every UI story references a journey contract; Gherkin lives once in the catalogue
-    declares: |             # seam-lite (#61): each ticket declares the surfaces it touches
-      writes: [<surface>...]   # surfaces this slice CHANGES (route literal or data-testid, EXACTLY as in code)
+    declares: |             # per-ticket declarations consumed by the gates below
+      writes: [<surface>...]   # seam-lite (#61): surfaces this slice CHANGES (route/data-testid, EXACTLY as in code)
       reads:  [<surface>...]   # surfaces this slice DEPENDS ON
+      reuses: [<component>...]  # ADR/reuse (#68): existing components this slice builds on
+      adrs:   [ADR-NNN...]      # the decisions it's built under  (or `adrNone: "<reason>"`)
+                                # only enforced if the repo has an ADR folder — else ignored
   - id: GATE_B               # soft
     type: soft
     do: >
@@ -84,9 +87,13 @@ stages:
       (writer×writer AND writer×reader pairs on shared surfaces) and ERRORS on any declared
       surface not found in the repo (no silent zero-seam runs). Derived hops are appended to
       ${hops_artifact} — the integration walk is DERIVED from seams, not remembered.
+      PLUS conditional ADR/reuse (#68): `verify-adr.cjs <tickets.json> --repo-root .` — if the
+      repo has an ADR folder, every ticket cites a RESOLVING ADR (or `adrNone`) and declares
+      `reuses` (or a justified new component); if there's no ADR folder it exits 0 silently.
     gate: >
       requirement→journey→test→issue complete; no orphans; no duplicate IDs;
-      all declared surfaces resolve; seam-derived hops written to ${hops_artifact}.
+      all declared surfaces resolve; seam-derived hops written to ${hops_artifact};
+      verify-adr passes (skipped automatically when the repo has no ADR folder).
   - id: GATE_B5              # soft — SECOND persona touch (first ran at the adversary stage)
     type: soft
     do: pre-flight-simulator — walk real personas through each TICKET before code.

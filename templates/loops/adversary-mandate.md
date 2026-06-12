@@ -38,3 +38,14 @@ Supersedes @v1 for spec-build. Everything in @v1 holds, **plus a required falsif
 - **green-by-assertion** — "tests pass" with no independent oracle.
 - **inventory-as-reliance** — a source listed for future reading treated as already used.
 - **unapplied correction** — a defect noted in prose but never patched into the artifact.
+
+---
+
+# adversary-mandate@v3
+
+Supersedes @v2 for spec-build. Everything in @v2 holds, **plus reuse-don't-reinvent + conditional ADR conformance** (the generalization of the v1 catch that flagged a duplicated existing validator).
+
+## Added in v3
+
+11. **Reuse check (universal).** For every component/module/script the PRD proposes to build, ask: **does this already exist?** Name the existing thing it should reuse, or justify the new one (and if it's an architectural decision, propose a new ADR). Reinventing an existing component is a FATAL.
+12. **ADR conformance (conditional — only if the repo has an ADR folder).** If `docs/adr|adrs|ard|architecture/decisions/` (or a CLAUDE.md `ADR Location`) exists: every ticket must be built **under** the relevant ADR(s) — cite a resolving ADR id, or carry `adr: none — <reason>` — and the PRD must **conform** to those ADRs (flag any silent violation). A cited ADR id that resolves to no file is a FATAL (phantom citation). If there is no ADR folder, this clause is a no-op — do not invent one.
