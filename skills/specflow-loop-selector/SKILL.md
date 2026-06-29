@@ -47,10 +47,11 @@ run_contract:
 
 Rules:
 - Load only the selected YAML and its prompt/example if needed.
-- Advance exactly one stage or rail per tick.
+- Continue through every currently unblocked stage/rail in the same invocation.
 - Persist evidence to the paths in the run contract; chat-only evidence does not count.
-- Update the run contract after each tick.
-- Stop at the selected YAML's hard gates and human handoffs.
+- Update the run contract after each completed stage/rail.
+- Stop only at a selected YAML hard gate that truly requires human input, a `never_without_human` action, missing required input/evidence, exhausted repair budget, external wait such as branch-protected CI, or the loop's done/handoff state.
+- Do not stop merely because the next stage is named `GATE_*`, `B.5`, or `handoff`. Soft gates are work to perform now, not boundaries for asking permission.
 
 ## Mandatory Simulation Path
 

@@ -6,12 +6,12 @@ A real, filled invocation of [`../prompts/feature-build.prompt.md`](../prompts/f
 Goal:   branch for #571 green on branch-protected CI vs the real seeded backend, ready for review
 Path:   QA/loops/feature-build.yaml
 Inputs: { issue: 571 }
-Automation: thread automation per ticket; interval matched to CI duration — re-fire until done_when.
+Automation: continue in this invocation until ready for review, or until a true HITL/external blocker is reached.
 
-Load the path and follow it — do not restate it. Each tick:
+Load the path and follow it — do not restate it. In this invocation:
 1. Render the path's progress_display (the rail map + CI status).
 2. Locate the current rail from the branch + CI state.
-3. Advance exactly ONE rail; persist the diff + an evidence note (tests WHERE/WHICH/HOW MANY/SKIPPED, oracle for each asserted number, provenance for each value-bearing output, an audit row per state mutation).
+3. Advance through every unblocked rail; persist the diff + an evidence note after each rail (tests WHERE/WHICH/HOW MANY/SKIPPED, oracle for each asserted number, provenance for each value-bearing output, an audit row per state mutation).
 4. After implementation, prove the value comes from stored versions/live calc, not a hard-coded literal or fake API payload.
 5. If CI has not been triggered, stop at the human CI handoff. After CI exists, read GATE C. Green → stop at "ready for review". Red → repair (inline if fast, else next tick). Stop / escalate per the path.
 
@@ -20,21 +20,12 @@ Ticket: #571 TT-ROLLBACK-03 — "revert updated rows via stored versions" (one o
 Hard rules from the path: trust lives ONLY in Gate C — you and any swarm are muscle. Keep the slice <1000 lines (else propose a 4–8 slice split). Oracle-anchor every assertion and source-prove every value-bearing output after code — a reverted balance is RECALCULATED from stored versions, never additive-inverse or hard-coded, so read the live calc. Never push / open PR / merge / --no-verify / override a contract without me.
 ```
 
-## What a correct first tick looks like
+## What a correct run looks like
 
 - Prints the rail map with ticket → contract → e2e → oracle → impl → provenance → human CI handoff → Gate C, with `now: 1_ticket   next: 2_contract   CI: —   blocked-on: none`.
 - **Checks the precondition first:** #571 has Gherkin ACs + data-testids + contract ref + e2e filename. If any is missing it **escalates** — it does not invent the ACs.
-- Advances **one** rail (confirms the ticket + journey id), persists, **stops.** If it writes the implementation on tick 1, the "one rail per tick" rule isn't landing — tighten the YAML.
-
-## Then continue
-
-Re-fire the automation:
-- **tick 2 — contract:** YAML stub → full (steps + selectors pulled from the catalogue).
-- **tick 3 — e2e:** the real-backend e2e test runs against a **real seeded backend** (never a mock).
-- **tick 4 — oracle:** the reverted-balance assertion is traced to the **live recalc**, not a guessed number.
-- **tick 5 — impl:** the smallest mergeable slice (<1000 lines) makes it pass.
-- **tick 6 — provenance:** the reverted balance is traced source → transform → API/input → output → assertion, with no hard-coded business literals or mock/fake/stub source on the tested path.
-- **tick 7 — human CI handoff:** if CI does not exist yet, it stops for *you* to push/open the PR or otherwise trigger branch-protected CI.
+- Continues through contract, e2e, oracle, impl, and provenance if each rail is unblocked.
+- **Stops at human CI handoff** if CI does not exist yet, because push/open PR is `never_without_human`.
 - **⛔ GATE C:** contract + journey tests green on **branch-protected CI vs the real seeded backend**, with provenance passing → it **stops at "branch ready for review."**
 
 ## Red flags that the run is wrong

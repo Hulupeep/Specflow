@@ -2,8 +2,9 @@
 # The shipped product is the artifact. Map its journeys, get the human to SIGN the map
 # (hash-bound — not a line the agent can type), walk the confirmed journeys as personas,
 # return an evidence-grounded do-list → spec-build.
-# Each tick: load this path, LOCATE the current stage from committed artifacts, advance ONE
-# gate, persist, stop/escalate. Gates are checked by `scripts/teardown-gate.cjs`, not self-attested.
+# Each invocation: load this path, LOCATE the current stage from committed artifacts,
+# advance all unblocked gates, persist after each gate, stop only on HITL/block/done.
+# Gates are checked by `scripts/teardown-gate.cjs`, not self-attested.
 loop: daily-use-teardown
 principle: >
   investigate BEFORE judging — a teardown of the wrong journeys is worse than none.

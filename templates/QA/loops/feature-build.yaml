@@ -1,11 +1,23 @@
 # feature-build.yaml — the reusable PATH for the feature-build loop (PROCESS.md Step 6→7).
-# The prompt only supplies: goal + issue + automation. Each tick: load this path,
-# LOCATE the current rail from the branch + CI state, advance ONE rail, persist, stop/escalate.
+# The prompt only supplies: goal + issue + automation. Each invocation: load this path,
+# LOCATE the current rail from branch + CI state, advance all unblocked rails, persist after
+# each rail, stop only on HITL/external CI wait/block/done.
 loop: feature-build
 process_ref: PROCESS.md#step-6-7
 principle: you and any swarm are muscle; per-slice trust lives ONLY in GATE C (branch-protected
   CI vs real data); EPIC-level trust lives in GATE D (epic_gate below) — a slice's contract test
   is necessary but not sufficient; the gate of record is the persona walk on the merged tree.
+
+execution:
+  continue_until: >
+    Keep going through every currently unblocked rail in this invocation. Persist the diff
+    and evidence note after each rail. A soft rail is work to perform now, not a reason to stop.
+  stop_only_when:
+    - a never_without_human action would be required
+    - branch-protected CI requires a human push/PR/opening action before Gate C exists
+    - required ticket/contract/journey/provenance evidence is missing and cannot be derived
+    - repair is slow or externally blocked
+    - Gate C is green and the branch is ready for review.
 
 progress_display:             # EMIT this at the START of every tick so the human sees the rail
   rule: >
@@ -33,7 +45,7 @@ preconditions:
   - issue has Gherkin ACs + data-testids + contract ref + e2e filename (Rule 1) else escalate
   - constraint: slice < 1000 lines (else propose a 4–8 slice split)
 
-rails:                        # advance one per tick, in order
+rails:                        # advance all unblocked rails in order
   - id: 1_ticket
     gate: ticket + ACs + journey id confirmed
   - id: 2_contract

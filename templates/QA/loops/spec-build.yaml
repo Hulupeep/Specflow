@@ -1,9 +1,22 @@
 # spec-build.yaml — the reusable PATH for the spec-build loop (PROCESS.md Steps 0–5).
 # The prompt does NOT restate this. The prompt only supplies: goal + inputs + automation.
-# Each tick: load this path, LOCATE the current stage from committed artifacts, advance ONE gate, persist, stop/escalate.
+# Each invocation: load this path, LOCATE the current stage from committed artifacts,
+# advance through all unblocked gates, persist after each gate, stop only on HITL/block/done.
 loop: spec-build
 process_ref: PROCESS.md#steps-0-5
 principle: writers are muscle; trust lives in GATE A (one hostile critic), never self-consensus.
+
+execution:
+  continue_until: >
+    Keep going through every currently unblocked stage in this invocation. Persist evidence
+    and update the run contract after each stage/gate. A soft gate is work to perform now,
+    not a reason to stop.
+  stop_only_when:
+    - a never_without_human action would be required
+    - GATE_A verdict is not SHIP/SHIP_WITH_STIPULATIONS, or human approval is required before creating issues
+    - required inputs/evidence are missing and cannot be derived from durable artifacts
+    - repair budget is exhausted or an escalation condition is hit
+    - done_when is met and handoff evidence is persisted.
 
 progress_display:             # EMIT this at the START of every tick so the human sees the phase
   rule: >

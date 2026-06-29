@@ -94,6 +94,8 @@ describe('install-hooks.sh', () => {
         expect(skill).toContain('Mandatory Run Contract');
         expect(skill).toContain('Mandatory Simulation Path');
         expect(skill).toContain('simulation_required: true');
+        expect(skill).toContain('Continue through every currently unblocked stage/rail');
+        expect(skill).not.toContain('Advance exactly one stage or rail per tick');
       }
 
       expect(fs.existsSync(path.join(targetDir, 'AGENTS.md'))).toBe(true);
@@ -101,6 +103,8 @@ describe('install-hooks.sh', () => {
       expect(agents).toContain('Specflow Loop Routing');
       expect(agents).toContain('Specflow Simulation Path');
       expect(agents).toContain('specflow-simulate');
+      expect(agents).toContain('Continuation rule');
+      expect(agents).toContain('Stop only for a true human gate');
       expect(result.stdout + result.stderr).toContain('specflow-loop-selector');
     });
   });
