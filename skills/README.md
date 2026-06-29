@@ -3,6 +3,34 @@
 Claude Code skills that package Specflow workflows so they trigger on natural
 phrasing instead of requiring you to manually invoke an agent prompt.
 
+## specflow-loop-selector
+
+Routes an agent to the right Specflow loop and forces a concrete `run_contract`
+before work starts. Use this as the pre-build/pre-loop skill for Claude Code,
+Codex, K2.7, or any other agent that might otherwise spend time rediscovering
+`spec-build`, `feature-build`, Gate D, or `daily-use-teardown`.
+
+**Triggers on:** starting Specflow work, choosing between `spec-build` and
+`feature-build`, implementing a Specflow ticket, creating/refining a PRD,
+investigating an existing product, running Gate D, or "go find out about
+Specflow loops".
+
+The skill is intentionally a router, not a duplicate of the loop docs:
+
+```
+select loop → emit run_contract → load selected YAML → advance one gate
+```
+
+For story/ticket creation or refinement it also enforces the simulation path:
+
+```
+create/refine story → specflow-simulate → specflow-audit/uplift → pre-flight gate → feature-build
+```
+
+Installers copy it to `.claude/skills/`, `.codex/skills/`, and
+`.agents/skills/` so Claude Code, Codex, K2.7, and generic agents can all read
+the same instructions.
+
 ## specflow-audit
 
 Audits a Specflow story/ticket and surgically uplifts it to compliance, then
@@ -60,4 +88,5 @@ create (specflow-writer) → simulate (specflow-simulate) → audit/uplift (spec
 ```
 
 Install the same way as specflow-audit (copy to `~/.claude/skills/` or
-`.claude/skills/`).
+`.claude/skills/`). `specflow init` / `specflow update` copy bundled skills into
+project-local agent skill directories automatically.

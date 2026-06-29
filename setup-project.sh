@@ -55,11 +55,14 @@ mkdir -p "$TARGET_DIR/tests/helpers"
 mkdir -p "$TARGET_DIR/tests/e2e"
 mkdir -p "$TARGET_DIR/hooks"
 mkdir -p "$TARGET_DIR/examples"
+mkdir -p "$TARGET_DIR/QA"
 mkdir -p "$TARGET_DIR/.specflow"
 mkdir -p "$TARGET_DIR/.claude"
+mkdir -p "$TARGET_DIR/.codex"
+mkdir -p "$TARGET_DIR/.agents"
 
 echo -e "${GREEN}✓${NC} Created: docs/contracts, scripts/agents, tests/contracts,"
-echo -e "  tests/helpers, tests/e2e, hooks, examples, .specflow, .claude"
+echo -e "  tests/helpers, tests/e2e, hooks, examples, QA, .specflow, .claude, .codex, .agents"
 echo ""
 
 # ============================================================================
@@ -109,13 +112,15 @@ echo ""
 # 4. Copy scripts and examples
 # ============================================================================
 
-echo -e "${BLUE}[4/10]${NC} Copying scripts and examples..."
+echo -e "${BLUE}[4/10]${NC} Copying scripts, examples, and QA loops kit..."
 
-# Scripts
-for script in specflow-compile.cjs verify-graph.cjs; do
-  if [ -f "$SCRIPT_DIR/scripts/$script" ]; then
-    cp "$SCRIPT_DIR/scripts/$script" "$TARGET_DIR/scripts/"
-    echo -e "${GREEN}✓${NC} scripts/$script"
+# Scripts — every gate/verify script the loops execute (globbed so new ones ship automatically:
+# teardown-gate, verify-seed, adversary-spawn, verify-ticket-journey, verify-falsification,
+# verify-seams, verify-adr, verify-graph, specflow-compile).
+for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+  if [ -f "$script" ]; then
+    cp "$script" "$TARGET_DIR/scripts/"
+    echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
   fi
 done
 
@@ -137,7 +142,47 @@ for hook in "$SCRIPT_DIR/hooks/"*; do
   fi
 done
 
-echo -e "${GREEN}✓${NC} Copied scripts, examples, hook sources"
+# QA loops kit (spec-build / feature-build / daily-use-teardown / gate-d) + PROCESS.md.
+# Specflow-OWNED: refreshed on every init so fixes in templates/QA propagate to every
+# project. The kit's own README says: don't hand-edit it per-project — change it here.
+if [ -d "$SCRIPT_DIR/templates/QA" ]; then
+  mkdir -p "$TARGET_DIR/QA"
+  cp -a "$SCRIPT_DIR/templates/QA/." "$TARGET_DIR/QA/"
+  QA_FILES=$(find "$TARGET_DIR/QA" -type f | wc -l | tr -d ' ')
+  echo -e "${GREEN}✓${NC} Installed QA loops kit → QA/ ($QA_FILES files: loops, prompts, examples, journeys, docs)"
+fi
+if [ -f "$SCRIPT_DIR/templates/PROCESS.md" ]; then
+  cp -a "$SCRIPT_DIR/templates/PROCESS.md" "$TARGET_DIR/PROCESS.md"
+  echo -e "${GREEN}✓${NC} Installed PROCESS.md"
+fi
+if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
+  if [ ! -f "$TARGET_DIR/AGENTS.md" ]; then
+    cp -a "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"
+    echo -e "${GREEN}✓${NC} Installed AGENTS.md"
+  elif ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
+    {
+      echo ""
+      cat "$SCRIPT_DIR/templates/AGENTS.md"
+    } >> "$TARGET_DIR/AGENTS.md"
+    echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
+  else
+    echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
+  fi
+fi
+if [ -d "$SCRIPT_DIR/skills" ]; then
+  for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do
+    mkdir -p "$TARGET_DIR/$skill_target"
+    for skill_dir in "$SCRIPT_DIR/skills/"*; do
+      if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
+        rm -rf "$TARGET_DIR/$skill_target/$(basename "$skill_dir")"
+        cp -a "$skill_dir" "$TARGET_DIR/$skill_target/"
+      fi
+    done
+    echo -e "${GREEN}✓${NC} Installed Specflow skills → $skill_target/"
+  done
+fi
+
+echo -e "${GREEN}✓${NC} Copied scripts, examples, hook sources, QA kit"
 echo ""
 
 # ============================================================================
@@ -611,6 +656,8 @@ echo ""
 echo -e "${GREEN}Project:${NC} $TARGET_DIR"
 echo ""
 echo "  CLAUDE.md                Specflow rules + contract references"
+echo "  PROCESS.md               End-to-end process the loops execute"
+echo "  QA/                      Loops kit: spec-build, feature-build, teardown, gate-d + journeys"
 echo "  docs/contracts/          $CONTRACT_COUNT default contracts"
 echo "  scripts/agents/          $AGENT_COUNT agents"
 echo "  tests/contracts/         Contract schema tests"

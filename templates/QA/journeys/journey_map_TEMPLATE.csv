@@ -1,0 +1,29 @@
+tier,journey_id,journey_name,persona,trigger,narrative,steps,systems_touched,success_outcome,parity_baseline,failure_modes,preconditions,data_created,help_needed
+CRITICAL,J-NOL-FILE,File Notice of Loss after named storm,Property owner,Owner gets a loss alert that a named storm hit their insured property,"The owner opens the dashboard, sees the loss alert, reviews the storm incident snapshot for their property, drafts a Notice of Loss pre-filled from their policy and the storm data, files it, and it shows up in their case manager's pipeline.",See alert; open incident snapshot; draft NOL; review pre-filled fields; file NOL; see Filed status; (case manager) see it in pipeline,claims-client; claims-server; named-storm engine; NOL drafter; claims-management-client pipeline,NOL status reads 'Filed' and a NOL record exists and is visible in the case manager pipeline,A public adjuster hand-keying the loss from a phone call — we must capture every field they would and faster,No policy on file; duplicate filing for same loss; storm not matched to property,Authenticated owner; property with uploaded policy; a named storm intersecting the property,NOL record; pipeline entry; audit log row,Owner doesn't know what a 'Notice of Loss' is; unsure which storm caused damage
+# ----------------------------------------------------------------------------------------------------
+# HOW TO USE THIS FILE
+#   1. Keep the header row (line 1). Delete the J-NOL-FILE example row above once you understand it.
+#   2. Add ONE row per journey. A journey = a whole task a real person finishes, end to end.
+#   3. See QA/journeys-how-to.md "Step 1 — fill in the journey map" for what each column means.
+#
+# COLUMN CHEAT-SHEET (full guide in the how-to):
+#   tier            CRITICAL (must work to ship) | IMPORTANT (tracked defect) | DIFFERENTIATOR (why switch to us)
+#   journey_id      J-<DOMAIN>-<VERB>, UPPER-KEBAB, stable forever. e.g. J-NOL-FILE
+#   journey_name    short human title
+#   persona         who is doing this (Property owner | Case manager | Property manager | ...)
+#   trigger         the real-world event that starts it ("owner gets a storm alert")
+#   narrative       2-3 sentences, trigger -> outcome. If it doesn't cross 2+ systems & end in a saved
+#                   state change, it's a story, not a journey.
+#   steps           the meaningful beats in order, separated by ';'. Prose, NOT clicks. ~5-10.
+#   systems_touched the apps/engines involved, separated by ';'
+#   success_outcome THE ORACLE. One checkable fact: a record/status/number/redirect. NOT a feeling.
+#                   Good: "status reads 'Filed' and a NOL row exists in the pipeline"
+#                   Bad:  "the owner feels confident"
+#   parity_baseline how a person does this TODAY (adjuster / spreadsheet / carrier portal). This sorts the tier.
+#   failure_modes   how it goes wrong in real life, separated by ';' (these become error_scenarios)
+#   preconditions   what must already be true before the trigger
+#   data_created    what records exist afterward
+#   help_needed     where a real user gets confused (informs UI copy / tooltips)
+#
+# DO NOT invent UI selectors here. Describe intent; engineering picks the data-testids at the spec step.
+# ----------------------------------------------------------------------------------------------------

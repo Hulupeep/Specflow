@@ -1,0 +1,28 @@
+# AGENTS.md
+
+Use this file for Codex, K2.7, and other agents that read repository-level agent instructions.
+
+## Specflow Loop Routing
+
+Before starting any Specflow loop work, use the installed skill:
+
+- Claude Code: `.claude/skills/specflow-loop-selector/SKILL.md`
+- Codex: `.codex/skills/specflow-loop-selector/SKILL.md`
+- Generic agents: `.agents/skills/specflow-loop-selector/SKILL.md`
+
+Do not only reference `QA/loops/*.yaml`. First select the loop, then emit a concrete `run_contract` with the selected loop, goal, input artifact, current stage/rail, next gate, durable evidence, stop condition, and `never_without_human` rules.
+
+## Specflow Simulation Path
+
+When creating, refining, uplifting, or auditing a Specflow story/ticket, the simulation path is mandatory before build work:
+
+`create/refine story -> specflow-simulate -> specflow-audit/uplift -> pre-flight gate -> feature-build`
+
+Do not mark a ticket ready for `feature-build` when simulation is missing, stale, skipped, or only mentioned in chat. The `run_contract` must carry `simulation_required: true` until `specflow-simulate` has produced durable findings or a durable clean result.
+
+Lifecycle routing:
+
+- `spec-build`: rough idea/discovery/PRD/ticket creation -> audited tickets.
+- `feature-build`: approved Specflow ticket -> implemented slice with provenance and Gate C.
+- `gate-d`: merged slices/epic close -> integration persona walk.
+- `daily-use-teardown`: already-built product -> evidence-grounded do-list for spec-build.

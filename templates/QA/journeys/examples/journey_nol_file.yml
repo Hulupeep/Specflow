@@ -1,0 +1,106 @@
+# Example journey contract for QA/journeys-how-to.md.
+# In the real repo this lives at claims-monorepo/docs/contracts/journey_nol_file.yml
+# and is registered in docs/contracts/CONTRACT_INDEX.yml under definition_of_done.critical_journeys.
+# This is Step 3 of the ladder: the machine-readable contract. Same schema for a stub
+# (omit `steps`, add `stub: true`) and a full journey.
+
+journey_meta:
+  id: J-NOL-FILE                       # stable, UPPER-KEBAB: J-<DOMAIN>-<VERB>
+  from_spec: "docs/specs/notice-of-loss.md"   # back-link to the spec (Step 2)
+  covers_reqs:                         # requirement IDs from the feature contracts it exercises
+    - NOL-001
+    - NOL-002
+    - STORM-004
+  type: "e2e"
+  dod_criticality: critical            # critical | important  -> which CONTRACT_INDEX DoD list
+  status: not_tested                   # not_tested | passing | failing | draft(=stub)
+  last_verified: null                  # timestamp of last green real-backend run (staleness signal)
+  # stub: true                         # present (with NO `steps`) when designed but not yet built
+
+description: |
+  An authenticated property owner who received a named-storm loss alert reviews the
+  incident snapshot for their property, drafts a Notice of Loss, files it, and sees it
+  appear in their case manager's pipeline. Proves the alert -> snapshot -> NOL -> pipeline
+  chain end to end on real data.
+
+preconditions:                         # real state the seeded backend must establish (NOT mocks)
+  - "User is authenticated (real seeded owner)"
+  - "Owner has at least one property with an uploaded policy"
+  - "A named storm intersecting the property exists in the storm store"
+
+timing:                                # named timeouts so the spec uses web-first waits, not sleeps
+  api_timeout: 5000
+  draft_timeout: 10000
+
+steps:                                 # the spine - one step per meaningful state transition
+  - step: 1
+    name: "Loss alert card is visible on the dashboard"
+    action: "navigate"
+    target: "/dashboard"
+    required_elements:
+      - selector: "[data-testid='loss-alert-card']"
+        description: "Named-storm loss alert for the affected property"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='loss-alert-card']"
+      - type: "text_content"
+        selector: "[data-testid='loss-alert-card']"
+        contains: "named storm"
+
+  - step: 2
+    name: "Open the incident snapshot"
+    action: "click"
+    target: "[data-testid='review-incident-btn']"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='incident-snapshot']"
+      - type: "text_content"
+        selector: "[data-testid='incident-peak-gust']"
+        contains: "mph"          # oracle: snapshot shows real met data, not a placeholder
+
+  - step: 3
+    name: "Draft the Notice of Loss"
+    action: "click"
+    target: "[data-testid='draft-nol-btn']"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='nol-draft']"
+      - type: "no_validation_errors"
+
+  - step: 4
+    name: "File the Notice of Loss"
+    action: "click"
+    target: "[data-testid='file-nol-btn']"
+    expected:
+      - type: "element_visible"
+        selector: "[data-testid='nol-status']"
+      - type: "text_content"
+        selector: "[data-testid='nol-status']"
+        contains: "Filed"        # oracle: state actually transitioned and persisted
+
+error_scenarios:                       # realistic failure paths (from the CSV row's failure_modes)
+  - id: "ERR-NOL-NO-POLICY"
+    name: "Property has no policy on file"
+    action: "Open NOL drafter for a property with no uploaded policy"
+    expected:
+      - type: "error_message"
+        contains: "Upload a policy before filing"
+
+  - id: "ERR-NOL-DUP"
+    name: "Duplicate NOL for the same loss"
+    action: "File a second NOL for the same storm + property"
+    expected:
+      - type: "error_message"
+        contains: "already filed"
+
+success_criteria:                      # the oracle, in prose - each clause checkable against a real value
+  - "Loss alert card appears for a property hit by a named storm"
+  - "Incident snapshot shows real peak gust (mph) and event dates, not placeholders"
+  - "NOL draft is pre-filled from policy + incident data"
+  - "Filing transitions status to 'Filed' and persists a NOL record"
+  - "Filed NOL appears in the case manager's pipeline for that org"
+  - "Filing is blocked with a clear message when no policy exists"
+  - "A duplicate NOL for the same loss is rejected"
+
+test_hooks:
+  e2e_test_file: "tests/e2e/journey_nol_file.spec.ts"

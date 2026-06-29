@@ -77,6 +77,32 @@ describe('install-hooks.sh', () => {
         expect(stat.mode & 0o100).toBeTruthy();
       }
     });
+
+    test('installs loop selector skill for Claude, Codex, and generic agents', () => {
+      const result = runInstaller();
+      expect(result.status).toBe(0);
+
+      for (const skillRoot of ['.claude/skills', '.codex/skills', '.agents/skills']) {
+        const skillPath = path.join(
+          targetDir,
+          skillRoot,
+          'specflow-loop-selector',
+          'SKILL.md'
+        );
+        expect(fs.existsSync(skillPath)).toBe(true);
+        const skill = fs.readFileSync(skillPath, 'utf8');
+        expect(skill).toContain('Mandatory Run Contract');
+        expect(skill).toContain('Mandatory Simulation Path');
+        expect(skill).toContain('simulation_required: true');
+      }
+
+      expect(fs.existsSync(path.join(targetDir, 'AGENTS.md'))).toBe(true);
+      const agents = fs.readFileSync(path.join(targetDir, 'AGENTS.md'), 'utf8');
+      expect(agents).toContain('Specflow Loop Routing');
+      expect(agents).toContain('Specflow Simulation Path');
+      expect(agents).toContain('specflow-simulate');
+      expect(result.stdout + result.stderr).toContain('specflow-loop-selector');
+    });
   });
 
   describe('session-start.sh installed', () => {
