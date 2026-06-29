@@ -23,10 +23,18 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
+# Parse flags out of the args (so the positional target still works).
+SKIP_ADVERSARY=0
+ARGS=()
+for a in "$@"; do
+  if [ "$a" = "--no-adversary" ]; then SKIP_ADVERSARY=1; else ARGS+=("$a"); fi
+done
+set -- "${ARGS[@]}"
+
 TARGET_DIR="$1"
 
 if [ -z "$TARGET_DIR" ]; then
-  echo "Usage: bash setup-project.sh /path/to/your/project"
+  echo "Usage: bash setup-project.sh /path/to/your/project [--no-adversary]"
   exit 1
 fi
 
@@ -183,6 +191,75 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
 fi
 
 echo -e "${GREEN}✓${NC} Copied scripts, examples, hook sources, QA kit"
+echo ""
+
+# ============================================================================
+# 4b. Loop kit + process docs (the runnable pipeline)
+# ============================================================================
+
+echo -e "${BLUE}[4b/10]${NC} Copying loop kit + process docs..."
+
+# QA/loops/ — paths (yaml) + thin prompt templates + example. Canonical source: Specflow.
+# Refreshed on every init/update so projects don't drift from the source of truth.
+if [ -d "$SCRIPT_DIR/templates/loops" ]; then
+  mkdir -p "$TARGET_DIR/QA/loops/prompts" "$TARGET_DIR/QA/loops/examples"
+  cp "$SCRIPT_DIR/templates/loops/"*.yaml "$TARGET_DIR/QA/loops/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/templates/loops/"*.md "$TARGET_DIR/QA/loops/" 2>/dev/null || true   # README + adversary-mandate@v1
+  cp "$SCRIPT_DIR/templates/loops/prompts/"*.md "$TARGET_DIR/QA/loops/prompts/" 2>/dev/null || true
+  cp "$SCRIPT_DIR/templates/loops/examples/"*.md "$TARGET_DIR/QA/loops/examples/" 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Copied QA/loops/ (paths + prompts + example)"
+fi
+
+# PROCESS*.md — the methodology (canonical + dummies + Codex). Skip if the project already has them.
+if [ -d "$SCRIPT_DIR/templates/process" ]; then
+  for doc in "$SCRIPT_DIR/templates/process/"*.md; do
+    base="$(basename "$doc")"
+    if [ -f "$TARGET_DIR/$base" ]; then
+      echo -e "${YELLOW}⚠️${NC}  $base already exists — not overwritten"
+    else
+      cp "$doc" "$TARGET_DIR/$base"
+      echo -e "${GREEN}✓${NC} $base"
+    fi
+  done
+fi
+echo ""
+
+# ============================================================================
+# 4c. Adversary skill (Gate A critic) — install once per machine
+# ============================================================================
+# spec-build's Gate A is a hostile critic that lives in its OWN repo (the source of
+# truth — not forked into Specflow). We just clone/update it into your skills dir so
+# it's ONE command, not two. Skip with --no-adversary. Never fails the install.
+
+echo -e "${BLUE}[4c/10]${NC} Installing the adversary skill (Gate A critic)..."
+if [ "$SKIP_ADVERSARY" -eq 1 ]; then
+  echo -e "${YELLOW}⚠️${NC}  skipped (--no-adversary)"
+else
+  ADV_REPO="https://github.com/Hulupeep/adversarial-prd-reviewer"
+  install_adversary_into() {
+    local skills_dir="$1" dest
+    dest="$skills_dir/adversarial-prd-reviewer"
+    mkdir -p "$skills_dir" 2>/dev/null || return 0
+    if [ -d "$dest/.git" ]; then
+      if git -C "$dest" pull --ff-only --quiet 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} updated $dest"
+      else
+        echo -e "${YELLOW}⚠️${NC}  kept existing $dest (couldn't update — offline?)"
+      fi
+    elif [ -d "$dest" ]; then
+      echo -e "${YELLOW}⚠️${NC}  $dest exists but isn't a git clone — left as-is"
+    else
+      if git clone --quiet "$ADV_REPO" "$dest" 2>/dev/null; then
+        echo -e "${GREEN}✓${NC} installed $dest"
+      else
+        echo -e "${YELLOW}⚠️${NC}  could not clone — install manually: git clone $ADV_REPO $dest"
+      fi
+    fi
+  }
+  # Claude Code (primary) always; Codex too if you use it.
+  install_adversary_into "$HOME/.claude/skills"
+  [ -d "$HOME/.codex" ] && install_adversary_into "$HOME/.codex/skills"
+fi
 echo ""
 
 # ============================================================================

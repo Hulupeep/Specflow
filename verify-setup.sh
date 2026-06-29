@@ -136,34 +136,36 @@ echo "3. Contract YAML Validation"
 echo "---------------------------"
 
 if [ "$CONTRACT_COUNT" -gt 0 ]; then
-    # Try to validate YAML syntax
-    if command -v python3 &> /dev/null; then
+    # Pick a validator that ACTUALLY WORKS. Prefer node+js-yaml (the project depends on it).
+    # Only use python3 if PyYAML genuinely imports — `command -v python3` alone is not enough:
+    # a python3 without PyYAML would make `import yaml` throw and falsely flag every contract.
+    YAML_VALIDATOR=""
+    if command -v node &> /dev/null && node -e "require('js-yaml')" 2>/dev/null; then
+        YAML_VALIDATOR="node"
+    elif command -v python3 &> /dev/null && python3 -c "import yaml" 2>/dev/null; then
+        YAML_VALIDATOR="python3"
+    fi
+
+    if [ -z "$YAML_VALIDATOR" ]; then
+        check_warn "No working YAML parser (need node+js-yaml or python3+PyYAML) — skipping syntax check, NOT failing"
+    else
         VALID=0
         INVALID=0
-
         for contract in "$CONTRACT_DIR"/*.yml "$CONTRACT_DIR"/*.yaml; do
-            if [ -f "$contract" ]; then
-                if python3 -c "import yaml; yaml.safe_load(open('$contract'))" 2>/dev/null; then
-                    ((VALID++))
-                else
-                    check_fail "$(basename "$contract") has invalid YAML syntax"
-                    ((INVALID++))
-                fi
+            [ -f "$contract" ] || continue
+            if [ "$YAML_VALIDATOR" = "node" ]; then
+                ok=$(node -e "try{require('js-yaml').load(require('fs').readFileSync(process.argv[1],'utf8'));process.exit(0)}catch(e){process.exit(1)}" "$contract" 2>/dev/null && echo y || echo n)
+            else
+                ok=$(python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$contract" 2>/dev/null && echo y || echo n)
+            fi
+            if [ "$ok" = "y" ]; then
+                ((VALID++))
+            else
+                check_fail "$(basename "$contract") has invalid YAML syntax"
+                ((INVALID++))
             fi
         done
-
-        if [ "$INVALID" -eq 0 ]; then
-            check_pass "All $VALID contract(s) have valid YAML syntax"
-        fi
-    elif command -v node &> /dev/null; then
-        # Try with Node.js js-yaml if available
-        if node -e "require('js-yaml')" 2>/dev/null; then
-            check_info "Using Node.js js-yaml for validation"
-        else
-            check_warn "Install js-yaml for YAML validation: npm install js-yaml"
-        fi
-    else
-        check_warn "No YAML validator available (install Python3 or js-yaml)"
+        [ "$INVALID" -eq 0 ] && check_pass "All $VALID contract(s) have valid YAML syntax (via $YAML_VALIDATOR)"
     fi
 else
     check_info "No contracts to validate yet"

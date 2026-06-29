@@ -1,0 +1,121 @@
+# spec-build.yaml — the reusable PATH for the spec-build loop (PROCESS.md Steps 0–5).
+# The prompt does NOT restate this. The prompt only supplies: goal + inputs + automation.
+# Each tick: load this path, LOCATE the current stage from committed artifacts, advance ONE gate, persist, stop/escalate.
+loop: spec-build
+process_ref: PROCESS.md#steps-0-5
+principle: writers are muscle; trust lives in GATE A (one hostile critic), never self-consensus.
+
+progress_display:             # EMIT this at the START of every tick so the human sees the phase
+  rule: >
+    Re-render the map below with marks: ✓ completed · ▶ current · · pending · ⛔ hard wall.
+    GATE_A stays ⛔ until the verdict artifact says SHIP. Show the one-line "now / next / blocked-on" under it.
+  template: |
+    ┌──────────────────────── SPEC-BUILD ────────────────────────┐
+      DISCOVER ─▶ PRD ═╣⛔A╠═▶ TICKETS ─▶ ╎B╎ ─▶ ╎B.5╎ ─▶ handoff
+         {d}      {p}    {a}     {t}       {b}    {b5}
+    └─────────────────────────────────────────────────────────────┘
+      now: {current_stage}   next: {next_stage}   blocked-on: {blocker_or_none}
+      ╣⛔╠ hard wall (GATE A: committed SHIP verdict)   ╎ ╎ soft gate
+
+inputs:                       # supplied by the invocation, not hard-coded here
+  goal: ${goal}               # e.g. "SHIP the TT-ROLLBACK spec (hardened PRD + audited tickets)"
+  story_slug: ${slug}         # e.g. tt-rollback
+  grounding_ref: ${inputs}    # path to the discovery grounding (real facts + oracle + constraints)
+
+state:                        # where 'where am I?' is read from — durable, never chat
+  prd: PRDs/${slug}-prd.md
+  verdict_artifact: PRDs/${slug}-verdict.md
+  hops_artifact: PRDs/${slug}-hops.md   # pre-committed integration oracle (GATE A output, consumed by GATE D)
+  tickets: gh issues labelled ${slug}
+
+stages:
+  - id: discover
+    do: ground against the REAL artifact named in grounding_ref; capture intent + constraints + oracle
+    gate: grounding written; problem + real-data-it-must-satisfy stated
+  - id: draft
+    do: writer → ${prd}
+    gate: JTBD, scope boundary, acceptance, success metrics, deps all present
+  - id: adversary            # one hostile critic (adversary-mandate@v2), informed by parallel lenses
+    do: adversarial-prd-reviewer @v2 — 7-pass rubric + Special Mandate
+        (reality-grounding ledger over every repo/schema claim; loophole hunt)
+    falsify_subrun: |         # @v2 added output — runs like the persona lens: PARALLEL, fresh-context
+      A fresh-context falsification sub-run (NOT bundled into the structural pass's depth budget)
+      tries to DISPROVE the premise, typed claim inventory, dependency graph, acceptance gates,
+      and source claims. It writes PRDs/${slug}-falsification.md (from falsification-template.md);
+      corrections are APPLIED to the PRD or recorded as owned stipulations in the verdict — chat
+      doesn't count. The 7 banned modes each disqualify a PASS. Informs the single verdict.
+    persona_lens: |           # runs IN PARALLEL with the structural review — first persona touch
+      A fresh-context persona/simulation lens walks real personas through the PRD's
+      journeys ON PAPER ("can a human actually do this?") and returns CRITICAL design
+      gaps, each with a repro. Top-thinker work — never a cheap model; a shallow walk
+      launders design gaps into a green check. The lens INFORMS the verdict; the
+      adversary still DECIDES (one critic, not a committee).
+      Why here: persona walks find PRD-level design flaws — catching them now costs a
+      PRD edit; catching them at B.5 costs redone tickets, audit, and uplift.
+    do_until: verdict issued; fix each FATAL/SERIOUS in the document, re-review
+  - id: GATE_A               # HARD — the trust gate
+    type: hard
+    gate: >
+      verdict ∈ {SHIP, SHIP_WITH_STIPULATIONS} written to ${verdict_artifact}
+      AND ${hops_artifact} exists with per-persona hop tables:
+      From → URL → required control → EXPECTED VALUE (re-read) → oracle/source.
+      A pre-committed integration oracle, pinned BEFORE code exists (post-hoc tests get
+      unconsciously shaped to pass). Assertion bar = a re-read value, never element presence.
+      AND PRDs/${slug}-falsification.md exists, passes `verify-falsification.cjs` (every
+      section filled, recognized verdict), and its PASS is HASH-BOUND to the current PRD —
+      `teardown-gate.cjs check-sign ${prd}` must be green (a PRD edited after PASS fails
+      until re-falsified; a typo-only edit needs a human re-sign, not full re-falsification).
+    rule: >
+      no ticket-writing until SHIP; then human approval before issues are created.
+      The hops artifact is HUMAN-SIGNED at pin time (teardown-gate.cjs sign); post-SHIP
+      changes only via countersigned amendment — never unilaterally by the build agent
+      (it is the party the oracle constrains). Consumed by GATE D (feature-build epic_gate).
+  - id: tickets
+    do: specflow-writer → issues (Gherkin ACs, data-testids, contract refs, e2e filename)
+    gate: every UI story references a journey contract; Gherkin lives once in the catalogue
+    declares: |             # per-ticket declarations consumed by the gates below
+      writes: [<surface>...]   # seam-lite (#61): surfaces this slice CHANGES (route/data-testid, EXACTLY as in code)
+      reads:  [<surface>...]   # surfaces this slice DEPENDS ON
+      reuses: [<component>...]  # ADR/reuse (#68): existing components this slice builds on
+      adrs:   [ADR-NNN...]      # the decisions it's built under  (or `adrNone: "<reason>"`)
+                                # only enforced if the repo has an ADR folder — else ignored
+  - id: GATE_B               # soft
+    type: soft
+    do: >
+      board-auditor + specflow-uplifter — wire every ticket to journey + test + contract.
+      PLUS seam-lite: `verify-seams.cjs <tickets.json> --repo-root .` computes the seam graph
+      (writer×writer AND writer×reader pairs on shared surfaces) and ERRORS on any declared
+      surface not found in the repo (no silent zero-seam runs). Derived hops are appended to
+      ${hops_artifact} — the integration walk is DERIVED from seams, not remembered.
+      PLUS conditional ADR/reuse (#68): `verify-adr.cjs <tickets.json> --repo-root .` — if the
+      repo has an ADR folder, every ticket cites a RESOLVING ADR (or `adrNone`) and declares
+      `reuses` (or a justified new component); if there's no ADR folder it exits 0 silently.
+    gate: >
+      requirement→journey→test→issue complete; no orphans; no duplicate IDs;
+      all declared surfaces resolve; seam-derived hops written to ${hops_artifact};
+      verify-adr passes (skipped automatically when the repo has no ADR folder).
+  - id: GATE_B5              # soft — SECOND persona touch (first ran at the adversary stage)
+    type: soft
+    do: pre-flight-simulator — walk real personas through each TICKET before code.
+        Different artifact than the adversary's persona lens — that walked the PRD
+        (design flaws); this walks the tickets (ticketization flaws — a journey sliced
+        wrong, a missing step, a walk that breaks at a ticket boundary). Top-thinker work.
+    gate: no CRITICAL design gap survives
+
+repair:
+  on_gate_fail: route back to the owning stage with a targeted prompt
+  within_run: fix fast failures inline
+  across_ticks: slow/blocked state is re-read on the next automation tick
+  budget: adversary cycles ≤ 4; uplift re-audits ≤ 3
+  on_exhausted: escalate with the open FATAL/SERIOUS list
+
+escalate_when:
+  - verdict = DO_NOT_SHIP, or a FATAL cannot be closed in the document
+  - discovery shows the idea is wrong (kill it — don't spec the wrong thing)
+  - an UNRESOLVED gap has no willing owner
+never_without_human: [create issues from a DO_NOT_SHIP PRD, fabricate a green verdict]
+
+done_when:
+  - ${verdict_artifact} = SHIP (or SHIP_WITH_STIPULATIONS) and committed
+  - audited, journey-contracted tickets exist; UNRESOLVED items owner-tagged
+  - handoff: those tickets are the INPUT to feature-build.yaml

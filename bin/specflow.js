@@ -1,11 +1,29 @@
 #!/usr/bin/env node
 
 const { execSync } = require('child_process');
-const { resolve, dirname } = require('path');
-const { existsSync } = require('fs');
+const { resolve, dirname, join } = require('path');
+const { existsSync, readFileSync, writeFileSync, readdirSync } = require('fs');
 
 // Specflow root is one level up from bin/
 const SPECFLOW_ROOT = resolve(dirname(__filename), '..');
+
+// Self-heal CRLF: bash (Linux/Mac) fails on Windows line endings. The published tarball
+// can ship CRLF if it was packed from a Windows checkout, so normalize the shell scripts
+// we're about to run — at runtime, via node, which always runs (unlike npm lifecycle scripts).
+function stripCR(p) {
+  try {
+    const s = readFileSync(p, 'utf8');
+    if (s.includes('\r')) writeFileSync(p, s.replace(/\r\n/g, '\n'));
+  } catch (_) { /* ignore unreadable/missing */ }
+}
+function normalizeShellScripts(root) {
+  for (const dir of ['.', 'hooks', 'scripts']) {
+    const abs = join(root, dir);
+    if (!existsSync(abs)) continue;
+    for (const f of readdirSync(abs)) if (f.endsWith('.sh')) stripCR(join(abs, f));
+  }
+  for (const hook of ['hooks/commit-msg', 'hooks/pre-push']) stripCR(join(root, hook));
+}
 
 const COMMANDS = {
   init: {
@@ -13,6 +31,7 @@ const COMMANDS = {
     desc: 'Set up Specflow in a project (safe to re-run)',
     run: (args) => {
       const target = resolve(args[0] || '.');
+      normalizeShellScripts(SPECFLOW_ROOT);
       exec(`bash "${SPECFLOW_ROOT}/setup-project.sh" "${target}"`);
     },
   },
@@ -20,6 +39,7 @@ const COMMANDS = {
     usage: 'specflow verify',
     desc: 'Check Specflow installation (hooks, contracts, version)',
     run: () => {
+      normalizeShellScripts(SPECFLOW_ROOT);
       exec(`bash "${SPECFLOW_ROOT}/verify-setup.sh"`);
     },
   },
@@ -29,6 +49,7 @@ const COMMANDS = {
     run: (args) => {
       const ciFlag = args.includes('--ci') ? '--ci' : '';
       const target = resolve(args.find(a => a !== '--ci') || '.');
+      normalizeShellScripts(SPECFLOW_ROOT);
       exec(`bash "${SPECFLOW_ROOT}/install-hooks.sh" "${target}" ${ciFlag}`);
     },
   },
@@ -140,11 +161,19 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   for (const [name, cmd] of Object.entries(COMMANDS)) {
     console.log(`  ${cmd.usage.padEnd(40)} ${cmd.desc}`);
   }
-  console.log(`\n  specflow help                          Show this help\n`);
+  console.log(`\n  specflow help                            Show this help\n`);
+  console.log('`init` scaffolds, in one command:');
+  console.log('  • contracts, hooks, agents, tests (the enforcement layer)');
+  console.log('  • the loop kit QA/loops/ — 3 loops: spec-build · feature-build · daily-use-teardown');
+  console.log('  • gate scripts: verify-graph, verify-seed, adversary-spawn, verify-ticket-journey,');
+  console.log('    verify-falsification, verify-seams, teardown-gate');
+  console.log('  • the adversary critic skill (Gate A) into ~/.claude|.codex/skills  (--no-adversary to skip)');
+  console.log('  • process docs: PROCESS.md / -GUIDE / -CLAUDE / -CODEX');
+  console.log('  → then read QA/loops/README.md to run the pipeline.\n');
   console.log('Examples:');
-  console.log('  npx @colmbyrne/specflow init .');
-  console.log('  npx @colmbyrne/specflow verify');
+  console.log('  npx @colmbyrne/specflow init .            # Mac/Linux any terminal; Windows = Git Bash');
   console.log('  npx @colmbyrne/specflow update . --ci');
+  console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow graph\n');
   process.exit(0);

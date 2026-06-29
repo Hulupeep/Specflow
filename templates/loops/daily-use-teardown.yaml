@@ -1,0 +1,135 @@
+# daily-use-teardown.yaml — the front door for products ALREADY BUILT.
+# The shipped product is the artifact. Map its journeys, get the human to SIGN the map
+# (hash-bound — not a line the agent can type), walk the confirmed journeys as personas,
+# return an evidence-grounded do-list → spec-build.
+# Each tick: load this path, LOCATE the current stage from committed artifacts, advance ONE
+# gate, persist, stop/escalate. Gates are checked by `scripts/teardown-gate.cjs`, not self-attested.
+loop: daily-use-teardown
+principle: >
+  investigate BEFORE judging — a teardown of the wrong journeys is worse than none.
+  The human signs the map (they know what the product is FOR; the agent can only infer).
+  The producer never certifies its own gates: sign-offs are hash-bound human artifacts,
+  completeness + evidence are script-checked. Screenshots are the oracle — and persona
+  "confusion" is a SIMULATION-DERIVED HYPOTHESIS, not a measured user fact (see deep_dive).
+
+progress_display:
+  rule: >
+    Re-render at the start of every tick: ✓ done · ▶ current · · pending · ⛔ gate.
+    GATE_HITL stays ⛔ until `teardown-gate check` confirms a valid, hash-matching sign-off.
+  template: |
+    ┌────────────────── DAILY-USE TEARDOWN ──────────────────┐
+      INVESTIGATE ─▶ ╣⛔HITL╠ ─▶ DEEP-DIVE ─▶ DO-LIST ─▶ handoff(spec-build)
+          {i}           {h}        {d}         {l}
+    └─────────────────────────────────────────────────────────┘
+      now: {current_stage}   next: {next_stage}   blocked-on: {blocker_or_none}
+
+inputs:
+  slug: ${slug}               # e.g. claim-alert-teardown
+  app: ${app}                 # the app env to walk — URL + backend description. The HUMAN
+                              # confirms this env is the right oracle when signing the map
+                              # (production, or seeded-real-backend local — named explicitly; never a mock).
+  personas: ${personas}       # optional; if absent, the investigate stage PROPOSES them for the human to confirm
+
+state:                        # durable, never chat
+  journey_map: docs/teardown/${slug}/journey-map.md       # journeys as "- J: <id> — <purpose>" lines (parseable)
+  map_signoff: docs/teardown/${slug}/journey-map.md.signoff.json   # HUMAN-created, hash-bound (see GATE_HITL)
+  evidence: docs/teardown/${slug}/evidence/               # screenshots — URL bar visible in every capture
+  walk_script: docs/teardown/${slug}/walkthrough.mjs      # the committed Playwright walk — reproducible, not narrated
+  findings: docs/teardown/${slug}/findings.md             # per journey "## J: <id>": WORKS / CONFUSING / BROKEN + evidence refs
+  bug_log: docs/teardown/${slug}/bugs.md                  # bugs land HERE the moment they're found — never sat on
+  do_list: docs/teardown/${slug}/do-list.md               # prioritized; becomes spec-build's grounding_ref
+  dolist_signoff: docs/teardown/${slug}/do-list.md.signoff.json    # second HUMAN sign-off, same mechanism
+
+walk_mandate: teardown-walkthrough-mandate@v1   # the METHOD for investigate + deep_dive: JTBD persona
+                                                # construction, the 4 cognitive-walkthrough questions,
+                                                # findings vocabulary. Referenced by id, never inlined —
+                                                # same pattern as the adversary's mandate. A richer local
+                                                # UX skill (e.g. a jtbd-ux-designer) may EXCEED this floor,
+                                                # never replace its output discipline.
+
+stages:
+  - id: investigate           # what ARE the journeys?
+    do: >
+      Explore the app (nav, routes, screens) + the repo. Enumerate the MAIN routes, each as a
+      parseable line "- J: <id> — <purpose>" (what is a user trying to achieve here?), with entry
+      points and who uses it. Propose the personas if not supplied — constructed per the
+      walk_mandate (JTBD: a persona is a job, not a profile) — and state the env (URL +
+      backend) the walk will use. Output: a ONE-PAGE journey map a human can review in five
+      minutes. No judgments yet — inventory, not critique.
+    gate: journey map committed — routes + purpose + personas + env, human-readable AND machine-parseable
+
+  - id: GATE_HITL             # HARD — human sign-off the agent cannot forge-by-edit
+    type: hard (human, mechanical)
+    gate: >
+      The human reviews the map — confirms/corrects each route's purpose, kills stale routes,
+      adds missed ones, signs off personas AND the env — then runs, THEMSELVES:
+        node scripts/teardown-gate.cjs sign docs/teardown/${slug}/journey-map.md --by "<name>"
+      That writes a hash-bound sign-off: it records the SHA of the map AT confirmation time, so
+      any later edit to the map invalidates it (`teardown-gate check` fails). The deep dive's
+      precondition is a PASSING `check`, not a line of text in an agent-authored file.
+    rule: >
+      NO deep dive until `teardown-gate check` passes the sign-off. The agent NEVER runs `sign`
+      (never_without_human) — and even if that discipline slipped, the hash binding still closes
+      confirm-then-silently-edit.
+
+  - id: deep_dive             # tier: judge — top thinkers, never tiered down
+    do: >
+      For each CONFIRMED journey × persona: walk the CONFIRMED env via a COMMITTED Playwright
+      script (walk_script — reproducible, not narrated) as that persona doing their normal task,
+      applying the walk_mandate's method: at EVERY step, the 4 cognitive-walkthrough questions
+      (knows the goal? action visible? action↔goal connection? feedback?), findings named with
+      its vocabulary (discoverability / affordance / feedback / mental-model / slip-vs-mistake /
+      dead end). Judge BOTH: (a) clarity — where does the persona stall, squint, mis-click? and (b)
+      correctness — does the journey achieve its purpose, doing the right thing? Capture a
+      screenshot at every stall/surprise/dead-end, URL BAR VISIBLE, saved under evidence/ and
+      referenced from the journey's findings entry. Verdict per journey ("## J: <id>"):
+      WORKS / CONFUSING / BROKEN. HONESTY CAP: a CONFUSING verdict is a simulation-derived
+      hypothesis about a real user — mark it [hypothesis]; validate top items with a real user
+      before heavy investment. Bugs go to bug_log THE MOMENT they're found; CRITICAL bugs also
+      escalate immediately.
+    gate: >
+      `node scripts/teardown-gate.cjs check docs/teardown/${slug}` passes — mechanically:
+      sign-off valid + every mapped journey has a findings entry (none silently skipped) +
+      every entry references >=1 evidence file that exists. Self-attestation does not pass this gate.
+
+  - id: do_list
+    do: >
+      Consolidate findings into a prioritized do-list. Each item: journey, persona, what's wrong,
+      evidence link, severity, and [hypothesis] markers carried over. OBSERVATIONS + priorities —
+      NOT solutions ("missing a bulk-edit button" is a solution in costume; write "persona
+      couldn't update 12 records without 12 round-trips" instead. The PRD designs solutions;
+      spec-build's adversary attacks them.)
+    gate: >
+      do-list committed AND the human signs it the same way:
+        node scripts/teardown-gate.cjs sign docs/teardown/${slug}/do-list.md --by "<name>"
+      (`teardown-gate check` verifies this too — approval in chat does not count.)
+
+  - id: handoff
+    do: >
+      Invoke spec-build with grounding_ref = the do-list (findings + evidence dir are the oracle).
+      Typically one spec-build run per top-priority cluster, not one giant PRD. Note for the PRD
+      stage: [hypothesis]-marked items are leads to verify, not established facts.
+
+repair:
+  on_gate_fail: route back to the owning stage with a targeted prompt
+  budget: investigate revisions ≤ 2 (if the human keeps correcting the map, the agent is
+          guessing — escalate and map it TOGETHER: human lists the journeys live, agent transcribes);
+          deep-dive re-walks ≤ 2 per journey
+  on_exhausted: escalate with what couldn't be walked and why
+
+escalate_when:
+  - the app can't be reached / personas can't authenticate (no real walk possible — never fake or narrate one)
+  - the human rejects the journey map twice (switch to mapping it together)
+  - a CRITICAL bug is found mid-walk (bug_log entry + surface to the human immediately; don't wait for the do-list)
+never_without_human:
+  - running `teardown-gate sign` (sign-offs are the human's act, on both the map and the do-list)
+  - starting the deep dive before `teardown-gate check` passes the map sign-off
+  - creating tickets directly (that is spec-build's job, behind its own gates)
+
+done_when:
+  - "`teardown-gate check` passes end-to-end: signed map, complete findings with resolving evidence, signed do-list"
+  - handoff: spec-build launched on the top items (prd → adversary → tickets → build → done)
+cadence: >
+  schedulable (monthly/quarterly) — but the two sign-offs are deliberate HITL breaks: an
+  unattended tick STOPS at them by design. The product re-generates its own backlog from
+  observed friction; the human stays the arbiter of what the product is for and what matters.

@@ -102,7 +102,10 @@ function validateFalsification(content, options = {}) {
     }
   }
 
-  return { ok: v.length === 0, violations: v, finalVerdict, boundPrdHash };
+  if (options.requirePass || options.prdHash) {
+    return { ok: v.length === 0, violations: v, finalVerdict, boundPrdHash };
+  }
+  return { ok: v.length === 0, violations: v };
 }
 
 function main(argv) {

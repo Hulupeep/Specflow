@@ -1,0 +1,7 @@
+# Shell scripts MUST stay LF — CRLF makes bash fail on Linux/Mac with
+# "$'\r': command not found" / "syntax error near ... $'do\r'".
+# Without this, publishing from a Windows working tree packs CRLF into the tarball.
+*.sh           text eol=lf
+*.bash         text eol=lf
+hooks/commit-msg text eol=lf
+hooks/pre-push   text eol=lf

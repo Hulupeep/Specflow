@@ -6,6 +6,154 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.9.1 (2026-06-12)
+
+**Conditional ADR-conformance + universal component-reuse check (#68).**
+
+- **`verify-adr.cjs`** — model-free, **conditional**: detects an ADR folder (`docs/adr|adrs|ard|architecture/decisions`, or a CLAUDE.md `ADR Location`) and **exits 0 silently when there isn't one**. When present, GATE B requires each ticket to cite a **resolving** ADR id (or `adrNone: <reason>`) and declare `reuses` (or a justified new component); a phantom ADR citation is an ERROR. IDs normalize (`ADR-006 ≡ ADR-6 ≡ 0006-foo.md`).
+- **adversary-mandate@v3** — universal *reuse-don't-reinvent* (reinventing an existing component is FATAL) + conditional ADR conformance.
+- spec-build tickets declare `adrs`/`reuses`; `init` scaffolds the script; `CLAUDE-MD-TEMPLATE.md` gains an optional **ADR Location** field.
+
+---
+
+## 0.9.0 (2026-06-12)
+
+**Pipeline hardening (EPIC) + docs overhaul.** The integration-gate / seam-awareness / falsification work, plus a README + CLI-help refresh so the front door matches reality.
+
+- **GATE D — persona-walk integration gate** (`feature-build.yaml` `epic_gate`, `prompts/gate-d.prompt.md`): per-slice green is blind to seam bugs (vertical slices, horizontal collisions); GATE D walks personas across the *merged* tree. Red hops are dispositioned `bug` (last-merged writer reopens) or a **human-countersigned** `stale-oracle` — the agent can't reconcile its own oracle. An epic isn't done until D is green.
+- **Hop tables at GATE A** — pinned, value-bearing (re-read oracle) integration oracle in `PRDs/<slug>-hops.md`, human-signed; amendments countersigned.
+- **Falsification folded into adversary-mandate@v2** — a required falsification artifact (parallel fresh-context sub-run), `verify-falsification.cjs` (rejects a stub), hash-bound PASS at GATE A (`teardown-gate.cjs check-sign`).
+- **Seam-lite** — tickets declare `writes/reads`; `verify-seams.cjs` computes writer×writer + writer×reader seams at GATE B (errors on unresolved surfaces) and derives GATE D hops.
+- **Hardening rules** — inherited-baseline *proof* (run on base branch first), DB-verification serialization, stacked-merge note, stable-key assertions (`journey-tester`, `contract-test-generator`).
+- **Docs** — README overhaul (the three loops named; gate list current; GATE D in the table; persona two-touch; absolute links so they resolve on npm); CLI `help` now describes what `init` actually delivers.
+- Drive-by: fixed long-standing invalid YAML in `feature-build.yaml` rails.
+
+---
+
+## 0.8.2 (2026-06-10)
+
+**Teardown gets a method: `teardown-walkthrough-mandate@v1` (JTBD personas + cognitive walkthrough).**
+
+The investigate/deep-dive stages now reference a versioned UX method by id (same pattern as the adversary's mandate): personas are constructed as **JTBD jobs**, not demographic profiles; every walk step answers the **4 cognitive-walkthrough questions** (knows the goal? action visible? action↔goal connection? feedback?); findings are named with a fixed vocabulary (discoverability / affordance / feedback / mental-model / slip-vs-mistake / dead-end) — so a CONFUSING verdict says *which* question failed instead of vibes. A richer local UX skill may exceed this floor; it never replaces the output discipline. Ships via `specflow init`.
+
+---
+
+## 0.8.1 (2026-06-10)
+
+**daily-use-teardown hardened after adversarial review — DO NOT SHIP → fixed.**
+
+An independent fresh-context adversary attacked the 0.8.0 loop and found the design self-attesting:
+
+- **F1 — the HITL gate was self-signable**: "confirmation written into the journey map" is a line the *agent* writes. Fixed with `scripts/teardown-gate.cjs`: the human runs `sign`, which writes a **hash-bound sign-off** (SHA of the map at confirmation time) — a forged `confirmed-by` line counts for nothing, and editing the map after sign-off fails `check`. Tested both attacks.
+- **F2 — every gate was prose checked by the entity it constrains**: `teardown-gate check` is now the deep-dive/done gate — mechanical: valid sign-offs (map *and* do-list), every mapped journey has findings (none silently skipped), every finding references evidence files that exist.
+- **S-fixes**: committed Playwright walk script required (reproducible, not narrated); URL bar visible in screenshots; env named + human-confirmed at sign-off; `bugs.md` so found bugs land immediately; CONFUSING verdicts marked **[hypothesis]** (a simulated persona is not a real user); do-list approval is a signed artifact, not chat; the example's precedent claim corrected (timebreez #673 ran *spec-build* with walkthrough discovery — the teardown's distinctive stages are new and unproven until a first real run).
+
+`specflow init` now ships `teardown-gate.cjs` with the rest of the gate scripts.
+
+---
+
+## 0.8.0 (2026-06-10)
+
+**New loop: `daily-use-teardown` — the front door for products that are already built.**
+
+For a shipped product, the question isn't "what should we build" — it's *"are the journeys confusing, and are they doing the right thing?"* The new loop (`QA/loops/daily-use-teardown.yaml` + prompt + a filled Claim Alert example):
+
+1. **INVESTIGATE** — map the live app's main routes, each with its *purpose* + proposed personas. Inventory, not critique.
+2. **⛔ GATE HITL (hard, human)** — *you* confirm/correct the journey map before any judging. The agent can only infer what the product is for; you know. A teardown of the wrong journeys is worse than none.
+3. **DEEP DIVE** — top-thinker persona walks of the live app (real backend), judging clarity *and* correctness per journey: **WORKS / CONFUSING / BROKEN**, every verdict with screenshot evidence.
+4. **DO-LIST** — prioritized observations (not solutions), each traceable to a screenshot; you approve priorities.
+5. **HANDOFF** — the do-list becomes spec-build's `grounding_ref`: PRD → adversary → tickets → done.
+
+Schedulable (monthly/quarterly): the product re-generates its own backlog from observed friction. Precedent: timebreez EPIC #673 (3-persona walkthrough → PRD survived Gate A → 9 sliced tickets + a live bug found mid-walk).
+
+---
+
+## 0.7.6 (2026-06-10)
+
+**spec-build: two-touch personas — a persona/simulation lens joins the adversary panel.**
+
+Persona walkthroughs now run **twice**: (1) at the adversary stage, in parallel with the structural review, walking real personas through the *PRD's* journeys on paper — design flaws get caught while only the PRD exists (the lens informs the verdict; the adversary still decides); (2) Gate B.5 unchanged, walking the *tickets* — catches ticketization flaws (a journey sliced wrong, a missing step). Both are top-thinker work: a shallow persona walk launders design gaps into a green check. Encoded in `templates/loops/spec-build.yaml` + the PROCESS docs.
+
+(Note for upgraders: re-run `specflow init .` to refresh `QA/loops/` — it's refreshed on every init.)
+
+---
+
+## 0.7.5 (2026-06-10)
+
+**The CLI now self-heals CRLF at runtime — works on Linux/Mac even if the tarball shipped with Windows line endings.**
+
+0.7.3/0.7.4 still shipped CRLF because the publisher's npm skipped the normalize hooks *and* the manual step wasn't run. Rather than keep depending on a clean publish, `bin/specflow.js` (which always runs — it's the node entry point, not an npm lifecycle script) now strips CR from the shell scripts **right before it invokes bash**. So `npx @colmbyrne/specflow init/update/verify` works on Linux/Mac regardless of how the package was published. The publish-time hooks remain as a secondary measure.
+
+---
+
+## 0.7.4 (2026-06-10)
+
+**Make the LF fix actually stick — 0.7.3's `prepack` didn't run on the publisher's machine, so it still shipped CRLF.**
+
+`prepack` is unreliable if the publisher has `ignore-scripts` set (or an npm that skips it on publish), so 0.7.3 was published with CRLF anyway and still broke Linux/Mac. Now: `normalize-eol` runs as **`prepack` *and* `prepublishOnly`** (redundant hooks), is exposed as **`npm run normalize`** to run by hand, and **aborts the publish (exit 1) if any CR survives** — so a CRLF tarball can't be published silently again.
+
+**Publishing this package:** `npm run normalize` then `npm publish` (the manual normalize guarantees LF even if your npm skips lifecycle scripts).
+
+---
+
+## 0.7.3 (2026-06-10)
+
+**Fix: shell scripts shipped with CRLF, breaking `init`/`update` on Linux & Mac.**
+
+`bash` on Linux/Mac chokes on Windows line endings — `setup-project.sh: line 17: $'\r': command not found`, `syntax error near unexpected token $'do\r'`. The scripts are LF in git, but `npm publish` packs from the working tree, so publishing from a Windows checkout (autocrlf) shipped CRLF. Two fixes: a `.gitattributes` forcing `*.sh`/hooks to LF on checkout, and a `prepack` step (`scripts/normalize-eol.cjs`) that strips CR from the shell scripts at pack time on **any** OS — so the published tarball is always LF regardless of who publishes from where.
+
+If you hit this on 0.7.2: install from a fresh Linux/Mac clone (`git clone … && bash setup-project.sh .`) until 0.7.3 is published.
+
+---
+
+## 0.7.2 (2026-06-10)
+
+**`init` now installs the adversary skill too — one command, not two.**
+
+Setting up spec-build used to be two steps: `specflow init` *and* a separate `git clone` of the adversarial-prd-reviewer skill. Now `init` clones/updates the adversary into your skills dir (`~/.claude/skills/`, and `~/.codex/skills/` if present) as part of setup. The adversary stays its **own repo** (Gate A is still owned outside Specflow — not forked in); `init` just installs it for you. Idempotent (pulls if already there), never fails the install (warns + prints the manual clone if offline), and opt-out with `--no-adversary`.
+
+---
+
+## 0.7.1 (2026-06-10)
+
+**Fix: `verify-setup` falsely reported every contract as "invalid YAML" when PyYAML wasn't installed.**
+
+Section 3 ran `python3 -c "import yaml; ..."` gated only on `command -v python3` — so a python3 without PyYAML made `import yaml` throw, and (with stderr swallowed) every contract was flagged invalid. Meanwhile the jest contract-schema suite parsed the same files fine. Now `verify-setup` prefers **node + js-yaml** (which the project depends on), falls back to python3 **only if PyYAML actually imports**, and **warns instead of failing** when neither parser is available. No more false "invalid YAML syntax."
+
+---
+
+## 0.7.0 (2026-06-10)
+
+**Pipeline v2: real, mechanical adversary independence — and `init` now ships the gate scripts.**
+
+The spec-build loop's adversary is no longer "same agent, switched hats." It runs in a **fresh context seeded by a fixed template that cannot carry the author's reasoning**, gated before it can launch:
+
+- `scripts/verify-seed.cjs` — byte-checks the spawn seed against `{artifact_paths, tool_grants, mandate_ref}`. Any extra key (`rationale`/`context`/…) — the priming-leak vector — or free-text `mandate_ref` is **rejected**. A primed seed cannot launch.
+- `scripts/adversary-spawn.cjs` — `buildSeed()` reads only the three slots (priming prevented *at construction*); `assertSeedMatchesTemplate()` gates before any spawn.
+- `templates/loops/adversary-mandate.md@v1` — the versioned static mandate the seed references by id.
+- `scripts/verify-ticket-journey.cjs` — Gate B leg 3: the ticket↔journey "→issue" join (`verify-graph.cjs` has no issue-awareness).
+
+`specflow init` now scaffolds these scripts (previously only `specflow-compile`/`verify-graph`). Runtime bindings for the whole pipeline ship too: `PROCESS-CLAUDE.md` (Workflow) alongside `PROCESS-CODEX.md` — run spec-build + feature-build end-to-end on either.
+
+**Get it:** `npx @colmbyrne/specflow init .` (or re-init existing projects). Pairs with the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) skill for Gate A.
+
+---
+
+## 0.6.0 (2026-06-09)
+
+**Distribute the loop kit + process docs via `specflow init`.**
+
+`specflow init` now scaffolds the runnable pipeline into every project:
+
+- `QA/loops/` — the reusable loop **paths** (`spec-build.yaml`, `feature-build.yaml`), thin invocation **prompt templates** (`prompts/`), a worked **example**, and a README. A loop = path (YAML) + thin prompt (goal + inputs + automation) + the tick + durable state.
+- `PROCESS.md`, `PROCESS-GUIDE.md`, `PROCESS-CODEX.md` — the methodology (canonical / plain-language / Codex-runtime), copied to the project root (skipped if already present).
+
+Specflow is now the **canonical source** of the loop kit — projects stop hand-mirroring it; re-running `init` refreshes it. The kit reframes the practice as **type-safe**: each phase emits a typed artifact the next won't consume until it conforms (the gates *are* the type-checker), and pairs the execution loop with storing the practice durably.
+
+**Get it:** `npx @colmbyrne/specflow init .` (or re-init existing projects). Pairs with the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) skill for Gate A.
+
+---
+
 ## 0.5.1 (2026-04-09)
 
 **Fix settings.json merge dropping Edit matcher when Write already existed.**

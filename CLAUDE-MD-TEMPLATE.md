@@ -73,6 +73,10 @@ Replace placeholders in [brackets] with your project-specific information.
 **Board CLI:** [gh | jira | linear | other] (must be installed and authenticated)
 **Tech Stack:** [e.g., React + Vite + Tailwind, Supabase, Vercel]
 **Primary Focus:** [e.g., Scheduling SaaS for childcare providers]
+<!-- OPTIONAL: if your project uses Architecture Decision Records, point here.
+     When set (or auto-detected at docs/adr|adrs|ard|architecture/decisions/), GATE B requires
+     tickets to cite a resolving ADR + declare component reuse (verify-adr.cjs). Omit if unused. -->
+**ADR Location:** [e.g., docs/adr/ — or leave blank if you don't use ADRs]
 
 <!-- If this section is empty, Claude MUST ask the user for context before proceeding -->
 
