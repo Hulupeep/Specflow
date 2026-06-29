@@ -10,6 +10,8 @@ Before starting any Specflow loop work, use the installed skill:
 - Codex: `.codex/skills/specflow-loop-selector/SKILL.md`
 - Generic agents: `.agents/skills/specflow-loop-selector/SKILL.md`
 
+If the skill is not listed in the current session's tool/skill registry, do not fall back to ad hoc loop reading. Read the local `SKILL.md` file directly from the paths above. If none exists, stop and tell the human to run `npx @colmbyrne/specflow init .` or `npx @colmbyrne/specflow update .`, then restart/reload the agent session.
+
 Do not only reference `QA/loops/*.yaml`. First select the loop, then emit a concrete `run_contract` with the selected loop, goal, input artifact, current stage/rail, next gate, durable evidence, stop condition, and `never_without_human` rules.
 
 Continuation rule: keep advancing through all currently unblocked stages/rails in the same invocation. Stop only for a true human gate, a `never_without_human` action, missing required input/evidence, exhausted repair budget, external wait such as branch-protected CI, or the loop's done/handoff state. Do not stop just because the next item is a soft gate such as `GATE_B` or `GATE_B5`.

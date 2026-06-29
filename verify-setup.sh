@@ -498,8 +498,8 @@ else
 fi
 
 echo ""
-echo "9. Agent Library"
-echo "-----------------"
+echo "9. Agent Library & Loop Skills"
+echo "-------------------------------"
 
 # Check for agents directory (scripts/agents/ in target projects, agents/ in Specflow repo)
 AGENT_DIR=""
@@ -537,6 +537,35 @@ if [ -f "SKILL.md" ]; then
     check_pass "SKILL.md exists (quick-start agent alternative)"
 else
     check_info "No SKILL.md found (optional quick-start alternative to agent library)"
+fi
+
+# Check for Specflow loop selector skill in every project-local agent root.
+LOOP_SKILL_ROOTS=(".claude/skills" ".codex/skills" ".agents/skills")
+LOOP_SKILLS_FOUND=0
+for root in "${LOOP_SKILL_ROOTS[@]}"; do
+    skill="$root/specflow-loop-selector/SKILL.md"
+    if [ -f "$skill" ]; then
+        if grep -q "Mandatory Run Contract" "$skill" 2>/dev/null && grep -q "Mandatory Simulation Path" "$skill" 2>/dev/null; then
+            check_pass "$skill installed"
+            ((LOOP_SKILLS_FOUND++))
+        else
+            check_fail "$skill exists but is not the expected loop-selector skill"
+        fi
+    else
+        check_fail "$skill missing — agents may say the specflow-loop-selector skill is unavailable"
+    fi
+done
+
+if [ -f "AGENTS.md" ]; then
+    if grep -q "Specflow Loop Routing" AGENTS.md 2>/dev/null && grep -q "If the skill is not listed" AGENTS.md 2>/dev/null; then
+        check_pass "AGENTS.md includes Specflow skill fallback instructions"
+    elif grep -q "Specflow Loop Routing" AGENTS.md 2>/dev/null; then
+        check_warn "AGENTS.md has Specflow routing but lacks direct-read fallback; refresh with: npx @colmbyrne/specflow update ."
+    else
+        check_warn "AGENTS.md exists but lacks Specflow Loop Routing"
+    fi
+else
+    check_fail "AGENTS.md missing — agents do not know to read the local specflow-loop-selector skill"
 fi
 
 echo ""

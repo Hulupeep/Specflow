@@ -325,6 +325,17 @@ done
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   INSTALL_OK=false
 fi
+for skill_path in \
+  ".claude/skills/specflow-loop-selector/SKILL.md" \
+  ".codex/skills/specflow-loop-selector/SKILL.md" \
+  ".agents/skills/specflow-loop-selector/SKILL.md"; do
+  if [ ! -f "$TARGET_DIR/$skill_path" ]; then
+    INSTALL_OK=false
+  fi
+done
+if [ ! -f "$TARGET_DIR/AGENTS.md" ] || ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
+  INSTALL_OK=false
+fi
 
 if [ "$INSTALL_OK" = true ]; then
   echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
@@ -349,6 +360,13 @@ echo "  .claude/skills/specflow-loop-selector - Claude Code loop router"
 echo "  .codex/skills/specflow-loop-selector  - Codex loop router"
 echo "  .agents/skills/specflow-loop-selector - Generic agent loop router"
 echo "  AGENTS.md                         - Agent bootstrap instructions"
+echo ""
+if [ ! -f "$TARGET_DIR/.codex/skills/specflow-loop-selector/SKILL.md" ]; then
+  echo -e "${YELLOW}Skill note:${NC} specflow-loop-selector is missing from .codex/skills."
+  echo "  If you installed from a raw curl script, run instead:"
+  echo "    npx @colmbyrne/specflow init ."
+  echo "  Then restart/reload the agent session so project-local skills are indexed."
+fi
 echo ""
 
 echo -e "${YELLOW}How it works:${NC}"

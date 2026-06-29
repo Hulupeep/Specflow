@@ -105,6 +105,8 @@ describe('install-hooks.sh', () => {
       expect(agents).toContain('specflow-simulate');
       expect(agents).toContain('Continuation rule');
       expect(agents).toContain('Stop only for a true human gate');
+      expect(agents).toContain('If the skill is not listed');
+      expect(agents).toContain('Read the local `SKILL.md` file directly');
       expect(result.stdout + result.stderr).toContain('specflow-loop-selector');
     });
   });
@@ -242,6 +244,18 @@ describe('verify-setup.sh executable bit check (Bug 5 fix)', () => {
 
     // Should report "not executable" for the non-executable files
     expect(result.stderr + result.stdout).toContain('not executable');
+  });
+
+  test('flags missing loop selector skills as failures', () => {
+    const result = spawnSync('bash', [VERIFY_PATH], {
+      encoding: 'utf-8',
+      cwd: projectDir,
+      timeout: 10000,
+    });
+
+    const output = result.stderr + result.stdout;
+    expect(output).toContain('specflow-loop-selector/SKILL.md missing');
+    expect(output).toContain('agents may say the specflow-loop-selector skill is unavailable');
   });
 
   test('passes executable hook scripts', () => {
