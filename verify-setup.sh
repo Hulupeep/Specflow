@@ -6,13 +6,13 @@
 # has been set up correctly in your project.
 #
 # Usage:
-#   ./verify-setup.sh
+#   ./verify-setup.sh [--strict]
 #
 # Run this from your project root after setting up Specflow.
 #
 # Exit codes:
-#   0 - All checks passed (or only warnings)
-#   1 - Critical checks failed
+#   0 - Install checks passed (warnings and project-readiness blockers may remain)
+#   1 - Install checks failed, or --strict found project-readiness blockers
 
 echo "🔍 Specflow Infrastructure Verification"
 echo "========================================"
@@ -27,7 +27,15 @@ NC='\033[0m' # No Color
 
 PASS=0
 FAIL=0
+PROJECT_FAIL=0
 WARN=0
+STRICT=0
+
+for arg in "$@"; do
+    if [ "$arg" = "--strict" ]; then
+        STRICT=1
+    fi
+done
 
 check_pass() {
     echo -e "${GREEN}✅ $1${NC}"
@@ -37,6 +45,11 @@ check_pass() {
 check_fail() {
     echo -e "${RED}❌ $1${NC}"
     ((FAIL++))
+}
+
+check_project_fail() {
+    echo -e "${RED}❌ $1${NC}"
+    ((PROJECT_FAIL++))
 }
 
 check_warn() {
@@ -227,15 +240,15 @@ if [ -f "CLAUDE.md" ]; then
             check_pass "Repository filled in: $DECLARED_REPO"
         fi
     elif grep -q '\[org/repo-name\]' CLAUDE.md 2>/dev/null; then
-        check_fail "Repository is placeholder [org/repo-name] — agents can't find your issues"
+        check_project_fail "Repository is placeholder [org/repo-name] — agents can't find your issues"
     else
-        check_fail "Repository missing — agents can't run gh commands against your repo"
+        check_project_fail "Repository missing — agents can't run gh commands against your repo"
     fi
 
     if grep -q '^\*\*Project Board:\*\*' CLAUDE.md 2>/dev/null && ! grep -q '\[GitHub Issues | Jira' CLAUDE.md 2>/dev/null; then
         check_pass "Project Board filled in"
     else
-        check_fail "Project Board missing or placeholder — agents don't know where issues are tracked"
+        check_project_fail "Project Board missing or placeholder — agents don't know where issues are tracked"
     fi
 
     if grep -q '^\*\*Board CLI:\*\*' CLAUDE.md 2>/dev/null && ! grep -q '\[gh | jira' CLAUDE.md 2>/dev/null; then
@@ -244,12 +257,12 @@ if [ -f "CLAUDE.md" ]; then
         if [ -n "$DECLARED_CLI" ] && command -v "$DECLARED_CLI" &> /dev/null; then
             check_pass "Board CLI: $DECLARED_CLI (installed)"
         elif [ -n "$DECLARED_CLI" ]; then
-            check_fail "Board CLI: $DECLARED_CLI is declared but NOT INSTALLED — hooks will crash when fetching issues"
+            check_project_fail "Board CLI: $DECLARED_CLI is declared but NOT INSTALLED — hooks will crash when fetching issues"
         else
             check_pass "Board CLI filled in"
         fi
     else
-        check_fail "Board CLI missing or placeholder — all issue automation broken"
+        check_project_fail "Board CLI missing or placeholder — all issue automation broken"
     fi
 
     # Rule 2: commits must reference issue — journey tests depend on this
@@ -318,7 +331,7 @@ if [ -f "CLAUDE.md" ]; then
         check_warn "Missing override protocol — Claude may override contracts without explicit human approval"
     fi
 else
-    check_fail "No CLAUDE.md found — Claude has no Specflow context. Run: npx @colmbyrne/specflow init ."
+    check_project_fail "No CLAUDE.md found — Claude has no Specflow context. Run: npx @colmbyrne/specflow init ."
 fi
 
 echo ""
@@ -646,7 +659,7 @@ if [ -n "$CONTRACT_DIR" ] && [ "$CONTRACT_COUNT" -gt 0 ]; then
             if [ -f "$TEST_REF" ]; then
                 check_pass "$(basename "$contract") → $TEST_REF exists"
             else
-                check_fail "$(basename "$contract") → $TEST_REF NOT FOUND"
+                check_project_fail "$(basename "$contract") → $TEST_REF NOT FOUND"
                 ((BROKEN_REFS++))
             fi
         fi
@@ -687,7 +700,7 @@ if [ -n "$GRAPH_SCRIPT" ] && command -v node &> /dev/null && [ -n "$CONTRACT_DIR
     if [ "$GRAPH_EXIT" -eq 0 ]; then
         check_pass "Graph validation passed"
     else
-        check_fail "Graph validation failed — run: node $GRAPH_SCRIPT $CONTRACT_DIR"
+        check_project_fail "Graph validation failed — run: node $GRAPH_SCRIPT $CONTRACT_DIR"
     fi
 elif [ -n "$SPECFLOW_GRAPH" ] && command -v node &> /dev/null && [ -n "$CONTRACT_DIR" ]; then
     check_info "Graph validator available at $SPECFLOW_GRAPH"
@@ -738,27 +751,32 @@ else
         fi
     done
 
-    # Git hooks (different install path)
-    GIT_HOOK_CHECKS=(
-        "commit-msg|HIGH|Commits without #issue accepted — journey tests silently skip"
-        "pre-push|HIGH|Stale-base pushes allowed — stale branches can re-introduce fixed bugs"
-    )
-    for entry in "${GIT_HOOK_CHECKS[@]}"; do
-        IFS='|' read -r name severity impact <<< "$entry"
-        src_path="$SPECFLOW_SRC/hooks/$name"
-        local_path=".git/hooks/$name"
-        if [ -f "$local_path" ] && [ -f "$src_path" ]; then
-            if diff -q "$local_path" "$src_path" > /dev/null 2>&1; then
-                printf "  ${GREEN}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "✅ current" "$severity" ""
-            else
-                printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "⚠ OUTDATED" "$severity" "$impact"
-                ((OUTDATED++))
+    # Git hooks (different install path). They are install-critical only inside a git repo;
+    # install-hooks.sh intentionally skips them for non-git directories.
+    if [ -d ".git" ]; then
+        GIT_HOOK_CHECKS=(
+            "commit-msg|HIGH|Commits without #issue accepted — journey tests silently skip"
+            "pre-push|HIGH|Stale-base pushes allowed — stale branches can re-introduce fixed bugs"
+        )
+        for entry in "${GIT_HOOK_CHECKS[@]}"; do
+            IFS='|' read -r name severity impact <<< "$entry"
+            src_path="$SPECFLOW_SRC/hooks/$name"
+            local_path=".git/hooks/$name"
+            if [ -f "$local_path" ] && [ -f "$src_path" ]; then
+                if diff -q "$local_path" "$src_path" > /dev/null 2>&1; then
+                    printf "  ${GREEN}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "✅ current" "$severity" ""
+                else
+                    printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "⚠ OUTDATED" "$severity" "$impact"
+                    ((OUTDATED++))
+                fi
+            elif [ -f "$src_path" ]; then
+                printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "❌ MISSING" "$severity" "$impact"
+                ((MISSING_LOCAL++))
             fi
-        elif [ -f "$src_path" ]; then
-            printf "  ${RED}%-32s %-10s %-10s %s${NC}\n" "$name (.git/hooks)" "❌ MISSING" "$severity" "$impact"
-            ((MISSING_LOCAL++))
-        fi
-    done
+        done
+    else
+        check_info "Not a git repo — skipping .git/hooks version check"
+    fi
 
     # settings.json hook wiring — subset check (verify each required matcher is present)
     if [ -f ".claude/settings.json" ] && command -v jq &> /dev/null; then
@@ -812,15 +830,23 @@ echo "Summary"
 echo "========================================"
 echo -e "${GREEN}Passed:   $PASS${NC}"
 echo -e "${YELLOW}Warnings: $WARN${NC}"
-echo -e "${RED}Failed:   $FAIL${NC}"
+echo -e "${RED}Install failures: $FAIL${NC}"
+echo -e "${RED}Project readiness blockers: $PROJECT_FAIL${NC}"
 echo ""
 
 if [ $FAIL -eq 0 ]; then
     if [ $WARN -eq 0 ]; then
-        echo -e "${GREEN}✅ Perfect! Specflow infrastructure is fully configured.${NC}"
+        echo -e "${GREEN}✅ Specflow install checks passed.${NC}"
     else
-        echo -e "${YELLOW}⚠️  Specflow is set up with minor recommendations.${NC}"
+        echo -e "${YELLOW}⚠️  Specflow install checks passed with minor recommendations.${NC}"
         echo "   Review warnings above to improve your setup."
+    fi
+    if [ $PROJECT_FAIL -gt 0 ]; then
+        echo ""
+        echo -e "${YELLOW}Project readiness is not complete: $PROJECT_FAIL blocker(s) remain.${NC}"
+        echo "   These are app/repo-specific follow-ups, not failed Specflow installation."
+        echo "   Run strict mode when you want project readiness to block:"
+        echo "     npx @colmbyrne/specflow verify --strict"
     fi
     echo ""
     echo "Quick commands:"
@@ -836,11 +862,15 @@ if [ $FAIL -eq 0 ]; then
     echo "  11:   Contract metadata integrity (test file references)"
     echo "  12:   Graph validator (cross-reference integrity)"
     echo "  13:   Version check (local vs Specflow source)"
+    if [ "$STRICT" -eq 1 ] && [ $PROJECT_FAIL -gt 0 ]; then
+        echo -e "${RED}❌ Strict verification failed on project readiness blockers.${NC}"
+        exit 1
+    fi
     exit 0
 else
-    echo -e "${RED}❌ Specflow setup has issues that need attention.${NC}"
+    echo -e "${RED}❌ Specflow installation has issues that need attention.${NC}"
     echo ""
-    echo "Fix the failed checks above, then run this script again."
+    echo "Fix the install failures above, then run this script again."
     echo ""
     echo "Need help? See:"
     echo "  - QUICKSTART.md for getting started"

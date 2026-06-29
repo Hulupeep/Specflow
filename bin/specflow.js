@@ -36,11 +36,12 @@ const COMMANDS = {
     },
   },
   verify: {
-    usage: 'specflow verify',
-    desc: 'Check Specflow installation (hooks, contracts, version)',
-    run: () => {
+    usage: 'specflow verify [--strict]',
+    desc: 'Check Specflow installation; --strict also fails on project-readiness blockers',
+    run: (args) => {
+      const strictFlag = args.includes('--strict') ? '--strict' : '';
       normalizeShellScripts(SPECFLOW_ROOT);
-      exec(`bash "${SPECFLOW_ROOT}/verify-setup.sh"`);
+      exec(`bash "${SPECFLOW_ROOT}/verify-setup.sh" ${strictFlag}`);
     },
   },
   update: {

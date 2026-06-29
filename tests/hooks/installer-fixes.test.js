@@ -109,6 +109,31 @@ describe('install-hooks.sh', () => {
       expect(agents).toContain('Read the local `SKILL.md` file directly');
       expect(result.stdout + result.stderr).toContain('specflow-loop-selector');
     });
+
+    test('verify separates install health from project readiness blockers', () => {
+      const install = runInstaller();
+      expect(install.status).toBe(0);
+      fs.mkdirSync(path.join(targetDir, 'docs', 'contracts'), { recursive: true });
+
+      const normal = spawnSync('bash', [VERIFY_PATH], {
+        encoding: 'utf-8',
+        cwd: targetDir,
+        timeout: 10000,
+      });
+      const normalOutput = normal.stderr + normal.stdout;
+      expect(normal.status).toBe(0);
+      expect(normalOutput).toContain('Specflow install checks passed');
+      expect(normalOutput).toContain('Project readiness blockers:');
+      expect(normalOutput).toContain('No CLAUDE.md found');
+
+      const strict = spawnSync('bash', [VERIFY_PATH, '--strict'], {
+        encoding: 'utf-8',
+        cwd: targetDir,
+        timeout: 10000,
+      });
+      expect(strict.status).toBe(1);
+      expect(strict.stderr + strict.stdout).toContain('Strict verification failed');
+    });
   });
 
   describe('session-start.sh installed', () => {
