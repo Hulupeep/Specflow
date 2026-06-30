@@ -54,6 +54,7 @@ npx @colmbyrne/specflow init .          # Set up everything (safe to re-run)
 npx @colmbyrne/specflow update . --ci   # Update hooks + install CI workflows
 npx @colmbyrne/specflow verify          # Check installation (13 sections)
 npx @colmbyrne/specflow audit 500       # Audit issue #500 for compliance
+npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md
 npx @colmbyrne/specflow graph           # Validate contract cross-references
 ```
 
@@ -94,6 +95,7 @@ journey tests enforce it on every build, so it can't drift back.
 |-------|-------------|
 | **Contract tests** | YAML rules scan source for forbidden patterns — break a rule, build fails |
 | **Journey tests** | Playwright tests for critical user flows — if a journey doesn't pass, the feature isn't done |
+| **Loop runner** | `specflow run` writes a durable run contract and ledger so agents execute the loop instead of referencing it |
 | **Hooks** | Auto-trigger tests on build/commit, catch violations on Write/Edit, reject commits without issue numbers |
 | **CI workflows** | PR compliance gate + post-merge audit — no contract violations merge to main |
 | **30+ agents** | Orchestrate wave execution, write contracts, audit boards, simulate specs |
@@ -111,6 +113,24 @@ DISCOVER → PRD → [GATE A: adversary] → TICKETS → [Specflow: GATE B/B.5] 
 ```
 
 Gate A (the hostile critic) is a separate skill — the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer). Specflow doesn't require it, but the pipeline pairs them. The loop runs whole on either runtime — Claude Code (`Workflow`) or Codex (automations); see `PROCESS-CLAUDE.md` / `PROCESS-CODEX.md`. The path (`QA/loops/*.yaml`) is the source of truth; each runtime is a binding of it. **Muscle never self-approves — Gate A (a hostile critic) and Gate C (CI on a real backend) decide.**
+
+### Prompt vs contracted loop
+
+A prompt is one instruction. A Specflow loop is a job contract: goal, input,
+current stage, next gate, durable evidence, stop condition, and
+`never_without_human` rules. `specflow run` makes that contract visible on disk
+under `.specflow/runs/<slug>/run-contract.yaml` and appends progress to
+`.specflow/runs/<slug>/ledger.jsonl`.
+
+The local runner is not a hosted scheduler. It runs or records the next bounded
+step, preserves state, and stops when a human gate, missing evidence, failed
+gate, or `agent_action_required` state is reached.
+
+For generative stages, an optional adapter policy can delegate one turn to an
+operator-owned CLI such as Claude Code (`claude -p`) or Codex (`codex exec`).
+Those CLIs keep their own authentication and subscriptions; Specflow stores no
+Claude/Codex subscription secrets. Provider output is never itself a gate result:
+the owning Specflow verifier must rerun before the run contract advances.
 
 ### The three loops (`QA/loops/`)
 

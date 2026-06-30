@@ -1,0 +1,38 @@
+{
+  "issues": [77, 78, 80],
+  "feature_build": "loop runtime, positioning, and generative adapter",
+  "source_provenance": [
+    {
+      "claim": "specflow run writes a durable run contract and ledger",
+      "source": "scripts/specflow-runner.cjs",
+      "verification": "tests/contracts/loop-run-contract.test.js creates a temporary run and re-reads run-contract.yaml plus ledger.jsonl"
+    },
+    {
+      "claim": "generative stages stop safely by default",
+      "source": "scripts/specflow-runner.cjs",
+      "verification": "CLI smoke test returned agent_action_required and ledger stop_reason agent_action_required"
+    },
+    {
+      "claim": "adapter output cannot self-approve a gate",
+      "source": "scripts/specflow-runner.cjs",
+      "verification": "fake provider success returns gate_rerun_required and records owning_gate_command"
+    },
+    {
+      "claim": "forbidden human-gate actions block state advance",
+      "source": "scripts/specflow-runner.cjs",
+      "verification": "fake provider output containing git push returns blocked_human_required"
+    },
+    {
+      "claim": "Claude and Codex adapter command shapes are grounded in local CLI help",
+      "source": "claude --help and codex exec --help, checked 2026-06-30",
+      "verification": "provider builder tests assert claude -p and codex exec JSON command construction"
+    }
+  ],
+  "checks": [
+    "npx jest tests/contracts/loop-run-contract.test.js --no-coverage --runInBand",
+    "node bin/specflow.js run spec-build --slug smoke --goal 'ready tickets' --input docs/idea.md --contract <tmp>/run-contract.yaml --ledger <tmp>/ledger.jsonl",
+    "npm test -- --runInBand"
+  ],
+  "result": "pass",
+  "notes": "No live Claude or Codex model call was used in tests. Adapter coverage uses fake provider fixtures by default."
+}

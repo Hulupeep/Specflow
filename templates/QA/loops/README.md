@@ -53,6 +53,12 @@ prompts/               examples/               ← the PROMPTS (thin: goal + inp
 **A loop = path + thin prompt + automation (the tick) + durable state (committed artifacts).**
 The path lives in the YAML. The prompt only carries *goal + inputs + automation* and says "follow the path." It never restates the stages. The YAML is the source of truth — if a prose doc disagrees, the YAML wins.
 
+`specflow run` is the local contracted-loop runner. It writes
+`.specflow/runs/<slug>/run-contract.yaml` plus `.specflow/runs/<slug>/ledger.jsonl`
+so an agent cannot merely cite this folder and improvise. A prompt is one
+instruction; a Specflow loop is a persisted job contract with verifier gates,
+state, evidence, and stop rules.
+
 ## Run the whole pipeline, in order
 
 1. **Spec-build** — turn a rough idea / discovery into defensible tickets.
@@ -80,8 +86,28 @@ See [`examples/tt-rollback.spec-build.md`](examples/tt-rollback.spec-build.md) f
 
 ## Two rules that make it trustworthy
 
-- **One gate per tick.** Each run locates where it is from committed artifacts, advances exactly one gate, persists, then stops/escalates. State lives in files (PRD, verdict, tickets, evidence) — never only in chat.
+- **Continue until done or truly blocked.** Each run locates where it is from
+  durable artifacts, advances every currently unblocked stage/rail, persists
+  after each gate, then stops only on a true human gate, missing evidence,
+  exhausted budget, external CI wait, or handoff/done state. State lives in files
+  (run contract, ledger, PRD, verdict, tickets, evidence) — never only in chat.
 - **Muscle never approves its own work.** Agents and the swarm do the work; trust lives only in **Gate A** (one hostile critic) and **Gate C** (branch-protected CI vs a real backend).
+
+## Generative stage adapters
+
+Some loop stages require writing or judgment. By default `specflow run` stops
+there with `agent_action_required`. To execute one generative stage under tight
+controls, provide an adapter policy for a local CLI runtime:
+
+- Claude Code: `claude -p`
+- Codex: `codex exec`
+
+The provider CLI owns authentication and subscription use. Specflow stores no
+subscription secrets. The adapter policy must name command args, timeout,
+budget where supported, transcript path, output path, allowed/denied tools, and
+`never_without_human`. The runner records transcript evidence, blocks forbidden
+actions outside the provider prompt, and requires the owning Specflow gate to
+rerun before state advances.
 
 ## Which repo do I run in?
 
