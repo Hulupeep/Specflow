@@ -1,0 +1,8 @@
+{
+  "command": "node bin/specflow.js run spec-build --slug genuine-looper --contract .specflow/runs/smoke-gateb/run-contract.yaml --ledger .specflow/runs/smoke-gateb/ledger.jsonl --spec-dir docs/specs/genuine-looper --until-terminal --max-iterations 4",
+  "result": "pass",
+  "status": "agent_action_required",
+  "iterations": 2,
+  "observed_sequence": ["gate_passed", "agent_action_required"],
+  "advanced_to": "GATE_B5"
+}

@@ -1,0 +1,12 @@
+{
+  "command": "node bin/specflow.js run status --contract .specflow/runs/smoke-gateb/run-contract.yaml",
+  "result": "pass",
+  "current_stage_or_rail": "GATE_B5",
+  "terminal_status": "blocked",
+  "ledger_entries_observed": [
+    "verify-seams",
+    "verify-adr",
+    "verify-ticket-journey",
+    "agent_action_required prompt"
+  ]
+}

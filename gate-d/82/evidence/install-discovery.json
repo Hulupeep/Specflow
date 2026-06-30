@@ -1,0 +1,14 @@
+{
+  "command": "node bin/specflow.js init /tmp/specflow-install-smoke && bash verify-setup.sh from the installed target",
+  "result": "pass",
+  "install_failures": 0,
+  "project_readiness_blockers": 3,
+  "installed_assets": [
+    ".claude/skills/specflow-loop-selector/SKILL.md",
+    ".codex/skills/specflow-loop-selector/SKILL.md",
+    ".agents/skills/specflow-loop-selector/SKILL.md",
+    ".specflow/adapter-policies/claude-print.safe.yml",
+    ".specflow/adapter-policies/codex-exec.safe.yml"
+  ],
+  "note": "The three readiness blockers are expected placeholder repository/board fields in a blank smoke target, not install failures."
+}
