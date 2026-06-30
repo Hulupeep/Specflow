@@ -143,16 +143,44 @@ const COMMANDS = {
     },
   },
   provenance: {
-    usage: 'specflow provenance <provenance.json>',
+    usage: 'specflow provenance <provenance.json> [--diff file|--git-diff|--staged-diff]',
     desc: 'Verify source provenance evidence for a feature-build slice',
     run: (args) => {
       const file = args[0];
       if (!file) {
-        console.error('Usage: specflow provenance <provenance.json>');
+        console.error('Usage: specflow provenance <provenance.json> [--diff file|--git-diff|--staged-diff]');
         process.exit(2);
       }
       const script = resolve(SPECFLOW_ROOT, 'scripts', 'provenance-gate.cjs');
-      exec(`node "${script}" "${resolve(file)}"`);
+      const rest = args.slice(1).map((arg) => arg.startsWith('--') ? arg : `"${resolve(arg)}"`).join(' ');
+      exec(`node "${script}" "${resolve(file)}" ${rest}`);
+    },
+  },
+  'ci-status': {
+    usage: 'specflow ci-status <pr-number>',
+    desc: 'Read GitHub PR check status for Gate C triage',
+    run: (args) => {
+      const pr = args[0];
+      if (!pr || !/^\d+$/.test(pr)) {
+        console.error('Usage: specflow ci-status <pr-number>');
+        process.exit(2);
+      }
+      const raw = execSilent(`gh pr checks ${pr} --json name,state,conclusion,link`);
+      if (!raw) {
+        console.error(`Could not read PR #${pr} checks. Verify gh auth and repo context.`);
+        process.exit(1);
+      }
+      const checks = JSON.parse(raw);
+      const failing = checks.filter((check) => ['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(String(check.conclusion || check.state || '').toUpperCase()));
+      const pending = checks.filter((check) => ['PENDING', 'QUEUED', 'IN_PROGRESS', 'WAITING'].includes(String(check.state || '').toUpperCase()));
+      console.log(JSON.stringify({
+        pr: Number(pr),
+        total: checks.length,
+        failing: failing.map((check) => ({ name: check.name, state: check.state, conclusion: check.conclusion, link: check.link })),
+        pending: pending.map((check) => ({ name: check.name, state: check.state, conclusion: check.conclusion, link: check.link })),
+        gate_c: failing.length ? 'red' : (pending.length ? 'pending' : 'green'),
+      }, null, 2));
+      if (failing.length) process.exit(1);
     },
   },
   'adapter-smoke': {
@@ -216,8 +244,9 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
-  console.log('  npx @colmbyrne/specflow provenance evidence/provenance-77-78-80.json');
+  console.log('  npx @colmbyrne/specflow provenance evidence/provenance-77-78-80.json --git-diff');
   console.log('  npx @colmbyrne/specflow adapter-smoke claude-print --dry-run');
+  console.log('  npx @colmbyrne/specflow ci-status 76');
   console.log('  npx @colmbyrne/specflow graph\n');
   process.exit(0);
 }

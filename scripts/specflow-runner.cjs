@@ -169,7 +169,24 @@ function isSimulationFresh({ simulationPath, inputPaths = [] }) {
   return { ok: true, reason: null };
 }
 
-function loopSequence(contract) {
+function loadLoopDefinition(contractOrLoop, options = {}) {
+  const loop = typeof contractOrLoop === 'string' ? contractOrLoop : contractOrLoop.loop;
+  const definitionPath = (typeof contractOrLoop === 'object' && contractOrLoop.path) || LOOP_PATHS[loop];
+  if (!definitionPath) return null;
+  const root = options.root || process.cwd();
+  const absolute = resolve(root, definitionPath);
+  if (!existsSync(absolute)) return null;
+  return loadDataFile(absolute);
+}
+
+function loopSequenceFromDefinition(definition) {
+  if (!definition || typeof definition !== 'object') return [];
+  const collection = Array.isArray(definition.stages) ? definition.stages : definition.rails;
+  if (!Array.isArray(collection)) return [];
+  return collection.map((item) => item && item.id).filter(Boolean);
+}
+
+function fallbackLoopSequence(contract) {
   if (contract.loop === 'feature-build') {
     return ['1_ticket', '2_contract', '3_e2e', '4_oracle', '5_impl', '6_provenance', '7_ci_handoff'];
   }
@@ -179,8 +196,13 @@ function loopSequence(contract) {
   return [];
 }
 
-function nextStage(contract) {
-  const sequence = loopSequence(contract);
+function loopSequence(contract, options = {}) {
+  const fromDefinition = loopSequenceFromDefinition(loadLoopDefinition(contract, options));
+  return fromDefinition.length ? fromDefinition : fallbackLoopSequence(contract);
+}
+
+function nextStage(contract, options = {}) {
+  const sequence = loopSequence(contract, options);
   const index = sequence.indexOf(contract.current_stage_or_rail);
   if (index === -1 || index === sequence.length - 1) return contract.current_stage_or_rail;
   return sequence[index + 1];
@@ -260,6 +282,51 @@ function executeVerifierRegistry(contract, options = {}) {
   return { status: 'gate_passed', entries, advance: true };
 }
 
+function materializeStagePrompt(contract, options = {}) {
+  const stage = contract.current_stage_or_rail || 'stage';
+  const safeStage = String(stage).replace(/[^a-z0-9._-]+/gi, '-');
+  const baseDir = options.promptDir
+    || join(dirname(options.contractPath || contract.storage?.contract_path || defaultRunPaths(options.slug || 'specflow-run').contractPath), 'prompts');
+  const promptPath = options.promptPath || join(baseDir, `${safeStage}.md`);
+  const definition = loadLoopDefinition(contract, options);
+  const sequence = loopSequence(contract, options);
+  const next = nextStage(contract, options);
+  const stageSpec = [
+    ...(Array.isArray(definition?.stages) ? definition.stages : []),
+    ...(Array.isArray(definition?.rails) ? definition.rails : []),
+  ].find((item) => item && item.id === stage);
+  const content = [
+    `# Specflow ${contract.loop} Stage Prompt`,
+    '',
+    `Goal: ${contract.goal}`,
+    `Input artifact: ${contract.input_artifact}`,
+    `Current stage: ${stage}`,
+    `Next stage: ${next}`,
+    `Next gate: ${contract.next_gate}`,
+    '',
+    '## Contract Rules',
+    `- Loop path: ${contract.path}`,
+    `- Stop condition: ${contract.stop_condition}`,
+    `- Never without human: ${(contract.never_without_human || []).join(', ') || 'none declared'}`,
+    `- Durable evidence: ${(contract.durable_evidence || []).join(', ') || 'none declared'}`,
+    '',
+    '## Stage Definition',
+    stageSpec ? yaml.dump(stageSpec, { lineWidth: 120, noRefs: true }).trim() : 'No YAML stage body found; use the run contract and next gate.',
+    '',
+    '## Required Behavior',
+    '- Execute only this stage or rail.',
+    '- Persist durable evidence before claiming progress.',
+    '- Do not mark the gate passed yourself; rerun the owning Specflow verifier after work.',
+    '- Stop immediately if a never_without_human action would be required.',
+    '',
+    `Sequence: ${sequence.join(' -> ')}`,
+    '',
+  ].join('\n');
+  ensureDir(promptPath);
+  writeFileSync(promptPath, content, 'utf8');
+  return { promptPath, content };
+}
+
 function resolveTemplate(value, context) {
   return String(value).replace(/<slug>/g, context.slug || 'run').replace(/\$\{slug\}/g, context.slug || 'run');
 }
@@ -277,6 +344,8 @@ function normalizeAdapterPolicy(raw, context = {}) {
     args: policy.args || [],
     allowed_tools: policy.allowed_tools || [],
     denied_tools: policy.denied_tools || [],
+    prompt: policy.prompt || null,
+    session_id: policy.session_id || null,
     dry_run: Boolean(policy.dry_run),
     transcript_path: resolveTemplate(policy.transcript_path, context),
     output_path: resolveTemplate(policy.output_path, context),
@@ -299,17 +368,24 @@ function buildAdapterCommand(policy, promptPath) {
     if (deniedTools.length && !args.includes('--disallowedTools') && !args.includes('--disallowed-tools')) {
       args.push('--disallowedTools', deniedTools.join(','));
     }
+    if (policy.session_id && !args.includes('--resume') && !args.includes('--session-id')) {
+      args.push('--resume', String(policy.session_id));
+    }
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
+    else if (policy.prompt) args.push(String(policy.prompt));
     return { command: policy.command || 'claude', args };
   }
 
   if (policy.provider === 'codex-exec') {
-    const args = ['exec', ...(policy.args || [])];
+    const args = policy.session_id
+      ? ['exec', 'resume', String(policy.session_id), ...(policy.args || [])]
+      : ['exec', ...(policy.args || [])];
     if (!args.includes('--json')) args.push('--json');
     if (policy.model && !args.includes('--model')) args.push('--model', String(policy.model));
     if (policy.profile && !args.includes('--profile')) args.push('--profile', String(policy.profile));
     if (policy.output_schema && !args.includes('--output-schema')) args.push('--output-schema', String(policy.output_schema));
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
+    else if (policy.prompt) args.push(String(policy.prompt));
     return { command: policy.command || 'codex', args };
   }
 
@@ -479,23 +555,29 @@ function runLoop(options) {
 
   if (options.adapterPolicy) {
     const policy = normalizeAdapterPolicy(loadDataFile(options.adapterPolicy), { slug });
+    const prompt = options.prompt ? { promptPath: options.prompt } : materializeStagePrompt(contract, { ...options, contractPath, slug });
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
-      promptPath: options.prompt,
+      promptPath: prompt.promptPath,
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
     });
-    appendLedger(ledgerPath, adapterResult.entry);
+    appendLedger(ledgerPath, { ...adapterResult.entry, prompt_path: prompt.promptPath });
     contract.terminal_status = adapterResult.status === 'gate_rerun_required' ? 'in_progress' : 'blocked';
     contract.current_stage_or_rail = adapterResult.status === 'gate_rerun_required' ? contract.current_stage_or_rail : contract.current_stage_or_rail;
+    if (adapterResult.entry && adapterResult.entry.session_id) contract.provider_session_id = adapterResult.entry.session_id;
     writeYaml(contractPath, { run_contract: contract });
     return { ...adapterResult, contractPath, ledgerPath };
   }
 
   const registryResult = executeVerifierRegistry(contract, options);
-  for (const entry of registryResult.entries) appendLedger(ledgerPath, entry);
+  let promptPath = null;
+  if (registryResult.status === 'agent_action_required') {
+    promptPath = materializeStagePrompt(contract, { ...options, contractPath, slug }).promptPath;
+  }
+  for (const entry of registryResult.entries) appendLedger(ledgerPath, promptPath ? { ...entry, prompt_path: promptPath } : entry);
   if (registryResult.advance) {
-    contract.current_stage_or_rail = nextStage(contract);
+    contract.current_stage_or_rail = nextStage(contract, options);
     contract.next_gate = `advance to ${contract.current_stage_or_rail}`;
     contract.terminal_status = contract.current_stage_or_rail === 'handoff' ? 'handoff' : 'in_progress';
   } else {
@@ -503,6 +585,68 @@ function runLoop(options) {
   }
   writeYaml(contractPath, { run_contract: contract });
   return { status: registryResult.status, contractPath, ledgerPath };
+}
+
+function readLedgerTail(ledgerPath, limit = 10) {
+  if (!existsSync(ledgerPath)) return [];
+  const lines = readFileSync(ledgerPath, 'utf8').trim().split(/\r?\n/).filter(Boolean);
+  return lines.slice(Math.max(0, lines.length - limit)).map((line) => JSON.parse(line));
+}
+
+function runStatus(options = {}) {
+  const contractPath = options.contract;
+  if (!contractPath || !existsSync(contractPath)) {
+    return { status: 'missing_contract', error: 'specflow run status requires --contract <path>' };
+  }
+  const contract = loadRunContract(contractPath);
+  const ledgerPath = options.ledger || contract.storage?.ledger_path || join(dirname(contractPath), 'ledger.jsonl');
+  return {
+    status: 'ok',
+    contract_path: contractPath,
+    ledger_path: ledgerPath,
+    loop: contract.loop,
+    current_stage_or_rail: contract.current_stage_or_rail,
+    next_gate: contract.next_gate,
+    terminal_status: contract.terminal_status || 'unknown',
+    sequence: loopSequence(contract, options),
+    ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
+  };
+}
+
+function isTerminalStatus(status) {
+  return [
+    'agent_action_required',
+    'gate_failed',
+    'invalid_contract',
+    'adapter_unavailable',
+    'adapter_failed',
+    'blocked_human_required',
+    'dry_run',
+  ].includes(status);
+}
+
+function runUntilTerminal(options = {}) {
+  const maxIterations = Number(options.maxIterations || 8);
+  const iterations = [];
+  for (let i = 0; i < maxIterations; i += 1) {
+    const result = runLoop({ ...options, untilTerminal: false });
+    iterations.push(result);
+    if (isTerminalStatus(result.status)) {
+      return { status: result.status, iterations: i + 1, results: iterations, contractPath: result.contractPath, ledgerPath: result.ledgerPath };
+    }
+    const contract = loadRunContract(result.contractPath);
+    if (contract.terminal_status === 'handoff') {
+      return { status: 'handoff', iterations: i + 1, results: iterations, contractPath: result.contractPath, ledgerPath: result.ledgerPath };
+    }
+  }
+  const last = iterations[iterations.length - 1] || {};
+  return {
+    status: 'iteration_budget_exhausted',
+    iterations: maxIterations,
+    results: iterations,
+    contractPath: last.contractPath,
+    ledgerPath: last.ledgerPath,
+  };
 }
 
 function planAdapterSmoke(provider, options = {}) {
@@ -518,6 +662,7 @@ function planAdapterSmoke(provider, options = {}) {
     transcript_path: `.specflow/runs/adapter-smoke/${provider}.jsonl`,
     output_path: `.specflow/runs/adapter-smoke/${provider}-final.md`,
     never_without_human: ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
+    prompt: 'Reply with SPECFLOW_ADAPTER_SMOKE_OK only. Do not edit files or run commands.',
     dry_run: !options.live,
   });
   const planned = buildAdapterCommand(policy);
@@ -528,14 +673,20 @@ function cli(argv = process.argv.slice(2)) {
   const opts = parseKeyValueArgs(argv);
   const loop = opts._[0];
   if (!loop) {
-    console.error('Usage: specflow run <loop> --slug <slug> --goal <goal> --input <path> [--contract path] [--ledger path] [--adapter-policy path] [--adapter-dry-run]');
+    console.error('Usage: specflow run <loop|status> --slug <slug> --goal <goal> --input <path> [--contract path] [--until-terminal] [--max-iterations n]');
     return 2;
   }
   try {
-    const result = runLoop({ ...opts, loop });
+    const result = loop === 'status'
+      ? runStatus(opts)
+      : (opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop }));
     if (result.status === 'invalid_contract') {
       console.error(`specflow run failed: ${result.errors.join('; ')}`);
       return 1;
+    }
+    if (result.status === 'missing_contract') {
+      console.error(result.error);
+      return 2;
     }
     console.log(JSON.stringify(result, null, 2));
     return 0;
@@ -560,11 +711,18 @@ module.exports = {
   parseProviderEvents,
   forbiddenFromProviderEvents,
   isSimulationFresh,
+  loadLoopDefinition,
+  loopSequence,
+  loopSequenceFromDefinition,
+  nextStage,
   verifierCommandsForStage,
   executeVerifierRegistry,
+  materializeStagePrompt,
   planAdapterSmoke,
   runAdapter,
   runLoop,
+  runStatus,
+  runUntilTerminal,
   cli,
 };
 

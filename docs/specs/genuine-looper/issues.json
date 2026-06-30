@@ -1,0 +1,7 @@
+[
+  {
+    "number": 82,
+    "title": "[SPECFLOW] Genuine looper runtime completion",
+    "body": "Journey IDs: J-LOOP-UNTIL-TERMINAL, J-LOOP-YAML-SEQUENCE, J-GEN-STAGE-PROMPT, J-GEN-SESSION-RESUME, J-GEN-LIVE-SMOKE, J-PROVENANCE-DIFF, J-GATEC-STATUS, J-LOOP-RUN-STATUS, J-INSTALL-LOOP-COMPLETE\n\nSee docs/specs/genuine-looper/tickets.md for the local ticket packet."
+  }
+]

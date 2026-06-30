@@ -9,10 +9,15 @@ const {
   executeVerifierRegistry,
   forbiddenFromProviderEvents,
   isSimulationFresh,
+  loopSequence,
+  materializeStagePrompt,
   normalizeAdapterPolicy,
   parseProviderEvents,
+  planAdapterSmoke,
   runAdapter,
   runLoop,
+  runStatus,
+  runUntilTerminal,
   validateRunContract,
 } = require('../../scripts/specflow-runner.cjs');
 
@@ -109,6 +114,102 @@ describe('local contracted loop runner', () => {
     expect(result.ok).toBe(false);
     expect(result.errors[0]).toContain('unsupported');
   });
+
+  test('loads stage order from loop YAML instead of only hardcoded defaults', () => {
+    const sequence = loopSequence({
+      loop: 'spec-build',
+      path: 'templates/QA/loops/spec-build.yaml',
+      current_stage_or_rail: 'GATE_B',
+    });
+
+    expect(sequence).toEqual(['discover', 'draft', 'adversary', 'GATE_A', 'tickets', 'GATE_B', 'GATE_B5']);
+  });
+
+  test('materializes a stage prompt when agent action is required', () => {
+    const dir = tempDir();
+    const contractPath = path.join(dir, 'run-contract.yaml');
+    const result = materializeStagePrompt({
+      loop: 'feature-build',
+      goal: 'finish loop runtime',
+      input_artifact: 'docs/specs/genuine-looper/prd.md',
+      path: 'templates/QA/loops/feature-build.yaml',
+      current_stage_or_rail: '5_impl',
+      next_gate: 'smallest mergeable slice',
+      durable_evidence: [contractPath],
+      stop_condition: 'handoff',
+      never_without_human: ['git push'],
+      storage: { contract_path: contractPath },
+    }, { contractPath });
+
+    expect(fs.existsSync(result.promptPath)).toBe(true);
+    expect(fs.readFileSync(result.promptPath, 'utf8')).toContain('Current stage: 5_impl');
+    expect(fs.readFileSync(result.promptPath, 'utf8')).toContain('Never without human: git push');
+  });
+
+  test('bounded run-until-terminal advances through green registries and stops at next agent stage', () => {
+    const dir = tempDir();
+    const specDir = path.join(dir, 'spec');
+    fs.mkdirSync(specDir);
+    fs.writeFileSync(path.join(specDir, 'contract.yml'), yaml.dump({
+      journeys: [{ journey_meta: { id: 'J-LOOP-RUNTIME' } }],
+    }));
+    fs.writeFileSync(path.join(specDir, 'issues.json'), JSON.stringify([
+      { number: 82, title: 'runtime', body: 'Journey IDs: J-LOOP-RUNTIME' },
+    ]));
+    fs.writeFileSync(path.join(specDir, 'tickets.json'), JSON.stringify([
+      { id: 'LOOP-RUNTIME-04', writes: ['runner'], reads: [], adrNone: 'no ADRs', reuses: ['scripts/specflow-runner.cjs'] },
+    ]));
+    const contract = path.join(dir, 'run-contract.yaml');
+    const ledger = path.join(dir, 'ledger.jsonl');
+    fs.writeFileSync(contract, yaml.dump({
+      run_contract: {
+        loop: 'spec-build',
+        goal: 'runtime',
+        input_artifact: 'docs/specs/genuine-looper/prd.md',
+        path: 'templates/QA/loops/spec-build.yaml',
+        current_stage_or_rail: 'GATE_B',
+        next_gate: 'Gate B checks',
+        durable_evidence: [contract, ledger],
+        stop_condition: 'handoff',
+        never_without_human: ['git push'],
+        storage: { contract_path: contract, ledger_path: ledger },
+      },
+    }));
+
+    const result = runUntilTerminal({ loop: 'spec-build', contract, ledger, specDir, maxIterations: 3 });
+    const saved = yaml.load(fs.readFileSync(contract, 'utf8')).run_contract;
+
+    expect(result.status).toBe('agent_action_required');
+    expect(result.iterations).toBe(2);
+    expect(saved.current_stage_or_rail).toBe('GATE_B5');
+    expect(readJsonl(ledger).some((entry) => entry.prompt_path && entry.stage === 'GATE_B5')).toBe(true);
+  });
+
+  test('run status reports the current contract and ledger tail', () => {
+    const dir = tempDir();
+    const contract = path.join(dir, 'run-contract.yaml');
+    const ledger = path.join(dir, 'ledger.jsonl');
+    fs.writeFileSync(contract, yaml.dump({
+      run_contract: {
+        loop: 'feature-build',
+        goal: 'status',
+        input_artifact: 'docs/specs/genuine-looper/prd.md',
+        path: 'templates/QA/loops/feature-build.yaml',
+        current_stage_or_rail: '6_provenance',
+        next_gate: 'provenance',
+        durable_evidence: [contract, ledger],
+        stop_condition: 'handoff',
+        never_without_human: ['git push'],
+        storage: { contract_path: contract, ledger_path: ledger },
+      },
+    }));
+    fs.writeFileSync(ledger, `${JSON.stringify({ stage: '6_provenance', result: 'pass' })}\n`);
+
+    const status = runStatus({ contract });
+    expect(status.status).toBe('ok');
+    expect(status.current_stage_or_rail).toBe('6_provenance');
+    expect(status.ledger_tail).toHaveLength(1);
+  });
 });
 
 describe('generative adapter policy and command builders', () => {
@@ -159,6 +260,32 @@ describe('generative adapter policy and command builders', () => {
     expect(command.args).toContain('--json');
     expect(command.args).toContain('--model');
     expect(command.args).toContain('--profile');
+  });
+
+  test('builds provider resume commands when a session id exists', () => {
+    const claude = buildAdapterCommand({
+      provider: 'claude-print',
+      command: 'claude',
+      args: [],
+      session_id: 'claude-session',
+      allowed_tools: [],
+      denied_tools: [],
+    });
+    const codex = buildAdapterCommand({
+      provider: 'codex-exec',
+      command: 'codex',
+      args: ['--ask-for-approval', 'never'],
+      session_id: 'codex-session',
+    });
+
+    expect(claude.args).toEqual(expect.arrayContaining(['--resume', 'claude-session']));
+    expect(codex.args.slice(0, 3)).toEqual(['exec', 'resume', 'codex-session']);
+  });
+
+  test('adapter smoke includes a bounded prompt by default', () => {
+    const smoke = planAdapterSmoke('claude-print', { live: false });
+    expect(smoke.policy.prompt).toContain('SPECFLOW_ADAPTER_SMOKE_OK');
+    expect(smoke.planned.args.join(' ')).toContain('SPECFLOW_ADAPTER_SMOKE_OK');
   });
 
   test('detects forbidden human-gate actions in provider output', () => {

@@ -1,0 +1,83 @@
+[
+  {
+    "id": "LOOP-RUNTIME-04",
+    "title": "Add bounded run-until-terminal execution",
+    "writes": ["runUntilTerminal", "specflow run", "ledger.jsonl"],
+    "reads": ["executeVerifierRegistry", "nextStage", "run_contract"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing runner and loop templates.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/QA/loops/spec-build.yaml", "templates/QA/loops/feature-build.yaml"],
+    "journeys": ["J-LOOP-UNTIL-TERMINAL"]
+  },
+  {
+    "id": "LOOP-RUNTIME-05",
+    "title": "Compile loop YAML into executable state machine",
+    "writes": ["loopSequence", "nextStage"],
+    "reads": ["templates/QA/loops/spec-build.yaml", "templates/QA/loops/feature-build.yaml", "contract.path"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing loop YAML and runner.",
+    "reuses": ["scripts/specflow-runner.cjs", "js-yaml"],
+    "journeys": ["J-LOOP-YAML-SEQUENCE"]
+  },
+  {
+    "id": "GEN-ADAPTER-05",
+    "title": "Materialize generative stage prompts",
+    "writes": ["materializeStagePrompt", ".specflow/runs", "prompts"],
+    "reads": ["run_contract", "never_without_human", "templates/QA/loops"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing adapter and loop-runner surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/adapter-policies/claude-print.safe.yml"],
+    "journeys": ["J-GEN-STAGE-PROMPT"]
+  },
+  {
+    "id": "GEN-ADAPTER-06",
+    "title": "Persist and resume provider session ids",
+    "writes": ["provider_session_id", "buildAdapterCommand"],
+    "reads": ["parseProviderEvents", "session_id"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing provider event parser.",
+    "reuses": ["scripts/specflow-runner.cjs"],
+    "journeys": ["J-GEN-SESSION-RESUME"]
+  },
+  {
+    "id": "GEN-ADAPTER-07",
+    "title": "Add opt-in live Claude/Codex smoke checks",
+    "writes": ["adapter-smoke", "planAdapterSmoke"],
+    "reads": ["runAdapter", "never_without_human"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing adapter policy support.",
+    "reuses": ["bin/specflow.js", "scripts/specflow-runner.cjs"],
+    "journeys": ["J-GEN-LIVE-SMOKE"]
+  },
+  {
+    "id": "PROVENANCE-02",
+    "title": "Audit git diff for provenance risks",
+    "writes": ["auditDiffText", "specflow provenance"],
+    "reads": ["source_provenance", "git diff"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against the existing provenance gate.",
+    "reuses": ["scripts/provenance-gate.cjs", "bin/specflow.js"],
+    "journeys": ["J-PROVENANCE-DIFF"]
+  },
+  {
+    "id": "GATE-C-01",
+    "title": "Read PR CI status for Gate C triage",
+    "writes": ["ci-status"],
+    "reads": ["gh pr checks"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing gh-based audit command style.",
+    "reuses": ["bin/specflow.js"],
+    "journeys": ["J-GATEC-STATUS"]
+  },
+  {
+    "id": "LOOP-RUNTIME-06",
+    "title": "Add specflow run status",
+    "writes": ["runStatus", "specflow run status"],
+    "reads": ["run_contract", "ledger.jsonl"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing run contract storage.",
+    "reuses": ["scripts/specflow-runner.cjs", "bin/specflow.js"],
+    "journeys": ["J-LOOP-RUN-STATUS"]
+  },
+  {
+    "id": "INSTALL-LOOP-01",
+    "title": "Verify loop runner install completeness",
+    "writes": ["verify-setup.sh"],
+    "reads": ["specflow-loop-selector", ".specflow/adapter-policies"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing installer and verify tests.",
+    "reuses": ["setup-project.sh", "verify-setup.sh", "tests/hooks/installer-fixes.test.js"],
+    "journeys": ["J-INSTALL-LOOP-COMPLETE"]
+  }
+]

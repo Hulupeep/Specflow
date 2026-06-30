@@ -1,0 +1,139 @@
+feature: genuine-looper
+requirements:
+  - id: REQ-LOOP-04
+    statement: Continue unblocked loop stages until a terminal condition or iteration budget.
+  - id: REQ-LOOP-05
+    statement: Derive executable stage order from loop YAML.
+  - id: REQ-GEN-05
+    statement: Materialize provider-ready stage prompts at generative stops.
+  - id: REQ-GEN-06
+    statement: Persist and resume provider session identifiers.
+  - id: REQ-GEN-07
+    statement: Provide opt-in live adapter smoke checks.
+  - id: REQ-PROV-02
+    statement: Audit changed code and tests for provenance risks after implementation.
+  - id: REQ-GATEC-01
+    statement: Read PR check status for Gate C triage.
+  - id: REQ-LOOP-06
+    statement: Report run status from durable contract and ledger state.
+  - id: REQ-INSTALL-01
+    statement: Verify loop runner install completeness in fresh projects.
+journeys:
+  - journey_meta:
+      id: J-LOOP-UNTIL-TERMINAL
+      persona: specflow_operator
+      owner_ticket: LOOP-RUNTIME-04
+      assertion_bar: ledger shows repeated gate attempts until a terminal stop
+    scenario: run all unblocked mechanical gates
+    given:
+      - a run_contract exists at GATE_B with valid local ticket evidence
+    when:
+      - the operator runs specflow run spec-build --until-terminal
+    then:
+      - Gate B verifiers execute
+      - the run advances to GATE_B5
+      - the next generative stop writes a prompt and stops
+  - journey_meta:
+      id: J-LOOP-YAML-SEQUENCE
+      persona: maintainer
+      owner_ticket: LOOP-RUNTIME-05
+      assertion_bar: sequence re-read from the YAML path in the contract
+    scenario: compile loop YAML into stage order
+    given:
+      - run_contract.path points at templates/QA/loops/spec-build.yaml
+    when:
+      - the runner calculates the next stage
+    then:
+      - stages are read from the YAML file
+      - fallback hardcoded order is used only if the YAML cannot be loaded
+  - journey_meta:
+      id: J-GEN-STAGE-PROMPT
+      persona: agent_operator
+      owner_ticket: GEN-ADAPTER-05
+      assertion_bar: prompt file re-reads current stage and human gates
+    scenario: materialize the next generative stage prompt
+    given:
+      - no verifier registry exists for the current stage
+    when:
+      - the runner stops with agent_action_required
+    then:
+      - .specflow/runs/<slug>/prompts/<stage>.md exists
+      - the prompt includes durable evidence and never_without_human
+  - journey_meta:
+      id: J-GEN-SESSION-RESUME
+      persona: interrupted_agent
+      owner_ticket: GEN-ADAPTER-06
+      assertion_bar: command argv contains the stored session id
+    scenario: resume a provider session
+    given:
+      - a provider output event includes a session id
+    when:
+      - the next adapter command is built with that id
+    then:
+      - Claude receives a resume flag
+      - Codex receives an exec resume invocation
+  - journey_meta:
+      id: J-GEN-LIVE-SMOKE
+      persona: local_user
+      owner_ticket: GEN-ADAPTER-07
+      assertion_bar: smoke command is dry-run unless --live is present
+    scenario: run a safe adapter smoke check
+    given:
+      - the user has an authenticated local provider CLI
+    when:
+      - specflow adapter-smoke claude-print --live is run
+    then:
+      - the provider receives a bounded one-line prompt
+      - forbidden human-gate actions still block
+  - journey_meta:
+      id: J-PROVENANCE-DIFF
+      persona: reviewer
+      owner_ticket: PROVENANCE-02
+      assertion_bar: suspicious diff lines fail the provenance gate
+    scenario: audit implementation diff for made-up values
+    given:
+      - a feature-build slice changed code or tests
+    when:
+      - specflow provenance evidence/file.json --git-diff runs
+    then:
+      - unallowed mock/fake/stub additions fail
+      - value-bearing literals without provenance fail
+  - journey_meta:
+      id: J-GATEC-STATUS
+      persona: release_operator
+      owner_ticket: GATE-C-01
+      assertion_bar: CLI reports green, red, or pending from PR checks
+    scenario: read Gate C status
+    given:
+      - a PR exists with GitHub check runs
+    when:
+      - specflow ci-status <pr-number> runs
+    then:
+      - failing checks are listed
+      - the gate_c field is red, pending, or green
+  - journey_meta:
+      id: J-LOOP-RUN-STATUS
+      persona: returning_agent
+      owner_ticket: LOOP-RUNTIME-06
+      assertion_bar: status output re-reads contract and ledger tail
+    scenario: inspect durable loop status
+    given:
+      - a run_contract and ledger exist
+    when:
+      - specflow run status --contract <path> runs
+    then:
+      - current stage and terminal status are printed
+      - recent ledger entries are included
+  - journey_meta:
+      id: J-INSTALL-LOOP-COMPLETE
+      persona: fresh_codespace_agent
+      owner_ticket: INSTALL-LOOP-01
+      assertion_bar: verify reports missing local loop assets as install failures
+    scenario: detect incomplete loop installation
+    given:
+      - a project is missing loop selector skills or adapter policies
+    when:
+      - specflow verify runs
+    then:
+      - missing skills fail install health
+      - missing adapter policy templates fail install health

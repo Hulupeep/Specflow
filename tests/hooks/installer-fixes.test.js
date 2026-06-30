@@ -283,6 +283,18 @@ describe('verify-setup.sh executable bit check (Bug 5 fix)', () => {
     expect(output).toContain('agents may say the specflow-loop-selector skill is unavailable');
   });
 
+  test('flags missing adapter policy templates as install failures', () => {
+    const result = spawnSync('bash', [VERIFY_PATH], {
+      encoding: 'utf-8',
+      cwd: projectDir,
+      timeout: 10000,
+    });
+
+    const output = result.stderr + result.stdout;
+    expect(output).toContain('.specflow/adapter-policies/claude-print.safe.yml missing');
+    expect(output).toContain('generative loop adapters have no safe starter policy');
+  });
+
   test('passes executable hook scripts', () => {
     for (const script of ['post-build-check.sh', 'run-journey-tests.sh', 'post-push-ci.sh']) {
       fs.writeFileSync(path.join(projectDir, '.claude', 'hooks', script), '#!/bin/bash\nexit 0');

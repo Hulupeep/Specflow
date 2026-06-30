@@ -251,6 +251,18 @@ if [ "$REFRESHED_KIT" = false ]; then
   echo -e "${YELLOW}⚠️${NC}  QA kit/scripts not in source (curl install?) — run 'specflow init' from the package to install them"
 fi
 
+ADAPTER_POLICY_DIR="$SCRIPT_DIR/templates/adapter-policies"
+if [ -d "$ADAPTER_POLICY_DIR" ]; then
+  mkdir -p "$TARGET_DIR/.specflow/adapter-policies"
+  for policy in "$ADAPTER_POLICY_DIR"/*.yml; do
+    [ -f "$policy" ] || continue
+    cp "$policy" "$TARGET_DIR/.specflow/adapter-policies/"
+    echo -e "${GREEN}✓${NC} Installed .specflow/adapter-policies/$(basename "$policy")"
+  done
+else
+  echo -e "${YELLOW}⚠️${NC}  Adapter policy templates not found in Specflow source"
+fi
+
 echo ""
 
 # ============================================================================
@@ -336,6 +348,13 @@ done
 if [ ! -f "$TARGET_DIR/AGENTS.md" ] || ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
   INSTALL_OK=false
 fi
+for policy_path in \
+  ".specflow/adapter-policies/claude-print.safe.yml" \
+  ".specflow/adapter-policies/codex-exec.safe.yml"; do
+  if [ ! -f "$TARGET_DIR/$policy_path" ]; then
+    INSTALL_OK=false
+  fi
+done
 
 if [ "$INSTALL_OK" = true ]; then
   echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
@@ -359,6 +378,7 @@ echo "  .claude/hooks/README.md            - Documentation"
 echo "  .claude/skills/specflow-loop-selector - Claude Code loop router"
 echo "  .codex/skills/specflow-loop-selector  - Codex loop router"
 echo "  .agents/skills/specflow-loop-selector - Generic agent loop router"
+echo "  .specflow/adapter-policies/          - Safe Claude/Codex adapter policies"
 echo "  AGENTS.md                         - Agent bootstrap instructions"
 echo ""
 if [ ! -f "$TARGET_DIR/.codex/skills/specflow-loop-selector/SKILL.md" ]; then

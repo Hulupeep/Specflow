@@ -1,4 +1,4 @@
-const { auditProvenance } = require('../../scripts/provenance-gate.cjs');
+const { auditDiffText, auditProvenance } = require('../../scripts/provenance-gate.cjs');
 
 describe('provenance gate', () => {
   test('passes source-provenance rows with claims, sources, and verification', () => {
@@ -30,5 +30,20 @@ describe('provenance gate', () => {
     });
     expect(result.ok).toBe(false);
     expect(result.violations[0]).toContain('mock/fake/stub');
+  });
+
+  test('rejects suspicious diff literals without provenance allowance', () => {
+    const result = auditDiffText([
+      'diff --git a/src/pricing.js b/src/pricing.js',
+      '+const payload = { region_code: "NOLA-LA" };', // contract-allowed negative scanner fixture
+    ].join('\n'));
+
+    expect(result.ok).toBe(false);
+    expect(result.violations[0]).toContain('value-bearing literal');
+  });
+
+  test('allows explicitly contract-approved fake provider diff lines', () => {
+    const result = auditDiffText('+const provider = "fake"; // fake provider opt-in smoke');
+    expect(result.ok).toBe(true);
   });
 });
