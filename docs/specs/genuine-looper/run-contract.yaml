@@ -1,0 +1,22 @@
+run_contract:
+  loop: feature-build
+  goal: Implement the genuine-looper runtime completion ticket packet.
+  input_artifact: docs/specs/genuine-looper/prd.md
+  path: templates/QA/loops/feature-build.yaml
+  current_stage_or_rail: 7_ci_handoff
+  next_gate: human push/PR or CI readback
+  durable_evidence:
+    - docs/specs/genuine-looper/prd.md
+    - docs/specs/genuine-looper/contract.yml
+    - docs/specs/genuine-looper/tickets.md
+    - docs/specs/genuine-looper/specflow-audit.md
+    - docs/specs/genuine-looper/simulation.md
+    - evidence/provenance-genuine-looper.json
+  stop_condition: Stop before push/PR/merge; human authorization is required for those actions.
+  never_without_human:
+    - git push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
+  terminal_status: ci_handoff

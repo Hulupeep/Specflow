@@ -1,0 +1,27 @@
+adapter_policy:
+  id: codex-exec-safe
+  provider: codex-exec
+  command: codex
+  args:
+    - --sandbox
+    - workspace-write
+    - --ask-for-approval
+    - never
+  model: gpt-5
+  timeout_seconds: 900
+  max_iterations: 1
+  allowed_tools: []
+  denied_tools:
+    - git push
+    - gh pr create
+    - gh issue create
+    - --no-verify
+  transcript_path: .specflow/runs/<slug>/adapter/codex-stage.jsonl
+  output_path: .specflow/runs/<slug>/adapter/codex-stage-final.md
+  dry_run: true
+  never_without_human:
+    - git push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract

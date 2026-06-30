@@ -3,7 +3,7 @@
 const { execSync } = require('child_process');
 const { resolve, dirname, join } = require('path');
 const { existsSync, readFileSync, writeFileSync, readdirSync } = require('fs');
-const { cli: runSpecflowLoop } = require('../scripts/specflow-runner.cjs');
+const { cli: runSpecflowLoop, planAdapterSmoke, runAdapter } = require('../scripts/specflow-runner.cjs');
 
 // Specflow root is one level up from bin/
 const SPECFLOW_ROOT = resolve(dirname(__filename), '..');
@@ -142,6 +142,65 @@ const COMMANDS = {
       if (code) process.exit(code);
     },
   },
+  provenance: {
+    usage: 'specflow provenance <provenance.json> [--diff file|--git-diff|--staged-diff]',
+    desc: 'Verify source provenance evidence for a feature-build slice',
+    run: (args) => {
+      const file = args[0];
+      if (!file) {
+        console.error('Usage: specflow provenance <provenance.json> [--diff file|--git-diff|--staged-diff]');
+        process.exit(2);
+      }
+      const script = resolve(SPECFLOW_ROOT, 'scripts', 'provenance-gate.cjs');
+      const rest = args.slice(1).map((arg) => arg.startsWith('--') ? arg : `"${resolve(arg)}"`).join(' ');
+      exec(`node "${script}" "${resolve(file)}" ${rest}`);
+    },
+  },
+  'ci-status': {
+    usage: 'specflow ci-status <pr-number>',
+    desc: 'Read GitHub PR check status for Gate C triage',
+    run: (args) => {
+      const pr = args[0];
+      if (!pr || !/^\d+$/.test(pr)) {
+        console.error('Usage: specflow ci-status <pr-number>');
+        process.exit(2);
+      }
+      const raw = execSilent(`gh pr view ${pr} --json statusCheckRollup`);
+      if (!raw) {
+        console.error(`Could not read PR #${pr} checks. Verify gh auth and repo context.`);
+        process.exit(1);
+      }
+      const checks = JSON.parse(raw).statusCheckRollup || [];
+      const statusOf = (check) => String(check.conclusion || check.status || check.state || check.bucket || '').toUpperCase();
+      const failing = checks.filter((check) => ['FAILURE', 'FAIL', 'FAILING', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(statusOf(check)));
+      const pending = checks.filter((check) => ['PENDING', 'QUEUED', 'IN_PROGRESS', 'WAITING', 'REQUESTED'].includes(statusOf(check)));
+      console.log(JSON.stringify({
+        pr: Number(pr),
+        total: checks.length,
+        failing: failing.map((check) => ({ name: check.name, status: statusOf(check), link: check.link || check.detailsUrl })),
+        pending: pending.map((check) => ({ name: check.name, status: statusOf(check), link: check.link || check.detailsUrl })),
+        gate_c: failing.length ? 'red' : (pending.length ? 'pending' : 'green'),
+      }, null, 2));
+      if (failing.length) process.exit(1);
+    },
+  },
+  'adapter-smoke': {
+    usage: 'specflow adapter-smoke <claude-print|codex-exec> [--live]',
+    desc: 'Plan or run an opt-in local adapter smoke check',
+    run: (args) => {
+      const provider = args[0];
+      if (!['claude-print', 'codex-exec'].includes(provider)) {
+        console.error('Usage: specflow adapter-smoke <claude-print|codex-exec> [--live]');
+        process.exit(2);
+      }
+      const smoke = planAdapterSmoke(provider, { live: args.includes('--live') });
+      console.log(JSON.stringify(smoke, null, 2));
+      if (!args.includes('--live')) return;
+      const result = runAdapter(smoke.policy, { owningGateCommand: 'adapter smoke only' });
+      console.log(JSON.stringify(result, null, 2));
+      if (!['gate_rerun_required', 'dry_run'].includes(result.status)) process.exit(1);
+    },
+  },
 };
 
 function exec(cmd) {
@@ -186,6 +245,9 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
+  console.log('  npx @colmbyrne/specflow provenance evidence/provenance-77-78-80.json --git-diff');
+  console.log('  npx @colmbyrne/specflow adapter-smoke claude-print --dry-run');
+  console.log('  npx @colmbyrne/specflow ci-status 76');
   console.log('  npx @colmbyrne/specflow graph\n');
   process.exit(0);
 }

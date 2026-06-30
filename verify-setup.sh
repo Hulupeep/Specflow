@@ -594,6 +594,15 @@ else
     check_info ".specflow/ directory not found (optional, created by post-mortem learning)"
 fi
 
+ADAPTER_POLICIES=(".specflow/adapter-policies/claude-print.safe.yml" ".specflow/adapter-policies/codex-exec.safe.yml")
+for policy in "${ADAPTER_POLICIES[@]}"; do
+    if [ -f "$policy" ]; then
+        check_pass "$policy installed"
+    else
+        check_fail "$policy missing — generative loop adapters have no safe starter policy"
+    fi
+done
+
 # Check for fix-patterns.json
 if [ -f ".specflow/fix-patterns.json" ]; then
     check_pass ".specflow/fix-patterns.json exists (post-mortem learning active)"

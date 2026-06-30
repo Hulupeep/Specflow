@@ -8,7 +8,7 @@
  */
 
 const { spawnSync } = require('child_process');
-const { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } = require('fs');
+const { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { dirname, join, resolve } = require('path');
 const yaml = require('js-yaml');
 
@@ -130,6 +130,203 @@ function appendLedger(ledgerPath, entry) {
   appendFileSync(ledgerPath, `${JSON.stringify({ recorded_at: new Date().toISOString(), ...entry })}\n`, 'utf8');
 }
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, "'\\''")}'`;
+}
+
+function runCommand(command, options = {}) {
+  const result = spawnSync(command, {
+    shell: true,
+    encoding: 'utf8',
+    timeout: options.timeoutSeconds ? options.timeoutSeconds * 1000 : undefined,
+    maxBuffer: 10 * 1024 * 1024,
+  });
+  return {
+    command,
+    exit_code: result.status,
+    stdout: result.stdout || '',
+    stderr: result.stderr || '',
+    error: result.error ? result.error.message : null,
+  };
+}
+
+function fileMtimeMs(path) {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return null;
+  }
+}
+
+function isSimulationFresh({ simulationPath, inputPaths = [] }) {
+  const simulationTime = fileMtimeMs(simulationPath);
+  if (!simulationTime) return { ok: false, reason: 'simulation evidence missing' };
+  const staleInput = inputPaths.find((p) => {
+    const mtime = fileMtimeMs(p);
+    return mtime && mtime > simulationTime;
+  });
+  if (staleInput) return { ok: false, reason: `simulation is older than ${staleInput}` };
+  return { ok: true, reason: null };
+}
+
+function loadLoopDefinition(contractOrLoop, options = {}) {
+  const loop = typeof contractOrLoop === 'string' ? contractOrLoop : contractOrLoop.loop;
+  const definitionPath = (typeof contractOrLoop === 'object' && contractOrLoop.path) || LOOP_PATHS[loop];
+  if (!definitionPath) return null;
+  const root = options.root || process.cwd();
+  const absolute = resolve(root, definitionPath);
+  if (!existsSync(absolute)) return null;
+  return loadDataFile(absolute);
+}
+
+function loopSequenceFromDefinition(definition) {
+  if (!definition || typeof definition !== 'object') return [];
+  const collection = Array.isArray(definition.stages) ? definition.stages : definition.rails;
+  if (!Array.isArray(collection)) return [];
+  return collection.map((item) => item && item.id).filter(Boolean);
+}
+
+function fallbackLoopSequence(contract) {
+  if (contract.loop === 'feature-build') {
+    return ['1_ticket', '2_contract', '3_e2e', '4_oracle', '5_impl', '6_provenance', '7_ci_handoff'];
+  }
+  if (contract.loop === 'spec-build') {
+    return ['discover', 'draft', 'adversary', 'GATE_A', 'tickets', 'GATE_B', 'GATE_B5', 'handoff'];
+  }
+  return [];
+}
+
+function loopSequence(contract, options = {}) {
+  const fromDefinition = loopSequenceFromDefinition(loadLoopDefinition(contract, options));
+  return fromDefinition.length ? fromDefinition : fallbackLoopSequence(contract);
+}
+
+function nextStage(contract, options = {}) {
+  const sequence = loopSequence(contract, options);
+  const index = sequence.indexOf(contract.current_stage_or_rail);
+  if (index === -1 || index === sequence.length - 1) return contract.current_stage_or_rail;
+  return sequence[index + 1];
+}
+
+function defaultSpecDir(slug) {
+  return join('docs', 'specs', slug);
+}
+
+function verifierCommandsForStage(contract, options = {}) {
+  const slug = options.slug || options.specSlug || contract.slug || 'specflow-run';
+  const specDir = options.specDir || defaultSpecDir(slug);
+  const stage = contract.current_stage_or_rail;
+  if (contract.loop === 'spec-build' && stage === 'GATE_A') {
+    return [{
+      name: 'verify-falsification',
+      command: `node scripts/verify-falsification.cjs ${shellQuote(join(specDir, 'falsification.md'))} --require-pass --binds-prd ${shellQuote(join(specDir, 'prd.md'))}`,
+    }];
+  }
+  if (contract.loop === 'spec-build' && stage === 'GATE_B') {
+    return [
+      { name: 'verify-seams', command: `node scripts/verify-seams.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root .` },
+      { name: 'verify-adr', command: `node scripts/verify-adr.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root .` },
+      { name: 'verify-ticket-journey', command: `node scripts/verify-ticket-journey.cjs ${shellQuote(specDir)} --issues ${shellQuote(join(specDir, 'issues.json'))}` },
+    ];
+  }
+  if (contract.loop === 'feature-build' && stage === '1_ticket') {
+    const simulationPath = options.simulationPath;
+    const inputPaths = (options.inputPaths || []).filter(Boolean);
+    return [{
+      name: 'simulation-freshness',
+      check: () => {
+        if (!simulationPath) return { ok: true, stdout: 'simulation freshness not configured for this run\n', stderr: '' };
+        const result = isSimulationFresh({ simulationPath, inputPaths });
+        return { ok: result.ok, stdout: result.ok ? 'simulation fresh\n' : '', stderr: result.ok ? '' : `${result.reason}\n` };
+      },
+    }];
+  }
+  if (contract.loop === 'feature-build' && stage === '6_provenance') {
+    const provenancePath = options.provenance || `evidence/provenance-${options.issue || slug}.json`;
+    return [{ name: 'provenance', command: `node scripts/provenance-gate.cjs ${shellQuote(provenancePath)}` }];
+  }
+  return [];
+}
+
+function executeVerifierRegistry(contract, options = {}) {
+  const commands = verifierCommandsForStage(contract, options);
+  if (!commands.length) {
+    return {
+      status: 'agent_action_required',
+      entries: [{
+        stage: contract.current_stage_or_rail,
+        result: 'skipped',
+        stop_reason: 'agent_action_required',
+        next_action: contract.next_gate,
+      }],
+      advance: false,
+    };
+  }
+
+  const entries = [];
+  for (const item of commands) {
+    const result = item.check ? item.check() : runCommand(item.command, options);
+    const pass = item.check ? result.ok : result.exit_code === 0;
+    entries.push({
+      stage: contract.current_stage_or_rail,
+      verifier: item.name,
+      command: item.command || item.name,
+      result: pass ? 'pass' : 'fail',
+      exit_code: item.check ? (pass ? 0 : 1) : result.exit_code,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      stop_reason: pass ? null : 'gate_failed',
+    });
+    if (!pass) return { status: 'gate_failed', entries, advance: false };
+  }
+  return { status: 'gate_passed', entries, advance: true };
+}
+
+function materializeStagePrompt(contract, options = {}) {
+  const stage = contract.current_stage_or_rail || 'stage';
+  const safeStage = String(stage).replace(/[^a-z0-9._-]+/gi, '-');
+  const baseDir = options.promptDir
+    || join(dirname(options.contractPath || contract.storage?.contract_path || defaultRunPaths(options.slug || 'specflow-run').contractPath), 'prompts');
+  const promptPath = options.promptPath || join(baseDir, `${safeStage}.md`);
+  const definition = loadLoopDefinition(contract, options);
+  const sequence = loopSequence(contract, options);
+  const next = nextStage(contract, options);
+  const stageSpec = [
+    ...(Array.isArray(definition?.stages) ? definition.stages : []),
+    ...(Array.isArray(definition?.rails) ? definition.rails : []),
+  ].find((item) => item && item.id === stage);
+  const content = [
+    `# Specflow ${contract.loop} Stage Prompt`,
+    '',
+    `Goal: ${contract.goal}`,
+    `Input artifact: ${contract.input_artifact}`,
+    `Current stage: ${stage}`,
+    `Next stage: ${next}`,
+    `Next gate: ${contract.next_gate}`,
+    '',
+    '## Contract Rules',
+    `- Loop path: ${contract.path}`,
+    `- Stop condition: ${contract.stop_condition}`,
+    `- Never without human: ${(contract.never_without_human || []).join(', ') || 'none declared'}`,
+    `- Durable evidence: ${(contract.durable_evidence || []).join(', ') || 'none declared'}`,
+    '',
+    '## Stage Definition',
+    stageSpec ? yaml.dump(stageSpec, { lineWidth: 120, noRefs: true }).trim() : 'No YAML stage body found; use the run contract and next gate.',
+    '',
+    '## Required Behavior',
+    '- Execute only this stage or rail.',
+    '- Persist durable evidence before claiming progress.',
+    '- Do not mark the gate passed yourself; rerun the owning Specflow verifier after work.',
+    '- Stop immediately if a never_without_human action would be required.',
+    '',
+    `Sequence: ${sequence.join(' -> ')}`,
+    '',
+  ].join('\n');
+  ensureDir(promptPath);
+  writeFileSync(promptPath, content, 'utf8');
+  return { promptPath, content };
+}
+
 function resolveTemplate(value, context) {
   return String(value).replace(/<slug>/g, context.slug || 'run').replace(/\$\{slug\}/g, context.slug || 'run');
 }
@@ -147,6 +344,8 @@ function normalizeAdapterPolicy(raw, context = {}) {
     args: policy.args || [],
     allowed_tools: policy.allowed_tools || [],
     denied_tools: policy.denied_tools || [],
+    prompt: policy.prompt || null,
+    session_id: policy.session_id || null,
     dry_run: Boolean(policy.dry_run),
     transcript_path: resolveTemplate(policy.transcript_path, context),
     output_path: resolveTemplate(policy.output_path, context),
@@ -169,17 +368,24 @@ function buildAdapterCommand(policy, promptPath) {
     if (deniedTools.length && !args.includes('--disallowedTools') && !args.includes('--disallowed-tools')) {
       args.push('--disallowedTools', deniedTools.join(','));
     }
+    if (policy.session_id && !args.includes('--resume') && !args.includes('--session-id')) {
+      args.push('--resume', String(policy.session_id));
+    }
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
+    else if (policy.prompt) args.push(String(policy.prompt));
     return { command: policy.command || 'claude', args };
   }
 
   if (policy.provider === 'codex-exec') {
-    const args = ['exec', ...(policy.args || [])];
+    const args = policy.session_id
+      ? ['exec', 'resume', String(policy.session_id), ...(policy.args || [])]
+      : ['exec', ...(policy.args || [])];
     if (!args.includes('--json')) args.push('--json');
     if (policy.model && !args.includes('--model')) args.push('--model', String(policy.model));
     if (policy.profile && !args.includes('--profile')) args.push('--profile', String(policy.profile));
     if (policy.output_schema && !args.includes('--output-schema')) args.push('--output-schema', String(policy.output_schema));
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
+    else if (policy.prompt) args.push(String(policy.prompt));
     return { command: policy.command || 'codex', args };
   }
 
@@ -197,6 +403,46 @@ function commandExists(command) {
 function containsForbiddenAction(text, neverWithoutHuman = []) {
   const lower = String(text || '').toLowerCase();
   return neverWithoutHuman.find((action) => lower.includes(String(action).toLowerCase())) || null;
+}
+
+function parseProviderEvents(provider, text) {
+  const events = [];
+  const errors = [];
+  const toolEvents = [];
+  let finalText = '';
+  let sessionId = null;
+
+  for (const line of String(text || '').split(/\r?\n/).filter(Boolean)) {
+    let event;
+    try {
+      event = JSON.parse(line);
+    } catch {
+      finalText += `${line}\n`;
+      continue;
+    }
+    events.push(event);
+    sessionId = sessionId || event.session_id || event.sessionId || event.conversation_id || event.conversationId || null;
+    const type = String(event.type || event.event || event.kind || '');
+    if (/error/i.test(type) || event.error) errors.push(event.error || event);
+    if (event.tool || event.tool_call || event.toolCall || /tool|command|exec/i.test(type)) toolEvents.push(event);
+    const textValue = event.text || event.content || event.message?.content || event.delta?.text || event.result;
+    if (typeof textValue === 'string') finalText += textValue;
+  }
+
+  return { provider, session_id: sessionId, final_text: finalText.trim(), errors, tool_events: toolEvents, events };
+}
+
+function eventText(event) {
+  return JSON.stringify(event);
+}
+
+function forbiddenFromProviderEvents(parsed, neverWithoutHuman = [], deniedTools = []) {
+  const patterns = [...neverWithoutHuman, ...deniedTools].filter(Boolean);
+  for (const event of parsed.tool_events || []) {
+    const found = containsForbiddenAction(eventText(event), patterns);
+    if (found) return found;
+  }
+  return containsForbiddenAction(parsed.final_text, neverWithoutHuman);
 }
 
 function runAdapter(policy, options = {}) {
@@ -249,7 +495,8 @@ function runAdapter(policy, options = {}) {
   const stderr = result.stderr || '';
   writeFileSync(policy.transcript_path, stdout + (stderr ? `\n${stderr}` : ''), 'utf8');
 
-  const forbidden = containsForbiddenAction(`${stdout}\n${stderr}`, policy.never_without_human);
+  const parsed = parseProviderEvents(policy.provider, `${stdout}\n${stderr}`);
+  const forbidden = forbiddenFromProviderEvents(parsed, policy.never_without_human, policy.denied_tools);
   if (forbidden) {
     return {
       status: 'blocked_human_required',
@@ -264,12 +511,15 @@ function runAdapter(policy, options = {}) {
     };
   }
 
-  writeFileSync(policy.output_path, stdout, 'utf8');
+  writeFileSync(policy.output_path, parsed.final_text || stdout, 'utf8');
   return {
     status: 'gate_rerun_required',
     entry: {
       ...baseEntry,
       exit_code: 0,
+      session_id: parsed.session_id,
+      final_response_chars: (parsed.final_text || stdout).length,
+      tool_event_count: parsed.tool_events.length,
       stop_reason: 'gate_rerun_required',
       forbidden_action_detected: false,
       owning_gate_command: options.owningGateCommand || null,
@@ -305,42 +555,138 @@ function runLoop(options) {
 
   if (options.adapterPolicy) {
     const policy = normalizeAdapterPolicy(loadDataFile(options.adapterPolicy), { slug });
+    const prompt = options.prompt ? { promptPath: options.prompt } : materializeStagePrompt(contract, { ...options, contractPath, slug });
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
-      promptPath: options.prompt,
+      promptPath: prompt.promptPath,
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
     });
-    appendLedger(ledgerPath, adapterResult.entry);
+    appendLedger(ledgerPath, { ...adapterResult.entry, prompt_path: prompt.promptPath });
     contract.terminal_status = adapterResult.status === 'gate_rerun_required' ? 'in_progress' : 'blocked';
     contract.current_stage_or_rail = adapterResult.status === 'gate_rerun_required' ? contract.current_stage_or_rail : contract.current_stage_or_rail;
+    if (adapterResult.entry && adapterResult.entry.session_id) contract.provider_session_id = adapterResult.entry.session_id;
     writeYaml(contractPath, { run_contract: contract });
     return { ...adapterResult, contractPath, ledgerPath };
   }
 
-  appendLedger(ledgerPath, {
-    stage: contract.current_stage_or_rail,
-    result: 'skipped',
-    stop_reason: 'agent_action_required',
-    next_action: contract.next_gate,
-  });
-  contract.terminal_status = 'blocked';
+  const registryResult = executeVerifierRegistry(contract, options);
+  let promptPath = null;
+  if (registryResult.status === 'agent_action_required') {
+    promptPath = materializeStagePrompt(contract, { ...options, contractPath, slug }).promptPath;
+  }
+  for (const entry of registryResult.entries) appendLedger(ledgerPath, promptPath ? { ...entry, prompt_path: promptPath } : entry);
+  if (registryResult.advance) {
+    contract.current_stage_or_rail = nextStage(contract, options);
+    contract.next_gate = `advance to ${contract.current_stage_or_rail}`;
+    contract.terminal_status = contract.current_stage_or_rail === 'handoff' ? 'handoff' : 'in_progress';
+  } else {
+    contract.terminal_status = registryResult.status === 'gate_failed' ? 'failed' : 'blocked';
+  }
   writeYaml(contractPath, { run_contract: contract });
-  return { status: 'agent_action_required', contractPath, ledgerPath };
+  return { status: registryResult.status, contractPath, ledgerPath };
+}
+
+function readLedgerTail(ledgerPath, limit = 10) {
+  if (!existsSync(ledgerPath)) return [];
+  const lines = readFileSync(ledgerPath, 'utf8').trim().split(/\r?\n/).filter(Boolean);
+  return lines.slice(Math.max(0, lines.length - limit)).map((line) => JSON.parse(line));
+}
+
+function runStatus(options = {}) {
+  const contractPath = options.contract;
+  if (!contractPath || !existsSync(contractPath)) {
+    return { status: 'missing_contract', error: 'specflow run status requires --contract <path>' };
+  }
+  const contract = loadRunContract(contractPath);
+  const ledgerPath = options.ledger || contract.storage?.ledger_path || join(dirname(contractPath), 'ledger.jsonl');
+  return {
+    status: 'ok',
+    contract_path: contractPath,
+    ledger_path: ledgerPath,
+    loop: contract.loop,
+    current_stage_or_rail: contract.current_stage_or_rail,
+    next_gate: contract.next_gate,
+    terminal_status: contract.terminal_status || 'unknown',
+    sequence: loopSequence(contract, options),
+    ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
+  };
+}
+
+function isTerminalStatus(status) {
+  return [
+    'agent_action_required',
+    'gate_failed',
+    'invalid_contract',
+    'adapter_unavailable',
+    'adapter_failed',
+    'blocked_human_required',
+    'dry_run',
+  ].includes(status);
+}
+
+function runUntilTerminal(options = {}) {
+  const maxIterations = Number(options.maxIterations || 8);
+  const iterations = [];
+  for (let i = 0; i < maxIterations; i += 1) {
+    const result = runLoop({ ...options, untilTerminal: false });
+    iterations.push(result);
+    if (isTerminalStatus(result.status)) {
+      return { status: result.status, iterations: i + 1, results: iterations, contractPath: result.contractPath, ledgerPath: result.ledgerPath };
+    }
+    const contract = loadRunContract(result.contractPath);
+    if (contract.terminal_status === 'handoff') {
+      return { status: 'handoff', iterations: i + 1, results: iterations, contractPath: result.contractPath, ledgerPath: result.ledgerPath };
+    }
+  }
+  const last = iterations[iterations.length - 1] || {};
+  return {
+    status: 'iteration_budget_exhausted',
+    iterations: maxIterations,
+    results: iterations,
+    contractPath: last.contractPath,
+    ledgerPath: last.ledgerPath,
+  };
+}
+
+function planAdapterSmoke(provider, options = {}) {
+  const policy = normalizeAdapterPolicy({
+    id: `${provider}-smoke`,
+    provider,
+    command: provider === 'claude-print' ? 'claude' : 'codex',
+    args: provider === 'claude-print'
+      ? ['-p', '--output-format', 'json']
+      : ['--sandbox', 'read-only', '--ask-for-approval', 'never'],
+    timeout_seconds: 120,
+    max_iterations: 1,
+    transcript_path: `.specflow/runs/adapter-smoke/${provider}.jsonl`,
+    output_path: `.specflow/runs/adapter-smoke/${provider}-final.md`,
+    never_without_human: ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
+    prompt: 'Reply with SPECFLOW_ADAPTER_SMOKE_OK only. Do not edit files or run commands.',
+    dry_run: !options.live,
+  });
+  const planned = buildAdapterCommand(policy);
+  return { policy, planned, live: Boolean(options.live) };
 }
 
 function cli(argv = process.argv.slice(2)) {
   const opts = parseKeyValueArgs(argv);
   const loop = opts._[0];
   if (!loop) {
-    console.error('Usage: specflow run <loop> --slug <slug> --goal <goal> --input <path> [--contract path] [--ledger path] [--adapter-policy path] [--adapter-dry-run]');
+    console.error('Usage: specflow run <loop|status> --slug <slug> --goal <goal> --input <path> [--contract path] [--until-terminal] [--max-iterations n]');
     return 2;
   }
   try {
-    const result = runLoop({ ...opts, loop });
+    const result = loop === 'status'
+      ? runStatus(opts)
+      : (opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop }));
     if (result.status === 'invalid_contract') {
       console.error(`specflow run failed: ${result.errors.join('; ')}`);
       return 1;
+    }
+    if (result.status === 'missing_contract') {
+      console.error(result.error);
+      return 2;
     }
     console.log(JSON.stringify(result, null, 2));
     return 0;
@@ -362,8 +708,21 @@ module.exports = {
   buildAdapterCommand,
   commandExists,
   containsForbiddenAction,
+  parseProviderEvents,
+  forbiddenFromProviderEvents,
+  isSimulationFresh,
+  loadLoopDefinition,
+  loopSequence,
+  loopSequenceFromDefinition,
+  nextStage,
+  verifierCommandsForStage,
+  executeVerifierRegistry,
+  materializeStagePrompt,
+  planAdapterSmoke,
   runAdapter,
   runLoop,
+  runStatus,
+  runUntilTerminal,
   cli,
 };
 

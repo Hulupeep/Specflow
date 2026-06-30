@@ -1,0 +1,41 @@
+{
+  "feature": "genuine-looper",
+  "result": "pass",
+  "source_provenance": [
+    {
+      "claim": "Loop stage order is derived from loop YAML when available.",
+      "source": "scripts/specflow-runner.cjs loadLoopDefinition, loopSequenceFromDefinition, loopSequence",
+      "verification": "tests/contracts/loop-run-contract.test.js loads templates/QA/loops/spec-build.yaml and asserts stage ids."
+    },
+    {
+      "claim": "Bounded run-until-terminal stops at a real terminal condition and records ledger evidence.",
+      "source": "scripts/specflow-runner.cjs runUntilTerminal and runLoop",
+      "verification": "tests/contracts/loop-run-contract.test.js asserts a Gate B pass followed by a GATE_B5 agent_action_required prompt."
+    },
+    {
+      "claim": "Generative stages produce durable prompt files with human-gate constraints.",
+      "source": "scripts/specflow-runner.cjs materializeStagePrompt",
+      "verification": "tests/contracts/loop-run-contract.test.js re-reads the generated prompt and checks current stage plus never_without_human."
+    },
+    {
+      "claim": "Provider session ids are parsed and resume arguments are generated for Claude and Codex.",
+      "source": "scripts/specflow-runner.cjs parseProviderEvents and buildAdapterCommand",
+      "verification": "tests/contracts/loop-run-contract.test.js checks Claude --resume and Codex exec resume argv."
+    },
+    {
+      "claim": "Diff provenance rejects suspicious value-bearing literals and unallowed test-double paths.",
+      "source": "scripts/provenance-gate.cjs auditDiffText",
+      "verification": "tests/contracts/provenance-gate.test.js rejects a region_code literal and permits only explicitly contract-allowed opt-in smoke wording."
+    },
+    {
+      "claim": "Fresh install verification fails when adapter policy templates are missing.",
+      "source": "verify-setup.sh adapter policy checks",
+      "verification": "tests/hooks/installer-fixes.test.js expects missing .specflow/adapter-policies/claude-print.safe.yml to fail install health."
+    },
+    {
+      "claim": "Gate C status is exposed as a CLI readback command.",
+      "source": "bin/specflow.js ci-status command",
+      "verification": "Manual CLI surface review plus package command help; live gh readback remains environment-dependent."
+    }
+  ]
+}
