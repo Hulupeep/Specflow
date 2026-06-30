@@ -1,0 +1,27 @@
+[
+  {
+    "id": "GENERATIVE-ADAPTER-01",
+    "title": "Add controlled local CLI adapters for generative loop stages",
+    "writes": ["init", "verify", "audit"],
+    "reads": ["init", "verify", "audit"],
+    "adrNone": "This repository does not currently use an ADR directory; reuse is declared against existing CLI, loop, and verifier surfaces.",
+    "reuses": [
+      "bin/specflow.js",
+      "skills/specflow-loop-selector/SKILL.md",
+      "templates/QA/loops/spec-build.yaml",
+      "templates/QA/loops/feature-build.yaml",
+      "scripts/verify-falsification.cjs",
+      "scripts/verify-ticket-journey.cjs",
+      "scripts/verify-seams.cjs",
+      "scripts/verify-adr.cjs"
+    ],
+    "journeys": [
+      "J-ADAPTER-CLAUDE-PRINT",
+      "J-ADAPTER-CODEX-EXEC",
+      "J-ADAPTER-HUMAN-GATE-BLOCK",
+      "J-ADAPTER-FAILURE-EVIDENCE",
+      "J-ADAPTER-AUTH-UNAVAILABLE",
+      "J-ADAPTER-DRY-RUN"
+    ]
+  }
+]

@@ -1,0 +1,7 @@
+[
+  {
+    "number": 80,
+    "title": "[SPECFLOW] GENERATIVE-ADAPTER-01: controlled local CLI adapters for generative loop stages",
+    "body": "Journey IDs: J-ADAPTER-CLAUDE-PRINT, J-ADAPTER-CODEX-EXEC, J-ADAPTER-HUMAN-GATE-BLOCK, J-ADAPTER-FAILURE-EVIDENCE, J-ADAPTER-AUTH-UNAVAILABLE, J-ADAPTER-DRY-RUN\n\nSee docs/specs/generative-loop-adapter/tickets.md for the uplifted local issue body."
+  }
+]
