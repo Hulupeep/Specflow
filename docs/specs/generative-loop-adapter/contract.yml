@@ -1,0 +1,113 @@
+feature: generative-loop-adapter
+requirements:
+  - id: REQ-01
+    statement: Add optional generative adapter interface to specflow run with claude-print and codex-exec providers.
+  - id: REQ-02
+    statement: Require adapter policy before generative execution.
+  - id: REQ-03
+    statement: Support Claude print mode with structured output, permission controls, resume, and budget flags.
+  - id: REQ-04
+    statement: Support Codex exec with JSONL output, sandbox/approval controls, output schema, and resume.
+  - id: REQ-05
+    statement: Persist every adapter invocation to the loop ledger.
+  - id: REQ-06
+    statement: Rerun owning Specflow gate after adapter output before advancing.
+  - id: REQ-07
+    statement: Block never_without_human actions outside the provider prompt.
+  - id: REQ-08
+    statement: Document subscription-backed CLI auth without storing subscription secrets.
+  - id: REQ-09
+    statement: Provide dry-run mode for adapter command inspection.
+journeys:
+  - journey_meta:
+      id: J-ADAPTER-CLAUDE-PRINT
+      persona: subscription_operator
+      owner_ticket: GENERATIVE-ADAPTER-01
+      assertion_bar: ledger re-read includes provider, transcript, exit code, and gate rerun result
+    scenario: execute a generative stage through Claude print mode
+    given:
+      - run_contract current stage is agent_action_required
+      - adapter policy provider is claude-print
+      - claude command is installed and authenticated
+    when:
+      - specflow run resumes with the adapter policy
+    then:
+      - the adapter invokes claude -p with configured output and permission flags
+      - transcript and final output artifacts are written
+      - the owning Specflow gate reruns before stage advance
+
+  - journey_meta:
+      id: J-ADAPTER-CODEX-EXEC
+      persona: codex_operator
+      owner_ticket: GENERATIVE-ADAPTER-01
+      assertion_bar: ledger re-read includes provider, transcript, exit code, and gate rerun result
+    scenario: execute a generative stage through Codex exec
+    given:
+      - run_contract current stage is agent_action_required
+      - adapter policy provider is codex-exec
+      - codex command is installed and authenticated
+    when:
+      - specflow run resumes with the adapter policy
+    then:
+      - the adapter invokes codex exec with configured json, sandbox, and approval flags
+      - transcript and final output artifacts are written
+      - the owning Specflow gate reruns before stage advance
+
+  - journey_meta:
+      id: J-ADAPTER-HUMAN-GATE-BLOCK
+      persona: safety_reviewer
+      owner_ticket: GENERATIVE-ADAPTER-01
+      assertion_bar: current stage unchanged and stop reason re-read from ledger
+    scenario: block a forbidden human-controlled action
+    given:
+      - adapter output attempts git push
+      - run_contract never_without_human includes push
+    when:
+      - the adapter controller audits the output and command events
+    then:
+      - the run stops with blocked_human_required
+      - current_stage_or_rail remains unchanged
+
+  - journey_meta:
+      id: J-ADAPTER-FAILURE-EVIDENCE
+      persona: ci_maintainer
+      owner_ticket: GENERATIVE-ADAPTER-01
+      assertion_bar: adapter_failed stop state plus transcript path
+    scenario: preserve evidence on provider failure
+    given:
+      - adapter command times out or emits malformed structured output
+    when:
+      - specflow run handles the adapter result
+    then:
+      - the run stops with adapter_failed
+      - the ledger includes transcript path, exit code, and failure reason
+
+  - journey_meta:
+      id: J-ADAPTER-AUTH-UNAVAILABLE
+      persona: subscription_operator
+      owner_ticket: GENERATIVE-ADAPTER-01
+      assertion_bar: adapter_unavailable stop state plus remediation message
+    scenario: stop before invoking an unauthenticated provider
+    given:
+      - adapter policy provider is claude-print or codex-exec
+      - provider command is missing or auth readiness check fails
+    when:
+      - specflow run prepares the adapter invocation
+    then:
+      - no provider process is invoked
+      - the run stops with adapter_unavailable
+      - the ledger names the failed provider and remediation hint
+
+  - journey_meta:
+      id: J-ADAPTER-DRY-RUN
+      persona: cautious_operator
+      owner_ticket: GENERATIVE-ADAPTER-01
+      assertion_bar: planned command and artifacts are printed without provider invocation
+    scenario: inspect adapter command before live execution
+    given:
+      - adapter policy exists
+    when:
+      - the operator runs specflow run with adapter dry-run enabled
+    then:
+      - Specflow prints provider command, prompt path, policy path, and output paths
+      - no Claude or Codex process is invoked

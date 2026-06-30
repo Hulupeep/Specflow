@@ -1,0 +1,32 @@
+run_contract:
+  loop: spec-build
+  goal: create audited tickets for controlled generative loop stage execution through local CLI adapters
+  input_artifact: conversation: execute generative loop stages with Claude/Codex subscriptions under tight controls
+  path: templates/QA/loops/spec-build.yaml
+  current_stage_or_rail: handoff
+  next_gate: audited and simulated ticket packet is ready for feature-build
+  durable_evidence:
+    - docs/specs/generative-loop-adapter/prd.md
+    - docs/specs/generative-loop-adapter/adversary-review.md
+    - docs/specs/generative-loop-adapter/falsification.md
+    - docs/specs/generative-loop-adapter/verdict.md
+    - docs/specs/generative-loop-adapter/hops.md
+    - docs/specs/generative-loop-adapter/contract.yml
+    - docs/specs/generative-loop-adapter/tickets.md
+    - docs/specs/generative-loop-adapter/tickets.json
+    - docs/specs/generative-loop-adapter/issues.json
+    - docs/specs/generative-loop-adapter/specflow-audit.md
+    - docs/specs/generative-loop-adapter/simulation.md
+  simulation_required: false
+  stop_condition: Stop at spec-build handoff. Feature-build may start from issue #80.
+  never_without_human:
+    - create issues from a DO_NOT_SHIP PRD
+    - push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
+  budgets:
+    adversary_cycles_max: 4
+    uplift_reaudits_max: 3
+  terminal_status: handoff

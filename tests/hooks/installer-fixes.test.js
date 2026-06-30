@@ -77,6 +77,63 @@ describe('install-hooks.sh', () => {
         expect(stat.mode & 0o100).toBeTruthy();
       }
     });
+
+    test('installs loop selector skill for Claude, Codex, and generic agents', () => {
+      const result = runInstaller();
+      expect(result.status).toBe(0);
+
+      for (const skillRoot of ['.claude/skills', '.codex/skills', '.agents/skills']) {
+        const skillPath = path.join(
+          targetDir,
+          skillRoot,
+          'specflow-loop-selector',
+          'SKILL.md'
+        );
+        expect(fs.existsSync(skillPath)).toBe(true);
+        const skill = fs.readFileSync(skillPath, 'utf8');
+        expect(skill).toContain('Mandatory Run Contract');
+        expect(skill).toContain('Mandatory Simulation Path');
+        expect(skill).toContain('simulation_required: true');
+        expect(skill).toContain('Continue through every currently unblocked stage/rail');
+        expect(skill).not.toContain('Advance exactly one stage or rail per tick');
+      }
+
+      expect(fs.existsSync(path.join(targetDir, 'AGENTS.md'))).toBe(true);
+      const agents = fs.readFileSync(path.join(targetDir, 'AGENTS.md'), 'utf8');
+      expect(agents).toContain('Specflow Loop Routing');
+      expect(agents).toContain('Specflow Simulation Path');
+      expect(agents).toContain('specflow-simulate');
+      expect(agents).toContain('Continuation rule');
+      expect(agents).toContain('Stop only for a true human gate');
+      expect(agents).toContain('If the skill is not listed');
+      expect(agents).toContain('Read the local `SKILL.md` file directly');
+      expect(result.stdout + result.stderr).toContain('specflow-loop-selector');
+    });
+
+    test('verify separates install health from project readiness blockers', () => {
+      const install = runInstaller();
+      expect(install.status).toBe(0);
+      fs.mkdirSync(path.join(targetDir, 'docs', 'contracts'), { recursive: true });
+
+      const normal = spawnSync('bash', [VERIFY_PATH], {
+        encoding: 'utf-8',
+        cwd: targetDir,
+        timeout: 10000,
+      });
+      const normalOutput = normal.stderr + normal.stdout;
+      expect(normal.status).toBe(0);
+      expect(normalOutput).toContain('Specflow install checks passed');
+      expect(normalOutput).toContain('Project readiness blockers:');
+      expect(normalOutput).toContain('No CLAUDE.md found');
+
+      const strict = spawnSync('bash', [VERIFY_PATH, '--strict'], {
+        encoding: 'utf-8',
+        cwd: targetDir,
+        timeout: 10000,
+      });
+      expect(strict.status).toBe(1);
+      expect(strict.stderr + strict.stdout).toContain('Strict verification failed');
+    });
   });
 
   describe('session-start.sh installed', () => {
@@ -212,6 +269,18 @@ describe('verify-setup.sh executable bit check (Bug 5 fix)', () => {
 
     // Should report "not executable" for the non-executable files
     expect(result.stderr + result.stdout).toContain('not executable');
+  });
+
+  test('flags missing loop selector skills as failures', () => {
+    const result = spawnSync('bash', [VERIFY_PATH], {
+      encoding: 'utf-8',
+      cwd: projectDir,
+      timeout: 10000,
+    });
+
+    const output = result.stderr + result.stdout;
+    expect(output).toContain('specflow-loop-selector/SKILL.md missing');
+    expect(output).toContain('agents may say the specflow-loop-selector skill is unavailable');
   });
 
   test('passes executable hook scripts', () => {

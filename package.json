@@ -15,6 +15,7 @@
     "hooks/",
     "templates/",
     "agents/",
+    "skills/",
     "scripts/",
     "setup-project.sh",
     "install-hooks.sh",

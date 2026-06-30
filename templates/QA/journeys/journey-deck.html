@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>道 — The Way of the Journey</title>
+<style>
+  :root{
+    --washi:#f4f1ea;       /* paper */
+    --sumi:#1f1d1a;        /* ink   */
+    --soft:#5c574e;        /* muted ink */
+    --shu:#c0392b;         /* vermilion (朱) */
+    --ai:#2b3a55;          /* indigo (藍) */
+    --line:#d8d2c4;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    background:var(--washi);
+    color:var(--sumi);
+    font-family:"Hiragino Mincho ProN","Yu Mincho",Georgia,"Times New Roman",serif;
+    overflow:hidden;
+  }
+  /* subtle paper grain */
+  body::before{
+    content:"";position:fixed;inset:0;pointer-events:none;opacity:.04;
+    background-image:radial-gradient(var(--sumi) .5px,transparent .5px);
+    background-size:7px 7px;
+  }
+  .deck{position:relative;height:100vh;width:100vw}
+  .slide{
+    position:absolute;inset:0;
+    display:none;
+    flex-direction:column;justify-content:center;
+    padding:8vh 11vw;
+    animation:fade .6s ease;
+  }
+  .slide.active{display:flex}
+  @keyframes fade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* giant faint kanji watermark */
+  .kanji{
+    position:absolute;top:50%;right:6vw;transform:translateY(-50%);
+    font-size:46vh;line-height:1;color:var(--sumi);opacity:.05;
+    user-select:none;pointer-events:none;font-weight:400;
+  }
+  .eyebrow{
+    font-size:.8rem;letter-spacing:.32em;text-transform:uppercase;
+    color:var(--shu);margin-bottom:1.4rem;font-family:Georgia,serif;
+  }
+  h1{font-size:clamp(2.4rem,6vw,5rem);font-weight:600;line-height:1.05;letter-spacing:-.01em}
+  h2{font-size:clamp(1.8rem,4vw,3rem);font-weight:600;line-height:1.12;max-width:18ch}
+  .lead{font-size:clamp(1.1rem,2.1vw,1.7rem);color:var(--soft);max-width:34ch;margin-top:1.6rem;line-height:1.5}
+  .term{font-size:1rem;letter-spacing:.06em;color:var(--ai);margin-top:.6rem;font-family:Georgia,serif}
+  .quote{font-style:italic;font-size:clamp(1.2rem,2.6vw,2rem);line-height:1.5;max-width:30ch}
+  .cite{margin-top:1.4rem;font-size:.85rem;letter-spacing:.12em;color:var(--soft);font-family:Georgia,serif;text-transform:uppercase}
+  ul{margin-top:1.5rem;max-width:46ch;list-style:none}
+  li{position:relative;padding-left:1.5em;margin:.7rem 0;font-size:clamp(1rem,1.8vw,1.35rem);line-height:1.5;color:#2c2924}
+  li::before{content:"—";position:absolute;left:0;color:var(--shu)}
+  li b{color:var(--sumi);font-weight:600}
+  .rule{width:60px;height:3px;background:var(--shu);margin:1.6rem 0}
+  .flow{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.8rem;font-family:Georgia,serif;font-size:clamp(.85rem,1.5vw,1.15rem)}
+  .flow span{background:#fff;border:1px solid var(--line);border-radius:2px;padding:.5rem .85rem;color:var(--ai)}
+  .flow i{color:var(--shu);font-style:normal;align-self:center}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem 2.5rem;margin-top:1.6rem;max-width:60ch}
+  .cols h3{font-family:Georgia,serif;font-size:.8rem;letter-spacing:.18em;text-transform:uppercase;color:var(--shu);margin-bottom:.3rem}
+  .cols p{font-size:clamp(.95rem,1.6vw,1.2rem);color:#2c2924;line-height:1.45}
+  .credits{font-family:Georgia,serif;font-size:.8rem;color:var(--soft);line-height:1.7;max-width:50ch;margin-top:1.4rem}
+
+  /* chrome */
+  .nav{position:fixed;bottom:3vh;left:0;right:0;display:flex;justify-content:center;gap:.55rem;z-index:10}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--line);border:none;cursor:pointer;padding:0;transition:.2s}
+  .dot.on{background:var(--shu);transform:scale(1.35)}
+  .count{position:fixed;bottom:3vh;right:4vw;font-family:Georgia,serif;font-size:.8rem;color:var(--soft);letter-spacing:.1em;z-index:10}
+  .hint{position:fixed;bottom:3vh;left:4vw;font-family:Georgia,serif;font-size:.72rem;color:var(--soft);letter-spacing:.08em;z-index:10}
+  .romaji{font-family:Georgia,serif;color:var(--ai)}
+  @media(max-width:680px){.kanji{opacity:.04;font-size:38vh}.cols{grid-template-columns:1fr}.slide{padding:7vh 8vw}}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+  <!-- 1 -->
+  <section class="slide active">
+    <div class="kanji">道</div>
+    <div class="eyebrow">Journeys at AI-Claims</div>
+    <h1>The Way of<br/>the Journey</h1>
+    <p class="lead">Why we map journeys, and how a designer turns a promise into a contract we can prove.</p>
+    <p class="term"><span class="romaji">dō / michi</span> — 道 — “the way; the path one walks”</p>
+  </section>
+
+  <!-- 2 -->
+  <section class="slide">
+    <div class="kanji">道</div>
+    <div class="eyebrow">The thesis</div>
+    <h2>A journey is a 道 — the whole path a person walks, not the stones underfoot.</h2>
+    <p class="lead">Stories pave the stones. A journey is the <i>walking</i> — start to finish, on real ground. We build the stones; we are paid for the walk.</p>
+  </section>
+
+  <!-- 3 — Basho -->
+  <section class="slide">
+    <div class="kanji">旅</div>
+    <div class="eyebrow">Matsuo Bashō · 奥の細道 · 1689</div>
+    <p class="quote">“The months and days are the travellers of eternity. The years that come and go are travellers too.”</p>
+    <div class="rule"></div>
+    <p class="lead">Bashō walked the narrow road and <b>wrote down each station</b>. A journey contract is that travel diary: the path, recorded, so anyone can walk it again and know they arrived.</p>
+    <p class="cite">Oku no Hosomichi — The Narrow Road to the Deep North</p>
+  </section>
+
+  <!-- 4 — Ma -->
+  <section class="slide">
+    <div class="kanji">間</div>
+    <div class="eyebrow">間 · ma — the meaningful interval</div>
+    <h2>The journey lives in the gaps between the steps.</h2>
+    <p class="lead"><span class="romaji">ma</span> is the space <i>between</i> — and it is where a real person gets stranded: a missing redirect, a balance that reads zero, a record that never reaches the next screen. Button A passes. Button B passes. The human is stuck in the <span class="romaji">ma</span>. <b>Journeys test the walking, not the stones.</b></p>
+  </section>
+
+  <!-- 5 — DoD -->
+  <section class="slide">
+    <div class="kanji">完</div>
+    <div class="eyebrow">Definition of Done</div>
+    <h2>“Done” is not “the button works.” Done is: a real human finished, on real data.</h2>
+    <ul>
+      <li>A feature ships when its <b>CRITICAL</b> journeys are green against the <b>real</b> backend.</li>
+      <li>Real session, not mocks. Every assertion checks a real value — a record, a status, a number.</li>
+      <li>The list of what must pass lives in <span class="romaji">CONTRACT_INDEX.yml → definition_of_done</span>.</li>
+    </ul>
+  </section>
+
+  <!-- 6 — Kata -->
+  <section class="slide">
+    <div class="kanji">型</div>
+    <div class="eyebrow">型 · kata — the perfected form</div>
+    <h2>The journey contract is a kata: the agreed form you must be able to perform.</h2>
+    <p class="lead">In Noh and the martial arts, the <span class="romaji">kata</span> is the form rehearsed until it can be performed flawlessly, on demand. The <span class="romaji">journey_*.yml</span> is our kata — written down, registered, and demonstrated green before we claim mastery.</p>
+    <p class="cite">Zeami, Fūshikaden · the Noh treatises</p>
+  </section>
+
+  <!-- 7 — what we must have / the wall -->
+  <section class="slide">
+    <div class="kanji">図</div>
+    <div class="eyebrow">What we must have, to build</div>
+    <h2>The wall first. Then agreement. Then — and only then — the CSV.</h2>
+    <p class="lead">You digitize only what has been <b>seen whole and agreed</b>. The CSV is not the start; it is the moment the journey goes digital.</p>
+    <div class="flow">
+      <span>① Map on the wall · Figma/FigJam</span><i>→</i>
+      <span>② Agree the set + tiers</span><i>→</i>
+      <span>③ Convert to CSV</span><i>→</i>
+      <span>spec → yaml → e2e</span>
+    </div>
+  </section>
+
+  <!-- 8 — shu ha ri -->
+  <section class="slide">
+    <div class="kanji">守破離</div>
+    <div class="eyebrow">守破離 · shu-ha-ri — the arc of mastery</div>
+    <h2>How a journey grows up.</h2>
+    <div class="cols">
+      <div><h3>守 Shu — keep the form</h3><p>Map it on the wall, agree it, write it into the CSV. Follow the path exactly as drawn.</p></div>
+      <div><h3>破 Ha — embody it</h3><p>Spec → machine-readable contract → real-backend e2e. The form becomes enforceable; it goes green.</p></div>
+      <div><h3>離 Ri — let it live</h3><p>The journey is alive and visible; it changes only through the ritual, never by editing the YAML in the dark.</p></div>
+    </div>
+    <p class="cite">Sen no Rikyū (tea) · later the martial Ways</p>
+  </section>
+
+  <!-- 9 — makoto -->
+  <section class="slide">
+    <div class="kanji">誠</div>
+    <div class="eyebrow">誠 · makoto — sincerity, truth</div>
+    <h2>Prove it on real ground, or you have proved nothing.</h2>
+    <ul>
+      <li><b>Real backend</b> — a seeded real user, not a mocked API pretending.</li>
+      <li><b>Oracle-anchored</b> — assert the real value; where a wrong answer exists, assert it is <i>not</i> shown.</li>
+      <li>A green-under-mocks journey is <span class="romaji">tatemae</span> — the polite façade. We require <span class="romaji">makoto</span>.</li>
+    </ul>
+    <p class="quote" style="margin-top:1.4rem">“Perceive that which cannot be seen with the eye.”</p>
+    <p class="cite">Miyamoto Musashi · 五輪書 The Book of Five Rings · 1645</p>
+  </section>
+
+  <!-- 10 — visibility -->
+  <section class="slide">
+    <div class="kanji">見</div>
+    <div class="eyebrow">Keeping journeys visible</div>
+    <h2>The YAML is the destination, never the origin — so it never goes obscure.</h2>
+    <p class="lead">Truth flows one way: <b>wall → CSV → spec → YAML → e2e</b>. Nobody invents a journey inside the YAML. Three views, kept in sync, share one vocabulary — the <span class="romaji">journey_id</span>:</p>
+    <ul>
+      <li><b>The wall</b> (Figma) — the human map, every node tagged with its journey id.</li>
+      <li><b>The board</b> — a dashboard generated from CONTRACT_INDEX: passing / failing / stub / last-verified, visible at a glance.</li>
+      <li><b>The YAML</b> — the enforceable detail, linked both ways.</li>
+    </ul>
+  </section>
+
+  <!-- 11 — kaizen / change -->
+  <section class="slide">
+    <div class="kanji">改善</div>
+    <div class="eyebrow">改善 · kaizen — changing a journey</div>
+    <h2>Change it the way it was born: from the wall, through agreement, down the ladder.</h2>
+    <div class="cols">
+      <div><h3>Refinement</h3><p>Add a step, tighten a check. Same id. Update spec + YAML + e2e in one PR; re-prove.</p></div>
+      <div><h3>Material change</h3><p>The promise changes (outcome / tier). Back to the wall, re-agree. Shared rule? An ADR.</p></div>
+      <div><h3>Supersession</h3><p>Replaced. Retire the old id (<span class="romaji">status: retired</span>), create a new one. Never mutate a passing meaning in the dark.</p></div>
+      <div><h3>Always</h3><p>Reset the proof: <span class="romaji">status: not_tested</span> until green again. The id is stable; its meaning is governed.</p></div>
+    </div>
+  </section>
+
+  <!-- 12 — specflow -->
+  <section class="slide">
+    <div class="kanji">契</div>
+    <div class="eyebrow">How this relates to specflow</div>
+    <h2>Journeys <i>are</i> specflow — at the altitude of the whole task.</h2>
+    <div class="cols">
+      <div><h3>Feature contract — the inner loop</h3><p><span class="romaji">feature_*.yml</span> asserts an <b>invariant</b> (“only this service writes X”), enforced by fast <span class="romaji">tests/contracts/*</span>.</p></div>
+      <div><h3>Journey contract — the outer loop</h3><p><span class="romaji">journey_*.yml</span> asserts a <b>promise</b> (a human finishes the task), enforced by real-backend <span class="romaji">e2e</span>.</p></div>
+    </div>
+    <p class="lead">One registry, one gate (<span class="romaji">specflow:verify + test:contracts</span>), one creed: <b>contract before code, verify before done.</b> A journey’s <span class="romaji">covers_reqs</span> ties it to the feature requirements it proves.</p>
+  </section>
+
+  <!-- 13 — designer -->
+  <section class="slide">
+    <div class="kanji">筆</div>
+    <div class="eyebrow">For the designer — your hand on the brush</div>
+    <h2>Your job is Step 1: one CSV row per journey. Two columns carry the weight.</h2>
+    <div class="cols">
+      <div><h3>success_outcome — the oracle</h3><p>One <i>checkable fact</i>: a record, a status, a number. “Status reads ‘Filed’ and a NOL row exists.” Never a feeling.</p></div>
+      <div><h3>parity_baseline — sorts the tier</h3><p>How a person does this today (adjuster / spreadsheet / portal). Must-match → CRITICAL. Can’t-do-today → DIFFERENTIATOR.</p></div>
+    </div>
+    <p class="lead">Describe intent, not UI. Engineering names the selectors. Get these two right and the contract almost writes itself.</p>
+    <p class="cite">Template: QA/journeys/journey_map_TEMPLATE.csv</p>
+  </section>
+
+  <!-- 14 — close -->
+  <section class="slide">
+    <div class="kanji">道</div>
+    <div class="eyebrow">The road</div>
+    <p class="quote">“Every day is a journey, and the journey itself home.”</p>
+    <p class="cite">Matsuo Bashō · Oku no Hosomichi</p>
+    <div class="rule"></div>
+    <p class="credits">
+      <b>Referenced —</b> Matsuo Bashō, <i>Oku no Hosomichi</i> (The Narrow Road to the Deep North), 1689–94 ·
+      Miyamoto Musashi, <i>Go Rin no Sho</i> (The Book of Five Rings), 1645 ·
+      Zeami Motokiyo, <i>Fūshikaden</i> (Noh treatises) ·
+      the concept of 道 dō, 間 ma, 型 kata, 守破離 shu-ha-ri, 誠 makoto, 改善 kaizen
+      in the Japanese aesthetic and martial tradition.<br/><br/>
+      <b>Reads with —</b> QA/journeys-how-to.md · QA/journeys/journey_map_TEMPLATE.csv · QA/journeys/examples/
+    </p>
+  </section>
+
+</div>
+
+<div class="nav" id="nav"></div>
+<div class="count" id="count"></div>
+<div class="hint">← → / space · click dots</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  const nav = document.getElementById('nav');
+  const count = document.getElementById('count');
+  let i = 0;
+  slides.forEach((_, n) => {
+    const b = document.createElement('button');
+    b.className = 'dot'; b.setAttribute('aria-label', 'Slide ' + (n+1));
+    b.onclick = () => go(n);
+    nav.appendChild(b);
+  });
+  const dots = Array.from(nav.children);
+  function go(n){
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle('active', k === i));
+    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    count.textContent = (i+1) + ' / ' + slides.length;
+    location.hash = i + 1;
+  }
+  function next(){ go(i + 1); }
+  function prev(){ go(i - 1); }
+  document.addEventListener('keydown', e => {
+    if (['ArrowRight','ArrowDown',' ','PageDown'].includes(e.key)){ e.preventDefault(); next(); }
+    else if (['ArrowLeft','ArrowUp','PageUp'].includes(e.key)){ e.preventDefault(); prev(); }
+    else if (e.key === 'Home'){ go(0); } else if (e.key === 'End'){ go(slides.length-1); }
+  });
+  // click right/left half of screen to advance/retreat (ignore clicks on dots)
+  document.getElementById('deck').addEventListener('click', e => {
+    (e.clientX > window.innerWidth/2) ? next() : prev();
+  });
+  const start = parseInt((location.hash || '').replace('#',''), 10);
+  go(Number.isFinite(start) && start > 0 ? start - 1 : 0);
+</script>
+</body>
+</html>

@@ -1,0 +1,87 @@
+feature: loop-runtime-optimization
+requirements:
+  - id: REQ-01
+    statement: Add a local specflow run command that contracts and executes unblocked loop stages.
+  - id: REQ-02
+    statement: Validate run_contract schema before advancing loop state.
+  - id: REQ-03
+    statement: Persist compact loop ledger entries after every gate.
+  - id: REQ-04
+    statement: Block feature-build readiness when ticket simulation evidence is missing or stale.
+  - id: REQ-05
+    statement: Position Specflow as a contracted loop runtime, not a hosted scheduler.
+  - id: REQ-06
+    statement: Report loop counters for accepted-change quality and stop reasons.
+journeys:
+  - journey_meta:
+      id: J-LOOP-RUN-SPECBUILD
+      persona: specflow_operator
+      owner_ticket: LOOP-RUNTIME-01
+      assertion_bar: re-read run_contract and ledger values
+    scenario: start a local spec-build loop through the CLI
+    given:
+      - templates/QA/loops/spec-build.yaml exists
+      - skills/specflow-loop-selector/SKILL.md exists
+    when:
+      - the operator runs specflow run spec-build with slug, goal, and input
+    then:
+      - a run_contract is written with loop spec-build
+      - a ledger entry records the selected path and first gate result
+
+  - journey_meta:
+      id: J-LOOP-RESUME
+      persona: interrupted_operator
+      owner_ticket: LOOP-RUNTIME-01
+      assertion_bar: current stage advances from persisted state
+    scenario: resume after an interrupted loop run
+    given:
+      - a run_contract exists with current_stage_or_rail GATE_B5
+      - the ledger contains prior Gate B evidence
+    when:
+      - the operator runs the same specflow run command
+    then:
+      - the runner resumes at GATE_B5
+      - discovery and draft are not rerun
+
+  - journey_meta:
+      id: J-LOOP-INVALID-CONTRACT
+      persona: ci_maintainer
+      owner_ticket: LOOP-RUNTIME-01
+      assertion_bar: validation error plus no state advance
+    scenario: reject an invalid run contract
+    given:
+      - a run_contract is missing next_gate
+    when:
+      - the runner validates the contract
+    then:
+      - the command exits non-zero with the missing field named
+      - current_stage_or_rail remains unchanged
+
+  - journey_meta:
+      id: J-LOOP-POSITIONING
+      persona: skeptical_adopter
+      owner_ticket: LOOP-RUNTIME-02
+      assertion_bar: docs re-read exact product boundary
+    scenario: understand prompt versus contracted loop
+    given:
+      - the README and loop docs are installed
+    when:
+      - a user reads the positioning section and command examples
+    then:
+      - the user sees that Specflow adds state, verifier gates, and stop rules
+      - the docs do not claim hosted scheduling or background execution
+
+  - journey_meta:
+      id: J-LOOP-INSTALL-DISCOVERY
+      persona: fresh_codespace_agent
+      owner_ticket: LOOP-RUNTIME-02
+      assertion_bar: skill path is discoverable after install
+    scenario: agent discovers the loop selector in a new codespace
+    given:
+      - npx @colmbyrne/specflow init has completed
+    when:
+      - an agent is asked to run spec-build or feature-build
+    then:
+      - AGENTS.md points to the local loop selector skill paths
+      - the skill or fallback instructions require a concrete run_contract
+

@@ -3,6 +3,7 @@
 const { execSync } = require('child_process');
 const { resolve, dirname, join } = require('path');
 const { existsSync, readFileSync, writeFileSync, readdirSync } = require('fs');
+const { cli: runSpecflowLoop } = require('../scripts/specflow-runner.cjs');
 
 // Specflow root is one level up from bin/
 const SPECFLOW_ROOT = resolve(dirname(__filename), '..');
@@ -36,11 +37,12 @@ const COMMANDS = {
     },
   },
   verify: {
-    usage: 'specflow verify',
-    desc: 'Check Specflow installation (hooks, contracts, version)',
-    run: () => {
+    usage: 'specflow verify [--strict]',
+    desc: 'Check Specflow installation; --strict also fails on project-readiness blockers',
+    run: (args) => {
+      const strictFlag = args.includes('--strict') ? '--strict' : '';
       normalizeShellScripts(SPECFLOW_ROOT);
-      exec(`bash "${SPECFLOW_ROOT}/verify-setup.sh"`);
+      exec(`bash "${SPECFLOW_ROOT}/verify-setup.sh" ${strictFlag}`);
     },
   },
   update: {
@@ -132,6 +134,14 @@ const COMMANDS = {
       exec(`node "${script}" "${dir}"`);
     },
   },
+  run: {
+    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--adapter-policy <path>]',
+    desc: 'Run or resume a local contracted Specflow loop',
+    run: (args) => {
+      const code = runSpecflowLoop(args);
+      if (code) process.exit(code);
+    },
+  },
 };
 
 function exec(cmd) {
@@ -175,6 +185,7 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  npx @colmbyrne/specflow update . --ci');
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
+  console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
   console.log('  npx @colmbyrne/specflow graph\n');
   process.exit(0);
 }

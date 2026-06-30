@@ -70,7 +70,7 @@ echo ""
 # 1. Check requirements
 # ============================================================================
 
-echo -e "${BLUE}[1/5]${NC} Checking requirements..."
+echo -e "${BLUE}[1/6]${NC} Checking requirements..."
 
 if ! command -v jq &> /dev/null; then
   echo -e "${RED}✗${NC}  jq not found — required for hook JSON parsing"
@@ -92,7 +92,7 @@ echo ""
 # 2. Create .claude directory structure
 # ============================================================================
 
-echo -e "${BLUE}[2/5]${NC} Creating .claude directory structure..."
+echo -e "${BLUE}[2/6]${NC} Creating .claude directory structure..."
 
 mkdir -p "$TARGET_DIR/.claude/hooks"
 
@@ -103,7 +103,7 @@ echo ""
 # 3. Copy hook files
 # ============================================================================
 
-echo -e "${BLUE}[3/5]${NC} Installing hook files..."
+echo -e "${BLUE}[3/6]${NC} Installing hook files..."
 
 # Copy all hook scripts (dynamic — picks up new hooks automatically)
 for script in "$HOOKS_DIR"/*.sh; do
@@ -194,10 +194,70 @@ fi
 echo ""
 
 # ============================================================================
-# 4. Install CI workflows (optional)
+# 4. Refresh QA loops kit + gate scripts
 # ============================================================================
 
-echo -e "${BLUE}[4/5]${NC} CI workflow installation..."
+echo -e "${BLUE}[4/6]${NC} Refreshing QA loops kit + gate scripts..."
+
+REFRESHED_KIT=false
+if [ -d "$SCRIPT_DIR/templates/QA" ]; then
+  mkdir -p "$TARGET_DIR/QA"
+  cp -a "$SCRIPT_DIR/templates/QA/." "$TARGET_DIR/QA/"
+  QA_FILES=$(find "$TARGET_DIR/QA" -type f | wc -l | tr -d ' ')
+  echo -e "${GREEN}✓${NC} Refreshed QA/ ($QA_FILES files)"
+  REFRESHED_KIT=true
+  if [ -f "$SCRIPT_DIR/templates/PROCESS.md" ]; then
+    cp -a "$SCRIPT_DIR/templates/PROCESS.md" "$TARGET_DIR/PROCESS.md"
+    echo -e "${GREEN}✓${NC} Refreshed PROCESS.md"
+  fi
+fi
+if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
+  mkdir -p "$TARGET_DIR/scripts"
+  for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+    cp "$script" "$TARGET_DIR/scripts/"
+    echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
+  done
+  REFRESHED_KIT=true
+fi
+if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
+  if [ ! -f "$TARGET_DIR/AGENTS.md" ]; then
+    cp -a "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"
+    echo -e "${GREEN}✓${NC} Installed AGENTS.md"
+  elif ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
+    {
+      echo ""
+      cat "$SCRIPT_DIR/templates/AGENTS.md"
+    } >> "$TARGET_DIR/AGENTS.md"
+    echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
+  else
+    echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
+  fi
+  REFRESHED_KIT=true
+fi
+if [ -d "$SCRIPT_DIR/skills" ]; then
+  for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do
+    mkdir -p "$TARGET_DIR/$skill_target"
+    for skill_dir in "$SCRIPT_DIR/skills/"*; do
+      if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
+        rm -rf "$TARGET_DIR/$skill_target/$(basename "$skill_dir")"
+        cp -a "$skill_dir" "$TARGET_DIR/$skill_target/"
+      fi
+    done
+    echo -e "${GREEN}✓${NC} Installed Specflow skills → $skill_target/"
+  done
+  REFRESHED_KIT=true
+fi
+if [ "$REFRESHED_KIT" = false ]; then
+  echo -e "${YELLOW}⚠️${NC}  QA kit/scripts not in source (curl install?) — run 'specflow init' from the package to install them"
+fi
+
+echo ""
+
+# ============================================================================
+# 5. Install CI workflows (optional)
+# ============================================================================
+
+echo -e "${BLUE}[5/6]${NC} CI workflow installation..."
 
 CI_DIR="$SCRIPT_DIR/templates/ci"
 WORKFLOWS_DIR="$TARGET_DIR/.github/workflows"
@@ -265,6 +325,17 @@ done
 if [ ! -f "$TARGET_DIR/.claude/settings.json" ]; then
   INSTALL_OK=false
 fi
+for skill_path in \
+  ".claude/skills/specflow-loop-selector/SKILL.md" \
+  ".codex/skills/specflow-loop-selector/SKILL.md" \
+  ".agents/skills/specflow-loop-selector/SKILL.md"; do
+  if [ ! -f "$TARGET_DIR/$skill_path" ]; then
+    INSTALL_OK=false
+  fi
+done
+if [ ! -f "$TARGET_DIR/AGENTS.md" ] || ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
+  INSTALL_OK=false
+fi
 
 if [ "$INSTALL_OK" = true ]; then
   echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
@@ -285,6 +356,17 @@ echo "  .claude/hooks/post-build-check.sh  - Detects build/commit"
 echo "  .claude/hooks/run-journey-tests.sh - Runs targeted tests"
 echo "  .claude/hooks/post-push-ci.sh      - CI status after push"
 echo "  .claude/hooks/README.md            - Documentation"
+echo "  .claude/skills/specflow-loop-selector - Claude Code loop router"
+echo "  .codex/skills/specflow-loop-selector  - Codex loop router"
+echo "  .agents/skills/specflow-loop-selector - Generic agent loop router"
+echo "  AGENTS.md                         - Agent bootstrap instructions"
+echo ""
+if [ ! -f "$TARGET_DIR/.codex/skills/specflow-loop-selector/SKILL.md" ]; then
+  echo -e "${YELLOW}Skill note:${NC} specflow-loop-selector is missing from .codex/skills."
+  echo "  If you installed from a raw curl script, run instead:"
+  echo "    npx @colmbyrne/specflow init ."
+  echo "  Then restart/reload the agent session so project-local skills are indexed."
+fi
 echo ""
 
 echo -e "${YELLOW}How it works:${NC}"

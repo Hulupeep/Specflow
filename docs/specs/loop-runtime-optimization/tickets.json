@@ -1,0 +1,42 @@
+[
+  {
+    "id": "LOOP-RUNTIME-01",
+    "title": "Add local contracted loop runner and ledger",
+    "writes": ["verify", "spec-build", "feature-build"],
+    "reads": ["spec-build", "feature-build", "verify-falsification", "verify-seams"],
+    "adrNone": "This repository does not currently use an ADR directory; reuse is declared against existing Specflow scripts and loop templates.",
+    "reuses": [
+      "bin/specflow.js",
+      "skills/specflow-loop-selector/SKILL.md",
+      "templates/QA/loops/spec-build.yaml",
+      "templates/QA/loops/feature-build.yaml",
+      "scripts/verify-falsification.cjs",
+      "scripts/verify-ticket-journey.cjs",
+      "scripts/verify-seams.cjs"
+    ],
+    "journeys": [
+      "J-LOOP-RUN-SPECBUILD",
+      "J-LOOP-RESUME",
+      "J-LOOP-INVALID-CONTRACT"
+    ]
+  },
+  {
+    "id": "LOOP-RUNTIME-02",
+    "title": "Position Specflow as a contracted loop runtime",
+    "writes": ["init", "verify", "spec-build"],
+    "reads": ["feature-build"],
+    "adrNone": "This repository does not currently use an ADR directory; reuse is declared against existing docs, install, and skill files.",
+    "reuses": [
+      "README.md",
+      "templates/AGENTS.md",
+      "templates/QA/loops/README.md",
+      "docs/getting-started.md",
+      "setup-project.sh",
+      "package.json"
+    ],
+    "journeys": [
+      "J-LOOP-POSITIONING",
+      "J-LOOP-INSTALL-DISCOVERY"
+    ]
+  }
+]

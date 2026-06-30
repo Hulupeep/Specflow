@@ -30,6 +30,11 @@
  *    Validates one hash-bound sign-off (exists, parses, hash matches, has signer).
  *    Used by GATE_A for the falsification PASS binding and by GATE D for hop-table
  *    amendments — same sign/check pattern, any artifact. Exit 0 = valid, 1 = invalid.
+ *
+ * 4. CHECK-GATE-D (epic integration gate, optional sign-off policy):
+ *      node scripts/teardown-gate.cjs check-gate-d <gate-d-dir>
+ *    Validates hop findings, evidence, value-bearing evidence, red-hop dispositions, and
+ *    only enforces sign-offs when signoff-policy.json says they are required.
  */
 
 const { createHash } = require('crypto');
@@ -69,6 +74,112 @@ function extractJourneys(content) {
   return ids;
 }
 
+function extractJourneyDetails(content) {
+  const details = [];
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    const m = trimmed.match(JOURNEY_ID);
+    if (!m) continue;
+    details.push({
+      id: m[1],
+      valueBearing: /\b(value[-_ ]bearing|oracle|re-read|expected value)\b/i.test(trimmed),
+    });
+  }
+  return details;
+}
+
+function loadGateDPolicy(dir) {
+  const policyPath = join(dir, 'signoff-policy.json');
+  if (!existsSync(policyPath)) return { signoff_policy: { required: false, artifacts: [] } };
+  let policy;
+  try {
+    policy = JSON.parse(readFileSync(policyPath, 'utf8'));
+  } catch {
+    return { error: 'signoff-policy.json is not valid JSON' };
+  }
+  const signoff = policy.signoff_policy || policy.signoffPolicy || {};
+  return {
+    signoff_policy: {
+      required: signoff.required === true,
+      artifacts: Array.isArray(signoff.artifacts) ? signoff.artifacts : [],
+    },
+  };
+}
+
+function splitFindingSections(content) {
+  const sections = [];
+  const re = /^#+\s*J:\s*([A-Za-z0-9][A-Za-z0-9_-]*)[^\n]*\n?/gm;
+  const matches = [...content.matchAll(re)];
+  matches.forEach((match, i) => {
+    const start = match.index + match[0].length;
+    const end = i + 1 < matches.length ? matches[i + 1].index : content.length;
+    sections.push({ id: match[1], body: content.slice(start, end) });
+  });
+  return sections;
+}
+
+function evidenceRefs(body) {
+  return [...body.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp|txt|json)/g)].map(m => m[0]);
+}
+
+function checkGateD(dir) {
+  const map = join(dir, 'journey-map.md');
+  const findings = join(dir, 'findings.md');
+  const errs = [];
+
+  if (!existsSync(map)) errs.push('journey-map.md missing');
+  if (!existsSync(findings)) errs.push('findings.md missing');
+
+  const policy = loadGateDPolicy(dir);
+  if (policy.error) errs.push(policy.error);
+
+  if (policy.signoff_policy?.required) {
+    const artifacts = policy.signoff_policy.artifacts.length ? policy.signoff_policy.artifacts : ['journey-map.md', 'gate-d-result.md'];
+    for (const artifact of artifacts) {
+      const err = checkSignoff(join(dir, artifact));
+      if (err) errs.push(`${artifact}: ${err}`);
+    }
+  }
+
+  if (existsSync(map) && existsSync(findings)) {
+    const mapContent = readFileSync(map, 'utf8');
+    const mapHops = extractJourneyDetails(mapContent);
+    const mapIds = new Set(mapHops.map(h => h.id));
+    const valueBearing = new Set(mapHops.filter(h => h.valueBearing).map(h => h.id));
+    const findContent = readFileSync(findings, 'utf8');
+    const sections = splitFindingSections(findContent);
+    const byId = new Map(sections.map(s => [s.id, s.body]));
+
+    if (mapHops.length === 0) errs.push(`journey map defines no hops (expected lines like "- J: <id> — <purpose>")`);
+    for (const id of mapIds) {
+      if (!byId.has(id)) errs.push(`hop silently skipped: ${id} is in the map but has no findings entry`);
+    }
+
+    for (const { id, body } of sections) {
+      const refs = evidenceRefs(body);
+      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json)`);
+      for (const r of refs) if (!existsSync(join(dir, r))) errs.push(`dangling evidence: ${r} referenced for ${id} but file does not exist`);
+
+      if (valueBearing.has(id) && !refs.some(r => /\.(txt|json)$/.test(r))) {
+        errs.push(`value evidence missing: ${id} is value-bearing and needs .txt/.json oracle re-read evidence`);
+      }
+
+      const isRed = /\b(status|result)\s*:\s*(red|broken|fail(?:ed|ure)?)\b/i.test(body) || /\b(red hop|broken|failed)\b/i.test(body);
+      if (isRed && !/\bdisposition\s*:\s*(bug|stale-oracle)\b/i.test(body)) {
+        errs.push(`missing disposition: red hop ${id} must declare disposition: bug or stale-oracle`);
+      }
+      if (/\bdisposition\s*:\s*stale-oracle\b/i.test(body) && !/\b(amendment|provenance|countersign|counter-sign)\s*:/i.test(body)) {
+        errs.push(`stale-oracle incomplete: ${id} needs amendment/provenance path`);
+      }
+    }
+  }
+
+  if (errs.length === 0) { console.error('✓ Gate D checks pass: hops complete, evidence resolves, value evidence and dispositions valid'); process.exit(0); }
+  console.error('✗ Gate D check FAILED:');
+  for (const e of errs) console.error(`  - ${e}`);
+  process.exit(1);
+}
+
 function check(dir) {
   const map = join(dir, 'journey-map.md');
   const findings = join(dir, 'findings.md');
@@ -89,7 +200,7 @@ function check(dir) {
     const sections = findContent.split(/^#+\s*J:/m).slice(1);
     sections.forEach(sec => {
       const id = (sec.match(/^\s*([A-Za-z0-9][A-Za-z0-9_-]*)/) || [])[1] || '?';
-      const refs = [...sec.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp|txt|json)/g)].map(m => m[0]);
+      const refs = evidenceRefs(sec);
       if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json) — "I walked it" is not evidence`);
       for (const r of refs) if (!existsSync(join(dir, r))) errs.push(`dangling evidence: ${r} referenced for ${id} but file does not exist`);
     });
@@ -108,7 +219,7 @@ function check(dir) {
   process.exit(1);
 }
 
-module.exports = { sha256, extractJourneys, checkSignoff };
+module.exports = { sha256, extractJourneys, extractJourneyDetails, checkSignoff, loadGateDPolicy, splitFindingSections, evidenceRefs };
 
 if (require.main === module) {
   const [, , cmd, target, ...rest] = process.argv;
@@ -119,13 +230,15 @@ if (require.main === module) {
     sign(target, by);
   } else if (cmd === 'check' && target) {
     check(target);
+  } else if (cmd === 'check-gate-d' && target) {
+    checkGateD(target);
   } else if (cmd === 'check-sign' && target) {
     const err = checkSignoff(target);
     if (err) { console.error(`✗ ${err}`); process.exit(1); }
     console.error(`✓ valid sign-off for ${basename(target)} (hash matches current content)`);
     process.exit(0);
   } else {
-    console.error('Usage: teardown-gate.cjs sign <file> --by "<name>" | check <teardown-dir> | check-sign <file>');
+    console.error('Usage: teardown-gate.cjs sign <file> --by "<name>" | check <teardown-dir> | check-gate-d <gate-d-dir> | check-sign <file>');
     process.exit(2);
   }
 }

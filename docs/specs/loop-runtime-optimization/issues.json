@@ -1,0 +1,12 @@
+[
+  {
+    "number": 77,
+    "title": "[SPECFLOW] LOOP-RUNTIME-01: add local contracted loop runner and ledger",
+    "body": "Journey IDs: J-LOOP-RUN-SPECBUILD, J-LOOP-RESUME, J-LOOP-INVALID-CONTRACT\n\nSee docs/specs/loop-runtime-optimization/tickets.md for the uplifted local issue body."
+  },
+  {
+    "number": 78,
+    "title": "[SPECFLOW] LOOP-RUNTIME-02: position Specflow as a contracted loop runtime",
+    "body": "Journey IDs: J-LOOP-POSITIONING, J-LOOP-INSTALL-DISCOVERY\n\nSee docs/specs/loop-runtime-optimization/tickets.md for the uplifted local issue body."
+  }
+]

@@ -1,0 +1,155 @@
+# feature-build.yaml — the reusable PATH for the feature-build loop (PROCESS.md Step 6→7).
+# The prompt only supplies: goal + issue + automation. Each invocation: load this path,
+# LOCATE the current rail from branch + CI state, advance all unblocked rails, persist after
+# each rail, stop only on HITL/external CI wait/block/done.
+loop: feature-build
+process_ref: PROCESS.md#step-6-7
+principle: you and any swarm are muscle; per-slice trust lives ONLY in GATE C (branch-protected
+  CI vs real data); EPIC-level trust lives in GATE D (epic_gate below) — a slice's contract test
+  is necessary but not sufficient; the gate of record is the persona walk on the merged tree.
+
+execution:
+  continue_until: >
+    Keep going through every currently unblocked rail in this invocation. Persist the diff
+    and evidence note after each rail. A soft rail is work to perform now, not a reason to stop.
+  stop_only_when:
+    - a never_without_human action would be required
+    - branch-protected CI requires a human push/PR/opening action before Gate C exists
+    - required ticket/contract/journey/provenance evidence is missing and cannot be derived
+    - repair is slow or externally blocked
+    - Gate C is green and the branch is ready for review.
+
+progress_display:             # EMIT this at the START of every tick so the human sees the rail
+  rule: >
+    Re-render the map below with marks: ✓ completed · ▶ current · · pending · ⛔ hard wall.
+    GATE_C stays ⛔ until CI is green vs the real seeded backend and provenance passes. Show "now / next / blocked-on" + CI status under it.
+  template: |
+    ┌──────────────────────── FEATURE-BUILD #{issue} ────────────────────────┐
+      ticket ─▶ contract ─▶ e2e ─▶ oracle ─▶ impl ─▶ prov ─▶ HITL ═╣⛔C╠═▶ ready-for-review
+        {r1}      {r2}      {r3}     {r4}    {r5}    {r6}    {h}      {c}
+                  ▲____________ ↺ repair ___________│
+    └─────────────────────────────────────────────────────────────────────────┘
+      now: {current_rail}   next: {next_rail}   CI: {ci_status}   blocked-on: {blocker_or_none}
+      muscle run: /qa {qa_status} · swarm {swarm_used}      ╣⛔╠ GATE C (CI vs real backend)
+
+inputs:
+  goal: ${goal}               # e.g. "branch for #566 green on CI, ready for review"
+  issue: ${issue}             # e.g. 566
+
+state:
+  branch: feat/${issue}-${slug}
+  evidence: an evidence note on the branch/thread (diff, test results, oracle, audit rows)
+  gate_c: branch-protected CI vs a real seeded backend
+
+preconditions:
+  - issue has Gherkin ACs + data-testids + contract ref + e2e filename (Rule 1) else escalate
+  - constraint: slice < 1000 lines (else propose a 4–8 slice split)
+
+rails:                        # advance all unblocked rails in order
+  - id: 1_ticket
+    gate: ticket + ACs + journey id confirmed
+  - id: 2_contract
+    gate: contract YAML stub → full (steps + selectors from catalogue)
+  - id: 3_e2e
+    gate: real-backend e2e test runs against a real seeded backend
+  - id: 4_oracle
+    gate: every asserted number traced to the live calc / real source (never guessed)
+  - id: 5_impl
+    gate: smallest mergeable slice (<1000 lines) makes it pass
+  - id: 6_provenance
+    gate: >
+      every value-bearing output/assertion is source-proven after implementation:
+      no hard-coded business literals, no mock/fake/stub source in the production or e2e
+      path, and every asserted value has runtime provenance showing:
+      source -> transform -> API/input -> UI/API output -> assertion.
+    do: >
+      run data-provenance audit on the diff + e2e run:
+      scan changed code/tests for asserted literals copied into implementation/API payloads;
+      reject mock/fake/stub adapters on the tested path unless explicitly contract-allowed;
+      capture runtime evidence from the real seeded backend/API/query/log; compare the
+      rendered/API value to the source re-read, not to a test literal.
+    evidence: evidence/provenance-${issue}.json
+  - id: 7_ci_handoff
+    gate: >
+      human has pushed/opened the PR or otherwise triggered branch-protected CI.
+      The agent stops here when CI does not exist yet; once CI exists, the next tick reads Gate C.
+
+muscle:                       # do work, never approve it
+  - /qa (coverage + regression) — run + SPOT-CHECK before trusting
+  - multicheck REVIEWER (different model) for complex slices
+  - ruflo swarm — only if triggered (>1500 lines, 3+ layers, security/invariant-critical, rejected-unsure, new pattern)
+  - db_serialization: >
+      parallel AUTHORING is fine; DB VERIFICATION is serial — one verification slot,
+      claimed in the epic checklist before any e2e run (non-teams path; teams keep db-coordinator)
+
+GATE_C:                       # HARD, unfakeable — the only trust gate
+  type: hard
+  gate: >
+    contract + journey tests green on branch-protected CI vs real seeded backend
+    AND provenance audit passes: value-bearing outputs are traced to allowed sources,
+    not literals, mocks, generated fixtures, or hand-written API inputs.
+  read: green → ready-for-review; red → repair (inline if fast, next tick if slow)
+
+repair:
+  classify: [coverage, regression, contract, journey, lint, flake]
+  inherited_baseline: >
+    not yours — but PROVE it before claiming it: run the failing test on the BASE branch first;
+    only a base-branch red may be classified inherited. File the tracking ticket. Never silent --no-verify.
+  budget: 3 attempts/rail, 2 full passes
+  on_exhausted: escalate with classified failure + last diff
+
+escalate_when: [precondition unmet, AC ambiguous (>1 reading), slice can't stay <1000 lines, budget exhausted]
+never_without_human: [git push, open PR, merge, --no-verify, override contract]
+
+done_when:
+  - 7 rails complete, muscle run + spot-checked, provenance evidence complete, GATE C green, evidence note complete
+  - if CI has not been triggered, STOP at "ready for human CI handoff" — human pushes/opens the PR
+  - after human CI handoff and green Gate C, STOP at "branch ready for review"
+  - NOTE (slice-done ≠ epic-done): the EPIC is not done until GATE D (epic_gate below) is green.
+
+merge_notes:                  # stacked branches
+  - squash-merging a stacked branch DUPLICATES the base slice's commits in the next PR's diff;
+    escape = merge-commit (no squash) for stacks, or rebase the stack after each squash lands.
+
+# ============================================================================
+# epic_gate: GATE D — the persona-walk INTEGRATION gate (pipeline-hardening #60)
+# ============================================================================
+# GUARD: this section is NOT a rail. Per-issue feature-build ticks IGNORE it — their
+# done_when fires before slices merge, so no per-issue instance can ever reach this.
+# GATE D is ITS OWN INVOCATION: "Run GATE D for epic #N" (prompts/gate-d.prompt.md),
+# fired by the epic runner when a wave/epic's slices have merged.
+epic_gate:
+  id: GATE_D
+  type: hard                  # for EPIC-done — slices still merge on GATE C alone
+  why: >
+    Epics slice vertically; coherence bugs live horizontally where slices share a surface.
+    Per-slice green is structurally blind to seams — the walk tests along the axis the
+    decomposition cut across. (Worked example: timebreez #673 — 3 cross-slice oracle
+    conflicts on /my-leave and /dashboard, invisible to 22/22-green GATE C runs.)
+  trigger: per wave when waves merge to main, else per epic-close (U2)
+  env: the same real seeded backend tier GATE C names — never a mock
+  do: >
+    A SCOPED TEARDOWN RUN against merged main: journey map := the hop tables
+    (PRDs/<slug>-hops.md, pinned at GATE A) + the seam-derived hops (GATE B; seams
+    RECOMPUTED here from final ticket state). The gate-d prompt MATERIALIZES the hop
+    artifact into teardown format (each hop a "- J:" entry; findings per hop; evidence
+    per finding) so `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/`
+    validates it.
+  evidence: >
+    every hop has a findings entry referencing evidence files that exist; VALUE-BEARING
+    hops must attach the oracle re-read output itself (.txt/.json or a screenshot showing
+    the value) — a decorative screenshot does not satisfy a value hop.
+  disposition: >               # closes the ungoverned-reconciliation loophole (PR #724 exhibit)
+    a red hop MUST be dispositioned `bug` or `stale-oracle`. stale-oracle = an amendment to
+    PRDs/<slug>-hops.md requiring the configured amendment/provenance trail. If
+    `signoff_policy.required` is true, the amendment also requires the configured human
+    countersign — the build agent can never reconcile its own oracle. On `bug`: the LAST-MERGED writer of the seam
+    reopens (it changed already-walked state); the failure names the seam pair + tiebreak.
+    Shared-module case: the disposition names the module commit, not page blame.
+  proof: >
+    `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/` passes. Human signatures
+    are required only when the Gate D signoff policy marks them required.
+  signoff_policy:
+    required: false
+    artifacts: []
+  never_without_human: [sign when signoff_policy.required, stale-oracle amendment, closing the epic on a red GATE D]
