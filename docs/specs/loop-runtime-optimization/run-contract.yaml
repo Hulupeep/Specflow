@@ -1,0 +1,32 @@
+run_contract:
+  loop: spec-build
+  goal: make Specflow's loop positioning true through a local contracted loop runtime
+  input_artifact: conversation: loops-vs-prompting market analysis and Specflow positioning request
+  path: templates/QA/loops/spec-build.yaml
+  current_stage_or_rail: handoff
+  next_gate: audited and simulated ticket packet is ready for feature-build
+  durable_evidence:
+    - docs/specs/loop-runtime-optimization/prd.md
+    - docs/specs/loop-runtime-optimization/verdict.md
+    - docs/specs/loop-runtime-optimization/adversary-review.md
+    - docs/specs/loop-runtime-optimization/falsification.md
+    - docs/specs/loop-runtime-optimization/hops.md
+    - docs/specs/loop-runtime-optimization/contract.yml
+    - docs/specs/loop-runtime-optimization/tickets.md
+    - docs/specs/loop-runtime-optimization/tickets.json
+    - docs/specs/loop-runtime-optimization/issues.json
+    - docs/specs/loop-runtime-optimization/specflow-audit.md
+    - docs/specs/loop-runtime-optimization/simulation.md
+  simulation_required: false
+  stop_condition: Stop at spec-build handoff. Feature-build may start from issues #77 and #78.
+  never_without_human:
+    - create issues from a DO_NOT_SHIP PRD
+    - push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
+  budgets:
+    adversary_cycles_max: 4
+    uplift_reaudits_max: 3
+  terminal_status: handoff
