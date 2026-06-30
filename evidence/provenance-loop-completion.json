@@ -1,0 +1,40 @@
+{
+  "issues": ["loop-completion"],
+  "feature_build": "stage executor, freshness, provider parsing, policy templates, provenance gate",
+  "source_provenance": [
+    {
+      "claim": "specflow run can execute mapped mechanical gates",
+      "source": "scripts/specflow-runner.cjs executeVerifierRegistry/verifierCommandsForStage",
+      "verification": "tests/contracts/loop-run-contract.test.js creates temporary Gate B artifacts and runs the real verify-seams, verify-adr, and verify-ticket-journey scripts"
+    },
+    {
+      "claim": "feature-build can reject stale simulation evidence",
+      "source": "scripts/specflow-runner.cjs isSimulationFresh",
+      "verification": "tests/contracts/loop-run-contract.test.js checks newer ticket input fails against older simulation"
+    },
+    {
+      "claim": "provider event streams are parsed for final text and tool events",
+      "source": "scripts/specflow-runner.cjs parseProviderEvents/forbiddenFromProviderEvents",
+      "verification": "tests/contracts/loop-run-contract.test.js parses JSONL with a tool_call attempting git push"
+    },
+    {
+      "claim": "adapter policy templates are installed by init",
+      "source": "setup-project.sh and templates/adapter-policies/*.safe.yml",
+      "verification": "setup-project.sh copies templates into .specflow/adapter-policies"
+    },
+    {
+      "claim": "provenance is a reusable gate",
+      "source": "scripts/provenance-gate.cjs and bin/specflow.js provenance command",
+      "verification": "tests/contracts/provenance-gate.test.js and specflow provenance evidence/provenance-loop-completion.json"
+    }
+  ],
+  "checks": [
+    "npx jest tests/contracts/loop-run-contract.test.js tests/contracts/provenance-gate.test.js --no-coverage --runInBand",
+    "node bin/specflow.js provenance evidence/provenance-loop-completion.json",
+    "node bin/specflow.js adapter-smoke claude-print --dry-run",
+    "node bin/specflow.js adapter-smoke codex-exec --dry-run",
+    "npm test -- --runInBand"
+  ],
+  "result": "pass",
+  "notes": "Live Claude/Codex provider calls remain opt-in. CI uses local fake/structural checks by default."
+}

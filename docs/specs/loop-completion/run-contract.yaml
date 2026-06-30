@@ -1,0 +1,19 @@
+run_contract:
+  loop: feature-build
+  goal: complete loop runtime missing requirements from stage execution through provenance
+  input_artifact: issue #81 + docs/specs/loop-completion/prd.md
+  path: templates/QA/loops/feature-build.yaml
+  current_stage_or_rail: 7_ci_handoff
+  next_gate: human push triggers branch-protected CI / Gate C
+  durable_evidence:
+    - docs/specs/loop-completion/prd.md
+    - evidence/provenance-loop-completion.json
+  simulation_required: false
+  stop_condition: Stop at human CI handoff after local tests and provenance pass.
+  never_without_human:
+    - git push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
+  terminal_status: ready_for_handoff

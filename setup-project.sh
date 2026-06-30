@@ -65,6 +65,7 @@ mkdir -p "$TARGET_DIR/hooks"
 mkdir -p "$TARGET_DIR/examples"
 mkdir -p "$TARGET_DIR/QA"
 mkdir -p "$TARGET_DIR/.specflow"
+mkdir -p "$TARGET_DIR/.specflow/adapter-policies"
 mkdir -p "$TARGET_DIR/.claude"
 mkdir -p "$TARGET_DIR/.codex"
 mkdir -p "$TARGET_DIR/.agents"
@@ -140,6 +141,14 @@ for example in "$SCRIPT_DIR/examples/"*; do
 done
 if [ -f "$SCRIPT_DIR/templates/journeys-template.csv" ]; then
   cp "$SCRIPT_DIR/templates/journeys-template.csv" "$TARGET_DIR/examples/"
+fi
+
+# Safe local adapter policies. Installed as dry-run templates; operators must
+# opt into live provider execution explicitly.
+if [ -d "$SCRIPT_DIR/templates/adapter-policies" ]; then
+  mkdir -p "$TARGET_DIR/.specflow/adapter-policies"
+  cp "$SCRIPT_DIR/templates/adapter-policies/"*.yml "$TARGET_DIR/.specflow/adapter-policies/" 2>/dev/null || true
+  echo -e "${GREEN}✓${NC} Installed adapter policy templates → .specflow/adapter-policies/"
 fi
 
 # Hook sources (for reference — .claude/hooks/ is installed separately)

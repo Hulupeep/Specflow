@@ -3,7 +3,7 @@
 const { execSync } = require('child_process');
 const { resolve, dirname, join } = require('path');
 const { existsSync, readFileSync, writeFileSync, readdirSync } = require('fs');
-const { cli: runSpecflowLoop } = require('../scripts/specflow-runner.cjs');
+const { cli: runSpecflowLoop, planAdapterSmoke, runAdapter } = require('../scripts/specflow-runner.cjs');
 
 // Specflow root is one level up from bin/
 const SPECFLOW_ROOT = resolve(dirname(__filename), '..');
@@ -142,6 +142,36 @@ const COMMANDS = {
       if (code) process.exit(code);
     },
   },
+  provenance: {
+    usage: 'specflow provenance <provenance.json>',
+    desc: 'Verify source provenance evidence for a feature-build slice',
+    run: (args) => {
+      const file = args[0];
+      if (!file) {
+        console.error('Usage: specflow provenance <provenance.json>');
+        process.exit(2);
+      }
+      const script = resolve(SPECFLOW_ROOT, 'scripts', 'provenance-gate.cjs');
+      exec(`node "${script}" "${resolve(file)}"`);
+    },
+  },
+  'adapter-smoke': {
+    usage: 'specflow adapter-smoke <claude-print|codex-exec> [--live]',
+    desc: 'Plan or run an opt-in local adapter smoke check',
+    run: (args) => {
+      const provider = args[0];
+      if (!['claude-print', 'codex-exec'].includes(provider)) {
+        console.error('Usage: specflow adapter-smoke <claude-print|codex-exec> [--live]');
+        process.exit(2);
+      }
+      const smoke = planAdapterSmoke(provider, { live: args.includes('--live') });
+      console.log(JSON.stringify(smoke, null, 2));
+      if (!args.includes('--live')) return;
+      const result = runAdapter(smoke.policy, { owningGateCommand: 'adapter smoke only' });
+      console.log(JSON.stringify(result, null, 2));
+      if (!['gate_rerun_required', 'dry_run'].includes(result.status)) process.exit(1);
+    },
+  },
 };
 
 function exec(cmd) {
@@ -186,6 +216,8 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
+  console.log('  npx @colmbyrne/specflow provenance evidence/provenance-77-78-80.json');
+  console.log('  npx @colmbyrne/specflow adapter-smoke claude-print --dry-run');
   console.log('  npx @colmbyrne/specflow graph\n');
   process.exit(0);
 }

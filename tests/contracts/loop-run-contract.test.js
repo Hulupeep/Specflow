@@ -6,7 +6,11 @@ const yaml = require('js-yaml');
 const {
   buildAdapterCommand,
   containsForbiddenAction,
+  executeVerifierRegistry,
+  forbiddenFromProviderEvents,
+  isSimulationFresh,
   normalizeAdapterPolicy,
+  parseProviderEvents,
   runAdapter,
   runLoop,
   validateRunContract,
@@ -160,6 +164,57 @@ describe('generative adapter policy and command builders', () => {
   test('detects forbidden human-gate actions in provider output', () => {
     expect(containsForbiddenAction('I will now run git push origin branch', ['git push'])).toBe('git push');
     expect(containsForbiddenAction('safe output', ['git push'])).toBe(null);
+  });
+
+  test('parses provider JSONL events into final text and tool events', () => {
+    const parsed = parseProviderEvents('codex-exec', [
+      JSON.stringify({ type: 'session', session_id: 's-1' }),
+      JSON.stringify({ type: 'message', text: 'done' }),
+      JSON.stringify({ type: 'tool_call', command: 'git push origin main' }),
+    ].join('\n'));
+
+    expect(parsed.session_id).toBe('s-1');
+    expect(parsed.final_text).toBe('done');
+    expect(parsed.tool_events).toHaveLength(1);
+    expect(forbiddenFromProviderEvents(parsed, ['git push'], [])).toBe('git push');
+  });
+});
+
+describe('stage verifier registry and freshness gates', () => {
+  test('runs Gate B verifier registry and advances only on pass', () => {
+    const dir = tempDir();
+    fs.writeFileSync(path.join(dir, 'contract.yml'), yaml.dump({
+      journeys: [{ journey_meta: { id: 'J-REGISTRY-PASS' } }],
+    }));
+    fs.writeFileSync(path.join(dir, 'issues.json'), JSON.stringify([
+      { number: 1, title: 'registry', body: 'Journey IDs: J-REGISTRY-PASS' },
+    ]));
+    fs.writeFileSync(path.join(dir, 'tickets.json'), JSON.stringify([
+      { id: 'REGISTRY-1', writes: ['verify'], reads: [], adrNone: 'no ADRs', reuses: ['scripts/verify-seams.cjs'] },
+    ]));
+
+    const result = executeVerifierRegistry({
+      loop: 'spec-build',
+      current_stage_or_rail: 'GATE_B',
+    }, { specDir: dir });
+
+    expect(result.status).toBe('gate_passed');
+    expect(result.entries.map((e) => e.verifier)).toEqual(['verify-seams', 'verify-adr', 'verify-ticket-journey']);
+  });
+
+  test('simulation freshness detects stale simulation evidence', () => {
+    const dir = tempDir();
+    const input = path.join(dir, 'ticket.md');
+    const simulation = path.join(dir, 'simulation.md');
+    fs.writeFileSync(simulation, 'old');
+    const now = new Date();
+    fs.writeFileSync(input, 'new');
+    fs.utimesSync(simulation, new Date(now.getTime() - 10000), new Date(now.getTime() - 10000));
+    fs.utimesSync(input, now, now);
+
+    const result = isSimulationFresh({ simulationPath: simulation, inputPaths: [input] });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toContain('older');
   });
 });
 

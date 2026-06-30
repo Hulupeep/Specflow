@@ -1,0 +1,32 @@
+adapter_policy:
+  id: claude-print-safe
+  provider: claude-print
+  command: claude
+  args:
+    - -p
+    - --output-format
+    - stream-json
+    - --permission-mode
+    - default
+  model: sonnet
+  max_budget_usd: 3
+  timeout_seconds: 900
+  max_iterations: 1
+  allowed_tools:
+    - Read
+    - Grep
+    - Glob
+  denied_tools:
+    - Bash(git push *)
+    - Bash(gh pr create *)
+    - Bash(gh issue create *)
+    - Bash(* --no-verify *)
+  transcript_path: .specflow/runs/<slug>/adapter/claude-stage.jsonl
+  output_path: .specflow/runs/<slug>/adapter/claude-stage-final.md
+  dry_run: true
+  never_without_human:
+    - git push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
