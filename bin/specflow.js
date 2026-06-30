@@ -165,19 +165,20 @@ const COMMANDS = {
         console.error('Usage: specflow ci-status <pr-number>');
         process.exit(2);
       }
-      const raw = execSilent(`gh pr checks ${pr} --json name,state,conclusion,link`);
+      const raw = execSilent(`gh pr view ${pr} --json statusCheckRollup`);
       if (!raw) {
         console.error(`Could not read PR #${pr} checks. Verify gh auth and repo context.`);
         process.exit(1);
       }
-      const checks = JSON.parse(raw);
-      const failing = checks.filter((check) => ['FAILURE', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(String(check.conclusion || check.state || '').toUpperCase()));
-      const pending = checks.filter((check) => ['PENDING', 'QUEUED', 'IN_PROGRESS', 'WAITING'].includes(String(check.state || '').toUpperCase()));
+      const checks = JSON.parse(raw).statusCheckRollup || [];
+      const statusOf = (check) => String(check.conclusion || check.status || check.state || check.bucket || '').toUpperCase();
+      const failing = checks.filter((check) => ['FAILURE', 'FAIL', 'FAILING', 'ERROR', 'CANCELLED', 'TIMED_OUT', 'ACTION_REQUIRED'].includes(statusOf(check)));
+      const pending = checks.filter((check) => ['PENDING', 'QUEUED', 'IN_PROGRESS', 'WAITING', 'REQUESTED'].includes(statusOf(check)));
       console.log(JSON.stringify({
         pr: Number(pr),
         total: checks.length,
-        failing: failing.map((check) => ({ name: check.name, state: check.state, conclusion: check.conclusion, link: check.link })),
-        pending: pending.map((check) => ({ name: check.name, state: check.state, conclusion: check.conclusion, link: check.link })),
+        failing: failing.map((check) => ({ name: check.name, status: statusOf(check), link: check.link || check.detailsUrl })),
+        pending: pending.map((check) => ({ name: check.name, status: statusOf(check), link: check.link || check.detailsUrl })),
         gate_c: failing.length ? 'red' : (pending.length ? 'pending' : 'green'),
       }, null, 2));
       if (failing.length) process.exit(1);
