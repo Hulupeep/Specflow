@@ -1,0 +1,65 @@
+[
+  {
+    "id": "MODEL-ROUTING-01",
+    "title": "Add model roles, effort levels, fallback models, and budgets to adapter policies",
+    "writes": ["adapter_policy", "normalizeAdapterPolicy", "buildAdapterCommand", "ledger.jsonl"],
+    "reads": ["adapter_policy", "runAdapter", "buildAdapterCommand"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing adapter policy and runner surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/adapter-policies/claude-print.safe.yml", "templates/adapter-policies/codex-exec.safe.yml", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-FABLE-MODEL-ROUTING"]
+  },
+  {
+    "id": "STATE-01",
+    "title": "Add .specflow/STATE.md and lesson-file compounding memory",
+    "writes": [".specflow", ".specflow/runs", "ledger.jsonl", "materializeStagePrompt"],
+    "reads": ["run_contract", "prompt_path", "ledger.jsonl"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against run contract, prompt, and ledger surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/AGENTS.md", "skills/specflow-loop-selector/SKILL.md"],
+    "journeys": ["J-FABLE-STATE-MEMORY"]
+  },
+  {
+    "id": "VERIFIER-01",
+    "title": "Add independent verifier stage for provider output",
+    "writes": ["verifier", "runAdapter", "ledger.jsonl"],
+    "reads": ["adapter_policy", "transcript_path", "output_path", "verify-falsification"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against adapter transcript and existing verifier gate patterns.",
+    "reuses": ["scripts/specflow-runner.cjs", "scripts/verify-falsification.cjs", "templates/QA/loops/spec-build.yaml"],
+    "journeys": ["J-FABLE-INDEPENDENT-VERIFIER"]
+  },
+  {
+    "id": "WORKTREE-01",
+    "title": "Support isolated worktree execution for delegated agents",
+    "writes": ["ledger.jsonl", "run_contract"],
+    "reads": ["never_without_human", "git push", "runStatus"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing process docs and human-gate rules.",
+    "reuses": ["templates/process/PROCESS-CLAUDE.md", "scripts/specflow-runner.cjs", "templates/QA/loops/feature-build.yaml"],
+    "journeys": ["J-FABLE-WORKTREE-ISOLATION"]
+  },
+  {
+    "id": "ROUTINE-01",
+    "title": "Scaffold /loop and routine manifests for scheduled Specflow loops",
+    "writes": ["specflow run", ".specflow", "ledger.jsonl"],
+    "reads": ["never_without_human", "run_contract", "ledger.jsonl"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against loop docs and installed process templates.",
+    "reuses": ["templates/QA/loops/README.md", "templates/process/PROCESS-CODEX.md", "bin/specflow.js"],
+    "journeys": ["J-FABLE-ROUTINE-MANIFEST"]
+  },
+  {
+    "id": "VISION-GATE-01",
+    "title": "Add screenshot plus vision-verifier evidence path for teardown and Gate D",
+    "writes": ["teardown-gate", "evidence", "gate-d"],
+    "reads": ["check-gate-d", "findings.md", "journey-map.md"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing teardown and Gate D evidence gates.",
+    "reuses": ["scripts/teardown-gate.cjs", "templates/QA/loops/daily-use-teardown.yaml", "templates/QA/loops/feature-build.yaml"],
+    "journeys": ["J-FABLE-VISION-EVIDENCE"]
+  },
+  {
+    "id": "COST-01",
+    "title": "Record model usage and cost-per-accepted-change counters",
+    "writes": ["ledger.jsonl", "runStatus", "adapter_policy"],
+    "reads": ["runAdapter", "parseProviderEvents", "gate_c"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing ledger, adapter parsing, and status output.",
+    "reuses": ["scripts/specflow-runner.cjs", "bin/specflow.js", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-FABLE-COST-ACCOUNTING"]
+  }
+]

@@ -1,0 +1,119 @@
+feature: fable-loop-compounding
+requirements:
+  - id: REQ-MODEL-ROUTING-01
+    statement: Adapter policies declare model roles, effort levels, fallback models, and per-role budgets.
+  - id: REQ-STATE-01
+    statement: Specflow persists compounding project memory in `.specflow/STATE.md` and one-lesson-per-file memory.
+  - id: REQ-VERIFIER-01
+    statement: Generative output is checked by an independent verifier stage before gate advance.
+  - id: REQ-WORKTREE-01
+    statement: Delegated agents can run in isolated git worktrees with ledger evidence.
+  - id: REQ-ROUTINE-01
+    statement: Specflow scaffolds `/loop` and routine manifests for cron, GitHub Actions, and hosted agent triggers.
+  - id: REQ-VISION-GATE-01
+    statement: Teardown/Gate D can record screenshot plus vision-verifier evidence without making vision the gate of record.
+  - id: REQ-COST-01
+    statement: Loop ledger records model usage and cost-per-accepted-change counters when available.
+journeys:
+  - journey_meta:
+      id: J-FABLE-MODEL-ROUTING
+      persona: loop_operator
+      owner_ticket: MODEL-ROUTING-01
+      assertion_bar: adapter policy re-reads role, effort, model, fallback, and budget fields
+    scenario: route heavy stages to a Fable-class model and cheap checks to lower-cost models
+    given:
+      - `.specflow/adapter-policies/claude-print.safe.yml` exists
+      - `scripts/specflow-runner.cjs` can normalize adapter policy fields
+    when:
+      - the operator runs specflow with an adapter policy that declares role orchestrator
+    then:
+      - the command argv uses the declared model for that role
+      - the ledger records model role, effort level, model id, fallback model id, and budget cap
+      - implementation roles can be routed to a Codex/GPT-class provider while planning remains on a Fable-class provider
+
+  - journey_meta:
+      id: J-FABLE-STATE-MEMORY
+      persona: returning_agent
+      owner_ticket: STATE-01
+      assertion_bar: `.specflow/STATE.md` and lesson files are updated and re-read on the next run
+    scenario: preserve verified facts and failed-gate lessons between loop runs
+    given:
+      - a loop run records a failed verifier and later repair
+    when:
+      - the run reaches a terminal stop
+    then:
+      - `.specflow/STATE.md` contains verified facts, failed gates, distilled rules, open questions, and last-session resume pointer
+      - `.specflow/lessons/` contains one confirmed lesson per file with a one-line summary
+      - the next `specflow run` prompt references the relevant state sections
+
+  - journey_meta:
+      id: J-FABLE-INDEPENDENT-VERIFIER
+      persona: reviewer
+      owner_ticket: VERIFIER-01
+      assertion_bar: maker transcript and verifier transcript are separate ledger entries
+    scenario: check Fable-generated artifacts with an independent verifier
+    given:
+      - an adapter provider writes PRD or simulation output
+    when:
+      - the verifier stage runs
+    then:
+      - verifier input is the artifact plus rubric, not the maker reasoning trace
+      - external reviewer providers can be declared for plan review without replacing mechanical gates
+      - gate advance remains blocked until the owning mechanical verifier reruns
+
+  - journey_meta:
+      id: J-FABLE-WORKTREE-ISOLATION
+      persona: orchestrator
+      owner_ticket: WORKTREE-01
+      assertion_bar: ledger records isolated worktree path and branch
+    scenario: delegate maker and verifier work without file collisions
+    given:
+      - a run requires parallel maker and verifier tasks
+    when:
+      - Specflow starts delegated work
+    then:
+      - each delegate gets a distinct git worktree or read-only verification mode
+      - cleanup and merge instructions are recorded without auto-merging
+
+  - journey_meta:
+      id: J-FABLE-ROUTINE-MANIFEST
+      persona: platform_operator
+      owner_ticket: ROUTINE-01
+      assertion_bar: routine manifest re-runs the same contract command and stop rules
+    scenario: schedule a recurring Specflow loop without inventing a new process
+    given:
+      - an operator wants a nightly loop health run
+    when:
+      - Specflow scaffolds a routine manifest
+    then:
+      - the manifest names trigger, `/loop` interval when supported, command, inputs, budget, outputs, and never_without_human
+      - cron/GitHub/hosted-agent variants all call `specflow run`
+      - project-improvement proposals are routed back into spec-build before implementation
+
+  - journey_meta:
+      id: J-FABLE-VISION-EVIDENCE
+      persona: ui_reviewer
+      owner_ticket: VISION-GATE-01
+      assertion_bar: teardown evidence contains screenshot and vision-verifier finding file
+    scenario: verify UI evidence with a vision-capable verifier
+    given:
+      - a teardown or Gate D hop has screenshot evidence
+    when:
+      - the vision verifier evaluates it against the goal
+    then:
+      - a finding file is persisted under evidence
+      - `teardown-gate` still checks evidence presence and value evidence, not model self-attestation
+
+  - journey_meta:
+      id: J-FABLE-COST-ACCOUNTING
+      persona: cost_conscious_operator
+      owner_ticket: COST-01
+      assertion_bar: ledger tail reports provider, model, token/cost estimate, and accepted gate count
+    scenario: track cost per accepted loop change
+    given:
+      - provider output includes token usage or cost metadata
+    when:
+      - Specflow appends the run ledger
+    then:
+      - token/cost fields are stored when available
+      - status output summarizes gate attempts, accepted gates, rejected gates, and cost-per-accepted-change
