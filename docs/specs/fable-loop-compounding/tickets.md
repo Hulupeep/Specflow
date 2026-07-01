@@ -14,7 +14,8 @@ Acceptance:
 - Adapter policies support role fields such as `orchestrator`, `worker`, `verifier`, and `fallback`.
 - Adapter policies support provider-specific effort fields such as `low`, `medium`, `high`, `xhigh`, or `ultracode` only when the active provider surface supports them.
 - Policies can express planner/implementer separation: Fable-class provider for planning; Codex/GPT-class provider for implementation.
-- Runner records provider, model id, role, effort, fallback model id, and max budget in `ledger.jsonl`.
+- Runner records provider, requested model id, effective/reported model id when the provider exposes it, role, effort, fallback model id, fallback/refusal reason, and max budget in `ledger.jsonl`.
+- When a Fable-class request is refused or routed to Opus/Sonnet/Codex, the ledger preserves both the requested model and the actual model/source used; silent downgrade is a failed contract.
 - Unsupported model-role policy fails validation before provider invocation.
 - Existing Claude/Codex safe policy templates remain valid.
 
@@ -77,7 +78,7 @@ Acceptance:
 **Journey:** `J-FABLE-COST-ACCOUNTING`
 
 Acceptance:
-- Adapter parser stores token/cost metadata when provider output exposes it.
-- Ledger records model, role, estimated cost, gate attempt, and gate result.
+- Adapter parser stores token/cost/model metadata when provider output exposes it.
+- Ledger records requested model, effective/reported model, role, estimated cost, gate attempt, fallback/refusal reason, and gate result.
 - `specflow run status` summarizes attempts, accepted gates, rejected gates, and cost per accepted gate/change.
 - Missing usage metadata is recorded as unknown, not fabricated.
