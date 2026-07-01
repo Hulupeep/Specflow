@@ -3,7 +3,7 @@
 const { execSync } = require('child_process');
 const { resolve, dirname, join } = require('path');
 const { existsSync, readFileSync, writeFileSync, readdirSync } = require('fs');
-const { cli: runSpecflowLoop, planAdapterSmoke, runAdapter } = require('../scripts/specflow-runner.cjs');
+const { cli: runSpecflowLoop, planAdapterSmoke, runAdapter, scaffoldRoutineManifest } = require('../scripts/specflow-runner.cjs');
 
 // Specflow root is one level up from bin/
 const SPECFLOW_ROOT = resolve(dirname(__filename), '..');
@@ -199,6 +199,29 @@ const COMMANDS = {
       const result = runAdapter(smoke.policy, { owningGateCommand: 'adapter smoke only' });
       console.log(JSON.stringify(result, null, 2));
       if (!['gate_rerun_required', 'dry_run'].includes(result.status)) process.exit(1);
+    },
+  },
+  routine: {
+    usage: 'specflow routine <slug> [--kind cron|github-actions|hosted] [--loop spec-build|feature-build] [--input path]',
+    desc: 'Scaffold a scheduled Specflow routine manifest that calls specflow run',
+    run: (args) => {
+      const slug = args[0];
+      if (!slug || slug.startsWith('--')) {
+        console.error('Usage: specflow routine <slug> [--kind cron|github-actions|hosted] [--loop spec-build|feature-build] [--input path]');
+        process.exit(2);
+      }
+      const opt = (name, fallback) => {
+        const idx = args.indexOf(`--${name}`);
+        return idx === -1 ? fallback : args[idx + 1];
+      };
+      const result = scaffoldRoutineManifest({
+        slug,
+        kind: opt('kind', 'cron'),
+        loop: opt('loop', 'spec-build'),
+        input: opt('input', 'docs/idea.md'),
+        goal: opt('goal', `Run ${slug}`),
+      });
+      console.log(JSON.stringify(result, null, 2));
     },
   },
 };

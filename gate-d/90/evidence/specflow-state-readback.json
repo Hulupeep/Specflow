@@ -1,0 +1,10 @@
+{
+  "command": "appendStateMemory + materializeStagePrompt",
+  "result": "pass",
+  "state_exists": true,
+  "lesson_files": [
+    "gate-d-state-memory.md"
+  ],
+  "prompt_has_state": true,
+  "re_read_fact": "Gate D prep re-read .specflow state"
+}

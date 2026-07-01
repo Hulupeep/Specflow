@@ -2,6 +2,8 @@ adapter_policy:
   id: claude-print-safe
   provider: claude-print
   command: claude
+  role: planner
+  effort: high
   args:
     - -p
     - --output-format
@@ -9,6 +11,8 @@ adapter_policy:
     - --permission-mode
     - default
   model: sonnet
+  requested_model: sonnet
+  fallback_model: opus
   max_budget_usd: 3
   timeout_seconds: 900
   max_iterations: 1

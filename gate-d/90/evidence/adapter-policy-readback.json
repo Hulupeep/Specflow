@@ -1,0 +1,28 @@
+{
+  "command": "normalizeAdapterPolicy over templates/adapter-policies/*.safe.yml",
+  "result": "pass",
+  "policies": [
+    {
+      "file": "templates/adapter-policies/claude-print.safe.yml",
+      "provider": "claude-print",
+      "role": "planner",
+      "effort": "high",
+      "requested_model": "sonnet",
+      "effective_model": "unknown",
+      "fallback_model": "opus",
+      "transcript_path": ".specflow/runs/gate-d-90/adapter/claude-stage.jsonl",
+      "output_path": ".specflow/runs/gate-d-90/adapter/claude-stage-final.md"
+    },
+    {
+      "file": "templates/adapter-policies/codex-exec.safe.yml",
+      "provider": "codex-exec",
+      "role": "implementer",
+      "effort": "high",
+      "requested_model": "gpt-5",
+      "effective_model": "unknown",
+      "fallback_model": null,
+      "transcript_path": ".specflow/runs/gate-d-90/adapter/codex-stage.jsonl",
+      "output_path": ".specflow/runs/gate-d-90/adapter/codex-stage-final.md"
+    }
+  ]
+}

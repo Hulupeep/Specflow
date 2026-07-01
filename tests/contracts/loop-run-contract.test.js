@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const yaml = require('js-yaml');
 
 const {
@@ -14,10 +15,14 @@ const {
   normalizeAdapterPolicy,
   parseProviderEvents,
   planAdapterSmoke,
+  appendStateMemory,
+  prepareWorktree,
   runAdapter,
   runLoop,
   runStatus,
   runUntilTerminal,
+  scaffoldRoutineManifest,
+  summarizeLedger,
   validateRunContract,
 } = require('../../scripts/specflow-runner.cjs');
 
@@ -146,6 +151,45 @@ describe('local contracted loop runner', () => {
     expect(fs.readFileSync(result.promptPath, 'utf8')).toContain('Never without human: git push');
   });
 
+  test('state memory writes STATE.md, one lesson file, and prompt digest', () => {
+    const dir = tempDir();
+    const statePath = path.join(dir, '.specflow/STATE.md');
+    const lessonDir = path.join(dir, '.specflow/lessons');
+    const contractPath = path.join(dir, '.specflow/runs/demo/run-contract.yaml');
+
+    const state = appendStateMemory({
+      statePath,
+      lessonDir,
+      update: {
+        verified_fact: 'adapter policy supports requested_model',
+        distilled_rule: 'never infer effective_model from requested_model',
+        lesson_summary: 'Do not infer effective model',
+        lesson_body: 'Record unknown unless provider reports the effective model.',
+      },
+    });
+
+    expect(fs.existsSync(statePath)).toBe(true);
+    expect(fs.existsSync(state.lessonPath)).toBe(true);
+    expect(fs.readFileSync(state.lessonPath, 'utf8')).toContain('# Do not infer effective model');
+
+    const prompt = materializeStagePrompt({
+      loop: 'feature-build',
+      goal: 'state memory',
+      input_artifact: 'docs/specs/fable-loop-compounding/tickets.md',
+      path: 'templates/QA/loops/feature-build.yaml',
+      current_stage_or_rail: '5_impl',
+      next_gate: 'implementation',
+      durable_evidence: [contractPath],
+      stop_condition: 'handoff',
+      never_without_human: ['git push'],
+      storage: { contract_path: contractPath, statePath, lessonDir },
+    }, { contractPath, statePath, lessonDir });
+
+    expect(prompt.content).toContain('## State Memory');
+    expect(prompt.content).toContain('adapter policy supports requested_model');
+    expect(prompt.content).toContain('lesson:do-not-infer-effective-model.md');
+  });
+
   test('bounded run-until-terminal advances through green registries and stops at next agent stage', () => {
     const dir = tempDir();
     const specDir = path.join(dir, 'spec');
@@ -203,12 +247,57 @@ describe('local contracted loop runner', () => {
         storage: { contract_path: contract, ledger_path: ledger },
       },
     }));
-    fs.writeFileSync(ledger, `${JSON.stringify({ stage: '6_provenance', result: 'pass' })}\n`);
+    fs.writeFileSync(ledger, `${JSON.stringify({ stage: '6_provenance', verifier: 'provenance', result: 'pass' })}\n`);
 
     const status = runStatus({ contract });
     expect(status.status).toBe('ok');
     expect(status.current_stage_or_rail).toBe('6_provenance');
     expect(status.ledger_tail).toHaveLength(1);
+    expect(status.ledger_summary.gate_passes).toBe(1);
+  });
+
+  test('prepares isolated delegated worktree metadata without auto merge or push', () => {
+    const dir = tempDir();
+    const wt = path.join(dir, 'delegate-wt');
+    spawnSync('git', ['init'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['config', 'user.name', 'Specflow Test'], { cwd: dir, encoding: 'utf8' });
+    fs.writeFileSync(path.join(dir, 'README.md'), 'demo\n');
+    spawnSync('git', ['add', 'README.md'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['commit', '-m', 'init'], { cwd: dir, encoding: 'utf8' });
+
+    const result = prepareWorktree({
+      repoRoot: dir,
+      worktreePath: wt,
+      branch: 'specflow/delegate',
+      create: true,
+      readOnly: true,
+    });
+
+    expect(result.action).toBe('created');
+    expect(result.worktree_path).toBe(wt);
+    expect(result.read_only).toBe(true);
+    expect(result.auto_merge).toBe(false);
+    expect(result.auto_push).toBe(false);
+    expect(fs.existsSync(path.join(wt, 'README.md'))).toBe(true);
+  });
+
+  test('scaffolds routine manifests that call specflow run and preserve human gates', () => {
+    const dir = tempDir();
+    const outPath = path.join(dir, 'docs/routines/nightly.yml');
+    const result = scaffoldRoutineManifest({
+      slug: 'nightly',
+      kind: 'github-actions',
+      loop: 'spec-build',
+      input: 'docs/idea.md',
+      outPath,
+    });
+
+    expect(fs.existsSync(outPath)).toBe(true);
+    expect(result.manifest.routine.command).toContain('specflow run spec-build');
+    expect(result.manifest.routine.command).toContain('--until-terminal');
+    expect(result.manifest.routine.never_without_human).toContain('git push');
+    expect(result.manifest.routine.proposal_policy).toContain('spec-build');
   });
 });
 
@@ -220,6 +309,10 @@ describe('generative adapter policy and command builders', () => {
       command: 'claude',
       timeout_seconds: 30,
       max_iterations: 1,
+      role: 'planner',
+      effort: 'high',
+      model: 'claude-fable-5',
+      fallback_model: 'claude-opus-4-8',
       transcript_path: '.specflow/runs/<slug>/adapter/out.jsonl',
       output_path: '.specflow/runs/<slug>/adapter/final.md',
       never_without_human: ['git push'],
@@ -227,6 +320,37 @@ describe('generative adapter policy and command builders', () => {
 
     expect(policy.transcript_path).toBe('.specflow/runs/demo/adapter/out.jsonl');
     expect(policy.output_path).toBe('.specflow/runs/demo/adapter/final.md');
+    expect(policy.requested_model).toBe('claude-fable-5');
+    expect(policy.effective_model).toBe('unknown');
+    expect(policy.role).toBe('planner');
+    expect(policy.effort).toBe('high');
+    expect(policy.fallback_model).toBe('claude-opus-4-8');
+  });
+
+  test('rejects unsupported adapter roles and effort levels before invocation', () => {
+    expect(() => normalizeAdapterPolicy({
+      id: 'bad-role',
+      provider: 'fake', // contract-allowed: fake provider fixture default
+      command: 'fake', // contract-allowed: fake provider fixture default
+      timeout_seconds: 30,
+      max_iterations: 1,
+      role: 'boss',
+      transcript_path: 'out.jsonl',
+      output_path: 'final.md',
+      never_without_human: ['git push'],
+    })).toThrow('adapter_policy.role is unsupported');
+
+    expect(() => normalizeAdapterPolicy({
+      id: 'bad-effort',
+      provider: 'fake', // contract-allowed: fake provider fixture default
+      command: 'fake', // contract-allowed: fake provider fixture default
+      timeout_seconds: 30,
+      max_iterations: 1,
+      effort: 'heroic',
+      transcript_path: 'out.jsonl',
+      output_path: 'final.md',
+      never_without_human: ['git push'],
+    })).toThrow('adapter_policy.effort is unsupported');
   });
 
   test('builds Claude print command with safety flags', () => {
@@ -235,6 +359,7 @@ describe('generative adapter policy and command builders', () => {
       command: 'claude',
       args: [],
       model: 'sonnet',
+      fallback_model: 'opus',
       max_budget_usd: 2,
       allowed_tools: ['Read'],
       denied_tools: ['Bash(git push *)'],
@@ -243,6 +368,7 @@ describe('generative adapter policy and command builders', () => {
     expect(command.args).toContain('-p');
     expect(command.args).toContain('--output-format');
     expect(command.args).toContain('--max-budget-usd');
+    expect(command.args).toContain('--fallback-model');
     expect(command.args).toContain('--allowedTools');
     expect(command.args).toContain('--disallowedTools');
   });
@@ -296,14 +422,46 @@ describe('generative adapter policy and command builders', () => {
   test('parses provider JSONL events into final text and tool events', () => {
     const parsed = parseProviderEvents('codex-exec', [
       JSON.stringify({ type: 'session', session_id: 's-1' }),
-      JSON.stringify({ type: 'message', text: 'done' }),
+      JSON.stringify({ type: 'message', text: 'done', model: 'claude-opus-4-8', usage: { input_tokens: 10, output_tokens: 5, cost_usd: 0.001 } }),
       JSON.stringify({ type: 'tool_call', command: 'git push origin main' }),
     ].join('\n'));
 
     expect(parsed.session_id).toBe('s-1');
     expect(parsed.final_text).toBe('done');
+    expect(parsed.effective_model).toBe('claude-opus-4-8');
+    expect(parsed.usage.total_tokens).toBe(15);
+    expect(parsed.usage.estimated_cost_usd).toBe(0.001);
     expect(parsed.tool_events).toHaveLength(1);
     expect(forbiddenFromProviderEvents(parsed, ['git push'], [])).toBe('git push');
+  });
+
+  test('summarizes requested and effective model accounting without guessing unknowns', () => {
+    const summary = summarizeLedger([
+      { verifier: 'unit', result: 'pass' },
+      {
+        provider: 'claude-print',
+        requested_model: 'claude-fable-5',
+        effective_model: 'claude-opus-4-8',
+        estimated_cost_usd: 0.5,
+        stop_reason: 'gate_rerun_required',
+      },
+      {
+        provider: 'codex-exec',
+        requested_model: 'gpt-5',
+        effective_model: 'unknown',
+        estimated_cost_usd: null,
+        stop_reason: 'adapter_failed',
+      },
+    ]);
+
+    expect(summary.gate_passes).toBe(1);
+    expect(summary.adapter_attempts).toBe(2);
+    expect(summary.unknown_usage_entries).toBe(1);
+    expect(summary.known_estimated_cost_usd).toBe(0.5);
+    expect(summary.cost_per_gate_pass_usd).toBe(0.5);
+    expect(summary.requested_models['claude-fable-5']).toBe(1);
+    expect(summary.effective_models['claude-opus-4-8']).toBe(1);
+    expect(summary.effective_models.unknown).toBe(1);
   });
 });
 
@@ -371,12 +529,30 @@ describe('generative adapter execution with fake provider', () => {
 
   test('successful fake provider writes transcript/output and requires gate rerun', () => {
     const dir = tempDir();
-    const result = runAdapter(fakePolicy(dir, { fake_stdout: '{"ok":true}\n' }), {
+    const result = runAdapter(fakePolicy(dir, {
+      role: 'planner',
+      effort: 'xhigh',
+      requested_model: 'claude-fable-5',
+      fallback_model: 'claude-opus-4-8',
+      fake_stdout: [ // contract-allowed: fake provider fixture default
+        JSON.stringify({
+          type: 'message',
+          text: 'done',
+          model: 'claude-opus-4-8',
+          fallback_reason: 'safety_reroute',
+          usage: { input_tokens: 100, output_tokens: 20, cost_usd: 0.006 },
+        }),
+      ].join('\n'),
+    }), {
       owningGateCommand: 'node scripts/verify-falsification.cjs ...',
     });
     expect(result.status).toBe('gate_rerun_required');
     expect(result.entry.owning_gate_command).toContain('verify-falsification');
-    expect(fs.readFileSync(path.join(dir, 'final.md'), 'utf8')).toContain('"ok"');
+    expect(result.entry.requested_model).toBe('claude-fable-5');
+    expect(result.entry.effective_model).toBe('claude-opus-4-8');
+    expect(result.entry.fallback_refusal_reason).toBe('safety_reroute');
+    expect(result.entry.estimated_cost_usd).toBe(0.006);
+    expect(fs.readFileSync(path.join(dir, 'final.md'), 'utf8')).toContain('done');
   });
 
   test('provider failure preserves transcript evidence', () => {

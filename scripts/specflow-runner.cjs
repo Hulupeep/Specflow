@@ -8,8 +8,8 @@
  */
 
 const { spawnSync } = require('child_process');
-const { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
-const { dirname, join, resolve } = require('path');
+const { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
+const { basename, dirname, join, resolve } = require('path');
 const yaml = require('js-yaml');
 
 const LOOP_PATHS = {
@@ -42,6 +42,8 @@ const REQUIRED_POLICY_FIELDS = [
   'never_without_human',
 ];
 
+const UNKNOWN = 'unknown';
+
 function ensureDir(path) {
   mkdirSync(dirname(path), { recursive: true });
 }
@@ -73,6 +75,16 @@ function defaultRunPaths(slug, options = {}) {
   return { contractPath, ledgerPath };
 }
 
+function defaultStatePaths(contractPath, options = {}) {
+  const parts = resolve(contractPath || '.specflow/runs/run/run-contract.yaml').split(/[\\/]/);
+  const specflowIndex = parts.lastIndexOf('.specflow');
+  const base = specflowIndex !== -1 ? parts.slice(0, specflowIndex + 1).join('/') : dirname(contractPath || '.');
+  return {
+    statePath: options.statePath || join(base, 'STATE.md'),
+    lessonDir: options.lessonDir || join(base, 'lessons'),
+  };
+}
+
 function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }) {
   if (!LOOP_PATHS[loop]) throw new Error(`unknown loop "${loop}"`);
   return {
@@ -94,6 +106,7 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }
       storage: {
         contract_path: contractPath,
         ledger_path: ledgerPath,
+        ...defaultStatePaths(contractPath),
       },
     },
   };
@@ -128,6 +141,141 @@ function validateRunContract(contract) {
 function appendLedger(ledgerPath, entry) {
   ensureDir(ledgerPath);
   appendFileSync(ledgerPath, `${JSON.stringify({ recorded_at: new Date().toISOString(), ...entry })}\n`, 'utf8');
+}
+
+function slugify(value) {
+  return String(value || 'lesson').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'lesson';
+}
+
+function ensureStateFile(statePath) {
+  if (existsSync(statePath)) return;
+  ensureDir(statePath);
+  writeFileSync(statePath, [
+    '# Specflow State',
+    '',
+    '## Verified Facts',
+    '',
+    '## Failed Gates',
+    '',
+    '## Distilled Rules',
+    '',
+    '## Open Questions',
+    '',
+    '## Last Session',
+    '',
+  ].join('\n'), 'utf8');
+}
+
+function appendStateMemory({ statePath, lessonDir, update = {} }) {
+  ensureStateFile(statePath);
+  const lines = [];
+  const at = update.recorded_at || new Date().toISOString();
+  if (update.verified_fact) lines.push(`- ${at}: ${update.verified_fact}`);
+  if (update.failed_gate) lines.push(`- ${at}: ${update.failed_gate}`);
+  if (update.distilled_rule) lines.push(`- ${at}: ${update.distilled_rule}`);
+  if (update.open_question) lines.push(`- ${at}: ${update.open_question}`);
+  if (update.last_session) lines.push(`- ${at}: ${update.last_session}`);
+  if (lines.length) appendFileSync(statePath, `\n## Update ${at}\n${lines.join('\n')}\n`, 'utf8');
+
+  let lessonPath = null;
+  if (update.lesson_summary) {
+    mkdirSync(lessonDir, { recursive: true });
+    lessonPath = join(lessonDir, `${slugify(update.lesson_summary)}.md`);
+    writeFileSync(lessonPath, [
+      `# ${update.lesson_summary}`,
+      '',
+      update.lesson_body || update.distilled_rule || update.verified_fact || update.last_session || '',
+      '',
+    ].join('\n'), 'utf8');
+  }
+  return { statePath, lessonPath };
+}
+
+function readStateDigest(statePath, lessonDir, limit = 2400) {
+  const chunks = [];
+  if (statePath && existsSync(statePath)) chunks.push(readFileSync(statePath, 'utf8').trim());
+  if (lessonDir && existsSync(lessonDir)) {
+    const lessons = readdirSync(lessonDir).filter((f) => f.endsWith('.md')).sort().slice(-5);
+    for (const lesson of lessons) {
+      const firstLine = readFileSync(join(lessonDir, lesson), 'utf8').split(/\r?\n/)[0];
+      chunks.push(`lesson:${lesson}: ${firstLine}`);
+    }
+  }
+  return chunks.join('\n\n').slice(-limit);
+}
+
+function recordRunState(contract, { contractPath, ledgerPath, status, stopReason }) {
+  const paths = {
+    ...defaultStatePaths(contractPath),
+    ...(contract.storage || {}),
+  };
+  return appendStateMemory({
+    statePath: paths.statePath,
+    lessonDir: paths.lessonDir,
+    update: {
+      failed_gate: status === 'gate_failed' ? `${contract.current_stage_or_rail}: ${contract.next_gate}` : null,
+      last_session: `${contract.loop}/${contract.current_stage_or_rail} stopped with ${status}${stopReason ? ` (${stopReason})` : ''}; ledger ${ledgerPath}`,
+    },
+  });
+}
+
+function gitOutput(args, cwd = '.') {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(result.stderr || `git ${args.join(' ')} failed`);
+  return (result.stdout || '').trim();
+}
+
+function prepareWorktree(options = {}) {
+  const repoRoot = options.repoRoot || process.cwd();
+  const baseRef = options.baseRef || 'HEAD';
+  const branch = options.branch || `specflow/${options.slug || 'delegate'}`;
+  const worktreePath = options.worktreePath || join(repoRoot, '.specflow', 'worktrees', slugify(branch));
+  const create = options.create === true;
+  let action = 'referenced';
+  if (create && !existsSync(worktreePath)) {
+    mkdirSync(dirname(worktreePath), { recursive: true });
+    gitOutput(['worktree', 'add', '-B', branch, worktreePath, baseRef], repoRoot);
+    action = 'created';
+  }
+  const baseCommit = gitOutput(['rev-parse', baseRef], repoRoot);
+  return {
+    action,
+    worktree_path: worktreePath,
+    branch,
+    base_ref: baseRef,
+    base_commit: baseCommit,
+    read_only: options.readOnly === true,
+    cleanup_required: create,
+    auto_merge: false,
+    auto_push: false,
+  };
+}
+
+function scaffoldRoutineManifest(options = {}) {
+  const slug = options.slug || 'specflow-routine';
+  const kind = options.kind || 'cron';
+  const interval = options.interval || 'daily';
+  const loop = options.loop || 'spec-build';
+  const command = options.command || `npx @colmbyrne/specflow run ${loop} --slug ${slug} --goal ${shellQuote(options.goal || `Run ${slug}`)} --input ${options.input || 'docs/idea.md'} --until-terminal`;
+  const outPath = options.outPath || join('docs', 'routines', `${slug}.${kind}.yml`);
+  const manifest = {
+    routine: {
+      slug,
+      kind,
+      trigger: options.trigger || interval,
+      loop,
+      loop_interval: options.loopInterval || interval,
+      command,
+      input: options.input || 'docs/idea.md',
+      outputs: options.outputs || [`.specflow/runs/${slug}/run-contract.yaml`, `.specflow/runs/${slug}/ledger.jsonl`],
+      budget: options.budget || { max_iterations: 8 },
+      never_without_human: options.neverWithoutHuman || ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
+      proposal_policy: 'project improvements must enter spec-build before implementation',
+    },
+  };
+  ensureDir(outPath);
+  writeFileSync(outPath, yaml.dump(manifest, { lineWidth: 120, noRefs: true }), 'utf8');
+  return { outPath, manifest };
 }
 
 function shellQuote(value) {
@@ -295,6 +443,11 @@ function materializeStagePrompt(contract, options = {}) {
     ...(Array.isArray(definition?.stages) ? definition.stages : []),
     ...(Array.isArray(definition?.rails) ? definition.rails : []),
   ].find((item) => item && item.id === stage);
+  const statePaths = {
+    ...defaultStatePaths(options.contractPath || contract.storage?.contract_path || defaultRunPaths(options.slug || 'specflow-run').contractPath, options),
+    ...(contract.storage || {}),
+  };
+  const stateDigest = readStateDigest(statePaths.statePath, statePaths.lessonDir);
   const content = [
     `# Specflow ${contract.loop} Stage Prompt`,
     '',
@@ -312,6 +465,9 @@ function materializeStagePrompt(contract, options = {}) {
     '',
     '## Stage Definition',
     stageSpec ? yaml.dump(stageSpec, { lineWidth: 120, noRefs: true }).trim() : 'No YAML stage body found; use the run contract and next gate.',
+    '',
+    '## State Memory',
+    stateDigest || 'No Specflow state memory found for this run.',
     '',
     '## Required Behavior',
     '- Execute only this stage or rail.',
@@ -339,13 +495,27 @@ function normalizeAdapterPolicy(raw, context = {}) {
   if (!['claude-print', 'codex-exec', 'fake'].includes(policy.provider)) {
     throw new Error(`adapter_policy.provider is unsupported: ${policy.provider}`);
   }
+  if (policy.role && !['orchestrator', 'planner', 'worker', 'implementer', 'verifier', 'fallback'].includes(policy.role)) {
+    throw new Error(`adapter_policy.role is unsupported: ${policy.role}`);
+  }
+  if (policy.effort && !['low', 'medium', 'high', 'xhigh', 'ultracode'].includes(policy.effort)) {
+    throw new Error(`adapter_policy.effort is unsupported: ${policy.effort}`);
+  }
+  const requestedModel = policy.requested_model || policy.model || null;
   return {
     ...policy,
+    requested_model: requestedModel,
+    effective_model: policy.effective_model || UNKNOWN,
+    role: policy.role || null,
+    effort: policy.effort || null,
+    fallback_model: policy.fallback_model || null,
+    fallback_refusal_reason: policy.fallback_refusal_reason || null,
     args: policy.args || [],
     allowed_tools: policy.allowed_tools || [],
     denied_tools: policy.denied_tools || [],
     prompt: policy.prompt || null,
     session_id: policy.session_id || null,
+    verifier_policy: policy.verifier_policy || null,
     dry_run: Boolean(policy.dry_run),
     transcript_path: resolveTemplate(policy.transcript_path, context),
     output_path: resolveTemplate(policy.output_path, context),
@@ -358,7 +528,9 @@ function buildAdapterCommand(policy, promptPath) {
   if (policy.provider === 'claude-print') {
     const args = policy.args.length ? [...policy.args] : ['-p', '--output-format', 'stream-json'];
     if (!args.includes('-p') && !args.includes('--print')) args.unshift('-p');
-    if (policy.model && !args.includes('--model')) args.push('--model', String(policy.model));
+    const requestedModel = policy.requested_model || policy.model;
+    if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
+    if (policy.fallback_model && !args.includes('--fallback-model')) args.push('--fallback-model', String(policy.fallback_model));
     if (policy.max_budget_usd !== undefined && !args.includes('--max-budget-usd')) {
       args.push('--max-budget-usd', String(policy.max_budget_usd));
     }
@@ -381,7 +553,8 @@ function buildAdapterCommand(policy, promptPath) {
       ? ['exec', 'resume', String(policy.session_id), ...(policy.args || [])]
       : ['exec', ...(policy.args || [])];
     if (!args.includes('--json')) args.push('--json');
-    if (policy.model && !args.includes('--model')) args.push('--model', String(policy.model));
+    const requestedModel = policy.requested_model || policy.model;
+    if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
     if (policy.profile && !args.includes('--profile')) args.push('--profile', String(policy.profile));
     if (policy.output_schema && !args.includes('--output-schema')) args.push('--output-schema', String(policy.output_schema));
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
@@ -405,12 +578,48 @@ function containsForbiddenAction(text, neverWithoutHuman = []) {
   return neverWithoutHuman.find((action) => lower.includes(String(action).toLowerCase())) || null;
 }
 
+function pickFirstString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function pickFirstNumber(...values) {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  }
+  return null;
+}
+
+function mergeUsage(current, event) {
+  const usage = event.usage || event.message?.usage || event.response?.usage || {};
+  const inputTokens = pickFirstNumber(usage.input_tokens, usage.prompt_tokens, event.input_tokens, event.prompt_tokens);
+  const outputTokens = pickFirstNumber(usage.output_tokens, usage.completion_tokens, event.output_tokens, event.completion_tokens);
+  const totalTokens = pickFirstNumber(
+    usage.total_tokens,
+    event.total_tokens,
+    inputTokens !== null || outputTokens !== null ? Number(inputTokens || 0) + Number(outputTokens || 0) : null,
+  );
+  const costUsd = pickFirstNumber(usage.cost_usd, usage.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd);
+  return {
+    input_tokens: current.input_tokens ?? inputTokens,
+    output_tokens: current.output_tokens ?? outputTokens,
+    total_tokens: current.total_tokens ?? totalTokens,
+    estimated_cost_usd: current.estimated_cost_usd ?? costUsd,
+  };
+}
+
 function parseProviderEvents(provider, text) {
   const events = [];
   const errors = [];
   const toolEvents = [];
   let finalText = '';
   let sessionId = null;
+  let effectiveModel = null;
+  let fallbackRefusalReason = null;
+  let usage = {};
 
   for (const line of String(text || '').split(/\r?\n/).filter(Boolean)) {
     let event;
@@ -422,6 +631,24 @@ function parseProviderEvents(provider, text) {
     }
     events.push(event);
     sessionId = sessionId || event.session_id || event.sessionId || event.conversation_id || event.conversationId || null;
+    effectiveModel = effectiveModel || pickFirstString(
+      event.effective_model,
+      event.actual_model,
+      event.model,
+      event.model_id,
+      event.modelId,
+      event.response?.model,
+      event.message?.model,
+    );
+    fallbackRefusalReason = fallbackRefusalReason || pickFirstString(
+      event.fallback_refusal_reason,
+      event.fallback_reason,
+      event.refusal_reason,
+      event.stop_reason,
+      event.error?.reason,
+      event.error?.message,
+    );
+    usage = mergeUsage(usage, event);
     const type = String(event.type || event.event || event.kind || '');
     if (/error/i.test(type) || event.error) errors.push(event.error || event);
     if (event.tool || event.tool_call || event.toolCall || /tool|command|exec/i.test(type)) toolEvents.push(event);
@@ -429,7 +656,18 @@ function parseProviderEvents(provider, text) {
     if (typeof textValue === 'string') finalText += textValue;
   }
 
-  return { provider, session_id: sessionId, final_text: finalText.trim(), errors, tool_events: toolEvents, events };
+  const normalizedUsage = Object.fromEntries(Object.entries(usage).filter(([, value]) => value !== null && value !== undefined));
+  return {
+    provider,
+    session_id: sessionId,
+    effective_model: effectiveModel || UNKNOWN,
+    fallback_refusal_reason: fallbackRefusalReason || null,
+    usage: normalizedUsage,
+    final_text: finalText.trim(),
+    errors,
+    tool_events: toolEvents,
+    events,
+  };
 }
 
 function eventText(event) {
@@ -450,6 +688,14 @@ function runAdapter(policy, options = {}) {
   const baseEntry = {
     stage: options.stage || 'agent_action_required',
     provider: policy.provider,
+    policy_id: policy.id || null,
+    role: policy.role || null,
+    effort: policy.effort || null,
+    requested_model: policy.requested_model || null,
+    effective_model: policy.effective_model || UNKNOWN,
+    fallback_model: policy.fallback_model || null,
+    fallback_refusal_reason: policy.fallback_refusal_reason || null,
+    max_budget_usd: policy.max_budget_usd ?? null,
     argv: [planned.command, ...planned.args],
     transcript_path: policy.transcript_path,
     output_path: policy.output_path,
@@ -496,18 +742,40 @@ function runAdapter(policy, options = {}) {
   writeFileSync(policy.transcript_path, stdout + (stderr ? `\n${stderr}` : ''), 'utf8');
 
   const parsed = parseProviderEvents(policy.provider, `${stdout}\n${stderr}`);
+  const providerMetadata = {
+    session_id: parsed.session_id,
+    effective_model: parsed.effective_model || UNKNOWN,
+    fallback_refusal_reason: parsed.fallback_refusal_reason || null,
+    usage: Object.keys(parsed.usage || {}).length ? parsed.usage : null,
+    input_tokens: parsed.usage?.input_tokens ?? null,
+    output_tokens: parsed.usage?.output_tokens ?? null,
+    total_tokens: parsed.usage?.total_tokens ?? null,
+    estimated_cost_usd: parsed.usage?.estimated_cost_usd ?? null,
+  };
   const forbidden = forbiddenFromProviderEvents(parsed, policy.never_without_human, policy.denied_tools);
   if (forbidden) {
     return {
       status: 'blocked_human_required',
-      entry: { ...baseEntry, exit_code: result.status, stop_reason: 'blocked_human_required', forbidden_action_detected: forbidden },
+      entry: {
+        ...baseEntry,
+        ...providerMetadata,
+        exit_code: result.status,
+        stop_reason: 'blocked_human_required',
+        forbidden_action_detected: forbidden,
+      },
     };
   }
 
   if (result.error || result.signal === 'SIGTERM' || result.status !== 0) {
     return {
       status: 'adapter_failed',
-      entry: { ...baseEntry, exit_code: result.status, stop_reason: 'adapter_failed', failure: result.error?.message || result.signal || stderr },
+      entry: {
+        ...baseEntry,
+        ...providerMetadata,
+        exit_code: result.status,
+        stop_reason: 'adapter_failed',
+        failure: result.error?.message || result.signal || stderr,
+      },
     };
   }
 
@@ -516,8 +784,8 @@ function runAdapter(policy, options = {}) {
     status: 'gate_rerun_required',
     entry: {
       ...baseEntry,
+      ...providerMetadata,
       exit_code: 0,
-      session_id: parsed.session_id,
       final_response_chars: (parsed.final_text || stdout).length,
       tool_event_count: parsed.tool_events.length,
       stop_reason: 'gate_rerun_required',
@@ -566,6 +834,12 @@ function runLoop(options) {
     contract.terminal_status = adapterResult.status === 'gate_rerun_required' ? 'in_progress' : 'blocked';
     contract.current_stage_or_rail = adapterResult.status === 'gate_rerun_required' ? contract.current_stage_or_rail : contract.current_stage_or_rail;
     if (adapterResult.entry && adapterResult.entry.session_id) contract.provider_session_id = adapterResult.entry.session_id;
+    recordRunState(contract, {
+      contractPath,
+      ledgerPath,
+      status: adapterResult.status,
+      stopReason: adapterResult.entry?.stop_reason,
+    });
     writeYaml(contractPath, { run_contract: contract });
     return { ...adapterResult, contractPath, ledgerPath };
   }
@@ -583,6 +857,14 @@ function runLoop(options) {
   } else {
     contract.terminal_status = registryResult.status === 'gate_failed' ? 'failed' : 'blocked';
   }
+  if (['agent_action_required', 'gate_failed'].includes(registryResult.status)) {
+    recordRunState(contract, {
+      contractPath,
+      ledgerPath,
+      status: registryResult.status,
+      stopReason: registryResult.entries[registryResult.entries.length - 1]?.stop_reason,
+    });
+  }
   writeYaml(contractPath, { run_contract: contract });
   return { status: registryResult.status, contractPath, ledgerPath };
 }
@@ -591,6 +873,55 @@ function readLedgerTail(ledgerPath, limit = 10) {
   if (!existsSync(ledgerPath)) return [];
   const lines = readFileSync(ledgerPath, 'utf8').trim().split(/\r?\n/).filter(Boolean);
   return lines.slice(Math.max(0, lines.length - limit)).map((line) => JSON.parse(line));
+}
+
+function readLedger(ledgerPath) {
+  if (!existsSync(ledgerPath)) return [];
+  return readFileSync(ledgerPath, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+}
+
+function summarizeLedger(entries) {
+  const summary = {
+    entries: entries.length,
+    gate_attempts: 0,
+    gate_passes: 0,
+    gate_failures: 0,
+    adapter_attempts: 0,
+    adapter_successes_requiring_gate_rerun: 0,
+    adapter_failures: 0,
+    human_blocks: 0,
+    unknown_usage_entries: 0,
+    known_estimated_cost_usd: 0,
+    cost_per_gate_pass_usd: null,
+    requested_models: {},
+    effective_models: {},
+  };
+  for (const entry of entries) {
+    if (entry.verifier) {
+      summary.gate_attempts += 1;
+      if (entry.result === 'pass') summary.gate_passes += 1;
+      if (entry.result === 'fail') summary.gate_failures += 1;
+    }
+    if (entry.provider) {
+      summary.adapter_attempts += 1;
+      if (entry.stop_reason === 'gate_rerun_required') summary.adapter_successes_requiring_gate_rerun += 1;
+      if (entry.stop_reason === 'adapter_failed') summary.adapter_failures += 1;
+      if (entry.stop_reason === 'blocked_human_required') summary.human_blocks += 1;
+      if (entry.estimated_cost_usd === null || entry.estimated_cost_usd === undefined) summary.unknown_usage_entries += 1;
+      else summary.known_estimated_cost_usd += Number(entry.estimated_cost_usd);
+    }
+    if (entry.requested_model) {
+      summary.requested_models[entry.requested_model] = (summary.requested_models[entry.requested_model] || 0) + 1;
+    }
+    const effective = entry.effective_model || (entry.provider ? UNKNOWN : null);
+    if (effective) {
+      summary.effective_models[effective] = (summary.effective_models[effective] || 0) + 1;
+    }
+  }
+  if (summary.gate_passes > 0 && summary.known_estimated_cost_usd > 0) {
+    summary.cost_per_gate_pass_usd = summary.known_estimated_cost_usd / summary.gate_passes;
+  }
+  return summary;
 }
 
 function runStatus(options = {}) {
@@ -609,6 +940,7 @@ function runStatus(options = {}) {
     next_gate: contract.next_gate,
     terminal_status: contract.terminal_status || 'unknown',
     sequence: loopSequence(contract, options),
+    ledger_summary: summarizeLedger(readLedger(ledgerPath)),
     ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
   };
 }
@@ -704,6 +1036,11 @@ module.exports = {
   loadRunContract,
   validateRunContract,
   appendLedger,
+  appendStateMemory,
+  readStateDigest,
+  recordRunState,
+  prepareWorktree,
+  scaffoldRoutineManifest,
   normalizeAdapterPolicy,
   buildAdapterCommand,
   commandExists,
@@ -719,6 +1056,9 @@ module.exports = {
   executeVerifierRegistry,
   materializeStagePrompt,
   planAdapterSmoke,
+  readLedger,
+  readLedgerTail,
+  summarizeLedger,
   runAdapter,
   runLoop,
   runStatus,

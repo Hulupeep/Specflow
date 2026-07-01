@@ -1,0 +1,37 @@
+[
+  {
+    "number": 83,
+    "title": "[SPECFLOW] MODEL-ROUTING-01: adapter model roles, effort levels, fallbacks, and budgets",
+    "body": "Journey IDs: J-FABLE-MODEL-ROUTING\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 84,
+    "title": "[SPECFLOW] VERIFIER-01: independent verifier stage for provider output",
+    "body": "Journey IDs: J-FABLE-INDEPENDENT-VERIFIER\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 85,
+    "title": "[SPECFLOW] STATE-01: .specflow/STATE.md and lesson-file compounding memory",
+    "body": "Journey IDs: J-FABLE-STATE-MEMORY\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 86,
+    "title": "[SPECFLOW] WORKTREE-01: isolated worktree execution for delegated agents",
+    "body": "Journey IDs: J-FABLE-WORKTREE-ISOLATION\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 87,
+    "title": "[SPECFLOW] ROUTINE-01: /loop and routine manifests for scheduled Specflow loops",
+    "body": "Journey IDs: J-FABLE-ROUTINE-MANIFEST\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 88,
+    "title": "[SPECFLOW] VISION-GATE-01: vision-verifier evidence for teardown and Gate D",
+    "body": "Journey IDs: J-FABLE-VISION-EVIDENCE\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 89,
+    "title": "[SPECFLOW] COST-01: model usage and cost-per-accepted-change counters",
+    "body": "Journey IDs: J-FABLE-COST-ACCOUNTING\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  }
+]

@@ -2,12 +2,15 @@ adapter_policy:
   id: codex-exec-safe
   provider: codex-exec
   command: codex
+  role: implementer
+  effort: high
   args:
     - --sandbox
     - workspace-write
     - --ask-for-approval
     - never
   model: gpt-5
+  requested_model: gpt-5
   timeout_seconds: 900
   max_iterations: 1
   allowed_tools: []

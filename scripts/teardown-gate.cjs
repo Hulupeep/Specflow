@@ -21,7 +21,7 @@
  *    Exit 0 = pass, 1 = gate fails, 2 = usage/IO error.
  *
  * Journeys are recognised by id lines like `- J: <id> — <purpose>` (map) and `## J: <id>` or
- * `- J: <id>` (findings). Evidence refs = any `evidence/<name>.(png|jpg|jpeg|webp|txt|json)`
+ * `- J: <id>` (findings). Evidence refs = any `evidence/<name>.(png|jpg|jpeg|webp|txt|json|md)`
  * mention in the entry — text/JSON included so value-bearing hops can attach the oracle
  * re-read output itself (GATE D, pipeline-hardening #60), not just a screenshot.
  *
@@ -119,7 +119,7 @@ function splitFindingSections(content) {
 }
 
 function evidenceRefs(body) {
-  return [...body.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp|txt|json)/g)].map(m => m[0]);
+  return [...body.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp|txt|json|md)/g)].map(m => m[0]);
 }
 
 function checkGateD(dir) {
@@ -157,8 +157,13 @@ function checkGateD(dir) {
 
     for (const { id, body } of sections) {
       const refs = evidenceRefs(body);
-      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json)`);
+      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json/md)`);
       for (const r of refs) if (!existsSync(join(dir, r))) errs.push(`dangling evidence: ${r} referenced for ${id} but file does not exist`);
+
+      const hasVision = refs.some(r => /\.md$/.test(r)) || /\bvision[-_ ]verifier\b/i.test(body);
+      if (hasVision && !refs.some(r => /\.(png|jpg|jpeg|webp)$/.test(r))) {
+        errs.push(`vision evidence incomplete: ${id} references a vision verifier without screenshot evidence`);
+      }
 
       if (valueBearing.has(id) && !refs.some(r => /\.(txt|json)$/.test(r))) {
         errs.push(`value evidence missing: ${id} is value-bearing and needs .txt/.json oracle re-read evidence`);
@@ -201,7 +206,7 @@ function check(dir) {
     sections.forEach(sec => {
       const id = (sec.match(/^\s*([A-Za-z0-9][A-Za-z0-9_-]*)/) || [])[1] || '?';
       const refs = evidenceRefs(sec);
-      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json) — "I walked it" is not evidence`);
+      if (refs.length === 0) errs.push(`no evidence: findings for ${id} reference no evidence/* file (png/jpg/webp/txt/json/md) — "I walked it" is not evidence`);
       for (const r of refs) if (!existsSync(join(dir, r))) errs.push(`dangling evidence: ${r} referenced for ${id} but file does not exist`);
     });
   } else if (existsSync(map)) {

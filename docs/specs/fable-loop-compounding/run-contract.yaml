@@ -1,0 +1,26 @@
+run_contract:
+  loop: spec-build
+  goal: Create tickets for Fable-class loop compounding features.
+  input_artifact: docs/specs/fable-loop-compounding/prd.md
+  path: templates/QA/loops/spec-build.yaml
+  current_stage_or_rail: handoff
+  next_gate: feature-build per created GitHub issue
+  durable_evidence:
+    - docs/specs/fable-loop-compounding/prd.md
+    - docs/specs/fable-loop-compounding/falsification.md
+    - docs/specs/fable-loop-compounding/verdict.md
+    - docs/specs/fable-loop-compounding/hops.md
+    - docs/specs/fable-loop-compounding/contract.yml
+    - docs/specs/fable-loop-compounding/tickets.md
+    - docs/specs/fable-loop-compounding/tickets.json
+    - docs/specs/fable-loop-compounding/issues.json
+    - docs/specs/fable-loop-compounding/simulation.md
+    - docs/specs/fable-loop-compounding/specflow-audit.md
+  stop_condition: Stop at spec-build handoff; GitHub issues #83-#89 are created and ready for feature-build.
+  never_without_human:
+    - git push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
+  terminal_status: handoff
