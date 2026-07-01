@@ -173,4 +173,32 @@ describe('Gate D checks', () => {
     const signed = runNode(TEARDOWN_GATE, ['check-gate-d', dir]);
     expect(signed.status).toBe(0);
   });
+
+  test('accepts vision verifier finding files only with screenshot evidence', () => {
+    const dir = tmpDir();
+    fs.mkdirSync(path.join(dir, 'evidence'), { recursive: true });
+    fs.writeFileSync(path.join(dir, 'journey-map.md'), '- J: UIHOP — screenshot review\n');
+    fs.writeFileSync(path.join(dir, 'evidence', 'screen.png'), 'png');
+    fs.writeFileSync(path.join(dir, 'evidence', 'vision.md'), '# Vision verifier\nVerdict: pass\n');
+    fs.writeFileSync(path.join(dir, 'findings.md'), [
+      '## J: UIHOP',
+      'status: green',
+      'vision-verifier: evidence/vision.md',
+      'screenshot: evidence/screen.png',
+      '',
+    ].join('\n'));
+
+    const pass = runNode(TEARDOWN_GATE, ['check-gate-d', dir]);
+    expect(pass.status).toBe(0);
+
+    fs.writeFileSync(path.join(dir, 'findings.md'), [
+      '## J: UIHOP',
+      'status: green',
+      'vision-verifier: evidence/vision.md',
+      '',
+    ].join('\n'));
+    const fail = runNode(TEARDOWN_GATE, ['check-gate-d', dir]);
+    expect(fail.status).toBe(1);
+    expect(fail.stderr).toContain('vision evidence incomplete');
+  });
 });

@@ -1,0 +1,37 @@
+{
+  "issues": [85, 86, 87, 88],
+  "feature_build": "state memory, delegated worktree metadata, routine manifests, and vision Gate D evidence",
+  "source_provenance": [
+    {
+      "claim": "Specflow writes durable state memory to .specflow/STATE.md and one lesson file per confirmed lesson.",
+      "source": "scripts/specflow-runner.cjs appendStateMemory",
+      "verification": "tests/contracts/loop-run-contract.test.js writes STATE.md plus a lesson file and re-reads both."
+    },
+    {
+      "claim": "Generated stage prompts consult bounded state memory and recent lesson summaries.",
+      "source": "scripts/specflow-runner.cjs materializeStagePrompt and readStateDigest",
+      "verification": "tests/contracts/loop-run-contract.test.js re-reads a generated prompt containing the state memory section and lesson summary."
+    },
+    {
+      "claim": "Delegated agent work can be isolated in a git worktree while preserving no auto-merge and no auto-push metadata.",
+      "source": "scripts/specflow-runner.cjs prepareWorktree",
+      "verification": "tests/contracts/loop-run-contract.test.js creates a temporary git repository and re-reads worktree path, branch, read-only, auto_merge, and auto_push fields."
+    },
+    {
+      "claim": "Specflow can scaffold routine manifests for scheduled runs that call specflow run rather than inventing a parallel process.",
+      "source": "scripts/specflow-runner.cjs scaffoldRoutineManifest and bin/specflow.js routine command",
+      "verification": "tests/contracts/loop-run-contract.test.js re-reads the generated manifest command, outputs, budget, and never_without_human fields."
+    },
+    {
+      "claim": "Gate D accepts screenshot plus vision-verifier finding evidence and rejects vision findings with no screenshot evidence.",
+      "source": "scripts/teardown-gate.cjs evidenceRefs and checkGateD",
+      "verification": "tests/scripts/gate-scripts.test.js runs check-gate-d against passing and failing vision evidence fixtures."
+    }
+  ],
+  "checks": [
+    "npm test -- tests/contracts/loop-run-contract.test.js tests/scripts/gate-scripts.test.js --runInBand",
+    "node bin/specflow.js provenance evidence/provenance-fable-remaining-loop-controls.json --git-diff",
+    "npm test -- --runInBand"
+  ],
+  "result": "pass"
+}

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const yaml = require('js-yaml');
 
 const {
@@ -14,10 +15,13 @@ const {
   normalizeAdapterPolicy,
   parseProviderEvents,
   planAdapterSmoke,
+  appendStateMemory,
+  prepareWorktree,
   runAdapter,
   runLoop,
   runStatus,
   runUntilTerminal,
+  scaffoldRoutineManifest,
   summarizeLedger,
   validateRunContract,
 } = require('../../scripts/specflow-runner.cjs');
@@ -147,6 +151,45 @@ describe('local contracted loop runner', () => {
     expect(fs.readFileSync(result.promptPath, 'utf8')).toContain('Never without human: git push');
   });
 
+  test('state memory writes STATE.md, one lesson file, and prompt digest', () => {
+    const dir = tempDir();
+    const statePath = path.join(dir, '.specflow/STATE.md');
+    const lessonDir = path.join(dir, '.specflow/lessons');
+    const contractPath = path.join(dir, '.specflow/runs/demo/run-contract.yaml');
+
+    const state = appendStateMemory({
+      statePath,
+      lessonDir,
+      update: {
+        verified_fact: 'adapter policy supports requested_model',
+        distilled_rule: 'never infer effective_model from requested_model',
+        lesson_summary: 'Do not infer effective model',
+        lesson_body: 'Record unknown unless provider reports the effective model.',
+      },
+    });
+
+    expect(fs.existsSync(statePath)).toBe(true);
+    expect(fs.existsSync(state.lessonPath)).toBe(true);
+    expect(fs.readFileSync(state.lessonPath, 'utf8')).toContain('# Do not infer effective model');
+
+    const prompt = materializeStagePrompt({
+      loop: 'feature-build',
+      goal: 'state memory',
+      input_artifact: 'docs/specs/fable-loop-compounding/tickets.md',
+      path: 'templates/QA/loops/feature-build.yaml',
+      current_stage_or_rail: '5_impl',
+      next_gate: 'implementation',
+      durable_evidence: [contractPath],
+      stop_condition: 'handoff',
+      never_without_human: ['git push'],
+      storage: { contract_path: contractPath, statePath, lessonDir },
+    }, { contractPath, statePath, lessonDir });
+
+    expect(prompt.content).toContain('## State Memory');
+    expect(prompt.content).toContain('adapter policy supports requested_model');
+    expect(prompt.content).toContain('lesson:do-not-infer-effective-model.md');
+  });
+
   test('bounded run-until-terminal advances through green registries and stops at next agent stage', () => {
     const dir = tempDir();
     const specDir = path.join(dir, 'spec');
@@ -211,6 +254,50 @@ describe('local contracted loop runner', () => {
     expect(status.current_stage_or_rail).toBe('6_provenance');
     expect(status.ledger_tail).toHaveLength(1);
     expect(status.ledger_summary.gate_passes).toBe(1);
+  });
+
+  test('prepares isolated delegated worktree metadata without auto merge or push', () => {
+    const dir = tempDir();
+    const wt = path.join(dir, 'delegate-wt');
+    spawnSync('git', ['init'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['config', 'user.email', 'test@example.com'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['config', 'user.name', 'Specflow Test'], { cwd: dir, encoding: 'utf8' });
+    fs.writeFileSync(path.join(dir, 'README.md'), 'demo\n');
+    spawnSync('git', ['add', 'README.md'], { cwd: dir, encoding: 'utf8' });
+    spawnSync('git', ['commit', '-m', 'init'], { cwd: dir, encoding: 'utf8' });
+
+    const result = prepareWorktree({
+      repoRoot: dir,
+      worktreePath: wt,
+      branch: 'specflow/delegate',
+      create: true,
+      readOnly: true,
+    });
+
+    expect(result.action).toBe('created');
+    expect(result.worktree_path).toBe(wt);
+    expect(result.read_only).toBe(true);
+    expect(result.auto_merge).toBe(false);
+    expect(result.auto_push).toBe(false);
+    expect(fs.existsSync(path.join(wt, 'README.md'))).toBe(true);
+  });
+
+  test('scaffolds routine manifests that call specflow run and preserve human gates', () => {
+    const dir = tempDir();
+    const outPath = path.join(dir, 'docs/routines/nightly.yml');
+    const result = scaffoldRoutineManifest({
+      slug: 'nightly',
+      kind: 'github-actions',
+      loop: 'spec-build',
+      input: 'docs/idea.md',
+      outPath,
+    });
+
+    expect(fs.existsSync(outPath)).toBe(true);
+    expect(result.manifest.routine.command).toContain('specflow run spec-build');
+    expect(result.manifest.routine.command).toContain('--until-terminal');
+    expect(result.manifest.routine.never_without_human).toContain('git push');
+    expect(result.manifest.routine.proposal_policy).toContain('spec-build');
   });
 });
 

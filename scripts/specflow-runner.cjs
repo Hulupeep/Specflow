@@ -8,8 +8,8 @@
  */
 
 const { spawnSync } = require('child_process');
-const { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
-const { dirname, join, resolve } = require('path');
+const { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
+const { basename, dirname, join, resolve } = require('path');
 const yaml = require('js-yaml');
 
 const LOOP_PATHS = {
@@ -75,6 +75,16 @@ function defaultRunPaths(slug, options = {}) {
   return { contractPath, ledgerPath };
 }
 
+function defaultStatePaths(contractPath, options = {}) {
+  const parts = resolve(contractPath || '.specflow/runs/run/run-contract.yaml').split(/[\\/]/);
+  const specflowIndex = parts.lastIndexOf('.specflow');
+  const base = specflowIndex !== -1 ? parts.slice(0, specflowIndex + 1).join('/') : dirname(contractPath || '.');
+  return {
+    statePath: options.statePath || join(base, 'STATE.md'),
+    lessonDir: options.lessonDir || join(base, 'lessons'),
+  };
+}
+
 function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }) {
   if (!LOOP_PATHS[loop]) throw new Error(`unknown loop "${loop}"`);
   return {
@@ -96,6 +106,7 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }
       storage: {
         contract_path: contractPath,
         ledger_path: ledgerPath,
+        ...defaultStatePaths(contractPath),
       },
     },
   };
@@ -130,6 +141,141 @@ function validateRunContract(contract) {
 function appendLedger(ledgerPath, entry) {
   ensureDir(ledgerPath);
   appendFileSync(ledgerPath, `${JSON.stringify({ recorded_at: new Date().toISOString(), ...entry })}\n`, 'utf8');
+}
+
+function slugify(value) {
+  return String(value || 'lesson').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'lesson';
+}
+
+function ensureStateFile(statePath) {
+  if (existsSync(statePath)) return;
+  ensureDir(statePath);
+  writeFileSync(statePath, [
+    '# Specflow State',
+    '',
+    '## Verified Facts',
+    '',
+    '## Failed Gates',
+    '',
+    '## Distilled Rules',
+    '',
+    '## Open Questions',
+    '',
+    '## Last Session',
+    '',
+  ].join('\n'), 'utf8');
+}
+
+function appendStateMemory({ statePath, lessonDir, update = {} }) {
+  ensureStateFile(statePath);
+  const lines = [];
+  const at = update.recorded_at || new Date().toISOString();
+  if (update.verified_fact) lines.push(`- ${at}: ${update.verified_fact}`);
+  if (update.failed_gate) lines.push(`- ${at}: ${update.failed_gate}`);
+  if (update.distilled_rule) lines.push(`- ${at}: ${update.distilled_rule}`);
+  if (update.open_question) lines.push(`- ${at}: ${update.open_question}`);
+  if (update.last_session) lines.push(`- ${at}: ${update.last_session}`);
+  if (lines.length) appendFileSync(statePath, `\n## Update ${at}\n${lines.join('\n')}\n`, 'utf8');
+
+  let lessonPath = null;
+  if (update.lesson_summary) {
+    mkdirSync(lessonDir, { recursive: true });
+    lessonPath = join(lessonDir, `${slugify(update.lesson_summary)}.md`);
+    writeFileSync(lessonPath, [
+      `# ${update.lesson_summary}`,
+      '',
+      update.lesson_body || update.distilled_rule || update.verified_fact || update.last_session || '',
+      '',
+    ].join('\n'), 'utf8');
+  }
+  return { statePath, lessonPath };
+}
+
+function readStateDigest(statePath, lessonDir, limit = 2400) {
+  const chunks = [];
+  if (statePath && existsSync(statePath)) chunks.push(readFileSync(statePath, 'utf8').trim());
+  if (lessonDir && existsSync(lessonDir)) {
+    const lessons = readdirSync(lessonDir).filter((f) => f.endsWith('.md')).sort().slice(-5);
+    for (const lesson of lessons) {
+      const firstLine = readFileSync(join(lessonDir, lesson), 'utf8').split(/\r?\n/)[0];
+      chunks.push(`lesson:${lesson}: ${firstLine}`);
+    }
+  }
+  return chunks.join('\n\n').slice(-limit);
+}
+
+function recordRunState(contract, { contractPath, ledgerPath, status, stopReason }) {
+  const paths = {
+    ...defaultStatePaths(contractPath),
+    ...(contract.storage || {}),
+  };
+  return appendStateMemory({
+    statePath: paths.statePath,
+    lessonDir: paths.lessonDir,
+    update: {
+      failed_gate: status === 'gate_failed' ? `${contract.current_stage_or_rail}: ${contract.next_gate}` : null,
+      last_session: `${contract.loop}/${contract.current_stage_or_rail} stopped with ${status}${stopReason ? ` (${stopReason})` : ''}; ledger ${ledgerPath}`,
+    },
+  });
+}
+
+function gitOutput(args, cwd = '.') {
+  const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
+  if (result.status !== 0) throw new Error(result.stderr || `git ${args.join(' ')} failed`);
+  return (result.stdout || '').trim();
+}
+
+function prepareWorktree(options = {}) {
+  const repoRoot = options.repoRoot || process.cwd();
+  const baseRef = options.baseRef || 'HEAD';
+  const branch = options.branch || `specflow/${options.slug || 'delegate'}`;
+  const worktreePath = options.worktreePath || join(repoRoot, '.specflow', 'worktrees', slugify(branch));
+  const create = options.create === true;
+  let action = 'referenced';
+  if (create && !existsSync(worktreePath)) {
+    mkdirSync(dirname(worktreePath), { recursive: true });
+    gitOutput(['worktree', 'add', '-B', branch, worktreePath, baseRef], repoRoot);
+    action = 'created';
+  }
+  const baseCommit = gitOutput(['rev-parse', baseRef], repoRoot);
+  return {
+    action,
+    worktree_path: worktreePath,
+    branch,
+    base_ref: baseRef,
+    base_commit: baseCommit,
+    read_only: options.readOnly === true,
+    cleanup_required: create,
+    auto_merge: false,
+    auto_push: false,
+  };
+}
+
+function scaffoldRoutineManifest(options = {}) {
+  const slug = options.slug || 'specflow-routine';
+  const kind = options.kind || 'cron';
+  const interval = options.interval || 'daily';
+  const loop = options.loop || 'spec-build';
+  const command = options.command || `npx @colmbyrne/specflow run ${loop} --slug ${slug} --goal ${shellQuote(options.goal || `Run ${slug}`)} --input ${options.input || 'docs/idea.md'} --until-terminal`;
+  const outPath = options.outPath || join('docs', 'routines', `${slug}.${kind}.yml`);
+  const manifest = {
+    routine: {
+      slug,
+      kind,
+      trigger: options.trigger || interval,
+      loop,
+      loop_interval: options.loopInterval || interval,
+      command,
+      input: options.input || 'docs/idea.md',
+      outputs: options.outputs || [`.specflow/runs/${slug}/run-contract.yaml`, `.specflow/runs/${slug}/ledger.jsonl`],
+      budget: options.budget || { max_iterations: 8 },
+      never_without_human: options.neverWithoutHuman || ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
+      proposal_policy: 'project improvements must enter spec-build before implementation',
+    },
+  };
+  ensureDir(outPath);
+  writeFileSync(outPath, yaml.dump(manifest, { lineWidth: 120, noRefs: true }), 'utf8');
+  return { outPath, manifest };
 }
 
 function shellQuote(value) {
@@ -297,6 +443,11 @@ function materializeStagePrompt(contract, options = {}) {
     ...(Array.isArray(definition?.stages) ? definition.stages : []),
     ...(Array.isArray(definition?.rails) ? definition.rails : []),
   ].find((item) => item && item.id === stage);
+  const statePaths = {
+    ...defaultStatePaths(options.contractPath || contract.storage?.contract_path || defaultRunPaths(options.slug || 'specflow-run').contractPath, options),
+    ...(contract.storage || {}),
+  };
+  const stateDigest = readStateDigest(statePaths.statePath, statePaths.lessonDir);
   const content = [
     `# Specflow ${contract.loop} Stage Prompt`,
     '',
@@ -314,6 +465,9 @@ function materializeStagePrompt(contract, options = {}) {
     '',
     '## Stage Definition',
     stageSpec ? yaml.dump(stageSpec, { lineWidth: 120, noRefs: true }).trim() : 'No YAML stage body found; use the run contract and next gate.',
+    '',
+    '## State Memory',
+    stateDigest || 'No Specflow state memory found for this run.',
     '',
     '## Required Behavior',
     '- Execute only this stage or rail.',
@@ -680,6 +834,12 @@ function runLoop(options) {
     contract.terminal_status = adapterResult.status === 'gate_rerun_required' ? 'in_progress' : 'blocked';
     contract.current_stage_or_rail = adapterResult.status === 'gate_rerun_required' ? contract.current_stage_or_rail : contract.current_stage_or_rail;
     if (adapterResult.entry && adapterResult.entry.session_id) contract.provider_session_id = adapterResult.entry.session_id;
+    recordRunState(contract, {
+      contractPath,
+      ledgerPath,
+      status: adapterResult.status,
+      stopReason: adapterResult.entry?.stop_reason,
+    });
     writeYaml(contractPath, { run_contract: contract });
     return { ...adapterResult, contractPath, ledgerPath };
   }
@@ -696,6 +856,14 @@ function runLoop(options) {
     contract.terminal_status = contract.current_stage_or_rail === 'handoff' ? 'handoff' : 'in_progress';
   } else {
     contract.terminal_status = registryResult.status === 'gate_failed' ? 'failed' : 'blocked';
+  }
+  if (['agent_action_required', 'gate_failed'].includes(registryResult.status)) {
+    recordRunState(contract, {
+      contractPath,
+      ledgerPath,
+      status: registryResult.status,
+      stopReason: registryResult.entries[registryResult.entries.length - 1]?.stop_reason,
+    });
   }
   writeYaml(contractPath, { run_contract: contract });
   return { status: registryResult.status, contractPath, ledgerPath };
@@ -868,6 +1036,11 @@ module.exports = {
   loadRunContract,
   validateRunContract,
   appendLedger,
+  appendStateMemory,
+  readStateDigest,
+  recordRunState,
+  prepareWorktree,
+  scaffoldRoutineManifest,
   normalizeAdapterPolicy,
   buildAdapterCommand,
   commandExists,
