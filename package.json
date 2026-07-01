@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Hulupeep/Specflow.git"
+    "url": "git+https://github.com/Hulupeep/Specflow.git"
   },
   "bin": {
     "specflow": "bin/specflow.js"
