@@ -14,6 +14,12 @@ requirements:
     statement: Teardown/Gate D can record screenshot plus vision-verifier evidence without making vision the gate of record.
   - id: REQ-COST-01
     statement: Loop ledger records model usage and cost-per-accepted-change counters when available.
+  - id: REQ-VERIFIER-02
+    statement: Feature-build negotiates a slice-local verification contract and can run adversarial runtime verification before gate advance.
+  - id: REQ-TRACE-01
+    statement: Operators can generate a divergence report from ledger, transcript, provider, verifier, and gate evidence.
+  - id: REQ-HARNESS-MINIMAL-01
+    statement: Provider-specific scaffolding stays thin, ledger-backed, and removable while mechanical gates remain durable.
 journeys:
   - journey_meta:
       id: J-FABLE-MODEL-ROUTING
@@ -117,3 +123,53 @@ journeys:
     then:
       - token/cost fields are stored when available
       - status output summarizes gate attempts, accepted gates, rejected gates, and cost-per-accepted-change
+
+  - journey_meta:
+      id: J-FABLE-VERIFIER-NEGOTIATION
+      persona: feature_builder
+      owner_ticket: VERIFIER-02
+      assertion_bar: accepted verification contract exists before maker implementation and runtime verifier evidence is subordinate to mechanical gates
+    scenario: negotiate done criteria and run an adversarial product verifier
+    given:
+      - a feature-build slice has an outer ticket contract and journey IDs
+      - the provider policy declares a separate verifier
+    when:
+      - the maker proposes the slice-local verification contract
+      - the verifier rejects vague or missing runtime checks until the contract is executable
+      - the maker implements against the accepted contract
+    then:
+      - the accepted verification contract is persisted under the run directory
+      - the verifier runs against artifact plus contract, not maker reasoning trace
+      - runtime evidence can include Playwright steps, screenshot refs, console logs, network logs, and value re-reads
+      - the gate does not advance until the owning mechanical verifier or journey test passes
+
+  - journey_meta:
+      id: J-FABLE-TRACE-REVIEW
+      persona: loop_operator
+      owner_ticket: TRACE-01
+      assertion_bar: divergence report re-reads ledger entries and transcript/evidence references without provider summarization by default
+    scenario: debug a long-running loop from persisted traces
+    given:
+      - a run directory contains `ledger.jsonl`, run contract, maker transcript refs, verifier refs, and gate results
+    when:
+      - the operator runs `specflow run trace <run-dir>`
+    then:
+      - the report groups attempts by stage and disposition
+      - maker/verifier/gate divergence is highlighted
+      - missing transcripts and dangling evidence refs are reported as missing
+      - no transcript content is sent to a provider unless explicitly requested
+
+  - journey_meta:
+      id: J-FABLE-HARNESS-MINIMAL
+      persona: maintainer
+      owner_ticket: HARNESS-MINIMAL-01
+      assertion_bar: status and docs distinguish durable trust fields from transient provider knobs
+    scenario: remove stale model scaffolding without weakening gates
+    given:
+      - provider capabilities change and a policy knob becomes unsupported or consistently unknown
+    when:
+      - Specflow validates adapter policy and renders status
+    then:
+      - durable trust fields remain recorded in the ledger
+      - stale or unsupported provider knobs are visible to maintainers
+      - no mechanical gate depends on effort tier, brand name, or cost estimate alone

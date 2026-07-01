@@ -33,5 +33,20 @@
     "number": 89,
     "title": "[SPECFLOW] COST-01: model usage and cost-per-accepted-change counters",
     "body": "Journey IDs: J-FABLE-COST-ACCOUNTING\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 92,
+    "title": "[SPECFLOW] VERIFIER-02: maker-verifier negotiation and runtime verification",
+    "body": "Journey IDs: J-FABLE-VERIFIER-NEGOTIATION\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 93,
+    "title": "[SPECFLOW] TRACE-01: run trace divergence report for long-running loops",
+    "body": "Journey IDs: J-FABLE-TRACE-REVIEW\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
+  },
+  {
+    "number": 94,
+    "title": "[SPECFLOW] HARNESS-MINIMAL-01: keep model scaffolding thin and removable",
+    "body": "Journey IDs: J-FABLE-HARNESS-MINIMAL\n\nSee docs/specs/fable-loop-compounding/tickets.md for the local ticket packet."
   }
 ]
