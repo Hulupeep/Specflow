@@ -6,6 +6,18 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.10.0 (2026-07-01)
+
+**Specflow loop runtime controls + Fable-class adapter accounting.**
+
+- **Contracted loop runner controls** — `specflow run` now carries richer adapter policy metadata for role, effort, requested model, effective/reported model, fallback, budget, usage, and cost-per-gate accounting. Silent model downgrade is no longer acceptable evidence: unknown provider metadata is recorded as `unknown`, not guessed.
+- **Compounding state memory** — loop runs can write `.specflow/STATE.md` and one-lesson-per-file memory under `.specflow/lessons/`; generated stage prompts include a bounded state digest so later runs resume from durable facts instead of chat memory.
+- **Delegation and routines** — added isolated worktree preparation metadata and `specflow routine <slug>` manifest scaffolding for cron/GitHub/hosted loops. Generated routines call `specflow run` and preserve `never_without_human`.
+- **Gate D vision evidence** — `teardown-gate check-gate-d` accepts screenshot plus vision-verifier finding evidence while still requiring value-bearing `.txt`/`.json` oracle re-reads for value hops.
+- **Install/package fix** — `js-yaml` is now a production dependency because the published CLI loads YAML at runtime.
+
+---
+
 ## 0.9.1 (2026-06-12)
 
 **Conditional ADR-conformance + universal component-reuse check (#68).**
