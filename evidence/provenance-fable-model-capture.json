@@ -1,0 +1,42 @@
+{
+  "issues": [83, 84, 89],
+  "feature_build": "requested/effective model capture, verifier policy metadata, and cost accounting",
+  "source_provenance": [
+    {
+      "claim": "Adapter policies validate role and effort before provider invocation.",
+      "source": "scripts/specflow-runner.cjs normalizeAdapterPolicy",
+      "verification": "tests/contracts/loop-run-contract.test.js rejects unsupported adapter roles and effort levels before invocation."
+    },
+    {
+      "claim": "Claude and Codex adapter commands use requested_model while preserving fallback_model where supported.",
+      "source": "scripts/specflow-runner.cjs buildAdapterCommand",
+      "verification": "tests/contracts/loop-run-contract.test.js checks --model for Codex and --fallback-model for Claude."
+    },
+    {
+      "claim": "Provider event parsing extracts effective model, fallback/refusal reason, usage, token counts, and estimated cost when exposed by provider output.",
+      "source": "scripts/specflow-runner.cjs parseProviderEvents",
+      "verification": "tests/contracts/loop-run-contract.test.js parses JSONL with model, fallback reason, usage, and cost fields."
+    },
+    {
+      "claim": "Adapter ledger entries preserve requested model and effective model separately, including a Fable-class request routed to an Opus-class effective model.",
+      "source": "scripts/specflow-runner.cjs runAdapter",
+      "verification": "tests/contracts/loop-run-contract.test.js uses the contract-allowed fake provider to simulate requested claude-fable-5 with effective claude-opus-4-8 and re-reads ledger entry fields."
+    },
+    {
+      "claim": "Run status summarizes model/cost counters without inventing missing usage or effective-model metadata.",
+      "source": "scripts/specflow-runner.cjs readLedger, summarizeLedger, runStatus",
+      "verification": "tests/contracts/loop-run-contract.test.js asserts requested/effective model counters, unknown usage entries, known cost, and cost per gate pass."
+    },
+    {
+      "claim": "Installed safe adapter policies expose planner and implementer roles for fresh projects.",
+      "source": "templates/adapter-policies/claude-print.safe.yml and templates/adapter-policies/codex-exec.safe.yml",
+      "verification": "tests/contracts/loop-run-contract.test.js validates normalized role/effort fields and command construction against the same adapter policy schema."
+    }
+  ],
+  "checks": [
+    "npm test -- tests/contracts/loop-run-contract.test.js --runInBand",
+    "node bin/specflow.js provenance evidence/provenance-fable-model-capture.json --git-diff",
+    "npm test -- tests/contracts/ --runInBand"
+  ],
+  "result": "pass"
+}

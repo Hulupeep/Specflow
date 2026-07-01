@@ -42,6 +42,8 @@ const REQUIRED_POLICY_FIELDS = [
   'never_without_human',
 ];
 
+const UNKNOWN = 'unknown';
+
 function ensureDir(path) {
   mkdirSync(dirname(path), { recursive: true });
 }
@@ -339,13 +341,27 @@ function normalizeAdapterPolicy(raw, context = {}) {
   if (!['claude-print', 'codex-exec', 'fake'].includes(policy.provider)) {
     throw new Error(`adapter_policy.provider is unsupported: ${policy.provider}`);
   }
+  if (policy.role && !['orchestrator', 'planner', 'worker', 'implementer', 'verifier', 'fallback'].includes(policy.role)) {
+    throw new Error(`adapter_policy.role is unsupported: ${policy.role}`);
+  }
+  if (policy.effort && !['low', 'medium', 'high', 'xhigh', 'ultracode'].includes(policy.effort)) {
+    throw new Error(`adapter_policy.effort is unsupported: ${policy.effort}`);
+  }
+  const requestedModel = policy.requested_model || policy.model || null;
   return {
     ...policy,
+    requested_model: requestedModel,
+    effective_model: policy.effective_model || UNKNOWN,
+    role: policy.role || null,
+    effort: policy.effort || null,
+    fallback_model: policy.fallback_model || null,
+    fallback_refusal_reason: policy.fallback_refusal_reason || null,
     args: policy.args || [],
     allowed_tools: policy.allowed_tools || [],
     denied_tools: policy.denied_tools || [],
     prompt: policy.prompt || null,
     session_id: policy.session_id || null,
+    verifier_policy: policy.verifier_policy || null,
     dry_run: Boolean(policy.dry_run),
     transcript_path: resolveTemplate(policy.transcript_path, context),
     output_path: resolveTemplate(policy.output_path, context),
@@ -358,7 +374,9 @@ function buildAdapterCommand(policy, promptPath) {
   if (policy.provider === 'claude-print') {
     const args = policy.args.length ? [...policy.args] : ['-p', '--output-format', 'stream-json'];
     if (!args.includes('-p') && !args.includes('--print')) args.unshift('-p');
-    if (policy.model && !args.includes('--model')) args.push('--model', String(policy.model));
+    const requestedModel = policy.requested_model || policy.model;
+    if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
+    if (policy.fallback_model && !args.includes('--fallback-model')) args.push('--fallback-model', String(policy.fallback_model));
     if (policy.max_budget_usd !== undefined && !args.includes('--max-budget-usd')) {
       args.push('--max-budget-usd', String(policy.max_budget_usd));
     }
@@ -381,7 +399,8 @@ function buildAdapterCommand(policy, promptPath) {
       ? ['exec', 'resume', String(policy.session_id), ...(policy.args || [])]
       : ['exec', ...(policy.args || [])];
     if (!args.includes('--json')) args.push('--json');
-    if (policy.model && !args.includes('--model')) args.push('--model', String(policy.model));
+    const requestedModel = policy.requested_model || policy.model;
+    if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
     if (policy.profile && !args.includes('--profile')) args.push('--profile', String(policy.profile));
     if (policy.output_schema && !args.includes('--output-schema')) args.push('--output-schema', String(policy.output_schema));
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
@@ -405,12 +424,48 @@ function containsForbiddenAction(text, neverWithoutHuman = []) {
   return neverWithoutHuman.find((action) => lower.includes(String(action).toLowerCase())) || null;
 }
 
+function pickFirstString(...values) {
+  for (const value of values) {
+    if (typeof value === 'string' && value.trim()) return value.trim();
+  }
+  return null;
+}
+
+function pickFirstNumber(...values) {
+  for (const value of values) {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && value.trim() && Number.isFinite(Number(value))) return Number(value);
+  }
+  return null;
+}
+
+function mergeUsage(current, event) {
+  const usage = event.usage || event.message?.usage || event.response?.usage || {};
+  const inputTokens = pickFirstNumber(usage.input_tokens, usage.prompt_tokens, event.input_tokens, event.prompt_tokens);
+  const outputTokens = pickFirstNumber(usage.output_tokens, usage.completion_tokens, event.output_tokens, event.completion_tokens);
+  const totalTokens = pickFirstNumber(
+    usage.total_tokens,
+    event.total_tokens,
+    inputTokens !== null || outputTokens !== null ? Number(inputTokens || 0) + Number(outputTokens || 0) : null,
+  );
+  const costUsd = pickFirstNumber(usage.cost_usd, usage.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd);
+  return {
+    input_tokens: current.input_tokens ?? inputTokens,
+    output_tokens: current.output_tokens ?? outputTokens,
+    total_tokens: current.total_tokens ?? totalTokens,
+    estimated_cost_usd: current.estimated_cost_usd ?? costUsd,
+  };
+}
+
 function parseProviderEvents(provider, text) {
   const events = [];
   const errors = [];
   const toolEvents = [];
   let finalText = '';
   let sessionId = null;
+  let effectiveModel = null;
+  let fallbackRefusalReason = null;
+  let usage = {};
 
   for (const line of String(text || '').split(/\r?\n/).filter(Boolean)) {
     let event;
@@ -422,6 +477,24 @@ function parseProviderEvents(provider, text) {
     }
     events.push(event);
     sessionId = sessionId || event.session_id || event.sessionId || event.conversation_id || event.conversationId || null;
+    effectiveModel = effectiveModel || pickFirstString(
+      event.effective_model,
+      event.actual_model,
+      event.model,
+      event.model_id,
+      event.modelId,
+      event.response?.model,
+      event.message?.model,
+    );
+    fallbackRefusalReason = fallbackRefusalReason || pickFirstString(
+      event.fallback_refusal_reason,
+      event.fallback_reason,
+      event.refusal_reason,
+      event.stop_reason,
+      event.error?.reason,
+      event.error?.message,
+    );
+    usage = mergeUsage(usage, event);
     const type = String(event.type || event.event || event.kind || '');
     if (/error/i.test(type) || event.error) errors.push(event.error || event);
     if (event.tool || event.tool_call || event.toolCall || /tool|command|exec/i.test(type)) toolEvents.push(event);
@@ -429,7 +502,18 @@ function parseProviderEvents(provider, text) {
     if (typeof textValue === 'string') finalText += textValue;
   }
 
-  return { provider, session_id: sessionId, final_text: finalText.trim(), errors, tool_events: toolEvents, events };
+  const normalizedUsage = Object.fromEntries(Object.entries(usage).filter(([, value]) => value !== null && value !== undefined));
+  return {
+    provider,
+    session_id: sessionId,
+    effective_model: effectiveModel || UNKNOWN,
+    fallback_refusal_reason: fallbackRefusalReason || null,
+    usage: normalizedUsage,
+    final_text: finalText.trim(),
+    errors,
+    tool_events: toolEvents,
+    events,
+  };
 }
 
 function eventText(event) {
@@ -450,6 +534,14 @@ function runAdapter(policy, options = {}) {
   const baseEntry = {
     stage: options.stage || 'agent_action_required',
     provider: policy.provider,
+    policy_id: policy.id || null,
+    role: policy.role || null,
+    effort: policy.effort || null,
+    requested_model: policy.requested_model || null,
+    effective_model: policy.effective_model || UNKNOWN,
+    fallback_model: policy.fallback_model || null,
+    fallback_refusal_reason: policy.fallback_refusal_reason || null,
+    max_budget_usd: policy.max_budget_usd ?? null,
     argv: [planned.command, ...planned.args],
     transcript_path: policy.transcript_path,
     output_path: policy.output_path,
@@ -496,18 +588,40 @@ function runAdapter(policy, options = {}) {
   writeFileSync(policy.transcript_path, stdout + (stderr ? `\n${stderr}` : ''), 'utf8');
 
   const parsed = parseProviderEvents(policy.provider, `${stdout}\n${stderr}`);
+  const providerMetadata = {
+    session_id: parsed.session_id,
+    effective_model: parsed.effective_model || UNKNOWN,
+    fallback_refusal_reason: parsed.fallback_refusal_reason || null,
+    usage: Object.keys(parsed.usage || {}).length ? parsed.usage : null,
+    input_tokens: parsed.usage?.input_tokens ?? null,
+    output_tokens: parsed.usage?.output_tokens ?? null,
+    total_tokens: parsed.usage?.total_tokens ?? null,
+    estimated_cost_usd: parsed.usage?.estimated_cost_usd ?? null,
+  };
   const forbidden = forbiddenFromProviderEvents(parsed, policy.never_without_human, policy.denied_tools);
   if (forbidden) {
     return {
       status: 'blocked_human_required',
-      entry: { ...baseEntry, exit_code: result.status, stop_reason: 'blocked_human_required', forbidden_action_detected: forbidden },
+      entry: {
+        ...baseEntry,
+        ...providerMetadata,
+        exit_code: result.status,
+        stop_reason: 'blocked_human_required',
+        forbidden_action_detected: forbidden,
+      },
     };
   }
 
   if (result.error || result.signal === 'SIGTERM' || result.status !== 0) {
     return {
       status: 'adapter_failed',
-      entry: { ...baseEntry, exit_code: result.status, stop_reason: 'adapter_failed', failure: result.error?.message || result.signal || stderr },
+      entry: {
+        ...baseEntry,
+        ...providerMetadata,
+        exit_code: result.status,
+        stop_reason: 'adapter_failed',
+        failure: result.error?.message || result.signal || stderr,
+      },
     };
   }
 
@@ -516,8 +630,8 @@ function runAdapter(policy, options = {}) {
     status: 'gate_rerun_required',
     entry: {
       ...baseEntry,
+      ...providerMetadata,
       exit_code: 0,
-      session_id: parsed.session_id,
       final_response_chars: (parsed.final_text || stdout).length,
       tool_event_count: parsed.tool_events.length,
       stop_reason: 'gate_rerun_required',
@@ -593,6 +707,55 @@ function readLedgerTail(ledgerPath, limit = 10) {
   return lines.slice(Math.max(0, lines.length - limit)).map((line) => JSON.parse(line));
 }
 
+function readLedger(ledgerPath) {
+  if (!existsSync(ledgerPath)) return [];
+  return readFileSync(ledgerPath, 'utf8').trim().split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
+}
+
+function summarizeLedger(entries) {
+  const summary = {
+    entries: entries.length,
+    gate_attempts: 0,
+    gate_passes: 0,
+    gate_failures: 0,
+    adapter_attempts: 0,
+    adapter_successes_requiring_gate_rerun: 0,
+    adapter_failures: 0,
+    human_blocks: 0,
+    unknown_usage_entries: 0,
+    known_estimated_cost_usd: 0,
+    cost_per_gate_pass_usd: null,
+    requested_models: {},
+    effective_models: {},
+  };
+  for (const entry of entries) {
+    if (entry.verifier) {
+      summary.gate_attempts += 1;
+      if (entry.result === 'pass') summary.gate_passes += 1;
+      if (entry.result === 'fail') summary.gate_failures += 1;
+    }
+    if (entry.provider) {
+      summary.adapter_attempts += 1;
+      if (entry.stop_reason === 'gate_rerun_required') summary.adapter_successes_requiring_gate_rerun += 1;
+      if (entry.stop_reason === 'adapter_failed') summary.adapter_failures += 1;
+      if (entry.stop_reason === 'blocked_human_required') summary.human_blocks += 1;
+      if (entry.estimated_cost_usd === null || entry.estimated_cost_usd === undefined) summary.unknown_usage_entries += 1;
+      else summary.known_estimated_cost_usd += Number(entry.estimated_cost_usd);
+    }
+    if (entry.requested_model) {
+      summary.requested_models[entry.requested_model] = (summary.requested_models[entry.requested_model] || 0) + 1;
+    }
+    const effective = entry.effective_model || (entry.provider ? UNKNOWN : null);
+    if (effective) {
+      summary.effective_models[effective] = (summary.effective_models[effective] || 0) + 1;
+    }
+  }
+  if (summary.gate_passes > 0 && summary.known_estimated_cost_usd > 0) {
+    summary.cost_per_gate_pass_usd = summary.known_estimated_cost_usd / summary.gate_passes;
+  }
+  return summary;
+}
+
 function runStatus(options = {}) {
   const contractPath = options.contract;
   if (!contractPath || !existsSync(contractPath)) {
@@ -609,6 +772,7 @@ function runStatus(options = {}) {
     next_gate: contract.next_gate,
     terminal_status: contract.terminal_status || 'unknown',
     sequence: loopSequence(contract, options),
+    ledger_summary: summarizeLedger(readLedger(ledgerPath)),
     ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
   };
 }
@@ -719,6 +883,9 @@ module.exports = {
   executeVerifierRegistry,
   materializeStagePrompt,
   planAdapterSmoke,
+  readLedger,
+  readLedgerTail,
+  summarizeLedger,
   runAdapter,
   runLoop,
   runStatus,
