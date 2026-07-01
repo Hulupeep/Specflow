@@ -1,0 +1,25 @@
+{
+  "command": "summarizeLedger",
+  "result": "pass",
+  "summary": {
+    "entries": 3,
+    "gate_attempts": 1,
+    "gate_passes": 1,
+    "gate_failures": 0,
+    "adapter_attempts": 2,
+    "adapter_successes_requiring_gate_rerun": 1,
+    "adapter_failures": 1,
+    "human_blocks": 0,
+    "unknown_usage_entries": 1,
+    "known_estimated_cost_usd": 0.001,
+    "cost_per_gate_pass_usd": 0.001,
+    "requested_models": {
+      "claude-fable-5": 1,
+      "gpt-5": 1
+    },
+    "effective_models": {
+      "claude-opus-4-8": 1,
+      "unknown": 1
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "command": "runAdapter with contract-allowed fake provider fixture",
+  "result": "pass",
+  "entry": {
+    "provider": "fake",
+    "policy_id": "gate-d-fake",
+    "role": "planner",
+    "effort": "high",
+    "requested_model": "claude-fable-5",
+    "effective_model": "claude-opus-4-8",
+    "usage": {
+      "input_tokens": 5,
+      "output_tokens": 2,
+      "total_tokens": 7,
+      "estimated_cost_usd": 0.001
+    },
+    "stop_reason": "gate_rerun_required",
+    "owning_gate_command": "gate-d-prep"
+  }
+}

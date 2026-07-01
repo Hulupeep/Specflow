@@ -1,0 +1,17 @@
+{
+  "command": "scaffoldRoutineManifest",
+  "result": "pass",
+  "routine_command": "npx @colmbyrne/specflow run spec-build --slug gate-d-90 --goal 'Run gate-d-90' --input docs/specs/fable-loop-compounding/tickets.md --until-terminal",
+  "outputs": [
+    ".specflow/runs/gate-d-90/run-contract.yaml",
+    ".specflow/runs/gate-d-90/ledger.jsonl"
+  ],
+  "never_without_human": [
+    "git push",
+    "open PR",
+    "merge",
+    "--no-verify",
+    "override contract"
+  ],
+  "proposal_policy": "project improvements must enter spec-build before implementation"
+}

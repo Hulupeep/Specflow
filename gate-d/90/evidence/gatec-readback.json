@@ -1,0 +1,9 @@
+{
+  "command": "node bin/specflow.js ci-status 90",
+  "result": "pass",
+  "pr": 90,
+  "total": 0,
+  "failing": [],
+  "pending": [],
+  "gate_c": "green"
+}
