@@ -16,6 +16,7 @@ Acceptance:
 - Policies can express planner/implementer separation: Fable-class provider for planning; Codex/GPT-class provider for implementation.
 - Runner records provider, requested model id, effective/reported model id when the provider exposes it, role, effort, fallback model id, fallback/refusal reason, and max budget in `ledger.jsonl`.
 - When a Fable-class request is refused or routed to Opus/Sonnet/Codex, the ledger preserves both the requested model and the actual model/source used; silent downgrade is a failed contract.
+- Adapter policy can record plan entitlement mode separately from API usage, including included weekly-plan usage through a dated window and usage-credit billing after that window.
 - Unsupported model-role policy fails validation before provider invocation.
 - Existing Claude/Codex safe policy templates remain valid.
 
@@ -82,3 +83,4 @@ Acceptance:
 - Ledger records requested model, effective/reported model, role, estimated cost, gate attempt, fallback/refusal reason, and gate result.
 - `specflow run status` summarizes attempts, accepted gates, rejected gates, and cost per accepted gate/change.
 - Missing usage metadata is recorded as unknown, not fabricated.
+- Plan entitlement metadata is recorded as policy context, not treated as zero cost unless the provider explicitly reports zero billable usage.
