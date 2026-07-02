@@ -10,7 +10,7 @@ Commands, file locations, model routing, and success criteria in one place.
 
 ```bash
 # Contract tests
-npm test                    # All tests (830 across 32 suites)
+npm test                    # All tests (847 across 35 suites)
 npm run test:contracts      # Contract pattern tests (SEC, A11Y, PROD, TEST)
 npm run test:hooks          # Hook behaviour tests
 npm run test:schema         # Contract YAML schema validation

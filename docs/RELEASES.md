@@ -2,6 +2,23 @@
 
 ---
 
+## v0.11.0 — 2026-07-02
+
+### Enforced runtime verifier + long-run trust primitives
+
+The trust layer that decides what ships is now enforced end-to-end, not just described.
+
+- **Runtime verifier lifecycle** — the maker persists a slice-local verification proposal *before* implementation; an independent verifier accepts/rejects it (fed artifact + spec + accepted contract + rubric, never the maker's reasoning trace); runtime checks (`playwright`/`api`/`db-reread`/`console`/`network`/`screenshot`/`custom-script`) write `verifier-findings.jsonl`. A missing executable surface yields a **blocked** finding, never fabricated evidence.
+- **Enforced verifier rail** — `feature-build` runs the verifier stage before the gate for runtime-required slices (`ui`, `workflow`, `api_behavior`, `integration`, `data_mutation`, `auth`, `billing`, `runtime_required`). A missing/blocked/failed required finding blocks gate advancement; skips are human-only and ledgered; screenshot-only evidence can't satisfy a value-bearing slice. **Done is decided by the gate, using verifier evidence.**
+- **`specflow run trace`** — groups maker claim vs verifier finding vs mechanical gate result and flags divergences (maker-claimed-done-but-verifier-failed, verifier-passed-but-gate-failed, missing evidence, human-gated action attempted).
+- **Safe durable re-entry** — on resume the durable run-contract position is authoritative; a conflicting caller-assumed stage is overridden and ledgered (`reentry_conflict`).
+- **Isolated delegated worktrees** — `prepareWorktree` refuses a path resolving to the main working tree and ledgers branch/base/path/cleanup; auto-merge/auto-push stay false.
+- **Honest subordinate controls** — silent model downgrade is a failed contract; a vision verdict is evidence, never a gate pass; routine manifests must call `specflow run` with no auto human-gated action.
+
+847 tests across 35 suites.
+
+---
+
 ## v0.10.0 — 2026-07-01
 
 ### Loop runtime controls + adapter accounting
