@@ -6,6 +6,32 @@
 
 ---
 
+## What Specflow is (one-idea primer)
+
+> **Specflow is a gated control loop for LLM work.** It runs an LLM as an **untrusted worker**, and won't let it advance a step until an **independent, mechanical check** passes.
+
+That is the entire product. Everything else is the four moving parts of that one loop — think controller/worker, or setpoint → actuator → sensor → memory:
+
+| Part | Control-loop role | What it is |
+|------|-------------------|------------|
+| **Contract** | the setpoint | "done" written as machine-checkable rules (invariants, ACs, journeys) — not prose |
+| **Adapter** | the actuator (untrusted) | runs a model to produce the work: `claude -p` / `codex exec`, under budget/tool/timeout caps |
+| **Gate** | the sensor (trusted) | a deterministic script decides pass/fail — it cannot be flattered or hurried |
+| **Ledger** | the memory | run-state on disk, so it runs for hours, survives compaction, and resumes |
+
+Plus a hard limit: **stop rules** (`never_without_human`) the worker physically cannot cross unattended — push, merge, PR, `--no-verify`, override.
+
+**The one rule that makes it work:** the worker *proposes*, the check *disposes*. A provider's output — and its exit code — is never a verdict (`I-ADAPTER-001`); the gate re-runs and decides. That matters because the thing a Fable-class model still cannot do is judge its own output — the talk's central finding (*self-evaluation is a trap*, § "Key takeaways for long-running agents", ~38:56).
+
+**Two clarifications that usually cause confusion:**
+
+- **It's one lane, not a conductor.** Specflow governs a single worker's loop and decides whether that lane's output may land. Deciding *who runs when* (fan-out, hand-off) is the model's / your orchestrator's job — Specflow sits **under** it. It is a **harness, not a loop orchestrator**; the orchestration layer is migrating into the model (Agent Teams), so keeping Specflow a harness keeps it on the durable side of the frontier.
+- **The model is swappable, the check is not.** The adapter is provider-agnostic *policy* (route Fable→planning, Codex→implementation); the gate is fixed and mechanical. You upgrade the worker freely; you never let the worker become the sensor.
+
+**Do you need it?** Yes if you want an agent to run **unattended and merge without you reading every diff** — brownfield, team, or regulated code where a machine, not the model, must certify "done" and CI must block what isn't. No if it's a **greenfield throwaway** you'll eyeball anyway, or you want the agent to freely rewrite from scratch mid-run (the loop is monotonic by design). **One-line test:** *would you merge a 6-hour agent run without reading it?* If you wish yes but it's no — that gap is Specflow.
+
+---
+
 ## 1. Context
 
 The talk is an Anthropic applied-AI session (Andrew + Ash) on harnesses for agents that run for hours-to-days. First half is a history of Claude Code primitives; second half is the current state-of-the-art harness pattern: a **planner → generator → evaluator** loop with adversarial pressure, file-system state, and granular contracts.
