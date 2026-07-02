@@ -1,0 +1,20 @@
+[
+  {
+    "id": "STATE-REENTRY-01",
+    "title": "Enforce safe durable re-entry over caller-assumed memory",
+    "writes": ["ledger.jsonl", "run_contract", "runStatus"],
+    "reads": ["run_contract", "ledger.jsonl", "STATE.md", "readStateDigest"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing run-contract, state-memory, and status surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-STATE-SAFE-REENTRY"]
+  },
+  {
+    "id": "WORKTREE-ISOLATION-01",
+    "title": "Ledger isolated delegated worktrees and refuse main-tree collision",
+    "writes": ["prepareWorktree", "ledger.jsonl"],
+    "reads": ["prepareWorktree", "ledger.jsonl", "run_contract"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against the existing prepareWorktree surface and ledger.",
+    "reuses": ["scripts/specflow-runner.cjs", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-WORKTREE-ISOLATION"]
+  }
+]

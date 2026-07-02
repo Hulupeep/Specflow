@@ -1,0 +1,12 @@
+[
+  {
+    "number": 85,
+    "title": "[SPECFLOW] STATE-01: durable state and safe re-entry",
+    "body": "Journey IDs: J-STATE-SAFE-REENTRY\n\nLocal child ticket: STATE-REENTRY-01.\n\nSee docs/specs/state-worktree-hardening/tickets.md for the spec-built packet."
+  },
+  {
+    "number": 86,
+    "title": "[SPECFLOW] WORKTREE-01: isolated delegated execution",
+    "body": "Journey IDs: J-WORKTREE-ISOLATION\n\nLocal child ticket: WORKTREE-ISOLATION-01.\n\nSee docs/specs/state-worktree-hardening/tickets.md for the spec-built packet."
+  }
+]
