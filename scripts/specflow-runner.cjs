@@ -553,6 +553,83 @@ function assembleVerifierInput(options = {}) {
   return input;
 }
 
+// --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
+// A pure read over the run ledger (+ verifier-findings). Groups maker claim,
+// verifier finding, mechanical gate result, and disposition; flags divergence.
+// Never sends transcript content to a provider; missing fields stay "missing".
+
+function verifierTrace(options = {}) {
+  const paths = verificationPaths(options);
+  const entries = readLedger(paths.ledgerPath);
+  const findings = existsSync(paths.findingsPath) ? readLedger(paths.findingsPath) : [];
+  const last = (pred) => entries.filter(pred).slice(-1)[0] || null;
+
+  const makerEntry = last((e) => e.event === 'maker_claim') || last((e) => e.stop_reason === 'gate_rerun_required');
+  const maker = makerEntry
+    ? {
+      claim: makerEntry.claim || (makerEntry.stop_reason === 'gate_rerun_required' ? 'produced_output' : UNKNOWN),
+      claimed_done: Boolean(makerEntry.claim === 'done' || makerEntry.claimed_done),
+      output_path: makerEntry.output_path || UNKNOWN,
+      transcript_path: makerEntry.transcript_path || UNKNOWN,
+    }
+    : { claim: 'missing', claimed_done: false, output_path: UNKNOWN, transcript_path: UNKNOWN };
+
+  const decisionEntry = last((e) => e.event === 'verifier_decision');
+  const failingFinding = findings.find((f) => f.result === 'fail' || f.severity === 'critical');
+  const verifier = (decisionEntry || findings.length)
+    ? {
+      decision: decisionEntry ? decisionEntry.verifier_decision : (failingFinding ? 'fail' : 'reported'),
+      missing_check: decisionEntry ? (decisionEntry.missing_check || null) : null,
+      finding_paths: findings.map((f) => f.evidence_path).filter(Boolean),
+      findings_count: findings.length,
+      verification_contract_path: decisionEntry ? (decisionEntry.verification_contract_path || null) : null,
+    }
+    : { decision: 'missing', missing_check: null, finding_paths: [], findings_count: 0, verification_contract_path: null };
+
+  const gateEntry = last((e) => ['pass', 'fail'].includes(e.result));
+  const stateEntry = last((e) => e.mechanical_gate_state);
+  const mechanicalGate = {
+    result: gateEntry ? gateEntry.result : 'not_run',
+    state: stateEntry ? stateEntry.mechanical_gate_state : UNKNOWN,
+  };
+
+  const contractGate = requireAcceptedVerificationContract(options);
+  const verifierFailed = verifier.decision === 'rejected' || Boolean(failingFinding);
+
+  const divergence = [];
+  if (maker.claimed_done && verifierFailed) divergence.push('maker_claimed_done_but_verifier_failed');
+  if (verifier.decision === 'accepted' && mechanicalGate.result === 'fail') divergence.push('verifier_passed_but_gate_failed');
+  const referenced = [
+    ...entries.map((e) => e.proposal_path),
+    ...entries.map((e) => e.verification_contract_path),
+    ...verifier.finding_paths,
+  ].filter(Boolean);
+  const missingEvidence = [...new Set(referenced)].filter((p) => !existsSync(p));
+  if (missingEvidence.length) divergence.push('missing_evidence');
+  if (entries.some((e) => e.stop_reason === 'blocked_human_required' || e.forbidden_action_detected)) {
+    divergence.push('human_gated_action_attempted');
+  }
+
+  let disposition = 'pending';
+  if (verifier.decision === 'rejected' || mechanicalGate.state === 'blocked') disposition = 'blocked';
+  else if (mechanicalGate.result === 'fail') disposition = 'gate_failed';
+  else if (mechanicalGate.result === 'pass' && contractGate.accepted) disposition = 'passed';
+
+  return {
+    status: 'ok',
+    run_dir: paths.baseDir,
+    ledger_path: paths.ledgerPath,
+    maker,
+    verifier,
+    mechanical_gate: mechanicalGate,
+    verification_contract: { path: contractGate.contractPath, accepted: contractGate.accepted, reason: contractGate.reason },
+    disposition,
+    divergence,
+    missing_evidence: missingEvidence,
+    sends_transcript_to_provider: false,
+  };
+}
+
 function verifierCommandsForStage(contract, options = {}) {
   const slug = options.slug || options.specSlug || contract.slug || 'specflow-run';
   const specDir = options.specDir || defaultSpecDir(slug);
@@ -1135,6 +1212,7 @@ function runStatus(options = {}) {
     sequence: loopSequence(contract, options),
     ledger_summary: summarizeLedger(readLedger(ledgerPath)),
     ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
+    verifier_trace: verifierTrace({ contract: contractPath, ledger: ledgerPath }),
   };
 }
 
@@ -1198,13 +1276,18 @@ function cli(argv = process.argv.slice(2)) {
   const opts = parseKeyValueArgs(argv);
   const loop = opts._[0];
   if (!loop) {
-    console.error('Usage: specflow run <loop|status> --slug <slug> --goal <goal> --input <path> [--contract path] [--until-terminal] [--max-iterations n]');
+    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n]');
     return 2;
   }
   try {
-    const result = loop === 'status'
-      ? runStatus(opts)
-      : (opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop }));
+    let result;
+    if (loop === 'status') {
+      result = runStatus(opts);
+    } else if (loop === 'trace') {
+      result = verifierTrace({ runDir: opts.runDir, contract: opts.contract, ledger: opts.ledger });
+    } else {
+      result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
+    }
     if (result.status === 'invalid_contract') {
       console.error(`specflow run failed: ${result.errors.join('; ')}`);
       return 1;
@@ -1255,6 +1338,7 @@ module.exports = {
   requireAcceptedVerificationContract,
   resolveVerifierPolicy,
   assembleVerifierInput,
+  verifierTrace,
   readLedger,
   readLedgerTail,
   summarizeLedger,
