@@ -24,6 +24,14 @@ Contract tests scan your source code for forbidden patterns. Break a rule → bu
 
 ---
 
+## The Invariant
+
+> **Frontier-model scaffolding is disposable. Gates, ledger, state, verifier evidence, and human boundaries are not.**
+
+As models get stronger they need less prompt scaffolding — so prompts, skills, and sprint decomposition are expected to come and go. What does **not** move is the trust layer: a provider's output (or exit code) is never a verdict; the mechanical gate decides, the ledger remembers, and unsafe boundaries stay human-authorized.
+
+---
+
 ## Install
 
 ```bash

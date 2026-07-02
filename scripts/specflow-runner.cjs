@@ -595,6 +595,7 @@ function runRuntimeChecks(options = {}) {
       finding = {
         severity: 'blocked',
         check_type: check.type,
+        required: Boolean(check.required),
         assertion: check.assertion || null,
         maker_claim: makerClaim,
         verifier_result: 'blocked',
@@ -608,6 +609,7 @@ function runRuntimeChecks(options = {}) {
       finding = {
         severity: failed ? (check.required ? 'critical' : 'warn') : 'info',
         check_type: check.type,
+        required: Boolean(check.required),
         assertion: check.assertion || null,
         maker_claim: makerClaim,
         verifier_result: outcome.result,
@@ -631,6 +633,86 @@ function runRuntimeChecks(options = {}) {
   };
 }
 
+// --- VERIFIER-RAIL-01 (issue #102): enforced runtime verifier stage ----------
+// Makes the verifier unavoidable for slices that need it — strict default with a
+// human-only escape hatch. Done is decided by the gate using verifier evidence:
+// maker_claim=complete with a required finding blocked/failed => gate blocks.
+
+const VERIFIER_REQUIRED_WHEN_DEFAULT = ['ui', 'workflow', 'api_behavior', 'integration', 'data_mutation', 'auth', 'billing', 'runtime_required'];
+const VERIFIER_VALUE_BEARING_TAGS = ['api_behavior', 'data_mutation', 'billing'];
+
+function verifierRequiredForSlice(sliceTags = [], options = {}) {
+  const mode = options.mode || 'auto';
+  if (mode === 'never') return false;
+  if (mode === 'always') return true;
+  const requiredWhen = options.requiredWhen || VERIFIER_REQUIRED_WHEN_DEFAULT;
+  const tags = Array.isArray(sliceTags) ? sliceTags : [];
+  return tags.some((t) => requiredWhen.includes(t));
+}
+
+function verifierGateDecision(findings = []) {
+  const required = findings.filter((f) => f.required);
+  if (!required.length) return 'blocked'; // required runtime evidence missing
+  if (required.some((f) => f.verifier_result === 'blocked')) return 'blocked';
+  if (required.some((f) => f.verifier_result === 'fail')) return 'fail';
+  return 'pass';
+}
+
+function runVerifierStage(options = {}) {
+  const paths = verificationPaths(options);
+  const sliceTags = Array.isArray(options.sliceTags) ? options.sliceTags : [];
+  const required = verifierRequiredForSlice(sliceTags, { mode: options.requiredMode, requiredWhen: options.requiredWhen });
+  const makerClaim = options.makerClaim || UNKNOWN;
+
+  // Human-only escape hatch — never silent.
+  if (options.humanSkip) {
+    const approvedBy = options.humanSkip.approved_by || options.humanSkip.approvedBy;
+    const reason = options.humanSkip.reason;
+    if (!approvedBy || !reason) throw new Error('verifier skip requires a human exception with approved_by and reason');
+    appendLedger(paths.ledgerPath, {
+      stage: 'verifier_stage', event: 'verifier_skip_override', required, slice_tags: sliceTags, approved_by: approvedBy, reason,
+    });
+    return { status: 'skipped_human_override', required, gate: 'skipped' };
+  }
+
+  if (!required) return { status: 'not_required', required: false, gate: 'not_applicable' };
+
+  if (makerClaim && makerClaim !== UNKNOWN) {
+    appendLedger(paths.ledgerPath, { stage: 'verifier_stage', event: 'maker_claim', claim: makerClaim });
+  }
+
+  const record = (gate, extra = {}) => appendLedger(paths.ledgerPath, {
+    stage: 'verifier_stage', event: 'verifier_stage', slice_tags: sliceTags,
+    maker_claim: makerClaim, verifier_result: gate, gate_result: gate === 'pass' ? 'pass' : 'blocked', ...extra,
+  });
+
+  const contractGate = requireAcceptedVerificationContract(options);
+  if (!contractGate.accepted) {
+    record('blocked', { reason: contractGate.reason });
+    return { status: 'blocked', required, gate: 'blocked', reason: contractGate.reason };
+  }
+
+  const checks = options.checks || (contractGate.contract && contractGate.contract.runtime_checks) || [];
+  const valueBearing = options.valueBearing !== undefined
+    ? options.valueBearing
+    : sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t));
+  const validation = validateRuntimeChecks(checks, { uiOrWorkflow: true, valueBearing });
+  if (!validation.ok) {
+    record('blocked', { reason: validation.errors.join('; ') });
+    return { status: 'blocked', required, gate: 'blocked', errors: validation.errors };
+  }
+
+  const { findings, summary } = runRuntimeChecks({
+    runDir: options.runDir, contract: options.contract, ledger: options.ledger, checks, makerClaim, runner: options.runner,
+  });
+  const gate = verifierGateDecision(findings);
+  record(gate, {
+    findings_count: findings.length,
+    divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,
+  });
+  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary };
+}
+
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
 // A pure read over the run ledger (+ verifier-findings). Groups maker claim,
 // verifier finding, mechanical gate result, and disposition; flags divergence.
@@ -646,7 +728,7 @@ function verifierTrace(options = {}) {
   const maker = makerEntry
     ? {
       claim: makerEntry.claim || (makerEntry.stop_reason === 'gate_rerun_required' ? 'produced_output' : UNKNOWN),
-      claimed_done: Boolean(makerEntry.claim === 'done' || makerEntry.claimed_done),
+      claimed_done: Boolean(['done', 'complete'].includes(makerEntry.claim) || makerEntry.claimed_done),
       output_path: makerEntry.output_path || UNKNOWN,
       transcript_path: makerEntry.transcript_path || UNKNOWN,
     }
@@ -1221,6 +1303,29 @@ function runLoop(options) {
     return { ...adapterResult, contractPath, ledgerPath };
   }
 
+  // VERIFIER-RAIL-01 (#102): the verifier stage gates feature-build "done".
+  // Runs before the provenance gate for runtime-required slices; a blocked/failed
+  // verifier finding (or a missing accepted contract) blocks gate advancement.
+  if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '6_provenance') {
+    const sliceTags = contract.slice_tags || [];
+    if (verifierRequiredForSlice(sliceTags, { mode: contract.verifier_required_mode })) {
+      const stage = runVerifierStage({
+        contract: contractPath,
+        ledger: ledgerPath,
+        sliceTags,
+        requiredMode: contract.verifier_required_mode,
+        makerClaim: contract.maker_claim || 'complete',
+        humanSkip: options.verifierHumanSkip || contract.verifier_human_skip,
+        runner: options.runtimeRunner,
+      });
+      if (stage.status !== 'passed' && stage.status !== 'skipped_human_override' && stage.status !== 'not_required') {
+        contract.terminal_status = 'blocked';
+        writeYaml(contractPath, { run_contract: contract });
+        return { status: 'blocked_verifier_stage', verifier_stage: stage, contractPath, ledgerPath };
+      }
+    }
+  }
+
   const registryResult = executeVerifierRegistry(contract, options);
   let promptPath = null;
   if (registryResult.status === 'agent_action_required') {
@@ -1331,6 +1436,8 @@ function isTerminalStatus(status) {
     'adapter_unavailable',
     'adapter_failed',
     'blocked_human_required',
+    'blocked_verification_required',
+    'blocked_verifier_stage',
     'dry_run',
   ].includes(status);
 }
@@ -1447,6 +1554,9 @@ module.exports = {
   assembleVerifierInput,
   validateRuntimeChecks,
   runRuntimeChecks,
+  verifierRequiredForSlice,
+  verifierGateDecision,
+  runVerifierStage,
   verifierTrace,
   readLedger,
   readLedgerTail,
