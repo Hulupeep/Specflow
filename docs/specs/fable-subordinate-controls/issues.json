@@ -1,0 +1,6 @@
+[
+  { "number": 83, "title": "[SPECFLOW] MODEL-ROUTING-01", "body": "Journey IDs: J-MODEL-ROUTING-HONESTY\n\nLocal child ticket: MODEL-ROUTING-HONESTY-01. See docs/specs/fable-subordinate-controls/tickets.md." },
+  { "number": 89, "title": "[SPECFLOW] COST-01", "body": "Journey IDs: J-COST-ACCOUNTING\n\nLocal child ticket: COST-ACCOUNTING-01. See docs/specs/fable-subordinate-controls/tickets.md." },
+  { "number": 88, "title": "[SPECFLOW] VISION-GATE-01", "body": "Journey IDs: J-VISION-EVIDENCE\n\nLocal child ticket: VISION-EVIDENCE-01. See docs/specs/fable-subordinate-controls/tickets.md." },
+  { "number": 87, "title": "[SPECFLOW] ROUTINE-01", "body": "Journey IDs: J-ROUTINE-SAFETY\n\nLocal child ticket: ROUTINE-SAFETY-01. See docs/specs/fable-subordinate-controls/tickets.md." }
+]

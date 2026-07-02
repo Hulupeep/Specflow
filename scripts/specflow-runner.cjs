@@ -715,6 +715,109 @@ function runRuntimeChecks(options = {}) {
   };
 }
 
+// --- Fable subordinate controls (thin, subordinate to the mechanical gate) ----
+
+// MODEL-ROUTING-HONESTY-01 (#83): a silent downgrade is a failed contract.
+function assertModelHonesty(info = {}) {
+  const requested = info.requested_model || info.model || null;
+  const effective = info.effective_model || null;
+  const fallback = info.fallback_model || null;
+  const reason = info.fallback_refusal_reason || info.reason || null;
+  const known = Boolean(effective && effective !== UNKNOWN);
+  const downgrade = Boolean(known && ((requested && effective !== requested) || (fallback && effective === fallback)));
+  if (downgrade && !reason) {
+    return {
+      ok: false, downgrade: true, requested_model: requested, effective_model: effective, reason: null,
+      violation: 'silent model downgrade: effective model differs from requested with no recorded reason',
+    };
+  }
+  return { ok: true, downgrade, requested_model: requested, effective_model: effective, reason };
+}
+
+function recordModelHonesty(ledgerPath, info = {}) {
+  const result = assertModelHonesty(info);
+  appendLedger(ledgerPath, {
+    stage: 'routing', event: 'model_honesty',
+    requested_model: result.requested_model, effective_model: result.effective_model,
+    downgrade: result.downgrade, reason: result.reason || null,
+    result: result.ok ? 'ok' : 'failed_contract',
+  });
+  return result;
+}
+
+// COST-ACCOUNTING-01 (#89): cost per accepted change; missing usage is unknown.
+function costAccounting(entries = []) {
+  const rows = [];
+  let total = 0;
+  let unknownUsage = 0;
+  let acceptedGates = 0;
+  for (const e of entries) {
+    if (e.result === 'pass') acceptedGates += 1;
+    const isWork = Boolean(e.provider) || e.event === 'adapter' || typeof e.estimated_cost === 'number';
+    if (!isWork) continue;
+    const model = e.effective_model || e.requested_model || UNKNOWN;
+    if (typeof e.estimated_cost === 'number') {
+      total += e.estimated_cost;
+      rows.push({ stage: e.stage || null, model, cost: e.estimated_cost });
+    } else {
+      unknownUsage += 1;
+      rows.push({ stage: e.stage || null, model, cost: 'unknown' }); // never fabricated as zero
+    }
+  }
+  return {
+    total_cost: total,
+    per_gate: rows,
+    accepted_gates: acceptedGates,
+    unknown_usage: unknownUsage,
+    cost_per_accepted_change: acceptedGates > 0 ? total / acceptedGates : null,
+  };
+}
+
+// VISION-EVIDENCE-01 (#88): a vision finding is evidence, never a gate pass.
+function visionFinding(info = {}) {
+  return {
+    stage: 'vision', event: 'vision_finding',
+    goal: info.goal || UNKNOWN,
+    screenshot: info.screenshot || null,
+    model: info.model || info.provider || UNKNOWN,
+    verdict: info.verdict || UNKNOWN,
+    gaps: Array.isArray(info.gaps) ? info.gaps : (info.gaps ? [info.gaps] : []),
+    gate_result: 'pending', // evidence only — the mechanical gate still decides
+  };
+}
+
+function recordVisionFinding(ledgerPath, info = {}) {
+  const finding = visionFinding(info);
+  appendLedger(ledgerPath, finding);
+  return finding;
+}
+
+function assertVisionNotGate(finding = {}) {
+  if (finding.gate_result && finding.gate_result !== 'pending') {
+    throw new Error('vision finding must not carry a gate result; it is evidence only');
+  }
+  return { gate_pass: false, reason: 'vision verdict is evidence, not a gate pass' };
+}
+
+// ROUTINE-SAFETY-01 (#87): reject manifests that bypass specflow run or human gates.
+const ROUTINE_HUMAN_GATED = ['git push', 'open pr', 'gh pr create', 'gh pr merge', ' merge ', '--no-verify', 'override contract'];
+function validateRoutineManifest(manifest = {}) {
+  const r = manifest.routine || manifest;
+  const errors = [];
+  const command = String(r.command || '');
+  if (!/specflow\s+run\b/.test(command)) errors.push('routine command must call `specflow run`');
+  const lower = ` ${command.toLowerCase()} `;
+  for (const act of ROUTINE_HUMAN_GATED) {
+    if (lower.includes(act)) errors.push(`routine command contains an auto human-gated action: ${act.trim()}`);
+  }
+  const label = `${r.slug || ''} ${r.loop || ''} ${r.kind || ''} ${r.trigger || ''}`;
+  const isPortfolio = /portfolio|improve|proposal/i.test(label);
+  if (isPortfolio && !r.proposal_policy) {
+    errors.push('portfolio-improvement routine must declare a proposal_policy (enter spec-build before implementation)');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
 // --- VERIFIER-RAIL-01 (issue #102): enforced runtime verifier stage ----------
 // Makes the verifier unavoidable for slices that need it — strict default with a
 // human-only escape hatch. Done is decided by the gate using verifier evidence:
@@ -1528,6 +1631,7 @@ function runStatus(options = {}) {
     ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
     verifier_trace: verifierTrace({ contract: contractPath, ledger: ledgerPath }),
     reentry: reentryBriefing({ contract: contractPath, ledger: ledgerPath }),
+    cost: costAccounting(readLedger(ledgerPath)),
   };
 }
 
@@ -1664,6 +1768,13 @@ module.exports = {
   verifierRequiredForSlice,
   verifierGateDecision,
   runVerifierStage,
+  assertModelHonesty,
+  recordModelHonesty,
+  costAccounting,
+  visionFinding,
+  recordVisionFinding,
+  assertVisionNotGate,
+  validateRoutineManifest,
   verifierTrace,
   readLedger,
   readLedgerTail,

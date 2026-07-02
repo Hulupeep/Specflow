@@ -1,0 +1,67 @@
+feature: fable-subordinate-controls
+requirements:
+  - id: REQ-ROUTING-HONESTY-01
+    statement: A silent model downgrade (effective differs from requested, no recorded reason) is a failed contract.
+  - id: REQ-COST-01
+    statement: Cost accounting reports per-gate cost and cost-per-accepted-change; missing usage is unknown, never fabricated.
+  - id: REQ-VISION-01
+    statement: A vision finding is evidence with gate_result pending and can never be a gate pass.
+  - id: REQ-ROUTINE-01
+    statement: A routine manifest must call specflow run, contain no auto human-gated action, and route proposals through spec-build.
+journeys:
+  - journey_meta:
+      id: J-MODEL-ROUTING-HONESTY
+      persona: cost_conscious_operator
+      owner_ticket: MODEL-ROUTING-HONESTY-01
+      assertion_bar: a downgrade without a recorded reason fails the contract
+    scenario: detect a silent model downgrade
+    given:
+      - an adapter policy requesting a specific model
+    when:
+      - the effective/reported model differs or a fallback is used
+    then:
+      - a downgrade without a recorded reason is a failed contract
+      - the requested and effective model and the reason are ledgered
+
+  - journey_meta:
+      id: J-COST-ACCOUNTING
+      persona: cost_conscious_operator
+      owner_ticket: COST-ACCOUNTING-01
+      assertion_bar: missing usage is unknown, never zero
+    scenario: summarize cost per accepted change
+    given:
+      - a ledger with adapter and gate entries, some without usage
+    when:
+      - cost accounting runs
+    then:
+      - per-gate cost, accepted gates, and cost-per-accepted-change are reported
+      - missing usage is counted as unknown, not fabricated as zero
+
+  - journey_meta:
+      id: J-VISION-EVIDENCE
+      persona: ui_reviewer
+      owner_ticket: VISION-EVIDENCE-01
+      assertion_bar: a vision verdict never advances a gate
+    scenario: record a vision finding as evidence only
+    given:
+      - a screenshot and a vision verdict for a goal
+    when:
+      - the vision finding is recorded
+    then:
+      - the finding carries gate_result pending and names goal/screenshot/model/verdict/gaps
+      - a vision verdict cannot be treated as a gate pass
+
+  - journey_meta:
+      id: J-ROUTINE-SAFETY
+      persona: platform_scheduler
+      owner_ticket: ROUTINE-SAFETY-01
+      assertion_bar: an unsafe routine manifest is rejected
+    scenario: validate a scheduled routine manifest
+    given:
+      - a routine manifest with a command, trigger, and policy
+    when:
+      - the manifest is validated
+    then:
+      - a command that does not call specflow run is rejected
+      - an auto human-gated action is rejected
+      - portfolio proposals must declare a spec-build proposal policy

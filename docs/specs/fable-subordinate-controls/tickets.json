@@ -1,0 +1,38 @@
+[
+  {
+    "id": "MODEL-ROUTING-HONESTY-01",
+    "title": "A silent model downgrade is a failed contract",
+    "writes": ["ledger.jsonl"],
+    "reads": ["normalizeAdapterPolicy", "adapter_policy", "ledger.jsonl"],
+    "adrNone": "No ADR directory; reuse declared against the adapter policy and ledger surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs"],
+    "journeys": ["J-MODEL-ROUTING-HONESTY"]
+  },
+  {
+    "id": "COST-ACCOUNTING-01",
+    "title": "Report cost per accepted change; missing usage is unknown",
+    "writes": ["runStatus", "ledger.jsonl"],
+    "reads": ["ledger.jsonl", "summarizeLedger"],
+    "adrNone": "No ADR directory; reuse declared against the ledger summary and status surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs"],
+    "journeys": ["J-COST-ACCOUNTING"]
+  },
+  {
+    "id": "VISION-EVIDENCE-01",
+    "title": "Vision finding is evidence only, never a gate pass",
+    "writes": ["ledger.jsonl"],
+    "reads": ["teardown-gate", "ledger.jsonl"],
+    "adrNone": "No ADR directory; reuse declared against teardown evidence and ledger surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "scripts/teardown-gate.cjs"],
+    "journeys": ["J-VISION-EVIDENCE"]
+  },
+  {
+    "id": "ROUTINE-SAFETY-01",
+    "title": "Reject routine manifests that bypass specflow run or human gates",
+    "writes": ["scaffoldRoutineManifest"],
+    "reads": ["scaffoldRoutineManifest", "never_without_human"],
+    "adrNone": "No ADR directory; reuse declared against the routine manifest surface.",
+    "reuses": ["scripts/specflow-runner.cjs"],
+    "journeys": ["J-ROUTINE-SAFETY"]
+  }
+]
