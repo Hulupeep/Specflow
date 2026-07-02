@@ -6,6 +6,22 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## 0.11.0 (2026-07-02)
+
+**Enforced runtime verifier + long-run trust primitives.** The trust layer that decides what ships is now enforced end-to-end, not just described. Fable can carry the work; Specflow carries the trust.
+
+- **Runtime verifier lifecycle** — a maker persists a slice-local verification proposal *before* implementation; an independent verifier accepts/rejects it (fed artifact + spec + accepted contract + rubric, never the maker's reasoning trace); runtime checks (`playwright`/`api`/`db-reread`/`console`/`network`/`screenshot`/`custom-script`) write `verifier-findings.jsonl`. A missing executable surface yields a **blocked** finding, never fabricated evidence. Provider output and exit codes are never a gate verdict.
+- **Enforced verifier rail** — `feature-build` runs the verifier stage before the gate for runtime-required slices (`ui`, `workflow`, `api_behavior`, `integration`, `data_mutation`, `auth`, `billing`, `runtime_required`). A missing/blocked/failed required finding **blocks gate advancement** (`blocked_verifier_stage`). Strict default with a human-only, ledgered skip. Screenshot-only evidence can't satisfy a value-bearing slice. **Done is decided by the gate, using verifier evidence.**
+- **`specflow run trace`** — groups maker claim vs verifier finding vs mechanical gate result and flags divergence (maker-claimed-done-but-verifier-failed, verifier-passed-but-gate-failed, missing evidence, human-gated action attempted). Never sends transcripts to a provider.
+- **Safe durable re-entry** — on resume the durable run-contract position is authoritative; a caller-assumed stage that conflicts is overridden and ledgered (`reentry_conflict`), never silently trusted. Surfaced in `specflow run status`.
+- **Isolated delegated worktrees** — `prepareWorktree` refuses a path resolving to the main working tree and ledgers branch/base/path/cleanup; `releaseWorktree` tracks cleanup; auto-merge/auto-push stay false.
+- **Honest subordinate controls** — a silent model downgrade (effective ≠ requested, no reason) is a **failed contract**; missing usage is recorded as `unknown` with cost-per-accepted-change in `run status`; a vision verdict is evidence (`gate_result: pending`), never a gate pass; routine manifests must call `specflow run` with no auto human-gated action.
+- **Invariant** — *"Frontier-model scaffolding is disposable. Gates, ledger, state, verifier evidence, and human boundaries are not."*
+
+847 tests across 35 suites.
+
+---
+
 ## 0.10.0 (2026-07-01)
 
 **Specflow loop runtime controls + Fable-class adapter accounting.**
