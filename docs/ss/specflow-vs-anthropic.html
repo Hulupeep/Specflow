@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Specflow vs Anthropic &mdash; Building Long-Running Agents</title>
+<style>
+  :root{
+    --bg:#F5F1EA; --ink:#1c1a17; --muted:#6b645b; --line:#e2dccf;
+    --accent:#CC785C; --panel:#ffffff; --sf:#fbf7f0;
+    --green:#3f8f5b; --blue:#3d6fb0; --coral:#c8553d; --amber:#b8862f; --purple:#7a5aa6; --gray:#8a8378;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+    --sans:system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{background:var(--bg);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  header{position:fixed;top:0;left:0;right:0;height:52px;display:flex;align-items:center;
+    gap:16px;padding:0 20px;background:rgba(245,241,234,.92);backdrop-filter:blur(6px);
+    border-bottom:1px solid var(--line);z-index:50}
+  header .brand{font-family:var(--serif);font-weight:600;font-size:17px;letter-spacing:.2px}
+  header .brand b{color:var(--accent)}
+  header .legend{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto;font-size:11px;color:var(--muted)}
+  header .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block}
+  .d-green{background:var(--green)}.d-blue{background:var(--blue)}.d-coral{background:var(--coral)}
+  .d-amber{background:var(--amber)}.d-purple{background:var(--purple)}.d-gray{background:var(--gray)}
+  .counter{font-variant-numeric:tabular-nums;font-size:13px;color:var(--muted);min-width:54px;text-align:right}
+  main{padding:52px 0 46px;min-height:100%}
+  .slide{display:none;max-width:1180px;margin:0 auto;padding:22px 26px 40px}
+  .slide.active{display:block;animation:fade .25s ease}
+  @keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .kicker{font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 4px}
+  .slide h2{font-family:var(--serif);font-weight:600;font-size:clamp(22px,3vw,32px);line-height:1.1;margin:0 0 14px}
+  .imgwrap{background:#fff;border:1px solid var(--line);border-radius:12px;padding:10px;
+    box-shadow:0 8px 30px -18px rgba(0,0,0,.35);text-align:center;margin-bottom:18px}
+  .imgwrap img{max-width:100%;max-height:52vh;object-fit:contain;border-radius:6px;display:inline-block}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:820px){.cols{grid-template-columns:1fr}.imgwrap img{max-height:40vh}}
+  .card{border:1px solid var(--line);border-radius:12px;padding:16px 18px;background:var(--panel)}
+  .card.sf{background:var(--sf);border-color:#ecdfce}
+  .card h3{margin:0 0 10px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);
+    display:flex;align-items:center;gap:8px}
+  .card.sf h3{color:var(--accent)}
+  .card ul{margin:0;padding-left:18px}
+  .card li{margin:0 0 9px;font-size:14.5px;line-height:1.5}
+  .card li:last-child{margin-bottom:0}
+  code{background:#efe9dd;border-radius:4px;padding:1px 5px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .card.sf code{background:#efe3d1}
+  .chip{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+    color:#fff;padding:2px 9px;border-radius:20px;margin-left:auto}
+  .c-green{background:var(--green)}.c-blue{background:var(--blue)}.c-coral{background:var(--coral)}
+  .c-amber{background:var(--amber)}.c-purple{background:var(--purple)}.c-gray{background:var(--gray)}
+  .cite{font-size:12px;color:var(--muted);margin-top:12px;font-style:italic}
+  .title{max-width:900px;margin:6vh auto 0;text-align:center;padding:0 24px}
+  .title .eyebrow{font-size:13px;letter-spacing:.2em;text-transform:uppercase;color:var(--accent);font-weight:700}
+  .title h1{font-family:var(--serif);font-weight:600;font-size:clamp(34px,6vw,60px);line-height:1.02;margin:14px 0 8px}
+  .title h1 .vs{color:var(--accent);font-style:italic}
+  .title p.sub{font-size:18px;color:var(--muted);line-height:1.5;max-width:680px;margin:8px auto 0}
+  .title .meta{margin-top:26px;font-size:13px;color:var(--muted)}
+  .title .scorecard{margin:30px auto 0;max-width:640px;text-align:left;display:grid;gap:8px}
+  .title .scorecard .row{display:flex;gap:12px;align-items:baseline;font-size:14.5px;
+    border-top:1px solid var(--line);padding-top:8px}
+  .title .scorecard .row b{min-width:96px}
+  .hint{margin-top:28px;font-size:13px;color:var(--muted)}
+  .hint kbd{background:#fff;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;
+    padding:1px 7px;font-family:var(--sans);font-size:12px}
+  .nav{position:fixed;bottom:0;left:0;right:0;height:46px;display:flex;align-items:center;justify-content:center;
+    gap:14px;background:rgba(245,241,234,.92);backdrop-filter:blur(6px);border-top:1px solid var(--line);z-index:50}
+  .nav button{font-family:var(--sans);font-size:13px;border:1px solid var(--line);background:#fff;color:var(--ink);
+    padding:6px 14px;border-radius:20px;cursor:pointer}
+  .nav button:hover{border-color:var(--accent);color:var(--accent)}
+  .nav button:disabled{opacity:.4;cursor:default;border-color:var(--line);color:var(--muted)}
+  .progress{position:fixed;bottom:46px;left:0;height:3px;background:var(--accent);width:0;z-index:51;transition:width .2s}
+  .edge{position:fixed;top:52px;bottom:46px;width:12%;z-index:40;cursor:pointer}
+  .edge.left{left:0}.edge.right{right:0}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Specflow <b>vs</b> Anthropic</div>
+  <div class="legend">
+    <span><i class="dot d-green"></i>Ahead</span>
+    <span><i class="dot d-blue"></i>Aligned</span>
+    <span><i class="dot d-coral"></i>Gap</span>
+    <span><i class="dot d-amber"></i>Tension</span>
+    <span><i class="dot d-purple"></i>Watch</span>
+    <span><i class="dot d-gray"></i>Context</span>
+  </div>
+  <div class="counter" id="counter">&ndash;</div>
+</header>
+<main id="stage">
+      <section class="slide" data-n="0">
+        <div class="title">
+          <div class="eyebrow">A slide-by-slide reading</div>
+          <h1>Specflow <span class="vs">vs</span> Anthropic</h1>
+          <p class="sub">Anthropic&#8217;s <i>&#8220;Building Long-Running Agents&#8221;</i> (AI Engineer) against Specflow&#8217;s contracted loop runtime &mdash; what it validates, where we&#8217;re ahead, and the gaps it exposes in the fable-loop-compounding packet (#83&#8211;#89).</p>
+          <div class="scorecard">
+            <div class="row"><b style="color:var(--green)">Ahead</b><span>No self-grading &mdash; a mechanical gate a critic can&#8217;t flatter.</span></div>
+            <div class="row"><b style="color:var(--blue)">Aligned</b><span>File-system state, structured handoffs, granular contracts, planner/maker/judge.</span></div>
+            <div class="row"><b style="color:var(--coral)">Gap</b><span>A verifier that <i>drives the running app</i>; trace-review tooling (&rarr; #90).</span></div>
+            <div class="row"><b style="color:var(--amber)">Tension</b><span>Heavy up-front spec vs build-time negotiation; monotonic vs restart-happy loop.</span></div>
+          </div>
+          <div class="hint">Navigate with <kbd>&larr;</kbd> <kbd>&rarr;</kbd> &middot; <kbd>Home</kbd> / <kbd>End</kbd> &middot; or click the screen edges</div>
+          <div class="meta">Transcript: <code>docs/ss/loops.md</code> &middot; Slides: <code>docs/ss/*.png</code> &middot; Analysis: <code>docs/ss/loops-talk-evaluation.md</code></div>
+        </div>
+      </section>
+      <section class="slide" data-n="1">
+        <p class="kicker">The substrate · Agent SDK</p>
+        <h2>The primitives everything is built on</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-31-28.png" alt="The primitives everything is built on"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>The Agent SDK runtime: a core <b>agent loop</b> (Claude decides the next action → tool call → result), tools (Read/Edit/Bash/WebSearch/Task/MCP), <b>subagent loops</b> spawned by the Task tool, a <b>permission</b> gate, <b>hooks</b> (PreToolUse, Stop…), project context (CLAUDE.md, Skills, slash commands), and resumable <b>sessions</b>.</li>
+          <li>Andrew’s framing: <i>“you use this framework to build your own harness.”</i> The primitives ship; the harness is yours.</li>
+            </ul>
+            <div class="cite">loops.md § “Two approaches: Model updates vs. Harness evolution”, ~4:51</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-gray">Context</span></h3>
+            <ul>
+          <li>Specflow is a <b>harness built on these primitives</b>, not a rival to them. <code>specflow run</code> is the agent-supervised controller; our adapters shell out to <code>claude -p</code> / <code>codex exec</code>.</li>
+          <li>Where the SDK exposes Permissions + Hooks + Sessions, Specflow adds a <b>contract layer</b> on top: <code>run-contract.yaml</code> (state), <code>ledger.jsonl</code> (durable memory), and mechanical gates (verification).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="2">
+        <p class="kicker">The problem</p>
+        <h2>Three reasons agents lose the plot</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-31-41.png" alt="Three reasons agents lose the plot"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li><b>Context</b> — finite window, amnesia between sessions, coherence degrades as it fills, and “context anxiety” makes it wrap up early.</li>
+          <li><b>Planning</b> — one-shots the whole project, or stubs half a feature and calls it done, or runs out of context mid-feature.</li>
+          <li><b>Verification</b> — tests shallowly (<i>curl, not click</i>), stubs features, and rates mediocre work as good. Uncorrected, all three compound.</li>
+            </ul>
+            <div class="cite">loops.md § “Challenges: Context, Planning, and Judgment”, ~2:29</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>These map 1:1 onto Specflow’s three answers. <b>Context</b> → durable <code>run-contract</code> + <code>ledger</code> (state survives the window).</li>
+          <li><b>Planning</b> → spec-build emits the plan as durable artifacts; feature-build executes one rail at a time.</li>
+          <li><b>Verification</b> → mechanical gates + provenance. The whole thesis: <b>put state and judgment on disk, not in the model.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="3">
+        <p class="kicker">Interlude · prior art</p>
+        <h2>The Ralph technique</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-32-22.png" alt="The Ralph technique"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Geoffrey Huntley, Jul 2025: <code>while :; do cat PROMPT.md | claude-code; done</code>. Infinite loop, one task per iteration, a <code>fix_plan.md</code> the agent updates itself.</li>
+          <li><i>“Deterministically bad in an undeterministic world”</i> — better to fail predictably. Claude Code’s version is a <b>Stop hook + iteration guard + safe word</b> (the same loop, no shell wrapper).</li>
+            </ul>
+            <div class="cite">loops.md § “The Ralph loop technique”, ~7:56</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-green">Specflow ahead</span></h3>
+            <ul>
+          <li><code>specflow run --until-terminal</code> <b>is</b> a Ralph-style bounded loop — but with the half Ralph is missing.</li>
+          <li>Ralph has a <b>fixed plan.md and nobody argues with the main loop.</b> Specflow inserts a <code>run-contract</code> (goal/state/verifier/stop) and a mechanical gate between iterations.</li>
+          <li>Verdict: <b>Specflow = Ralph loop + a contract + a critic.</b> Keep the loop; reject “fixed plan, no judge.”</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="4">
+        <p class="kicker">Timeline · Sep 2025</p>
+        <h2>Sonnet 4.5 + Claude Code 2.0</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-32-33.png" alt="Sonnet 4.5 + Claude Code 2.0"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Sonnet 4.5 — first model post-trained to be <b>context-aware</b>: tracks its own token budget, gives <i>“fact-based progress updates,”</i> advances a few tasks at a time, and substantially cuts sycophancy / reward hacking.</li>
+          <li>Harness: checkpoints (<code>/rewind</code>), the renamed <b>Agent SDK</b>, and a <b>memory tool + context editing</b> (auto-clears stale tool results).</li>
+            </ul>
+            <div class="cite">loops.md § “Sonnet 4.5, Agent SDK, and checkpoints”, ~9:54</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>“Fact-based progress updates” is exactly a <code>ledger.jsonl</code> entry. Reduced sycophancy matters because our gate is the backstop for the sycophancy that remains.</li>
+          <li>Their memory tool ≈ what <b>STATE-01 (#85)</b> formalizes as durable, curated state — except we keep it on disk and auditable rather than model-managed.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="5">
+        <p class="kicker">Timeline · Oct–Nov 2025</p>
+        <h2>Haiku 4.5 / Opus 4.5 — routing gets economical</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-32-40.png" alt="Haiku 4.5 / Opus 4.5 — routing gets economical"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Haiku 4.5 matches Sonnet 4 at ~⅓ cost → <b>subagent swarms become economical.</b> Opus 4.5 adds an <b>effort parameter</b>, 50–75% fewer tokens, “knows the right details to remember,” and runs teams of subagents.</li>
+          <li>Harness: Skills + Plugins (procedural knowledge on demand), programmatic tool calling, tool search, structured outputs, client-side compaction.</li>
+            </ul>
+            <div class="cite">loops.md § “Opus 4.5 and the role of sub-agents”, ~10:50</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>Cheap-workhorse + expensive-planner economics <b>is MODEL-ROUTING-01 (#83)</b>: Fable/Opus plans, Codex/Sonnet implements.</li>
+          <li>“Effort parameter” → our per-role effort policy fields (validated against the provider surface). Skills → we already package rubrics as skills; structured outputs → our adapters request a JSON schema.</li>
+          <li>Verdict: <b>#83 is us catching up to the effort/role/cost knobs the platform exposed here.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="6">
+        <p class="kicker">Interlude · Nov 2025 blog</p>
+        <h2>“Effective harnesses for long-running agents”</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-32-50.png" alt="“Effective harnesses for long-running agents”"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>An initializer expands a one-line prompt into a <b>~200-feature JSON spec</b> (<code>feature_list.json</code> — models overwrite markdown but not JSON), plus <code>claude-progress.txt</code>, <code>init.sh</code>, git.</li>
+          <li>Harness loop, fresh context each session: get bearings → smoke test → pick <b>one</b> failing feature → implement → E2E self-verify (Puppeteer) → leave clean state (flip <code>passes:true</code>, commit, append progress). Loop until all pass.</li>
+            </ul>
+            <div class="cite">loops.md § “First long-running agent patterns”, ~12:05</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-amber">Tension</span></h3>
+            <ul>
+          <li>This is <b>almost exactly feature-build</b>: persistent JSON artifacts = our <code>tickets.json</code> + <code>ledger.jsonl</code>; “one feature only” = one rail per invocation; “leave clean state / commit” = ledger + <code>never_without_human</code> on push.</li>
+          <li>But note their <i>own</i> later verdict: the 200-feature up-front spec <b>“forced bad design decisions”</b> (Q&A ~52:45).</li>
+          <li>Verdict: feature-build ≈ this Nov harness — <b>including the heavy up-front spec they later walked back.</b> The tension to watch (planner slides ahead).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="7">
+        <p class="kicker">Timeline · Feb 2026</p>
+        <h2>Opus 4.6 / Sonnet 4.6 + Agent Teams</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-33-03.png" alt="Opus 4.6 / Sonnet 4.6 + Agent Teams"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Opus 4.6 — <b>adaptive thinking</b> (decides when deeper reasoning helps), plans more carefully, <i>“better code review and debugging skills to catch its own mistakes,”</i> better long-context retrieval, stronger prompt-injection resistance.</li>
+          <li>Agent Teams — native multi-agent; agents own a piece and coordinate directly. Server-side compaction API; <b>1M context GA.</b> p50 horizon jumps ~4h → 12h.</li>
+            </ul>
+            <div class="cite">loops.md § “Opus 4.6, Agent Teams, and server-side compaction”, ~14:20</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>“Catch its own mistakes” is still not “grade its own gate” — we keep the mechanical gate regardless of model.</li>
+          <li>Agent Teams ≈ our subagent orchestration (<code>waves-controller</code>); <b>#84</b>’s maker/verifier split is a two-role team. 1M context lets us relax per-stage resets — but a durable handoff still beats lossy compaction for audit.</li>
+          <li>Verdict: <b>better self-review narrows the gap but never closes it for high-stakes work — the gate stays.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="8">
+        <p class="kicker">The money chart</p>
+        <h2>Every release, agents run longer unattended</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-33-18.png" alt="Every release, agents run longer unattended"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>METR p50 task horizon on a <b>minimal</b> scaffold: Sonnet 3.7 ~1h → Opus 4/Sonnet 4 ~1h40 → Sonnet 4.5 ~1h53 → Opus 4.5 ~4h53 → <b>Opus 4.6 ~12h (719 min).</b></li>
+          <li>With a harness the anecdotes go further: 7h refactor, 30h+ sustained, multi-day 200-feature clone, 6h retro game / 4h DAW. Each release the <b>binding failure shifts</b>: planning → context → verification.</li>
+            </ul>
+            <div class="cite">loops.md § horizon table, ~15:58</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-gray">Context</span></h3>
+            <ul>
+          <li>The growing horizon is <b>why the fable packet exists</b>: longer autonomy = larger unsupported changes = more need for state, isolation, and independent verification (fable PRD problem statement).</li>
+          <li>Verdict: <b>longer unattended runs are the argument FOR contracted loops, not against them.</b> Specflow’s value grows with the horizon.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="9">
+        <p class="kicker">The core pattern</p>
+        <h2>Separate the builder from the judge</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-33-30.png" alt="Separate the builder from the judge"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Generator <b>builds</b> → Evaluator <b>grades</b> → critique back. Inspired by GANs: split the context windows, system prompts, and jobs entirely.</li>
+          <li>Crucially, the evaluator <b>uses Playwright to navigate the live page before scoring</b> — it doesn’t read diffs, it drives the product.</li>
+            </ul>
+            <div class="cite">loops.md § “State-of-the-art harness patterns”, ~18:27</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-coral">Specflow gap</span></h3>
+            <ul>
+          <li>This <b>is</b> our trust model: provider output is never a gate result (<code>I-ADAPTER-001</code>). <b>#84 VERIFIER-01</b> makes the split explicit — verifier policy separate from maker policy.</li>
+          <li><b>The gap:</b> their evaluator <i>drives the running app</i>; our verifiers mostly inspect artifacts.</li>
+          <li>Verdict: aligned on the split; <b>#84 must adopt the “evaluator uses the app” half</b>, not just plan-review.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="10">
+        <p class="kicker">The key insight</p>
+        <h2>Tuning a skeptic is tractable; self-criticism isn’t</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-33-36.png" alt="Tuning a skeptic is tractable; self-criticism isn’t"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li><i>“Tuning a standalone evaluator to be skeptical is tractable. Making a generator self-critical is not.”</i></li>
+          <li>Same as humans — easy to critique a meal, hard to cook it. Exploit the gap between an LLM as <b>critic</b> and the same LLM as <b>generator</b>.</li>
+            </ul>
+            <div class="cite">loops.md, ~19:50</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-green">Specflow ahead</span></h3>
+            <ul>
+          <li>We go one better: where it matters our critic <b>isn’t an LLM at all</b> — it’s a deterministic script (<code>verify-seams</code>/<code>verify-adr</code>/<code>provenance</code>). <b>A script can’t be flattered.</b></li>
+          <li>Where we do add an LLM critic (#84 external reviewer, #88 vision) we inherit their rule: harsh rubric, <b>artifact + rubric only</b>, never the maker’s trace.</li>
+          <li>Verdict: <b>mechanical critic &gt; tuned-skeptical LLM critic.</b> Keep LLM critics subordinate to the script.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="11">
+        <p class="kicker">Grading taste</p>
+        <h2>Making subjective quality gradable</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-33-43.png" alt="Making subjective quality gradable"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>You <b>can</b> grade taste if you write it down. Four criteria: <b>Design</b> (coherent whole?), <b>Originality</b> (custom vs library defaults), <b>Craft</b> (typography/spacing/contrast), <b>Functionality</b> (tasks without guessing).</li>
+          <li>Weighted toward Design & Originality (4.6 already nails Craft & Functionality). Kills purple-gradient “AI slop.”</li>
+            </ul>
+            <div class="cite">loops.md § “Evaluating subjective output with rubrics”, ~21:31</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>Same philosophy as our contracts: write the standard down as checkable criteria. Their weighted rubric is exactly what <b>#84’s verifier rubric and #88’s vision rubric</b> should be — granular and weighted, not vague.</li>
+          <li>Their finding <i>“vague criteria → the generator shrugs; 27 granular criteria → it fixes the exact line”</i> is the Specflow thesis restated.</li>
+          <li>Verdict: <b>strong validation of contracts</b>; port the weighted-rubric shape into #84/#88.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="12">
+        <p class="kicker">Demo</p>
+        <h2>The frontend loop in action</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-33-55.png" alt="The frontend loop in action"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Prompt: <i>“Create a website for a Dutch art museum.”</i> 5–15 iterations, ~4 hours. Evaluator navigates the live page with Playwright, scores, critiques; generator decides <b>refine or pivot.</b></li>
+          <li>The unique behavior vs a single loop: it will <b>throw the whole thing out and restart</b> if it can’t hill-climb a criterion (Q&A ~46:37).</li>
+            </ul>
+            <div class="cite">loops.md, frontend loop ~22:27; restart behavior Q&A ~46:37</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-amber">Tension</span></h3>
+            <ul>
+          <li>Our loop advances <b>monotonically</b> (stage → next on pass; fail → blocked). We have no “discard the slice and restart from scratch” primitive — that’s a human decision, by design (auditability).</li>
+          <li>For greenfield taste-work their pivot behavior wins; for contracted brownfield ours is safer.</li>
+          <li>Verdict: <b>tension — their restart-happy loop vs our monotonic, ledgered loop.</b> Ours trades exploration for auditability, correct for our domain.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="13">
+        <p class="kicker">Scaling up</p>
+        <h2>Full-stack: three agents</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-34-03.png" alt="Full-stack: three agents"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Add a <b>Planner</b>: one-line prompt → full spec. <b>Generator</b> builds one sprint at a time. <b>Evaluator</b> = Playwright + rubric, handoff / pass-fail.</li>
+          <li>Squint and it’s just PM / IC / QA — <i>“we didn’t invent this; we gave each role its own context window.”</i></li>
+            </ul>
+            <div class="cite">loops.md § “Introducing the ‘Planner’ role”, ~23:45</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>This is literally our loop set: Planner ≈ <b>spec-build</b>, Generator ≈ <b>feature-build</b> rails, Evaluator ≈ <b>gates + #84 verifier</b>.</li>
+          <li>We reached the same PM/IC/QA split — but we <b>persist</b> each role as contracts and issues rather than ephemeral agent roles.</li>
+          <li>Verdict: <b>same three-role architecture; Specflow makes each role a durable, CI-enforceable artifact.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="14">
+        <p class="kicker">The key innovation Ralph never had</p>
+        <h2>Sprint contracts — negotiate “done”</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-34-21.png" alt="Sprint contracts — negotiate “done”"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Before any code, generator and evaluator <b>negotiate what “done” means for this chunk</b>, iterating via files until they agree.</li>
+          <li>The spec is <b>intentionally high-level</b>; the contract bridges user stories → testable behaviors; the evaluator grades against the <b>contract</b>, not the original spec.</li>
+            </ul>
+            <div class="cite">loops.md § “The generator-evaluator contract”, ~24:56 / ~26:33</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-coral">Specflow gap</span></h3>
+            <ul>
+          <li>This is the sub-stage <b>#84 is missing.</b> Our spec-build authors the contract <i>up front</i>; theirs is <i>negotiated at build time</i> by maker + verifier.</li>
+          <li>Recommendation: keep <b>ticket ACs as the high-level spec</b>, then add a <b>maker↔verifier negotiation</b> that derives the granular test assertions to disk before building.</li>
+          <li>Verdict: <b>adopt the negotiation into #84</b> — the one primitive our loop lacks. (But see slide 19: they later removed even this.)</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="15">
+        <p class="kicker">Evidence</p>
+        <h2>What the evaluator actually caught</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-34-40.png" alt="What the evaluator actually caught"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Real findings — only caught because the evaluator <b>used the app</b>: rectangle-fill never fires on <code>mouseUp</code>; delete-key handler needs selection <b>AND</b> selectedEntityId (should be OR); <code>PUT /frames/reorder</code> defined after <code>/{frame_id}</code>, so FastAPI matches “reorder” as an int → 422.</li>
+          <li>These <b>sail through CI</b> in a Ralph loop.</li>
+            </ul>
+            <div class="cite">loops.md § “Specificity in contracts and debugging traces”, ~31:19</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-coral">Specflow gap</span></h3>
+            <ul>
+          <li>These are behavioral / runtime bugs — route-ordering, boolean logic, event wiring — that our <b>static gates would not catch.</b></li>
+          <li>This is the concrete case for a <b>runtime verifier in #84</b> and the vision/journey path in <b>#88</b>. Our Playwright/journey agents exist but aren’t wired into <code>specflow run</code> as a gate.</li>
+          <li>Verdict: <b>the single strongest argument to add a runtime verifier — our biggest gap.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="16">
+        <p class="kicker">Honest admission</p>
+        <h2>“Out of the box, Claude is a poor QA agent”</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-34-50.png" alt="“Out of the box, Claude is a poor QA agent”"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li><i>“It would identify legitimate issues, then talk itself into deciding they weren’t a big deal and approve the work anyway.”</i></li>
+          <li>It took <b>exorbitant rubric-tuning</b> to fix — the same sycophancy that hits any LLM-as-judge.</li>
+            </ul>
+            <div class="cite">loops.md § “Specificity in contracts and debugging traces”, ~32:40</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-green">Specflow ahead</span></h3>
+            <ul>
+          <li>This is the <b>exact failure our mechanical gate exists to prevent</b> — a script never “talks itself into” a pass.</li>
+          <li>It’s also the warning label for #84/#88: any LLM verifier we add <b>starts here</b> and must be tuned harsh + kept subordinate to the gate.</li>
+          <li>Verdict: <b>vindicates “no self-grading” and sets the bar for any LLM critic we introduce.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="17">
+        <p class="kicker">The primary debugging loop</p>
+        <h2>Read the traces. Repeat.</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-34-55.png" alt="Read the traces. Repeat."></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li><i>“Read the evaluator’s logs. Find where its judgment diverges from yours. Update the prompt. Repeat.”</i></li>
+          <li>Reading traces <b>by hand</b> is the primary debugging loop; piping to another agent is only a first pass. Observability for long runs is <b>unsolved green-field software.</b></li>
+            </ul>
+            <div class="cite">loops.md § “Specificity…”, ~33:26; Q&A ~1:01:25</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-coral">Specflow gap</span></h3>
+            <ul>
+          <li>We produce the ideal artifact — <code>ledger.jsonl</code> + <code>transcript_path</code> — and ship <b>zero</b> tooling to read it. No fable ticket covers this.</li>
+          <li>Proposal: <b>candidate #90</b> — <code>specflow run trace</code> / a <b>maker-vs-gate divergence report.</b></li>
+          <li>Verdict: <b>clear gap; the talk’s #1 practice has no Specflow tooling yet.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="18">
+        <p class="kicker">Co-evolution</p>
+        <h2>Opus 4.5 → 4.6: harness on a diet</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-35-10.png" alt="Opus 4.5 → 4.6: harness on a diet"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>What they <b>removed</b> as the model improved: context resets (essential → dropped); sprint decomposition (load-bearing → removed, single continuous build); evaluator cadence (per-sprint → single pass at end).</li>
+          <li>What survived: the <b>Planner</b> (required → still required). <i>“The harness wasn’t wrong; it was right for 4.5, the frontier moved.”</i></li>
+            </ul>
+            <div class="cite">loops.md § “Adjusting harnesses as models evolve”, ~34:14</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-purple">Watch</span></h3>
+            <ul>
+          <li>This is the co-evolution warning aimed straight at <b>#83/#89</b>: fine-grained effort tiers and cost dashboards are 4.5-era scaffolding a stronger model may obsolete.</li>
+          <li>What survives every column: the <b>Planner (spec-build)</b> and the <b>separation of roles.</b></li>
+          <li>Verdict: <b>build the durable primitives (verifier split, state, worktrees) heavy; build tunable scaffolding thin and disposable.</b></li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="19">
+        <p class="kicker">The end state</p>
+        <h2>The simplified harness, end to end</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-35-15.png" alt="The simplified harness, end to end"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Human → <b>Planner</b> (prompt→spec, once, ~5 min) → <b>Generator</b> (one continuous build, no resets, 2+ hrs) ↔ <b>Evaluator</b> (Playwright + rubric, at end, 2–3 passes).</li>
+          <li>The filesystem is shared state: <code>spec.md</code>, <code>app/ + git</code>, <code>findings.md</code>. <i>“Three agents, zero shared context — all coordination through files on disk.”</i> Removed on 4.6: context resets, sprint decomposition, per-sprint eval loop, <b>and sprint contracts.</b></li>
+            </ul>
+            <div class="cite">loops.md, ~36:08</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>The end state is <b>pure Specflow philosophy</b> — file system as shared state, not context. Their <code>spec.md</code>/<code>findings.md</code> = our <code>run-contract.yaml</code>/<code>ledger.jsonl</code>/spec dir.</li>
+          <li>Sharpening slide 14: they removed the per-sprint <b>contract negotiation</b> too — so that step is itself 4.5-era scaffold. The <b>durable core = planner + maker/judge split + files-on-disk.</b></li>
+          <li>Verdict: <b>our architecture already matches their simplified end state.</b> Treat negotiation as optional; keep the file-based handoff as bedrock.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="20">
+        <p class="kicker">DIY</p>
+        <h2>Build this loop yourself, today</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-35-25.png" alt="Build this loop yourself, today"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>You don’t need their internal harness. <b>Auto mode</b> (safe unattended permissions), <b>Subagents</b> for the evaluator/QA role, <b>Playwright MCP</b> for click-through verification, <b>Skills</b> to package grading rubrics.</li>
+          <li><i>“The patterns that work tend to get absorbed back into the tools.”</i></li>
+            </ul>
+            <div class="cite">loops.md § “How to build your own agent harness”, ~37:55</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-blue">Aligned</span></h3>
+            <ul>
+          <li>Every primitive they list, Specflow already wires: Auto mode/permissions ≈ <code>never_without_human</code> (<b>enforced, not just prompted</b>); Subagents ≈ our agent library + #84 verifier; Playwright MCP ≈ #88 vision + journey agents; Skills ≈ the specflow-audit skill + rubric packaging.</li>
+          <li>Verdict: <b>Specflow is one concrete assembly of exactly these four primitives</b> — with the contract/gate layer they leave to you.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="21">
+        <p class="kicker">The take-a-photo slide</p>
+        <h2>Five takeaways</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-35-28.png" alt="Five takeaways"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li><b>1.</b> Self-evaluation is a trap → use an adversarial evaluator.</li>
+          <li><b>2.</b> Compaction doesn’t cure coherence drift → structured handoffs do.</li>
+          <li><b>3.</b> Make subjective quality gradable with rubrics the model can apply.</li>
+          <li><b>4.</b> Read the traces — they’re your primary debugging loop.</li>
+          <li><b>5.</b> Delete scaffolding when the model catches up — the frontier moves.</li>
+            </ul>
+            <div class="cite">loops.md § “Key takeaways for long-running agents”, ~38:56</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-gray">Context</span></h3>
+            <ul>
+          <li><b>1</b> → <span style="color:var(--green)">Ahead</span> (mechanical gate; #84 formalizes the split).</li>
+          <li><b>2</b> → <span style="color:var(--blue)">Aligned</span> (run-contract + ledger = structured handoff).</li>
+          <li><b>3</b> → <span style="color:var(--blue)">Aligned / core</span> (contracts; port the weighted rubric to #84/#88).</li>
+          <li><b>4</b> → <span style="color:var(--coral)">Gap</span> (no trace tooling — propose #90).</li>
+          <li><b>5</b> → <span style="color:var(--purple)">Watch</span> (keep #83/#89 thin; durable primitives heavy).</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+      <section class="slide" data-n="22">
+        <p class="kicker">Closing</p>
+        <h2>Same architecture, opposite directions</h2>
+        <div class="imgwrap"><img loading="lazy" src="Screenshot%20from%202026-07-01%2016-35-35.png" alt="Same architecture, opposite directions"></div>
+        <div class="cols">
+          <div class="card">
+            <h3>&#127908; Anthropic says</h3>
+            <ul>
+          <li>Anthropic arrived here from <b>greenfield one-shot demos</b> ($200, 6 hours, a retro game maker) — optimising for taste and autonomy with no one auditing <i>why</i>.</li>
+          <li>Specflow arrives from <b>brownfield, auditable, no-ticket-no-code delivery</b> — optimising for traceability and CI enforcement. We converged on the <b>same planner / maker / judge + files-on-disk</b> shape.</li>
+            </ul>
+            <div class="cite">Full write-up: docs/ss/loops-talk-evaluation.md</div>
+          </div>
+          <div class="card sf">
+            <h3>&#9878;&#65039; Specflow vs Anthropic <span class="chip c-gray">Context</span></h3>
+            <ul>
+          <li><b>The five takeaways are a to-do list for the fable packet, not a refutation of it.</b></li>
+          <li>Top moves: (1) broaden <b>#84</b> to a runtime adversarial verifier + build-time negotiation; (2) ship <b>#85 + #86</b>; (3) open <b>#90</b> trace tooling; (4) build <b>#83/#89</b> thin; (5) hold the conservative line on <b>#87/#88</b>.</li>
+          <li>Where we’re already ahead: the <b>mechanical gate</b> and <b>enforced <code>never_without_human</code></b> answer their two hardest unsolved problems — sycophantic self-grading, and human control of high-stakes actions.</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+</main>
+<div class="edge left"  onclick="Deck.prev()"></div>
+<div class="edge right" onclick="Deck.next()"></div>
+<div class="progress" id="progress"></div>
+<div class="nav">
+  <button id="prevBtn" onclick="Deck.prev()">&larr; Prev</button>
+  <button id="nextBtn" onclick="Deck.next()">Next &rarr;</button>
+</div>
+<script>
+(function(){
+  var all=[].slice.call(document.querySelectorAll('.slide'));
+  var total=all.length, i=0;
+  var counter=document.getElementById('counter');
+  var bar=document.getElementById('progress');
+  var prevBtn=document.getElementById('prevBtn');
+  var nextBtn=document.getElementById('nextBtn');
+  function show(n){
+    i=Math.max(0,Math.min(total-1,n));
+    for(var x=0;x<all.length;x++){ all[x].classList.toggle('active', x===i); }
+    counter.textContent=(i===0?'Title':i+' / '+(total-1));
+    bar.style.width=((i/(total-1))*100)+'%';
+    prevBtn.disabled=(i===0);
+    nextBtn.disabled=(i===total-1);
+    window.scrollTo(0,0);
+    if(location.hash!=='#'+i){ history.replaceState(null,'','#'+i); }
+  }
+  window.Deck={next:function(){show(i+1)},prev:function(){show(i-1)},go:show};
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' '){e.preventDefault();show(i+1);}
+    else if(e.key==='ArrowLeft'||e.key==='PageUp'){e.preventDefault();show(i-1);}
+    else if(e.key==='Home'){show(0);}
+    else if(e.key==='End'){show(total-1);}
+  });
+  var start=parseInt((location.hash||'').replace('#',''),10);
+  show(isFinite(start)?start:0);
+})();
+</script>
+</body>
+</html>
