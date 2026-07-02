@@ -1093,6 +1093,35 @@ function runLoop(options) {
 
   if (options.adapterPolicy) {
     const policy = normalizeAdapterPolicy(loadDataFile(options.adapterPolicy), { slug });
+
+    // VERIFIER-CONTRACT-01 enforcement (#100): a maker may not implement without
+    // an accepted verification contract. Enforced once the lifecycle has begun
+    // (a proposal exists) or when explicitly required; verifier runs are exempt.
+    if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '5_impl' && policy.role !== 'verifier') {
+      const vpaths = verificationPaths({ contract: contractPath });
+      const proposalExists = existsSync(vpaths.proposalPath);
+      const enforce = options.requireVerifierContract === true
+        || (options.requireVerifierContract !== false && proposalExists);
+      if (enforce) {
+        const gate = requireAcceptedVerificationContract({ contract: contractPath });
+        if (!gate.accepted) {
+          const entry = {
+            stage: '5_impl',
+            event: 'impl_blocked',
+            result: 'fail',
+            stop_reason: 'verification_contract_required',
+            reason: gate.reason,
+            verification_contract_path: gate.contractPath,
+            mechanical_gate_state: 'blocked',
+          };
+          appendLedger(ledgerPath, entry);
+          contract.terminal_status = 'blocked';
+          writeYaml(contractPath, { run_contract: contract });
+          return { status: 'blocked_verification_required', entry, contractPath, ledgerPath };
+        }
+      }
+    }
+
     const prompt = options.prompt ? { promptPath: options.prompt } : materializeStagePrompt(contract, { ...options, contractPath, slug });
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
