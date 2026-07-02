@@ -10,7 +10,7 @@ Commands, file locations, model routing, and success criteria in one place.
 
 ```bash
 # Contract tests
-npm test                    # All tests (558 across 14 suites)
+npm test                    # All tests (847 across 35 suites)
 npm run test:contracts      # Contract pattern tests (SEC, A11Y, PROD, TEST)
 npm run test:hooks          # Hook behaviour tests
 npm run test:schema         # Contract YAML schema validation
@@ -31,6 +31,23 @@ bash install-hooks.sh .          # Install Claude Code hooks only
 # CSV compilation
 npm run compile:journeys -- path/to/journeys.csv
 ```
+
+## Contracted Loop Runner (`specflow run`)
+
+The runtime that executes the contracted loops. Each run writes a run contract and an append-only ledger under `.specflow/runs/<slug>/`.
+
+```bash
+# Turn a goal + input into a specflow-compliant spec (PRD, tickets, contracts)
+npx @colmbyrne/specflow run spec-build --slug <slug> --goal "..." --input <file>
+
+# Build against an accepted spec, gated by the runtime verifier rail
+npx @colmbyrne/specflow run feature-build --slug <slug>
+
+# Divergence report over ledger.jsonl: maker claim vs verifier finding vs gate result
+npx @colmbyrne/specflow run trace --slug <slug>
+```
+
+`feature-build` enforces the verifier rail: behavioural slices (`ui`, `workflow`, `api_behavior`, `integration`, `data_mutation`, `auth`, `billing`, `runtime_required`) require independent verifier evidence before any gate advances — a maker cannot verify its own work. `run trace` reads the ledger and surfaces where the maker's claim, the verifier's finding, and the gate's verdict diverge.
 
 ## Skill Commands
 
@@ -114,6 +131,8 @@ override:[reason]    Human override applied; wave can proceed
 
 Default routing for cost efficiency (~40-60% savings vs running everything on Opus):
 
+Model routing is policy metadata, not a trust mechanism — the gate decides on verifier evidence, never on which model produced the output.
+
 | Tier | Agents |
 |------|--------|
 | **Haiku** | board-auditor, contract-validator, journey-enforcer, test-runner, e2e-test-auditor, ticket-closer |
@@ -154,8 +173,10 @@ You're doing it right when:
 ┌─────────────────────────────────────────────────────────┐
 │ Specflow Quick Reference                                │
 ├─────────────────────────────────────────────────────────┤
-│ Core Loop:                                              │
-│   Spec → [Pre-Flight] → Contract → Test → Code → Verify │
+│ Core Loop (verifier lifecycle):                         │
+│   Spec → Contract → Maker proposes verification →       │
+│   Verifier strengthens → Code → Runtime verification →  │
+│   Gate decides on evidence                              │
 │                                                         │
 │ Contract Location:                                      │
 │   docs/contracts/feature_*.yml   = Pattern rules        │

@@ -503,6 +503,18 @@ npx @colmbyrne/specflow graph           # Validate contract cross-references
 
 ---
 
+## Next Step: the Contracted Loop
+
+Setup gets you the contracts and hooks. The contracted loop is where you run work against them:
+
+- `npx @colmbyrne/specflow run spec-build --slug <slug> --goal "..." --input <file>` turns a goal into a specflow-compliant spec.
+- `npx @colmbyrne/specflow run feature-build --slug <slug>` builds against an accepted spec, gated by the runtime verifier rail.
+- Each run writes a run contract and an append-only ledger under `.specflow/runs/<slug>/`; `specflow run trace --slug <slug>` reports where the maker's claim, the verifier's finding, and the gate's verdict diverge.
+
+Behavioural slices (UI, workflow, API behaviour, integrations, data mutations, auth, billing) require independent verifier evidence before a gate advances — a maker never verifies its own work.
+
+---
+
 > **Understand how it works deeper?** See [How It Works](how-it-works.md)
 > **Using with a team?** See [Team Workflows](team-workflows.md)
 > **Setting up CI?** See [CI Integration](../CI-INTEGRATION.md)

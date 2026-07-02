@@ -1,13 +1,18 @@
 # Specflow PRD — A Trust Harness for Frontier Coding Agents
 
-**Version:** 1.0
+**Version:** 1.1 (canonical internal)
 **Date:** 2026-07-02
-**Status:** Active — supersedes positioning in `docs/preflightprd.md` for the loop-runtime era
+**Status:** Active — supersedes positioning in `docs/old-do-not-use/preflightprd.md` for the loop-runtime era
+**Audience:** contributors and agents working on Specflow. A shorter commercial narrative version (no ticket IDs) lives at `docs/PRD-COMMERCIAL.md`.
 **Sources:** repo state at `main` + `feat/verifier-rail-102`; issues/PRs #77–#103; `docs/ss/loops.md` and `docs/ss/loops-talk-evaluation.md` (Anthropic long-running-agent materials); `docs/specs/fable-enable.md`
 
 ---
 
 ## 1. Product summary
+
+**Capability does not create authority.**
+
+Specflow is for teams that want frontier-agent speed without granting frontier agents merge authority. It turns AI-produced work into an evidence-backed change packet: contract, verifier findings, runtime proof, provenance, trace, and human authorization where required.
 
 Specflow is a model-agnostic trust harness for frontier coding agents. It lets Claude, Codex, Fable-class models, Ruflo, or other agent swarms produce the work — but only contracts, verifier evidence, mechanical gates, ledger state, and human boundaries decide what advances or ships. The model is the actuator; the gate is the sensor. A provider's output — and its exit code — is never a gate verdict. Specflow runs an LLM as an untrusted worker inside a contracted loop (`specflow run`), requires an independent verifier to exercise the built thing where behavior matters, records everything to a durable on-disk ledger, and mechanically enforces the boundaries (push, merge, PR, override) that only a human may cross. The thesis in one line: **frontier models can carry more of the work; Specflow must carry the trust.**
 
@@ -29,6 +34,17 @@ The failure path is letting capability accumulate authority: the stronger the mo
 
 **Capability does not create authority.**
 
+### Before / after
+
+| Without Specflow | With Specflow |
+|---|---|
+| Agent says "done" | Gate decides from evidence |
+| Reviewer reads a huge diff cold | Reviewer reads trace/divergence first |
+| Tests may be written by the maker | Verifier contract defines what counts |
+| Screenshot implies success | Runtime/value evidence required |
+| Model fallback is invisible | Requested/effective model is ledgered |
+| Client gets reassurance | Client gets an evidence packet |
+
 ---
 
 ## 3. Why now
@@ -47,10 +63,16 @@ The window is now because organizations are deciding, this year, how much author
 
 ## 4. Target users
 
+### The wedge
+
+The primary buyer is the **AI-enabled agency or consultant delivering commercial software to clients who need evidence that agent-produced work is controlled.** This buyer has the acute, unavoidable version of the pain: they want agent speed for margin, but they must explain trust to a paying client — and "our AI is careful" is not an answer a client accepts. Specflow's core deliverable for them is the **client-ready evidence packet**: per change, a ledgered record of the contract, verifier findings, runtime proof, provenance, model metadata, and every human authorization. That packet is what turns AI-assisted delivery from a liability disclosure into a selling point.
+
+### Full target segments
+
 | User | Situation | What they need from Specflow |
 |---|---|---|
+| **AI-enabled agencies / consultants** (primary) | Clients ask "how do I know the AI work is safe?" | The client-ready evidence packet: what ran, what was verified, who authorized what |
 | **Product/engineering leads** using AI agents on real commercial work | Agents produce more change than the team can review line-by-line | Evidence-backed gates so review effort concentrates where risk is |
-| **Consultants and agencies** delivering client software with AI assistance | Clients ask "how do I know the AI work is safe?" | A ledgered evidence packet per change: what ran, what was verified, who authorized what |
 | **Teams on brownfield production systems** | Existing behavior must not regress; agents don't know what they don't know | Contracts that pin invariants; runtime verification of touched seams |
 | **Teams where auth, billing, workflows, data mutation, compliance, or audit trails matter** | A wrong change has direct customer or legal impact | Mandatory verifier evidence by slice type; human-only boundaries; provenance |
 | **Technical founders** | Want agent speed without agent self-certification | One runner, mechanical gates, readable traces |
@@ -114,7 +136,7 @@ Specflow sits **underneath or around** those systems as the harness: the model s
 
 ## 8. Current capabilities
 
-Verified against the repo as of 2026-07-02. The suite passes **835/835 tests across 33 suites** on the current verifier-rail branch (830/830 at the last main merge).
+Verified against the repo as of 2026-07-02 (release 0.11.0). The suite passes **847/847 tests across 35 suites** on `main`.
 
 ### Implemented
 
@@ -145,8 +167,8 @@ Verified against the repo as of 2026-07-02. The suite passes **835/835 tests acr
 
 | Item | Issue | Status |
 |---|---|---|
-| Durable `.specflow/STATE.md` + lesson-file memory | #85 | Open |
-| Isolated worktree execution for delegated agents | #86 | Open |
+| Durable `.specflow/STATE.md` + lesson-file memory | #85 | Open (core shipped in 0.10.0; issue pending closure) |
+| Isolated worktree execution for delegated agents | #86 | Open (prepare/release + main-tree refusal shipped in 0.11.0; issue pending closure) |
 | Model roles, effort, fallbacks, budgets as policy metadata | #83 | Open (honesty/ledger parts partially in 0.10.0) |
 | Harness-minimal principle codified | #94 | Open |
 | Vision evidence for teardown/Gate D | #88 | Open |
@@ -224,6 +246,8 @@ These are the invariants that define the product. If any of these can be crossed
 ---
 
 ## 12. Commercial value
+
+The commercial wedge is not "better AI coding." It is: **make AI-assisted delivery acceptable to serious clients.**
 
 The buyer pain, verbatim:
 
@@ -310,7 +334,7 @@ This PRD is complete because it answers, in one place:
 - **What does it refuse to do?** Be the worker, orchestrate swarms, auto-merge, trust provider output, or guarantee correctness without evidence (§10–§11).
 - **Why is it different from prompt packs, agent swarms, and CI?** It is the trust layer those systems lack, sitting beneath and around them (§6).
 - **What trust boundaries must never be crossed?** Nine, enumerated and enforced (§10).
-- **What has shipped?** Verifier lifecycle, enforced verifier rail, trace, provenance, adapters, `never_without_human` — 835/835 tests green (§8).
+- **What has shipped?** Verifier lifecycle, enforced verifier rail, trace, provenance, adapters, `never_without_human` — 847/847 tests green (§8).
 - **What remains?** State, worktrees, harness-minimal, routing metadata, vision, cost, routines, audit refresh — in that order (§15).
 - **What commercial value does this create?** Evidence packets instead of confidence claims; measurable cost per accepted change (§12).
 
@@ -339,8 +363,8 @@ Anthropic's own long-running-agent research confirms the design independently: s
 
 ## Status and value
 
-The trust core is shipped and tested (835/835 across 33 suites): the contracted loop runner, verifier lifecycle, enforced verifier rail, runtime evidence requirements, provenance gate, trace tooling, and mechanically enforced human boundaries. Remaining work — durable state memory, worktree isolation, cost reporting, scheduled routines — is sequenced so that autonomy features land only after the trust layer beneath them is safe.
+The trust core is shipped and tested (847/847 across 35 suites): the contracted loop runner, verifier lifecycle, enforced verifier rail, runtime evidence requirements, provenance gate, trace tooling, and mechanically enforced human boundaries. Remaining work — durable state memory, worktree isolation, cost reporting, scheduled routines — is sequenced so that autonomy features land only after the trust layer beneath them is safe.
 
-For a buyer, the value is one sentence: **"My AI agent produced something that looks done — Specflow tells me, with evidence, whether it is safe to merge."** Agencies get client-ready evidence packets instead of assurances. Teams get agent speed with concentrated, boundary-level human review instead of line-by-line reading. The metric that matters is cost per *accepted* change — and Specflow is how it comes down without trust going with it.
+The commercial wedge: **make AI-assisted delivery acceptable to serious clients.** For a buyer, the value is one sentence: **"My AI agent produced something that looks done — Specflow tells me, with evidence, whether it is safe to merge."** The sharpest customer is the AI-enabled agency or consultancy, which gets client-ready evidence packets instead of assurances. Product teams get agent speed with concentrated, boundary-level human review instead of line-by-line reading. The metric that matters is cost per *accepted* change — and Specflow is how it comes down without trust going with it.
 
 **Swarm faster. Ship only what survives contracts.**

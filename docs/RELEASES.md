@@ -2,6 +2,84 @@
 
 ---
 
+## v0.11.0 — 2026-07-02
+
+### Enforced runtime verifier + long-run trust primitives
+
+The trust layer that decides what ships is now enforced end-to-end, not just described.
+
+- **Runtime verifier lifecycle** — the maker persists a slice-local verification proposal *before* implementation; an independent verifier accepts/rejects it (fed artifact + spec + accepted contract + rubric, never the maker's reasoning trace); runtime checks (`playwright`/`api`/`db-reread`/`console`/`network`/`screenshot`/`custom-script`) write `verifier-findings.jsonl`. A missing executable surface yields a **blocked** finding, never fabricated evidence.
+- **Enforced verifier rail** — `feature-build` runs the verifier stage before the gate for runtime-required slices (`ui`, `workflow`, `api_behavior`, `integration`, `data_mutation`, `auth`, `billing`, `runtime_required`). A missing/blocked/failed required finding blocks gate advancement; skips are human-only and ledgered; screenshot-only evidence can't satisfy a value-bearing slice. **Done is decided by the gate, using verifier evidence.**
+- **`specflow run trace`** — groups maker claim vs verifier finding vs mechanical gate result and flags divergences (maker-claimed-done-but-verifier-failed, verifier-passed-but-gate-failed, missing evidence, human-gated action attempted).
+- **Safe durable re-entry** — on resume the durable run-contract position is authoritative; a conflicting caller-assumed stage is overridden and ledgered (`reentry_conflict`).
+- **Isolated delegated worktrees** — `prepareWorktree` refuses a path resolving to the main working tree and ledgers branch/base/path/cleanup; auto-merge/auto-push stay false.
+- **Honest subordinate controls** — silent model downgrade is a failed contract; a vision verdict is evidence, never a gate pass; routine manifests must call `specflow run` with no auto human-gated action.
+
+847 tests across 35 suites.
+
+---
+
+## v0.10.0 — 2026-07-01
+
+### Loop runtime controls + adapter accounting
+
+- **Contracted loop runner controls** — `specflow run` carries richer adapter policy metadata (role, effort, requested model, effective/reported model, fallback, budget, usage, cost-per-gate). Model routing is accounting metadata, not evidence: silent downgrade is no longer acceptable, and unknown provider metadata is recorded as `unknown` rather than guessed.
+- **Compounding state memory** — loop runs write `.specflow/STATE.md` and one-lesson-per-file memory under `.specflow/lessons/`; generated stage prompts include a bounded state digest so later runs resume from durable facts.
+- **Delegation and routines** — isolated-worktree preparation metadata plus `specflow routine <slug>` manifest scaffolding for cron/GitHub/hosted loops. Generated routines call `specflow run` and preserve `never_without_human`.
+- **Gate D vision evidence** — `teardown-gate check-gate-d` accepts screenshot plus vision-verifier findings while still requiring value-bearing `.txt`/`.json` oracle re-reads for value hops.
+- **Install fix** — `js-yaml` is now a production dependency (the published CLI loads YAML at runtime).
+
+---
+
+## v0.9.1 — 2026-06-12
+
+### Conditional ADR-conformance + universal component-reuse check (#68)
+
+- **`verify-adr.cjs`** is model-free and conditional: it detects an ADR folder (or a CLAUDE.md `ADR Location`) and exits 0 silently when there isn't one. When present, GATE B requires each ticket to cite a resolving ADR id (or `adrNone: <reason>`) and declare `reuses`; a phantom ADR citation is an error. IDs normalize (`ADR-006 ≡ ADR-6 ≡ 0006-foo.md`).
+- **adversary-mandate@v3** adds universal reuse-don't-reinvent (reinventing an existing component is fatal) alongside conditional ADR conformance.
+- spec-build tickets declare `adrs`/`reuses`; `init` scaffolds the script; `CLAUDE-MD-TEMPLATE.md` gains an optional **ADR Location** field.
+
+---
+
+## v0.9.0 — 2026-06-12
+
+### Pipeline hardening (EPIC) + docs overhaul
+
+- **GATE D — persona-walk integration gate.** Per-slice green is blind to seam bugs, so GATE D walks personas across the merged tree. Red hops are dispositioned `bug` (last-merged writer reopens) or a human-countersigned `stale-oracle`; an epic isn't done until D is green.
+- **Hop tables at GATE A** — pinned, value-bearing integration oracle in `PRDs/<slug>-hops.md`, human-signed, with countersigned amendments.
+- **Falsification folded into adversary-mandate@v2** — a required falsification artifact (parallel fresh-context sub-run), `verify-falsification.cjs`, and a hash-bound PASS at GATE A.
+- **Seam-lite** — tickets declare `writes/reads`; `verify-seams.cjs` computes writer×writer and writer×reader seams at GATE B and derives GATE D hops.
+- **Docs** — README overhaul (the three loops named, gate list current, GATE D in the table) and a CLI `help` that describes what `init` actually delivers.
+
+---
+
+## v0.8.0 – v0.8.2 — 2026-06-10
+
+### New loop: `daily-use-teardown` — the front door for already-built products
+
+For a shipped product the question isn't "what should we build" but "are the journeys confusing, and are they doing the right thing?" The new loop maps live routes, stops at a hard human gate to confirm the journey map, runs top-thinker persona walks judging **WORKS / CONFUSING / BROKEN** with screenshot evidence, and hands a prioritized do-list to spec-build. Schedulable monthly/quarterly so the product re-generates its own backlog from observed friction.
+
+Hardened across two patch releases after an independent fresh-context adversary attacked the design:
+
+- **0.8.1** — closed self-attestation holes: `teardown-gate.cjs` replaces "confirmation written into the journey map" with a hash-bound human sign-off (editing the map after sign-off fails `check`); every gate is now mechanical rather than prose checked by the entity it constrains; committed Playwright walk scripts, visible URL bars, and a `bugs.md` for findings are required.
+- **0.8.2** — `teardown-walkthrough-mandate@v1` gives teardown a method: JTBD personas, the four cognitive-walkthrough questions per step, and a fixed finding vocabulary so a CONFUSING verdict says which question failed.
+
+---
+
+## v0.7.0 – v0.7.6 — 2026-06-10
+
+### Pipeline v2: mechanical adversary independence + the loop kit ships with `init`
+
+The spec-build adversary stops being "same agent, switched hats." It runs in a fresh context seeded by a fixed template that cannot carry the author's reasoning, gated before it can launch:
+
+- `verify-seed.cjs` byte-checks the spawn seed against `{artifact_paths, tool_grants, mandate_ref}` — any extra key (the priming-leak vector) is rejected, so a primed seed cannot launch.
+- `adversary-spawn.cjs`, the versioned `adversary-mandate.md@v1`, and `verify-ticket-journey.cjs` (Gate B's ticket↔journey join) round out the independence machinery.
+- **0.7.6** adds two-touch personas — a persona/simulation lens runs at the adversary stage (on the PRD) and again at Gate B.5 (on the tickets).
+
+`specflow init` now scaffolds these gate scripts and the runtime bindings (`PROCESS-CLAUDE.md` / `PROCESS-CODEX.md`) so spec-build and feature-build run end-to-end on either runtime. Patch releases 0.7.1–0.7.5 fixed a `verify-setup` false "invalid YAML" report and shipped CRLF-normalization so `init`/`update` work on Linux/Mac regardless of how the package was published.
+
+---
+
 ## v0.6.1 — 2026-02-20
 
 ### Hook System Bug Fixes
