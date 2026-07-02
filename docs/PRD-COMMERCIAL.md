@@ -105,7 +105,7 @@ Specflow sits **underneath** those systems as the trust layer. The model stack a
 
 ## 7. What exists today
 
-The trust core is shipped and tested (835 passing tests across 33 suites):
+The trust core is shipped and tested (830 passing tests across 32 suites):
 
 - The **contracted loop runner** with durable on-disk run contracts and ledger — runs survive interruption and resume without losing state.
 - The full **verifier lifecycle**: maker-proposed verification contracts, independent strengthening, runtime verification, separately-written findings.

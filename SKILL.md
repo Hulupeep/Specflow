@@ -9,6 +9,8 @@ author: Hulupeep
 
 Specs that enforce themselves. Turn requirements into contracts that break the build when violated.
 
+> **Trust boundary note (2026-07):** The `/specflow` autonomous loop described below predates the enforced verifier rail. Under the current runtime (`specflow run feature-build`), a maker must not verify its own work: runtime-required slices need independent verifier evidence before any gate advances, and provider output is never itself a gate verdict. See [docs/PRD.md](docs/PRD.md) §10. A loop-era refresh of this skill is tracked in #97.
+
 ## Core Loop
 
 ```
