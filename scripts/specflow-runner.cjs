@@ -553,6 +553,84 @@ function assembleVerifierInput(options = {}) {
   return input;
 }
 
+// --- VERIFIER-RUNTIME-01 (epic #100): adversarial runtime evidence -----------
+// Verification contracts declare runtime checks; the verifier executes them and
+// writes findings. Missing executable surface yields a BLOCKED finding, never
+// fabricated evidence. The verdict is evidence only — the gate still decides.
+
+const RUNTIME_CHECK_TYPES = ['playwright', 'api', 'db-reread', 'console', 'network', 'screenshot', 'custom-script'];
+const RUNTIME_REREAD_TYPES = ['api', 'db-reread', 'custom-script'];
+
+function validateRuntimeChecks(checks, options = {}) {
+  const list = Array.isArray(checks) ? checks : [];
+  const errors = [];
+  for (const c of list) {
+    if (!c || !RUNTIME_CHECK_TYPES.includes(c.type)) errors.push(`unsupported runtime check type: ${c && c.type}`);
+  }
+  if (options.uiOrWorkflow && !list.some((c) => c && c.required)) {
+    errors.push('UI/workflow slice requires at least one required runtime check');
+  }
+  if (options.valueBearing && !list.some((c) => c && RUNTIME_REREAD_TYPES.includes(c.type))) {
+    errors.push('value-bearing slice requires an api/db-reread/custom-script reread; screenshot-only evidence is insufficient');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function defaultRuntimeRunner(check) {
+  if (!check.command) return { executable: false };
+  const res = runCommand(check.command, { timeoutSeconds: check.timeout_seconds });
+  return { executable: true, result: res.exit_code === 0 ? 'pass' : 'fail', exit_code: res.exit_code, stderr: res.stderr };
+}
+
+function runRuntimeChecks(options = {}) {
+  const paths = verificationPaths(options);
+  const checks = Array.isArray(options.checks) ? options.checks : [];
+  const makerClaim = options.makerClaim || UNKNOWN;
+  const runner = options.runner || defaultRuntimeRunner;
+  const findings = [];
+  for (const check of checks) {
+    const outcome = runner(check) || {};
+    let finding;
+    if (outcome.executable === false || outcome.result === 'blocked') {
+      finding = {
+        severity: 'blocked',
+        check_type: check.type,
+        assertion: check.assertion || null,
+        maker_claim: makerClaim,
+        verifier_result: 'blocked',
+        result: 'blocked',
+        gate_result: 'pending',
+        evidence_path: null,
+        reason: outcome.reason || `missing executable surface for ${check.type} check`,
+      };
+    } else {
+      const failed = outcome.result === 'fail';
+      finding = {
+        severity: failed ? (check.required ? 'critical' : 'warn') : 'info',
+        check_type: check.type,
+        assertion: check.assertion || null,
+        maker_claim: makerClaim,
+        verifier_result: outcome.result,
+        result: outcome.result,
+        gate_result: 'pending', // evidence only — the mechanical gate still decides
+        evidence_path: outcome.evidence_path || check.evidence_path || null,
+      };
+    }
+    findings.push(finding);
+    appendLedger(paths.findingsPath, finding);
+  }
+  return {
+    findings,
+    findingsPath: paths.findingsPath,
+    summary: {
+      total: findings.length,
+      pass: findings.filter((f) => f.verifier_result === 'pass').length,
+      fail: findings.filter((f) => f.verifier_result === 'fail').length,
+      blocked: findings.filter((f) => f.verifier_result === 'blocked').length,
+    },
+  };
+}
+
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
 // A pure read over the run ledger (+ verifier-findings). Groups maker claim,
 // verifier finding, mechanical gate result, and disposition; flags divergence.
@@ -1367,6 +1445,8 @@ module.exports = {
   requireAcceptedVerificationContract,
   resolveVerifierPolicy,
   assembleVerifierInput,
+  validateRuntimeChecks,
+  runRuntimeChecks,
   verifierTrace,
   readLedger,
   readLedgerTail,
