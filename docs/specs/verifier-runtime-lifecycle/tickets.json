@@ -1,0 +1,38 @@
+[
+  {
+    "id": "VERIFIER-CONTRACT-01",
+    "title": "Persist verification proposal and accepted contract before implementation",
+    "writes": ["verification", "ledger.jsonl", "run_contract"],
+    "reads": ["adapter_policy", "runAdapter", "ledger.jsonl"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing runner, adapter policy, and ledger surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/QA/loops/feature-build.yaml", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-VERIFIER-CONTRACT-LIFECYCLE"]
+  },
+  {
+    "id": "VERIFIER-POLICY-01",
+    "title": "Run verifier policy in isolated artifact/spec/rubric context",
+    "writes": ["runAdapter", "transcript_path", "output_path", "ledger.jsonl"],
+    "reads": ["adapter_policy", "runAdapter", "transcript_path", "output_path"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing adapter execution and transcript/output policy surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/adapter-policies/claude-print.safe.yml", "templates/adapter-policies/codex-exec.safe.yml"],
+    "journeys": ["J-VERIFIER-POLICY-ISOLATION"]
+  },
+  {
+    "id": "VERIFIER-RUNTIME-01",
+    "title": "Collect adversarial runtime evidence for UI/workflow slices",
+    "writes": ["Playwright", "console", "network", "teardown-gate", "ledger.jsonl"],
+    "reads": ["Playwright", "console", "network", "teardown-gate", "output_path"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against journey verification docs, Playwright compiler output, and teardown evidence checks.",
+    "reuses": ["scripts/specflow-compile.cjs", "scripts/teardown-gate.cjs", "docs/JOURNEY-VERIFICATION-HOOKS.md"],
+    "journeys": ["J-VERIFIER-RUNTIME-EVIDENCE"]
+  },
+  {
+    "id": "VERIFIER-TRACE-01",
+    "title": "Show maker claim, verifier finding, gate result, and divergence",
+    "writes": ["runStatus", "ledger.jsonl", "specflow run status"],
+    "reads": ["ledger.jsonl", "run_contract", "transcript_path", "output_path", "runStatus"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing status, ledger, and CLI surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "bin/specflow.js", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-VERIFIER-TRACE-DIVERGENCE"]
+  }
+]
