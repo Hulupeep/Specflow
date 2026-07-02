@@ -272,11 +272,21 @@ function gitOutput(args, cwd = '.') {
   return (result.stdout || '').trim();
 }
 
+// --- WORKTREE-ISOLATION-01 (#86): isolated, ledgered delegated execution -------
+// Delegated maker/verifier work runs in an isolated worktree with branch/base/
+// path/cleanup recorded in the ledger. A path resolving to the main working tree
+// is refused (no silent collision); auto-merge/auto-push stay false.
+
 function prepareWorktree(options = {}) {
   const repoRoot = options.repoRoot || process.cwd();
   const baseRef = options.baseRef || 'HEAD';
   const branch = options.branch || `specflow/${options.slug || 'delegate'}`;
   const worktreePath = options.worktreePath || join(repoRoot, '.specflow', 'worktrees', slugify(branch));
+
+  if (resolve(worktreePath) === resolve(repoRoot)) {
+    throw new Error('worktree path collides with the main working tree; delegated work must be isolated');
+  }
+
   const create = options.create === true;
   let action = 'referenced';
   if (create && !existsSync(worktreePath)) {
@@ -285,7 +295,7 @@ function prepareWorktree(options = {}) {
     action = 'created';
   }
   const baseCommit = gitOutput(['rev-parse', baseRef], repoRoot);
-  return {
+  const record = {
     action,
     worktree_path: worktreePath,
     branch,
@@ -293,9 +303,34 @@ function prepareWorktree(options = {}) {
     base_commit: baseCommit,
     read_only: options.readOnly === true,
     cleanup_required: create,
+    cleanup_status: 'pending',
     auto_merge: false,
     auto_push: false,
   };
+  if (options.ledger) appendLedger(options.ledger, { stage: 'delegation', event: 'worktree_prepared', ...record });
+  return record;
+}
+
+function releaseWorktree(options = {}) {
+  const repoRoot = options.repoRoot || process.cwd();
+  const worktreePath = options.worktreePath;
+  if (!worktreePath) throw new Error('releaseWorktree requires worktreePath');
+  let cleanupStatus = 'kept';
+  if (options.remove === true && existsSync(worktreePath)) {
+    gitOutput(['worktree', 'remove', '--force', worktreePath], repoRoot);
+    cleanupStatus = 'removed';
+  }
+  const record = {
+    stage: 'delegation',
+    event: 'worktree_released',
+    worktree_path: worktreePath,
+    branch: options.branch || null,
+    cleanup_status: cleanupStatus,
+    auto_merge: false,
+    auto_push: false,
+  };
+  if (options.ledger) appendLedger(options.ledger, record);
+  return record;
 }
 
 function scaffoldRoutineManifest(options = {}) {
@@ -1601,6 +1636,7 @@ module.exports = {
   assertSafeReentry,
   reconcileAssumedStage,
   prepareWorktree,
+  releaseWorktree,
   scaffoldRoutineManifest,
   normalizeAdapterPolicy,
   buildAdapterCommand,
