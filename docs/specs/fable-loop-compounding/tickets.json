@@ -61,5 +61,32 @@
     "adrNone": "This repository has no ADR directory; reuse is declared against existing ledger, adapter parsing, and status output.",
     "reuses": ["scripts/specflow-runner.cjs", "bin/specflow.js", "tests/contracts/loop-run-contract.test.js"],
     "journeys": ["J-FABLE-COST-ACCOUNTING"]
+  },
+  {
+    "id": "VERIFIER-02",
+    "title": "Add maker-verifier negotiation and adversarial runtime verification",
+    "writes": ["run_contract", "ledger.jsonl", "runAdapter", "verifier"],
+    "reads": ["adapter_policy", "output_path", "transcript_path", "journey tests", "teardown-gate"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing verifier, adapter, journey, and teardown evidence surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "scripts/teardown-gate.cjs", "templates/QA/loops/feature-build.yaml", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-FABLE-VERIFIER-NEGOTIATION"]
+  },
+  {
+    "id": "TRACE-01",
+    "title": "Add specflow run trace divergence report for long-running loops",
+    "writes": ["runStatus", "ledger.jsonl"],
+    "reads": ["ledger.jsonl", "run_contract", "transcript_path", "parseProviderEvents", "verifier", "gate_c"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing ledger, status, and CLI surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "bin/specflow.js", "tests/contracts/loop-run-contract.test.js"],
+    "journeys": ["J-FABLE-TRACE-REVIEW"]
+  },
+  {
+    "id": "HARNESS-MINIMAL-01",
+    "title": "Keep model scaffolding thin and removable as providers improve",
+    "writes": ["adapter_policy", "runStatus", "docs"],
+    "reads": ["adapter_policy", "ledger.jsonl", "runAdapter", "gate_c"],
+    "adrNone": "This repository has no ADR directory; reuse is declared against existing adapter policy, status, and documentation surfaces.",
+    "reuses": ["scripts/specflow-runner.cjs", "templates/adapter-policies/claude-print.safe.yml", "templates/adapter-policies/codex-exec.safe.yml", "README.md"],
+    "journeys": ["J-FABLE-HARNESS-MINIMAL"]
   }
 ]

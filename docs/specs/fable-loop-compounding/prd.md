@@ -20,6 +20,9 @@ Specflow should treat Fable-class models as high-capability workers and orchestr
 - `ROUTINE-01`: Specflow can scaffold `/loop`/routine manifests for cron, GitHub Actions, or hosted agent triggers while preserving the same run contract and stop rules.
 - `VISION-GATE-01`: Teardown/Gate D evidence supports screenshot plus vision-verifier findings, while the mechanical gate still validates evidence paths and value-bearing re-reads.
 - `COST-01`: Loop ledgers record provider/model, token/cost estimates when available, gate attempt counts, and cost-per-accepted-change counters.
+- `VERIFIER-02`: Feature-build adds a maker-verifier negotiation stage that writes a slice-specific verification contract before implementation and can run adversarial runtime verification against the built product.
+- `TRACE-01`: Specflow provides trace-review tooling over `ledger.jsonl`, transcripts, provider events, and gate results so operators can find where maker judgment diverged from verifier or mechanical gates.
+- `HARNESS-MINIMAL-01`: Model-routing and cost scaffolding stay thin, ledger-backed, and removable as provider capabilities improve; the trust boundary remains mechanical gates plus human-gated actions.
 
 ## Non-Goals
 
@@ -60,10 +63,16 @@ The prompt should say why the work matters and when to stop/check in, but it sho
 
 Portfolio-level routines may ask a planning provider to inspect important projects and propose improvements, but any proposed improvement must enter spec-build as a normal PRD/ticket packet before implementation.
 
+Specflow intentionally keeps durable spec-build artifacts as the outer contract for brownfield, auditable work. It does not respond to stronger models by pinning more implementation detail up front. Fine-grained "done means this, verified this way" criteria are negotiated inside feature-build between the maker and an independent verifier, then written to disk before implementation. The verifier may use Playwright, screenshots, console/network logs, or other runtime evidence to refute the built behavior, but its judgment remains evidence subordinate to mechanical gates.
+
+Harness scaffolding is disposable. Model names, effort tiers, cost estimates, and provider-specific routing knobs are policy metadata recorded in the ledger, not product doctrine. If a future provider makes a scaffold unnecessary, Specflow should preserve the gate and delete the scaffold rather than carry stale complexity.
+
 ## Success Criteria
 
-- Tickets declare executable journeys and surfaces for all seven requirements.
+- Tickets declare executable journeys and surfaces for all ten requirements.
 - Gate A falsification attacks overclaim, self-modifying skills, cost runaway, and weak verifier separation.
 - Gate B seam/ADR/journey checks pass against the local ticket packet.
 - Gate B.5 simulation covers long-running session, hosted routine, UI vision, and model fallback routes.
 - Resulting GitHub issues are ready for feature-build implementation.
+- Feature-build can produce and enforce a slice-local verification contract before maker work begins.
+- Operators can inspect a divergence report that links ledger events, transcripts, provider events, and failed gates.

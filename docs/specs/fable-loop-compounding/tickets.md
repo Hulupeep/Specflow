@@ -84,3 +84,37 @@ Acceptance:
 - `specflow run status` summarizes attempts, accepted gates, rejected gates, and cost per accepted gate/change.
 - Missing usage metadata is recorded as unknown, not fabricated.
 - Plan entitlement metadata is recorded as policy context, not treated as zero cost unless the provider explicitly reports zero billable usage.
+
+### #92 VERIFIER-02 - Add maker-verifier negotiation and adversarial runtime verification
+
+**Journey:** `J-FABLE-VERIFIER-NEGOTIATION`
+
+Acceptance:
+- Feature-build can insert a pre-implementation negotiation stage where the maker proposes a slice-local verification contract and the independent verifier can reject it as too vague, too broad, or missing edge/runtime checks.
+- The accepted verification contract is written to disk under the run directory before maker implementation starts and is referenced by later ledger entries.
+- The verifier input remains artifact plus rubric/contract, not maker reasoning trace.
+- Verifier policies can declare an adversarial runtime verifier that drives the built product through Playwright or equivalent tooling, including screenshots, console logs, network failures, and value re-reads when applicable.
+- Runtime verifier rubrics support weighted criteria and default to a refute/harsh posture when evidence is incomplete.
+- A runtime verifier verdict is evidence only; gate advance remains blocked until the owning mechanical gate or journey test passes.
+
+### #93 TRACE-01 - Add `specflow run trace` divergence report for long-running loops
+
+**Journey:** `J-FABLE-TRACE-REVIEW`
+
+Acceptance:
+- CLI exposes `specflow run trace <run-dir>` or equivalent, reading `ledger.jsonl`, run contract, transcript paths, provider events, verifier entries, and gate results.
+- Trace output groups each stage attempt by maker action, verifier response, mechanical gate result, human gate stop, and final disposition.
+- The report highlights divergence: maker claimed done but verifier failed, verifier passed but mechanical gate failed, provider refused/fell back, human-gated action was attempted, or transcript/evidence is missing.
+- The command never sends transcripts to a provider by default; provider summarization is opt-in and recorded in the ledger.
+- Missing transcript paths, dangling evidence refs, and unknown model/cost fields are reported as unknown or missing, not inferred.
+
+### #94 HARNESS-MINIMAL-01 - Keep model scaffolding thin and removable as providers improve
+
+**Journey:** `J-FABLE-HARNESS-MINIMAL`
+
+Acceptance:
+- PRD/docs state that Specflow preserves mechanical gates and human-gated stop rules, but provider-specific scaffolding should be removed when it stops paying for itself.
+- Adapter policy validation distinguishes durable trust fields (`requested_model`, `effective_model`, role, fallback/refusal, budget) from transient provider knobs such as effort names or model-family marketing labels.
+- Cost/status output can show when a policy field is unused, unsupported, or always unknown so stale scaffolding is visible.
+- No gate may depend solely on a provider-specific effort tier, model brand, or cost estimate.
+- Documentation positions Specflow as a brownfield/auditable loop control plane, not a free-running demo harness.

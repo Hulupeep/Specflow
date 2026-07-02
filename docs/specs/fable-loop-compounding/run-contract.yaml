@@ -16,7 +16,8 @@ run_contract:
     - docs/specs/fable-loop-compounding/issues.json
     - docs/specs/fable-loop-compounding/simulation.md
     - docs/specs/fable-loop-compounding/specflow-audit.md
-  stop_condition: Stop at spec-build handoff; GitHub issues #83-#89 are created and ready for feature-build.
+    - docs/specs/fable-loop-compounding/long-running-agents-evaluation.md
+  stop_condition: Stop at spec-build handoff; GitHub issues #83-#89 and #92-#94 are created and ready for feature-build.
   never_without_human:
     - git push
     - open PR
