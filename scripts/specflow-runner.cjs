@@ -496,6 +496,63 @@ function requireAcceptedVerificationContract(options = {}) {
   return { accepted: true, contractPath: paths.contractPath, contract: data, reason: null };
 }
 
+// --- VERIFIER-POLICY-01 (epic #100): verifier policy isolation ---------------
+// The verifier policy is distinct from the maker policy (separate id and
+// output/transcript paths) and is fed artifact + spec + accepted verification
+// contract + rubric. The maker reasoning transcript is excluded by default;
+// including it requires a human-recorded ledger exception.
+
+function resolveVerifierPolicy(rawMaker, context = {}) {
+  const maker = normalizeAdapterPolicy(rawMaker, context);
+  if (!maker.verifier_policy) {
+    throw new Error('maker adapter_policy does not declare a verifier_policy');
+  }
+  const verifier = normalizeAdapterPolicy(maker.verifier_policy, context);
+  const errors = [];
+  if (verifier.id === maker.id) errors.push('verifier_policy.id must differ from maker policy id');
+  if (verifier.transcript_path === maker.transcript_path) errors.push('verifier transcript_path must differ from maker transcript_path');
+  if (verifier.output_path === maker.output_path) errors.push('verifier output_path must differ from maker output_path');
+  if (errors.length) throw new Error(`verifier policy not isolated: ${errors.join('; ')}`);
+  return { maker, verifier: { ...verifier, role: verifier.role || 'verifier' } };
+}
+
+function assembleVerifierInput(options = {}) {
+  const required = ['artifactPath', 'specPath', 'verificationContractPath', 'rubric'];
+  const missing = required.filter((k) => !options[k]);
+  if (missing.length) {
+    throw new Error(`verifier input missing required field(s): ${missing.join(', ')}`);
+  }
+  const input = {
+    artifact_path: options.artifactPath,
+    spec_path: options.specPath,
+    verification_contract_path: options.verificationContractPath,
+    rubric: options.rubric,
+    includes_maker_trace: false,
+    maker_transcript_path: null,
+  };
+  if (options.allowMakerTrace) {
+    const exception = options.humanException || options.human_exception || {};
+    const approvedBy = exception.approved_by || exception.approvedBy;
+    const reason = exception.reason;
+    if (!approvedBy || !reason) {
+      throw new Error('including the maker transcript requires a human exception with approved_by and reason');
+    }
+    input.includes_maker_trace = true;
+    input.maker_transcript_path = options.makerTranscriptPath || null;
+    input.maker_trace_exception = { approved_by: approvedBy, reason };
+    if (options.ledger) {
+      appendLedger(options.ledger, {
+        stage: 'verification',
+        event: 'verifier_maker_trace_exception',
+        approved_by: approvedBy,
+        reason,
+        maker_transcript_path: input.maker_transcript_path,
+      });
+    }
+  }
+  return input;
+}
+
 function verifierCommandsForStage(contract, options = {}) {
   const slug = options.slug || options.specSlug || contract.slug || 'specflow-run';
   const specDir = options.specDir || defaultSpecDir(slug);
@@ -1196,6 +1253,8 @@ module.exports = {
   writeVerificationProposal,
   decideVerification,
   requireAcceptedVerificationContract,
+  resolveVerifierPolicy,
+  assembleVerifierInput,
   readLedger,
   readLedgerTail,
   summarizeLedger,
