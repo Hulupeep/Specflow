@@ -2,7 +2,7 @@
 
 **Version:** 1.1 (canonical internal)
 **Date:** 2026-07-02
-**Status:** Active — supersedes positioning in `docs/preflightprd.md` for the loop-runtime era
+**Status:** Active — supersedes positioning in `docs/old-do-not-use/preflightprd.md` for the loop-runtime era
 **Audience:** contributors and agents working on Specflow. A shorter commercial narrative version (no ticket IDs) lives at `docs/PRD-COMMERCIAL.md`.
 **Sources:** repo state at `main` + `feat/verifier-rail-102`; issues/PRs #77–#103; `docs/ss/loops.md` and `docs/ss/loops-talk-evaluation.md` (Anthropic long-running-agent materials); `docs/specs/fable-enable.md`
 
@@ -136,7 +136,7 @@ Specflow sits **underneath or around** those systems as the harness: the model s
 
 ## 8. Current capabilities
 
-Verified against the repo as of 2026-07-02. The suite passes **835/835 tests across 33 suites** on the current verifier-rail branch (830/830 at the last main merge).
+Verified against the repo as of 2026-07-02. The suite passes **830/830 tests across 32 suites** on `main`; the in-flight verifier-rail workbranch measures 835/835 across 33.
 
 ### Implemented
 
@@ -334,7 +334,7 @@ This PRD is complete because it answers, in one place:
 - **What does it refuse to do?** Be the worker, orchestrate swarms, auto-merge, trust provider output, or guarantee correctness without evidence (§10–§11).
 - **Why is it different from prompt packs, agent swarms, and CI?** It is the trust layer those systems lack, sitting beneath and around them (§6).
 - **What trust boundaries must never be crossed?** Nine, enumerated and enforced (§10).
-- **What has shipped?** Verifier lifecycle, enforced verifier rail, trace, provenance, adapters, `never_without_human` — 835/835 tests green (§8).
+- **What has shipped?** Verifier lifecycle, enforced verifier rail, trace, provenance, adapters, `never_without_human` — 830/830 tests green (§8).
 - **What remains?** State, worktrees, harness-minimal, routing metadata, vision, cost, routines, audit refresh — in that order (§15).
 - **What commercial value does this create?** Evidence packets instead of confidence claims; measurable cost per accepted change (§12).
 
@@ -363,7 +363,7 @@ Anthropic's own long-running-agent research confirms the design independently: s
 
 ## Status and value
 
-The trust core is shipped and tested (835/835 across 33 suites): the contracted loop runner, verifier lifecycle, enforced verifier rail, runtime evidence requirements, provenance gate, trace tooling, and mechanically enforced human boundaries. Remaining work — durable state memory, worktree isolation, cost reporting, scheduled routines — is sequenced so that autonomy features land only after the trust layer beneath them is safe.
+The trust core is shipped and tested (830/830 across 32 suites): the contracted loop runner, verifier lifecycle, enforced verifier rail, runtime evidence requirements, provenance gate, trace tooling, and mechanically enforced human boundaries. Remaining work — durable state memory, worktree isolation, cost reporting, scheduled routines — is sequenced so that autonomy features land only after the trust layer beneath them is safe.
 
 The commercial wedge: **make AI-assisted delivery acceptable to serious clients.** For a buyer, the value is one sentence: **"My AI agent produced something that looks done — Specflow tells me, with evidence, whether it is safe to merge."** The sharpest customer is the AI-enabled agency or consultancy, which gets client-ready evidence packets instead of assurances. Product teams get agent speed with concentrated, boundary-level human review instead of line-by-line reading. The metric that matters is cost per *accepted* change — and Specflow is how it comes down without trust going with it.
 
