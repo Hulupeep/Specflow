@@ -1,0 +1,76 @@
+feature: verifier-runtime-lifecycle
+requirements:
+  - id: REQ-VERIFIER-CONTRACT-01
+    statement: Feature-build persists a maker verification proposal and accepted verifier contract before implementation.
+  - id: REQ-VERIFIER-POLICY-01
+    statement: Verifier policy runs separately from maker policy and excludes maker reasoning trace by default.
+  - id: REQ-VERIFIER-RUNTIME-01
+    statement: UI/workflow slices collect executable runtime evidence and value-bearing rereads where applicable.
+  - id: REQ-VERIFIER-TRACE-01
+    statement: Ledger/status/trace records maker claim, verifier finding, mechanical gate result, and divergence.
+journeys:
+  - journey_meta:
+      id: J-VERIFIER-CONTRACT-LIFECYCLE
+      persona: feature_builder
+      owner_ticket: VERIFIER-CONTRACT-01
+      assertion_bar: accepted verification contract exists before maker implementation starts
+    scenario: negotiate and persist the slice-local verification contract
+    given:
+      - a feature-build run has an outer ticket contract and journey IDs
+      - maker and verifier policies are declared
+    when:
+      - the maker writes a verification proposal
+      - the verifier accepts or rejects it
+    then:
+      - accepted proposals write `.specflow/runs/<slug>/verification-contract.json`
+      - rejected proposals block maker implementation with a verifier finding
+      - the ledger records the proposal path, verifier decision, and accepted contract path
+
+  - journey_meta:
+      id: J-VERIFIER-POLICY-ISOLATION
+      persona: independent_verifier
+      owner_ticket: VERIFIER-POLICY-01
+      assertion_bar: verifier ledger entry has separate policy, transcript, and output references
+    scenario: run verifier from artifact/spec/rubric without maker trace contamination
+    given:
+      - a maker artifact exists under the run directory
+      - a verifier policy is configured
+    when:
+      - the verifier stage runs
+    then:
+      - verifier input includes artifact, spec, rubric, and accepted verification contract
+      - verifier input does not include maker reasoning transcript unless a human exception is recorded
+      - verifier output is stored separately from maker output
+
+  - journey_meta:
+      id: J-VERIFIER-RUNTIME-EVIDENCE
+      persona: runtime_adversary
+      owner_ticket: VERIFIER-RUNTIME-01
+      assertion_bar: runtime findings include executable evidence and value rereads where state matters
+    scenario: attack a built UI/workflow slice with runtime checks
+    given:
+      - a slice declares UI or workflow behavior
+      - an accepted verification contract names runtime checks
+    when:
+      - the verifier runs the runtime evidence commands
+    then:
+      - Playwright/browser evidence is persisted when configured
+      - console and network findings are captured when available
+      - value-bearing behavior is reread through API, DB, or custom script evidence
+      - missing executable surface creates a blocked verifier finding instead of invented evidence
+
+  - journey_meta:
+      id: J-VERIFIER-TRACE-DIVERGENCE
+      persona: loop_operator
+      owner_ticket: VERIFIER-TRACE-01
+      assertion_bar: status or trace output separates maker claim, verifier result, and gate result
+    scenario: inspect divergence after a long-running verifier disagreement
+    given:
+      - a run ledger contains maker, verifier, and gate entries
+    when:
+      - the operator runs status or trace review
+    then:
+      - maker claim is shown separately from verifier finding
+      - verifier finding is shown separately from mechanical gate result
+      - missing transcript or evidence refs are reported as missing
+      - no transcript content is sent to a provider by default

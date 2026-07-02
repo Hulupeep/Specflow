@@ -1,0 +1,27 @@
+run_contract:
+  loop: spec-build
+  goal: Create audited verifier lifecycle tickets from #100.
+  input_artifact: issue #100 plus #84/#92 and docs/specs/fable-loop-compounding
+  path: templates/QA/loops/spec-build.yaml
+  current_stage_or_rail: handoff
+  next_gate: feature-build local tickets in order; start with VERIFIER-CONTRACT-01 and VERIFIER-POLICY-01
+  durable_evidence:
+    - docs/specs/verifier-runtime-lifecycle/prd.md
+    - docs/specs/verifier-runtime-lifecycle/adversary-review.md
+    - docs/specs/verifier-runtime-lifecycle/falsification.md
+    - docs/specs/verifier-runtime-lifecycle/verdict.md
+    - docs/specs/verifier-runtime-lifecycle/hops.md
+    - docs/specs/verifier-runtime-lifecycle/contract.yml
+    - docs/specs/verifier-runtime-lifecycle/tickets.md
+    - docs/specs/verifier-runtime-lifecycle/tickets.json
+    - docs/specs/verifier-runtime-lifecycle/issues.json
+    - docs/specs/verifier-runtime-lifecycle/specflow-audit.md
+    - docs/specs/verifier-runtime-lifecycle/simulation.md
+  stop_condition: Stop at spec-build handoff; do not implement until feature-build consumes the local ticket packet.
+  never_without_human:
+    - git push
+    - open PR
+    - merge
+    - --no-verify
+    - override contract
+  terminal_status: handoff

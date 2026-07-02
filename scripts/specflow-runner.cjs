@@ -360,6 +360,354 @@ function defaultSpecDir(slug) {
   return join('docs', 'specs', slug);
 }
 
+// --- VERIFIER-CONTRACT-01 (epic #100): verification contract lifecycle -------
+// Maker proposes a slice-local verification contract; an independent verifier
+// accepts or rejects it BEFORE implementation. Acceptance is an explicit,
+// complete contract artifact — never a provider exit code or maker summary.
+
+const VERIFICATION_CONTRACT_FIELDS = [
+  'journey_id',
+  'maker_policy_id',
+  'verifier_policy_id',
+  'runtime_checks',
+  'forbidden_evidence',
+];
+
+function verificationPaths(options = {}) {
+  const base = options.runDir
+    || (options.contract ? dirname(options.contract) : dirname(defaultRunPaths(options.slug || 'run', options).contractPath));
+  return {
+    baseDir: base,
+    proposalPath: join(base, 'verification-proposal.md'),
+    contractPath: join(base, 'verification-contract.json'),
+    findingsPath: join(base, 'verifier-findings.jsonl'),
+    runtimeEvidenceDir: join(base, 'runtime-evidence'),
+    ledgerPath: options.ledger || join(base, 'ledger.jsonl'),
+  };
+}
+
+function writeVerificationProposal(options = {}) {
+  const paths = verificationPaths(options);
+  const journeyId = options.journeyId || options.journey_id;
+  if (!journeyId) throw new Error('writeVerificationProposal requires journeyId');
+  const runtimeChecks = options.runtimeChecks || options.runtime_checks || [];
+  const forbiddenEvidence = options.forbiddenEvidence || options.forbidden_evidence
+    || ['maker self-review', 'provider exit code as gate pass'];
+  const proposedAt = options.proposedAt || new Date().toISOString();
+  const content = [
+    `# Verification Proposal — ${journeyId}`,
+    '',
+    `- Proposed at: ${proposedAt}`,
+    `- Maker policy: ${options.makerPolicyId || options.maker_policy_id || UNKNOWN}`,
+    `- Verifier policy: ${options.verifierPolicyId || options.verifier_policy_id || UNKNOWN}`,
+    '',
+    '## Proposed runtime checks',
+    runtimeChecks.length
+      ? runtimeChecks.map((c) => `- [${c.type}] ${c.assertion || c.command || ''}${c.required ? ' (required)' : ''}`).join('\n')
+      : '- (none proposed — verifier must reject if this slice needs runtime/value/negative-path evidence)',
+    '',
+    '## Forbidden evidence',
+    forbiddenEvidence.map((f) => `- ${f}`).join('\n'),
+    '',
+    options.body ? `## Notes\n\n${options.body}\n` : '',
+  ].join('\n');
+  ensureDir(paths.proposalPath);
+  writeFileSync(paths.proposalPath, content, 'utf8');
+  appendLedger(paths.ledgerPath, {
+    stage: 'verification',
+    event: 'proposal_written',
+    journey_id: journeyId,
+    proposal_path: paths.proposalPath,
+    verification_contract_path: null,
+    verifier_decision: 'pending',
+    mechanical_gate_state: 'not_run',
+  });
+  return { proposalPath: paths.proposalPath, ledgerPath: paths.ledgerPath };
+}
+
+function decideVerification(options = {}) {
+  const paths = verificationPaths(options);
+  const decision = options.decision;
+  if (!['accept', 'reject'].includes(decision)) {
+    throw new Error("decideVerification requires decision 'accept' or 'reject'");
+  }
+  if (!existsSync(paths.proposalPath)) {
+    throw new Error('cannot decide verification before a proposal is written');
+  }
+
+  if (decision === 'reject') {
+    const missingCheck = options.missingCheck || options.missing_check;
+    if (!missingCheck) throw new Error('rejection must name the missing runtime/value/negative-path check');
+    appendLedger(paths.ledgerPath, {
+      stage: 'verification',
+      event: 'verifier_decision',
+      verifier_decision: 'rejected',
+      proposal_path: paths.proposalPath,
+      verification_contract_path: null,
+      missing_check: missingCheck,
+      blocks_implementation: true,
+      mechanical_gate_state: 'blocked',
+    });
+    return { ok: true, decision: 'rejected', blocksImplementation: true, contractPath: null };
+  }
+
+  const vc = options.verificationContract || options.verification_contract || {};
+  const missing = VERIFICATION_CONTRACT_FIELDS.filter((f) => {
+    const v = vc[f];
+    return v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
+  });
+  if (missing.length) {
+    throw new Error(`accepted verification contract missing field(s): ${missing.join(', ')}`);
+  }
+  const acceptedAt = options.acceptedAt || vc.accepted_at || new Date().toISOString();
+  const contract = { ...vc, accepted_at: acceptedAt };
+  ensureDir(paths.contractPath);
+  writeFileSync(paths.contractPath, `${JSON.stringify(contract, null, 2)}\n`, 'utf8');
+  appendLedger(paths.ledgerPath, {
+    stage: 'verification',
+    event: 'verifier_decision',
+    verifier_decision: 'accepted',
+    proposal_path: paths.proposalPath,
+    verification_contract_path: paths.contractPath,
+    journey_id: contract.journey_id,
+    mechanical_gate_state: 'pending',
+  });
+  return { ok: true, decision: 'accepted', contractPath: paths.contractPath, contract };
+}
+
+function requireAcceptedVerificationContract(options = {}) {
+  const paths = verificationPaths(options);
+  if (!existsSync(paths.contractPath)) {
+    return { accepted: false, contractPath: paths.contractPath, reason: 'no accepted verification contract; maker implementation is blocked' };
+  }
+  let data;
+  try {
+    data = JSON.parse(readFileSync(paths.contractPath, 'utf8'));
+  } catch {
+    return { accepted: false, contractPath: paths.contractPath, reason: 'verification contract is not valid JSON' };
+  }
+  if (!data.accepted_at) {
+    return { accepted: false, contractPath: paths.contractPath, reason: 'verification contract missing accepted_at' };
+  }
+  const missing = VERIFICATION_CONTRACT_FIELDS.filter((f) => data[f] === undefined || data[f] === null);
+  if (missing.length) {
+    return { accepted: false, contractPath: paths.contractPath, reason: `verification contract missing: ${missing.join(', ')}` };
+  }
+  return { accepted: true, contractPath: paths.contractPath, contract: data, reason: null };
+}
+
+// --- VERIFIER-POLICY-01 (epic #100): verifier policy isolation ---------------
+// The verifier policy is distinct from the maker policy (separate id and
+// output/transcript paths) and is fed artifact + spec + accepted verification
+// contract + rubric. The maker reasoning transcript is excluded by default;
+// including it requires a human-recorded ledger exception.
+
+function resolveVerifierPolicy(rawMaker, context = {}) {
+  const maker = normalizeAdapterPolicy(rawMaker, context);
+  if (!maker.verifier_policy) {
+    throw new Error('maker adapter_policy does not declare a verifier_policy');
+  }
+  const verifier = normalizeAdapterPolicy(maker.verifier_policy, context);
+  const errors = [];
+  if (verifier.id === maker.id) errors.push('verifier_policy.id must differ from maker policy id');
+  if (verifier.transcript_path === maker.transcript_path) errors.push('verifier transcript_path must differ from maker transcript_path');
+  if (verifier.output_path === maker.output_path) errors.push('verifier output_path must differ from maker output_path');
+  if (errors.length) throw new Error(`verifier policy not isolated: ${errors.join('; ')}`);
+  return { maker, verifier: { ...verifier, role: verifier.role || 'verifier' } };
+}
+
+function assembleVerifierInput(options = {}) {
+  const required = ['artifactPath', 'specPath', 'verificationContractPath', 'rubric'];
+  const missing = required.filter((k) => !options[k]);
+  if (missing.length) {
+    throw new Error(`verifier input missing required field(s): ${missing.join(', ')}`);
+  }
+  const input = {
+    artifact_path: options.artifactPath,
+    spec_path: options.specPath,
+    verification_contract_path: options.verificationContractPath,
+    rubric: options.rubric,
+    includes_maker_trace: false,
+    maker_transcript_path: null,
+  };
+  if (options.allowMakerTrace) {
+    const exception = options.humanException || options.human_exception || {};
+    const approvedBy = exception.approved_by || exception.approvedBy;
+    const reason = exception.reason;
+    if (!approvedBy || !reason) {
+      throw new Error('including the maker transcript requires a human exception with approved_by and reason');
+    }
+    input.includes_maker_trace = true;
+    input.maker_transcript_path = options.makerTranscriptPath || null;
+    input.maker_trace_exception = { approved_by: approvedBy, reason };
+    if (options.ledger) {
+      appendLedger(options.ledger, {
+        stage: 'verification',
+        event: 'verifier_maker_trace_exception',
+        approved_by: approvedBy,
+        reason,
+        maker_transcript_path: input.maker_transcript_path,
+      });
+    }
+  }
+  return input;
+}
+
+// --- VERIFIER-RUNTIME-01 (epic #100): adversarial runtime evidence -----------
+// Verification contracts declare runtime checks; the verifier executes them and
+// writes findings. Missing executable surface yields a BLOCKED finding, never
+// fabricated evidence. The verdict is evidence only — the gate still decides.
+
+const RUNTIME_CHECK_TYPES = ['playwright', 'api', 'db-reread', 'console', 'network', 'screenshot', 'custom-script'];
+const RUNTIME_REREAD_TYPES = ['api', 'db-reread', 'custom-script'];
+
+function validateRuntimeChecks(checks, options = {}) {
+  const list = Array.isArray(checks) ? checks : [];
+  const errors = [];
+  for (const c of list) {
+    if (!c || !RUNTIME_CHECK_TYPES.includes(c.type)) errors.push(`unsupported runtime check type: ${c && c.type}`);
+  }
+  if (options.uiOrWorkflow && !list.some((c) => c && c.required)) {
+    errors.push('UI/workflow slice requires at least one required runtime check');
+  }
+  if (options.valueBearing && !list.some((c) => c && RUNTIME_REREAD_TYPES.includes(c.type))) {
+    errors.push('value-bearing slice requires an api/db-reread/custom-script reread; screenshot-only evidence is insufficient');
+  }
+  return { ok: errors.length === 0, errors };
+}
+
+function defaultRuntimeRunner(check) {
+  if (!check.command) return { executable: false };
+  const res = runCommand(check.command, { timeoutSeconds: check.timeout_seconds });
+  return { executable: true, result: res.exit_code === 0 ? 'pass' : 'fail', exit_code: res.exit_code, stderr: res.stderr };
+}
+
+function runRuntimeChecks(options = {}) {
+  const paths = verificationPaths(options);
+  const checks = Array.isArray(options.checks) ? options.checks : [];
+  const makerClaim = options.makerClaim || UNKNOWN;
+  const runner = options.runner || defaultRuntimeRunner;
+  const findings = [];
+  for (const check of checks) {
+    const outcome = runner(check) || {};
+    let finding;
+    if (outcome.executable === false || outcome.result === 'blocked') {
+      finding = {
+        severity: 'blocked',
+        check_type: check.type,
+        assertion: check.assertion || null,
+        maker_claim: makerClaim,
+        verifier_result: 'blocked',
+        result: 'blocked',
+        gate_result: 'pending',
+        evidence_path: null,
+        reason: outcome.reason || `missing executable surface for ${check.type} check`,
+      };
+    } else {
+      const failed = outcome.result === 'fail';
+      finding = {
+        severity: failed ? (check.required ? 'critical' : 'warn') : 'info',
+        check_type: check.type,
+        assertion: check.assertion || null,
+        maker_claim: makerClaim,
+        verifier_result: outcome.result,
+        result: outcome.result,
+        gate_result: 'pending', // evidence only — the mechanical gate still decides
+        evidence_path: outcome.evidence_path || check.evidence_path || null,
+      };
+    }
+    findings.push(finding);
+    appendLedger(paths.findingsPath, finding);
+  }
+  return {
+    findings,
+    findingsPath: paths.findingsPath,
+    summary: {
+      total: findings.length,
+      pass: findings.filter((f) => f.verifier_result === 'pass').length,
+      fail: findings.filter((f) => f.verifier_result === 'fail').length,
+      blocked: findings.filter((f) => f.verifier_result === 'blocked').length,
+    },
+  };
+}
+
+// --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
+// A pure read over the run ledger (+ verifier-findings). Groups maker claim,
+// verifier finding, mechanical gate result, and disposition; flags divergence.
+// Never sends transcript content to a provider; missing fields stay "missing".
+
+function verifierTrace(options = {}) {
+  const paths = verificationPaths(options);
+  const entries = readLedger(paths.ledgerPath);
+  const findings = existsSync(paths.findingsPath) ? readLedger(paths.findingsPath) : [];
+  const last = (pred) => entries.filter(pred).slice(-1)[0] || null;
+
+  const makerEntry = last((e) => e.event === 'maker_claim') || last((e) => e.stop_reason === 'gate_rerun_required');
+  const maker = makerEntry
+    ? {
+      claim: makerEntry.claim || (makerEntry.stop_reason === 'gate_rerun_required' ? 'produced_output' : UNKNOWN),
+      claimed_done: Boolean(makerEntry.claim === 'done' || makerEntry.claimed_done),
+      output_path: makerEntry.output_path || UNKNOWN,
+      transcript_path: makerEntry.transcript_path || UNKNOWN,
+    }
+    : { claim: 'missing', claimed_done: false, output_path: UNKNOWN, transcript_path: UNKNOWN };
+
+  const decisionEntry = last((e) => e.event === 'verifier_decision');
+  const failingFinding = findings.find((f) => f.result === 'fail' || f.severity === 'critical');
+  const verifier = (decisionEntry || findings.length)
+    ? {
+      decision: decisionEntry ? decisionEntry.verifier_decision : (failingFinding ? 'fail' : 'reported'),
+      missing_check: decisionEntry ? (decisionEntry.missing_check || null) : null,
+      finding_paths: findings.map((f) => f.evidence_path).filter(Boolean),
+      findings_count: findings.length,
+      verification_contract_path: decisionEntry ? (decisionEntry.verification_contract_path || null) : null,
+    }
+    : { decision: 'missing', missing_check: null, finding_paths: [], findings_count: 0, verification_contract_path: null };
+
+  const gateEntry = last((e) => ['pass', 'fail'].includes(e.result));
+  const stateEntry = last((e) => e.mechanical_gate_state);
+  const mechanicalGate = {
+    result: gateEntry ? gateEntry.result : 'not_run',
+    state: stateEntry ? stateEntry.mechanical_gate_state : UNKNOWN,
+  };
+
+  const contractGate = requireAcceptedVerificationContract(options);
+  const verifierFailed = verifier.decision === 'rejected' || Boolean(failingFinding);
+
+  const divergence = [];
+  if (maker.claimed_done && verifierFailed) divergence.push('maker_claimed_done_but_verifier_failed');
+  if (verifier.decision === 'accepted' && mechanicalGate.result === 'fail') divergence.push('verifier_passed_but_gate_failed');
+  const referenced = [
+    ...entries.map((e) => e.proposal_path),
+    ...entries.map((e) => e.verification_contract_path),
+    ...verifier.finding_paths,
+  ].filter(Boolean);
+  const missingEvidence = [...new Set(referenced)].filter((p) => !existsSync(p));
+  if (missingEvidence.length) divergence.push('missing_evidence');
+  if (entries.some((e) => e.stop_reason === 'blocked_human_required' || e.forbidden_action_detected)) {
+    divergence.push('human_gated_action_attempted');
+  }
+
+  let disposition = 'pending';
+  if (verifier.decision === 'rejected' || mechanicalGate.state === 'blocked') disposition = 'blocked';
+  else if (mechanicalGate.result === 'fail') disposition = 'gate_failed';
+  else if (mechanicalGate.result === 'pass' && contractGate.accepted) disposition = 'passed';
+
+  return {
+    status: 'ok',
+    run_dir: paths.baseDir,
+    ledger_path: paths.ledgerPath,
+    maker,
+    verifier,
+    mechanical_gate: mechanicalGate,
+    verification_contract: { path: contractGate.contractPath, accepted: contractGate.accepted, reason: contractGate.reason },
+    disposition,
+    divergence,
+    missing_evidence: missingEvidence,
+    sends_transcript_to_provider: false,
+  };
+}
+
 function verifierCommandsForStage(contract, options = {}) {
   const slug = options.slug || options.specSlug || contract.slug || 'specflow-run';
   const specDir = options.specDir || defaultSpecDir(slug);
@@ -823,6 +1171,35 @@ function runLoop(options) {
 
   if (options.adapterPolicy) {
     const policy = normalizeAdapterPolicy(loadDataFile(options.adapterPolicy), { slug });
+
+    // VERIFIER-CONTRACT-01 enforcement (#100): a maker may not implement without
+    // an accepted verification contract. Enforced once the lifecycle has begun
+    // (a proposal exists) or when explicitly required; verifier runs are exempt.
+    if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '5_impl' && policy.role !== 'verifier') {
+      const vpaths = verificationPaths({ contract: contractPath });
+      const proposalExists = existsSync(vpaths.proposalPath);
+      const enforce = options.requireVerifierContract === true
+        || (options.requireVerifierContract !== false && proposalExists);
+      if (enforce) {
+        const gate = requireAcceptedVerificationContract({ contract: contractPath });
+        if (!gate.accepted) {
+          const entry = {
+            stage: '5_impl',
+            event: 'impl_blocked',
+            result: 'fail',
+            stop_reason: 'verification_contract_required',
+            reason: gate.reason,
+            verification_contract_path: gate.contractPath,
+            mechanical_gate_state: 'blocked',
+          };
+          appendLedger(ledgerPath, entry);
+          contract.terminal_status = 'blocked';
+          writeYaml(contractPath, { run_contract: contract });
+          return { status: 'blocked_verification_required', entry, contractPath, ledgerPath };
+        }
+      }
+    }
+
     const prompt = options.prompt ? { promptPath: options.prompt } : materializeStagePrompt(contract, { ...options, contractPath, slug });
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
@@ -942,6 +1319,7 @@ function runStatus(options = {}) {
     sequence: loopSequence(contract, options),
     ledger_summary: summarizeLedger(readLedger(ledgerPath)),
     ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
+    verifier_trace: verifierTrace({ contract: contractPath, ledger: ledgerPath }),
   };
 }
 
@@ -1005,13 +1383,18 @@ function cli(argv = process.argv.slice(2)) {
   const opts = parseKeyValueArgs(argv);
   const loop = opts._[0];
   if (!loop) {
-    console.error('Usage: specflow run <loop|status> --slug <slug> --goal <goal> --input <path> [--contract path] [--until-terminal] [--max-iterations n]');
+    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n]');
     return 2;
   }
   try {
-    const result = loop === 'status'
-      ? runStatus(opts)
-      : (opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop }));
+    let result;
+    if (loop === 'status') {
+      result = runStatus(opts);
+    } else if (loop === 'trace') {
+      result = verifierTrace({ runDir: opts.runDir, contract: opts.contract, ledger: opts.ledger });
+    } else {
+      result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
+    }
     if (result.status === 'invalid_contract') {
       console.error(`specflow run failed: ${result.errors.join('; ')}`);
       return 1;
@@ -1056,6 +1439,15 @@ module.exports = {
   executeVerifierRegistry,
   materializeStagePrompt,
   planAdapterSmoke,
+  verificationPaths,
+  writeVerificationProposal,
+  decideVerification,
+  requireAcceptedVerificationContract,
+  resolveVerifierPolicy,
+  assembleVerifierInput,
+  validateRuntimeChecks,
+  runRuntimeChecks,
+  verifierTrace,
   readLedger,
   readLedgerTail,
   summarizeLedger,

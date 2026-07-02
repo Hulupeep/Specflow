@@ -1,0 +1,7 @@
+[
+  {
+    "number": 100,
+    "title": "[SPECFLOW] VERIFIER-EPIC: runtime verifier contract lifecycle for frontier agents",
+    "body": "Journey IDs: J-VERIFIER-CONTRACT-LIFECYCLE, J-VERIFIER-POLICY-ISOLATION, J-VERIFIER-RUNTIME-EVIDENCE, J-VERIFIER-TRACE-DIVERGENCE\n\nLocal child tickets: VERIFIER-CONTRACT-01, VERIFIER-POLICY-01, VERIFIER-RUNTIME-01, VERIFIER-TRACE-01.\n\nSee docs/specs/verifier-runtime-lifecycle/tickets.md for the spec-built packet."
+  }
+]
