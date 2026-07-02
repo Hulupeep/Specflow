@@ -17,6 +17,12 @@ npm-debug.log*
 tmp/
 temp/
 
+# Agent/generated local state
+.claude-flow/
+.swarm/
+**/.claude-flow/
+**/.swarm/
+
 # Node modules
 node_modules/
 sample_spec/node_modules
