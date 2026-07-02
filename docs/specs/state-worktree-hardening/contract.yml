@@ -1,0 +1,44 @@
+feature: state-worktree-hardening
+requirements:
+  - id: REQ-STATE-REENTRY-01
+    statement: On resume the runner briefs from durable state and the durable position overrides caller-assumed position, recording conflicts.
+  - id: REQ-STATE-REENTRY-02
+    statement: Missing durable position is reported unsafe rather than proceeding on assumed memory.
+  - id: REQ-WORKTREE-ISO-01
+    statement: Delegated worktree preparation ledgers branch/base/path/cleanup and refuses the main working tree.
+  - id: REQ-WORKTREE-ISO-02
+    statement: Delegated worktrees never auto-merge or auto-push and track cleanup status on release.
+journeys:
+  - journey_meta:
+      id: J-STATE-SAFE-REENTRY
+      persona: resuming_agent
+      owner_ticket: STATE-REENTRY-01
+      assertion_bar: a resumed run proceeds from durable state, not caller-assumed memory
+    scenario: resume a long-running loop from durable state
+    given:
+      - a run contract and ledger exist with a durable current stage and next gate
+      - a state digest may exist under .specflow/STATE.md and lessons
+    when:
+      - the runner re-enters the loop
+      - a caller supplies an assumed stage that conflicts with the durable stage
+    then:
+      - the runner builds a re-entry briefing from durable state
+      - the durable stage overrides the assumed stage and the conflict is ledgered
+      - a missing durable position is reported unsafe instead of proceeding
+
+  - journey_meta:
+      id: J-WORKTREE-ISOLATION
+      persona: delegating_operator
+      owner_ticket: WORKTREE-ISOLATION-01
+      assertion_bar: delegated work is isolated, ledgered, and never collides with the main tree
+    scenario: prepare and release an isolated worktree for delegated work
+    given:
+      - a repository with a main working tree
+      - a delegated maker/verifier task
+    when:
+      - the runner prepares a worktree for the task
+      - the runner releases the worktree
+    then:
+      - branch, base ref, base commit, path, read-only and cleanup status are ledgered
+      - a path resolving to the main working tree is refused
+      - auto-merge and auto-push remain false and cleanup status is recorded

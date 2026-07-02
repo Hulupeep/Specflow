@@ -219,17 +219,74 @@ function recordRunState(contract, { contractPath, ledgerPath, status, stopReason
   });
 }
 
+// --- STATE-REENTRY-01 (#85): safe durable re-entry -----------------------------
+// On resume, the authoritative position is the durable run-contract — never the
+// agent's own (compacted, drifting) memory. A caller-assumed stage that conflicts
+// with the durable stage is overridden and the conflict is ledgered, not silent.
+
+function reentryBriefing(options = {}) {
+  const contractPath = options.contract || (options.runDir ? join(options.runDir, 'run-contract.yaml') : null);
+  const durable = contractPath && existsSync(contractPath) ? loadRunContract(contractPath) : null;
+  const ledgerPath = options.ledger
+    || (durable && durable.storage && durable.storage.ledger_path)
+    || (contractPath ? join(dirname(contractPath), 'ledger.jsonl') : null);
+  const statePaths = defaultStatePaths(contractPath || '.specflow/runs/run/run-contract.yaml', options);
+  const present = Boolean(durable && durable.current_stage_or_rail && durable.next_gate);
+  return {
+    durable_position_present: present,
+    source: 'durable_state', // authoritative — not model memory
+    loop: durable ? durable.loop : UNKNOWN,
+    current_stage_or_rail: present ? durable.current_stage_or_rail : 'missing',
+    next_gate: present ? durable.next_gate : 'missing',
+    terminal_status: durable ? (durable.terminal_status || UNKNOWN) : 'missing',
+    state_digest: readStateDigest(statePaths.statePath, statePaths.lessonDir),
+    recent_ledger: ledgerPath ? readLedgerTail(ledgerPath, Number(options.limit || 5)) : [],
+  };
+}
+
+function assertSafeReentry(options = {}) {
+  const briefing = reentryBriefing(options);
+  if (!briefing.durable_position_present) {
+    return { safe: false, reason: 'no durable run position; cannot safely re-enter from memory', briefing };
+  }
+  return { safe: true, reason: null, briefing };
+}
+
+function reconcileAssumedStage(options = {}) {
+  const briefing = reentryBriefing(options);
+  const assumed = options.assumeStage || options.assumed_stage || null;
+  const durableStage = briefing.durable_position_present ? briefing.current_stage_or_rail : null;
+  const conflict = Boolean(assumed && durableStage && assumed !== durableStage);
+  return {
+    stage: durableStage || assumed,
+    assumed_stage: assumed,
+    durable_stage: durableStage,
+    conflict,
+    durable_wins: conflict,
+  };
+}
+
 function gitOutput(args, cwd = '.') {
   const result = spawnSync('git', args, { cwd, encoding: 'utf8' });
   if (result.status !== 0) throw new Error(result.stderr || `git ${args.join(' ')} failed`);
   return (result.stdout || '').trim();
 }
 
+// --- WORKTREE-ISOLATION-01 (#86): isolated, ledgered delegated execution -------
+// Delegated maker/verifier work runs in an isolated worktree with branch/base/
+// path/cleanup recorded in the ledger. A path resolving to the main working tree
+// is refused (no silent collision); auto-merge/auto-push stay false.
+
 function prepareWorktree(options = {}) {
   const repoRoot = options.repoRoot || process.cwd();
   const baseRef = options.baseRef || 'HEAD';
   const branch = options.branch || `specflow/${options.slug || 'delegate'}`;
   const worktreePath = options.worktreePath || join(repoRoot, '.specflow', 'worktrees', slugify(branch));
+
+  if (resolve(worktreePath) === resolve(repoRoot)) {
+    throw new Error('worktree path collides with the main working tree; delegated work must be isolated');
+  }
+
   const create = options.create === true;
   let action = 'referenced';
   if (create && !existsSync(worktreePath)) {
@@ -238,7 +295,7 @@ function prepareWorktree(options = {}) {
     action = 'created';
   }
   const baseCommit = gitOutput(['rev-parse', baseRef], repoRoot);
-  return {
+  const record = {
     action,
     worktree_path: worktreePath,
     branch,
@@ -246,9 +303,34 @@ function prepareWorktree(options = {}) {
     base_commit: baseCommit,
     read_only: options.readOnly === true,
     cleanup_required: create,
+    cleanup_status: 'pending',
     auto_merge: false,
     auto_push: false,
   };
+  if (options.ledger) appendLedger(options.ledger, { stage: 'delegation', event: 'worktree_prepared', ...record });
+  return record;
+}
+
+function releaseWorktree(options = {}) {
+  const repoRoot = options.repoRoot || process.cwd();
+  const worktreePath = options.worktreePath;
+  if (!worktreePath) throw new Error('releaseWorktree requires worktreePath');
+  let cleanupStatus = 'kept';
+  if (options.remove === true && existsSync(worktreePath)) {
+    gitOutput(['worktree', 'remove', '--force', worktreePath], repoRoot);
+    cleanupStatus = 'removed';
+  }
+  const record = {
+    stage: 'delegation',
+    event: 'worktree_released',
+    worktree_path: worktreePath,
+    branch: options.branch || null,
+    cleanup_status: cleanupStatus,
+    auto_merge: false,
+    auto_push: false,
+  };
+  if (options.ledger) appendLedger(options.ledger, record);
+  return record;
 }
 
 function scaffoldRoutineManifest(options = {}) {
@@ -1229,8 +1311,9 @@ function runLoop(options) {
   const slug = options.slug || 'specflow-run';
   const { contractPath, ledgerPath } = defaultRunPaths(slug, options);
   let wrapper;
+  const resuming = existsSync(contractPath);
 
-  if (existsSync(contractPath)) {
+  if (resuming) {
     wrapper = { run_contract: loadRunContract(contractPath) };
   } else {
     wrapper = createRunContract({
@@ -1245,6 +1328,25 @@ function runLoop(options) {
   }
 
   const contract = wrapper.run_contract;
+
+  // STATE-REENTRY-01 (#85): on resume the durable position is authoritative; a
+  // caller-assumed stage that conflicts is overridden and ledgered, not silent.
+  if (resuming && options.assumeStage) {
+    const rec = reconcileAssumedStage({ contract: contractPath, ledger: ledgerPath, assumeStage: options.assumeStage });
+    appendLedger(ledgerPath, {
+      stage: contract.current_stage_or_rail, event: 'reentry', source: 'durable_state',
+      assumed_stage: rec.assumed_stage, durable_stage: rec.durable_stage, conflict: rec.conflict,
+    });
+    if (rec.conflict) {
+      appendLedger(ledgerPath, {
+        stage: contract.current_stage_or_rail, event: 'reentry_conflict',
+        assumed_stage: rec.assumed_stage, durable_stage: rec.durable_stage, durable_wins: true,
+        note: 'durable state overrides caller-assumed stage',
+      });
+      // durable wins — contract.current_stage_or_rail is left unchanged
+    }
+  }
+
   const validation = validateRunContract(contract);
   if (!validation.ok) {
     appendLedger(ledgerPath, { stage: contract.current_stage_or_rail || null, result: 'fail', stop_reason: 'invalid_contract', errors: validation.errors });
@@ -1425,6 +1527,7 @@ function runStatus(options = {}) {
     ledger_summary: summarizeLedger(readLedger(ledgerPath)),
     ledger_tail: readLedgerTail(ledgerPath, Number(options.limit || 10)),
     verifier_trace: verifierTrace({ contract: contractPath, ledger: ledgerPath }),
+    reentry: reentryBriefing({ contract: contractPath, ledger: ledgerPath }),
   };
 }
 
@@ -1529,7 +1632,11 @@ module.exports = {
   appendStateMemory,
   readStateDigest,
   recordRunState,
+  reentryBriefing,
+  assertSafeReentry,
+  reconcileAssumedStage,
   prepareWorktree,
+  releaseWorktree,
   scaffoldRoutineManifest,
   normalizeAdapterPolicy,
   buildAdapterCommand,

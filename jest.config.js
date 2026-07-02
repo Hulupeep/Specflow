@@ -1,5 +1,5 @@
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.js'],
-  testPathIgnorePatterns: ['/node_modules/', '/demo/'],
+  testPathIgnorePatterns: ['/node_modules/', '/demo/', '/.claude/', '/.specflow/worktrees/'],
 };
