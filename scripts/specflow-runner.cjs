@@ -43,6 +43,11 @@ const REQUIRED_POLICY_FIELDS = [
 ];
 
 const UNKNOWN = 'unknown';
+const DEFAULT_ROUTING_PATHS = [
+  '.specflow/adapter-routing.yml',
+  '.specflow/adapter-routing.yaml',
+  '.specflow/adapter-routing.json',
+];
 
 function ensureDir(path) {
   mkdirSync(dirname(path), { recursive: true });
@@ -116,6 +121,15 @@ function loadDataFile(path) {
   const text = readFileSync(path, 'utf8');
   if (/\.json$/i.test(path)) return JSON.parse(text);
   return yaml.load(text);
+}
+
+function findDefaultAdapterRoutingPath(options = {}) {
+  if (options.adapterRouting) return options.adapterRouting;
+  if (options.noAdapterRouting) return null;
+  for (const candidate of DEFAULT_ROUTING_PATHS) {
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
 }
 
 function writeYaml(path, value) {
@@ -1137,6 +1151,153 @@ function normalizeAdapterPolicy(raw, context = {}) {
   };
 }
 
+function normalizeRouteKey(loop, stage) {
+  return `${loop}.${stage}`;
+}
+
+function routeValueForStage(routing, contract) {
+  const routes = routing.routes || {};
+  const stage = contract.current_stage_or_rail;
+  const dotted = normalizeRouteKey(contract.loop, stage);
+  if (Object.prototype.hasOwnProperty.call(routes, dotted)) return routes[dotted];
+  if (routes[contract.loop] && Object.prototype.hasOwnProperty.call(routes[contract.loop], stage)) {
+    return routes[contract.loop][stage];
+  }
+  return null;
+}
+
+function loadPolicyRef(ref, routingPath, context = {}) {
+  if (!ref) return null;
+  if (ref.adapter_policy || ref.provider) return normalizeAdapterPolicy(ref, context);
+  if (ref.path) return normalizeAdapterPolicy(loadDataFile(resolve(dirname(routingPath), ref.path)), context);
+  throw new Error('adapter routing policy reference must be an adapter_policy object or path');
+}
+
+function resolvePolicyFromRouting(routing, route, routingPath, context = {}) {
+  const routeObj = typeof route === 'string' ? { policy: route } : route;
+  if (!routeObj || routeObj.policy === false || routeObj.policy === 'none') {
+    return { route: routeObj, policy: null, policyId: null };
+  }
+  const policyRef = routeObj.policy || routeObj.adapter_policy || routeObj;
+  if (typeof policyRef === 'string') {
+    const policies = routing.policies || {};
+    const named = policies[policyRef];
+    if (!named) throw new Error(`adapter routing references unknown policy: ${policyRef}`);
+    return {
+      route: routeObj,
+      policy: loadPolicyRef(named, routingPath, context),
+      policyId: policyRef,
+    };
+  }
+  return {
+    route: routeObj,
+    policy: loadPolicyRef(policyRef, routingPath, context),
+    policyId: routeObj.id || routeObj.policy_id || null,
+  };
+}
+
+function resolveAdapterRouting(options = {}, contract = null) {
+  const routingPath = findDefaultAdapterRoutingPath(options);
+  if (!routingPath || !contract) return { status: 'not_configured', routingPath: null };
+  const routing = loadDataFile(routingPath);
+  if (!routing || typeof routing !== 'object') throw new Error('adapter routing file must be an object');
+  const route = routeValueForStage(routing, contract);
+  if (!route) {
+    return {
+      status: 'no_route',
+      routingPath,
+      loop: contract.loop,
+      stage: contract.current_stage_or_rail,
+    };
+  }
+  const { policy, policyId, route: routeObj } = resolvePolicyFromRouting(routing, route, routingPath, {
+    slug: options.slug || 'run',
+  });
+  const defaults = routing.defaults || {};
+  const confirmationRequired = routeObj?.confirm_models !== undefined
+    ? Boolean(routeObj.confirm_models)
+    : (policy?.confirm_models !== undefined
+      ? Boolean(policy.confirm_models)
+      : defaults.confirm_models !== false);
+  return {
+    status: policy ? 'resolved' : 'none',
+    routingPath,
+    loop: contract.loop,
+    stage: contract.current_stage_or_rail,
+    policyId: policyId || policy?.id || null,
+    policy,
+    route: routeObj,
+    confirmationRequired,
+    reason: routeObj?.reason || policy?.reason || defaults.reason || null,
+  };
+}
+
+function modelConfirmationPlan(resolved, options = {}) {
+  const policy = resolved.policy || {};
+  return {
+    status: 'model_confirmation_required',
+    routing_path: resolved.routingPath,
+    loop: resolved.loop,
+    stage: resolved.stage,
+    policy_id: resolved.policyId || policy.id,
+    provider: policy.provider,
+    role: policy.role || null,
+    effort: policy.effort || null,
+    requested_model: policy.requested_model || policy.model || null,
+    fallback_model: policy.fallback_model || null,
+    max_budget_usd: policy.max_budget_usd ?? null,
+    reason: resolved.reason,
+    transcript_path: policy.transcript_path,
+    output_path: policy.output_path,
+    confirm_with: `specflow run ${resolved.loop} --slug ${options.slug || '<slug>'} --adapter-routing ${resolved.routingPath} --confirm-models`,
+  };
+}
+
+function modelRoutingBriefing(options = {}, contract = null) {
+  const resolved = resolveAdapterRouting(options, contract);
+  if (resolved.status === 'resolved') {
+    const policy = resolved.policy || {};
+    return {
+      active: true,
+      status: 'active',
+      routing_path: resolved.routingPath,
+      loop: resolved.loop,
+      stage: resolved.stage,
+      policy_id: resolved.policyId || policy.id,
+      provider: policy.provider,
+      role: policy.role || null,
+      effort: policy.effort || null,
+      requested_model: policy.requested_model || policy.model || null,
+      fallback_model: policy.fallback_model || null,
+      max_budget_usd: policy.max_budget_usd ?? null,
+      confirmation_required: resolved.confirmationRequired,
+      message: `Model routing active: ${policy.requested_model || policy.model || UNKNOWN} for ${resolved.loop}.${resolved.stage} (${policy.role || 'worker'}).`,
+    };
+  }
+  if (resolved.status === 'no_route' || resolved.status === 'none') {
+    return {
+      active: true,
+      status: resolved.status,
+      routing_path: resolved.routingPath,
+      loop: resolved.loop,
+      stage: resolved.stage,
+      message: `Model routing file found, but no executable model route is configured for ${resolved.loop}.${resolved.stage}.`,
+      next_step: `Add a route for ${resolved.loop}.${resolved.stage} or run with --adapter-policy <path>.`,
+    };
+  }
+  return {
+    active: false,
+    status: 'not_configured',
+    routing_path: null,
+    message: 'Model routing inactive: no .specflow/adapter-routing.yml was found.',
+    setup: [
+      'cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml',
+      'specflow run <loop> --slug <slug> --goal "<goal>" --input <path>',
+      'specflow run <loop> --slug <slug> --confirm-models',
+    ],
+  };
+}
+
 function buildAdapterCommand(policy, promptPath) {
   const allowedTools = policy.allowed_tools || [];
   const deniedTools = policy.denied_tools || [];
@@ -1456,8 +1617,38 @@ function runLoop(options) {
     return { status: 'invalid_contract', errors: validation.errors, contractPath, ledgerPath };
   }
 
-  if (options.adapterPolicy) {
-    const policy = normalizeAdapterPolicy(loadDataFile(options.adapterPolicy), { slug });
+  const routed = !options.adapterPolicy ? resolveAdapterRouting({ ...options, slug }, contract) : null;
+  if (routed && routed.status === 'resolved' && routed.confirmationRequired && !options.confirmModels) {
+    const plan = modelConfirmationPlan(routed, { slug });
+    appendLedger(ledgerPath, {
+      stage: contract.current_stage_or_rail,
+      event: 'model_confirmation',
+      result: 'blocked',
+      stop_reason: 'model_confirmation_required',
+      provider: plan.provider,
+      role: plan.role,
+      effort: plan.effort,
+      requested_model: plan.requested_model,
+      fallback_model: plan.fallback_model,
+      max_budget_usd: plan.max_budget_usd,
+      routing_path: plan.routing_path,
+      policy_id: plan.policy_id,
+    });
+    contract.terminal_status = 'blocked';
+    recordRunState(contract, {
+      contractPath,
+      ledgerPath,
+      status: 'model_confirmation_required',
+      stopReason: 'model_confirmation_required',
+    });
+    writeYaml(contractPath, { run_contract: contract });
+    return { ...plan, contractPath, ledgerPath };
+  }
+
+  if (options.adapterPolicy || (routed && routed.status === 'resolved')) {
+    const policy = options.adapterPolicy
+      ? normalizeAdapterPolicy(loadDataFile(options.adapterPolicy), { slug })
+      : routed.policy;
 
     // VERIFIER-CONTRACT-01 enforcement (#100): a maker may not implement without
     // an accepted verification contract. Enforced once the lifecycle has begun
@@ -1494,7 +1685,13 @@ function runLoop(options) {
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
     });
-    appendLedger(ledgerPath, { ...adapterResult.entry, prompt_path: prompt.promptPath });
+    appendLedger(ledgerPath, {
+      ...adapterResult.entry,
+      prompt_path: prompt.promptPath,
+      routing_path: routed?.routingPath || null,
+      policy_id: routed?.policyId || policy.id,
+      model_confirmation: routed ? 'confirmed' : null,
+    });
     contract.terminal_status = adapterResult.status === 'gate_rerun_required' ? 'in_progress' : 'blocked';
     contract.current_stage_or_rail = adapterResult.status === 'gate_rerun_required' ? contract.current_stage_or_rail : contract.current_stage_or_rail;
     if (adapterResult.entry && adapterResult.entry.session_id) contract.provider_session_id = adapterResult.entry.session_id;
@@ -1553,7 +1750,12 @@ function runLoop(options) {
     });
   }
   writeYaml(contractPath, { run_contract: contract });
-  return { status: registryResult.status, contractPath, ledgerPath };
+  return {
+    status: registryResult.status,
+    contractPath,
+    ledgerPath,
+    model_routing: modelRoutingBriefing({ ...options, slug }, contract),
+  };
 }
 
 function readLedgerTail(ledgerPath, limit = 10) {
@@ -1632,6 +1834,7 @@ function runStatus(options = {}) {
     verifier_trace: verifierTrace({ contract: contractPath, ledger: ledgerPath }),
     reentry: reentryBriefing({ contract: contractPath, ledger: ledgerPath }),
     cost: costAccounting(readLedger(ledgerPath)),
+    model_routing: modelRoutingBriefing(options, contract),
   };
 }
 
@@ -1643,6 +1846,7 @@ function isTerminalStatus(status) {
     'adapter_unavailable',
     'adapter_failed',
     'blocked_human_required',
+    'model_confirmation_required',
     'blocked_verification_required',
     'blocked_verifier_stage',
     'dry_run',
@@ -1743,6 +1947,9 @@ module.exports = {
   releaseWorktree,
   scaffoldRoutineManifest,
   normalizeAdapterPolicy,
+  resolveAdapterRouting,
+  modelConfirmationPlan,
+  modelRoutingBriefing,
   buildAdapterCommand,
   commandExists,
   containsForbiddenAction,

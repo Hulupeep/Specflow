@@ -13,6 +13,9 @@ const {
   loopSequence,
   materializeStagePrompt,
   normalizeAdapterPolicy,
+  resolveAdapterRouting,
+  modelConfirmationPlan,
+  modelRoutingBriefing,
   parseProviderEvents,
   planAdapterSmoke,
   appendStateMemory,
@@ -254,6 +257,8 @@ describe('local contracted loop runner', () => {
     expect(status.current_stage_or_rail).toBe('6_provenance');
     expect(status.ledger_tail).toHaveLength(1);
     expect(status.ledger_summary.gate_passes).toBe(1);
+    expect(status.model_routing.status).toBe('not_configured');
+    expect(status.model_routing.setup[0]).toContain('claude-code-large-routing.yml');
   });
 
   test('prepares isolated delegated worktree metadata without auto merge or push', () => {
@@ -412,6 +417,111 @@ describe('generative adapter policy and command builders', () => {
     const smoke = planAdapterSmoke('claude-print', { live: false });
     expect(smoke.policy.prompt).toContain('SPECFLOW_ADAPTER_SMOKE_OK');
     expect(smoke.planned.args.join(' ')).toContain('SPECFLOW_ADAPTER_SMOKE_OK');
+  });
+
+  test('resolves default adapter routing for the current loop stage', () => {
+    const dir = tempDir();
+    const routing = path.join(dir, 'adapter-routing.yml');
+    fs.writeFileSync(routing, yaml.dump({
+      defaults: { confirm_models: true },
+      policies: {
+        planner: {
+          adapter_policy: {
+            id: 'planner',
+            provider: 'claude-print',
+            command: 'claude',
+            role: 'planner',
+            effort: 'xhigh',
+            requested_model: 'fable-5',
+            fallback_model: 'opus-4.8',
+            timeout_seconds: 30,
+            max_iterations: 1,
+            transcript_path: path.join(dir, '<slug>-planner.jsonl'),
+            output_path: path.join(dir, '<slug>-planner.md'),
+            never_without_human: ['git push'],
+          },
+        },
+      },
+      routes: {
+        'spec-build.discover': { policy: 'planner', reason: 'requirements thinking' },
+      },
+    }));
+
+    const resolved = resolveAdapterRouting({ adapterRouting: routing, slug: 'auth' }, {
+      loop: 'spec-build',
+      current_stage_or_rail: 'discover',
+    });
+
+    expect(resolved.status).toBe('resolved');
+    expect(resolved.policyId).toBe('planner');
+    expect(resolved.policy.requested_model).toBe('fable-5');
+    expect(resolved.policy.transcript_path).toContain('auth-planner.jsonl');
+    expect(resolved.confirmationRequired).toBe(true);
+
+    const plan = modelConfirmationPlan(resolved, { slug: 'auth' });
+    expect(plan.status).toBe('model_confirmation_required');
+    expect(plan.confirm_with).toContain('--confirm-models');
+
+    const briefing = modelRoutingBriefing({ adapterRouting: routing, slug: 'auth' }, {
+      loop: 'spec-build',
+      current_stage_or_rail: 'discover',
+    });
+    expect(briefing.message).toContain('Model routing active');
+    expect(briefing.requested_model).toBe('fable-5');
+  });
+
+  test('runLoop blocks routed adapter execution until model choices are confirmed', () => {
+    const dir = tempDir();
+    const contract = path.join(dir, 'run-contract.yaml');
+    const ledger = path.join(dir, 'ledger.jsonl');
+    const routing = path.join(dir, 'adapter-routing.yml');
+    fs.writeFileSync(routing, yaml.dump({
+      defaults: { confirm_models: true },
+      policies: {
+        coder: {
+          adapter_policy: {
+            id: 'coder',
+            provider: 'fake',
+            command: 'fake-provider',
+            role: 'implementer',
+            effort: 'medium',
+            requested_model: 'gpt-5.5',
+            timeout_seconds: 30,
+            max_iterations: 1,
+            transcript_path: path.join(dir, '<slug>-transcript.jsonl'),
+            output_path: path.join(dir, '<slug>-final.md'),
+            never_without_human: ['git push'],
+            fake_stdout: JSON.stringify({ type: 'message', text: 'done', model: 'gpt-5.5' }),
+          },
+        },
+      },
+      routes: { 'feature-build.2_contract': { policy: 'coder' } },
+    }));
+    fs.writeFileSync(contract, yaml.dump({
+      run_contract: {
+        loop: 'feature-build',
+        goal: 'auth',
+        input_artifact: 'issue 1',
+        path: 'templates/QA/loops/feature-build.yaml',
+        current_stage_or_rail: '2_contract',
+        next_gate: 'contract',
+        durable_evidence: [contract, ledger],
+        stop_condition: 'handoff',
+        never_without_human: ['git push'],
+        storage: { contract_path: contract, ledger_path: ledger },
+      },
+    }));
+
+    const result = runLoop({ loop: 'feature-build', slug: 'auth', contract, ledger, adapterRouting: routing });
+    expect(result.status).toBe('model_confirmation_required');
+    expect(result.requested_model).toBe('gpt-5.5');
+    expect(fs.existsSync(path.join(dir, 'auth-final.md'))).toBe(false);
+    expect(readJsonl(ledger)[0].stop_reason).toBe('model_confirmation_required');
+
+    const confirmed = runLoop({ loop: 'feature-build', slug: 'auth', contract, ledger, adapterRouting: routing, confirmModels: true });
+    expect(confirmed.status).toBe('gate_rerun_required');
+    expect(fs.readFileSync(path.join(dir, 'auth-final.md'), 'utf8')).toBe('done');
+    expect(readJsonl(ledger).some((entry) => entry.model_confirmation === 'confirmed')).toBe(true);
   });
 
   test('detects forbidden human-gate actions in provider output', () => {

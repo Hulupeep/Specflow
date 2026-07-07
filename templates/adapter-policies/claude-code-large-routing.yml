@@ -1,0 +1,146 @@
+defaults:
+  confirm_models: true
+  reason: Confirm model choices before spending expensive planner/reviewer budget.
+
+policies:
+  fable-planner:
+    adapter_policy:
+      id: fable-planner
+      provider: claude-print
+      command: claude
+      role: planner
+      effort: xhigh
+      args:
+        - -p
+        - --output-format
+        - stream-json
+        - --permission-mode
+        - default
+      model: fable-5
+      requested_model: fable-5
+      fallback_model: opus-4.8
+      max_budget_usd: 20
+      timeout_seconds: 1800
+      max_iterations: 1
+      allowed_tools:
+        - Read
+        - Grep
+        - Glob
+      denied_tools:
+        - Bash(git push *)
+        - Bash(gh pr create *)
+        - Bash(gh pr merge *)
+        - Bash(* deploy *)
+        - Bash(* --no-verify *)
+      transcript_path: .specflow/runs/<slug>/adapter/fable-planner.jsonl
+      output_path: .specflow/runs/<slug>/adapter/fable-planner.md
+      never_without_human:
+        - git push
+        - open PR
+        - merge
+        - production deploy
+        - --no-verify
+        - override contract
+
+  fable-reviewer:
+    adapter_policy:
+      id: fable-reviewer
+      provider: claude-print
+      command: claude
+      role: verifier
+      effort: xhigh
+      args:
+        - -p
+        - --output-format
+        - stream-json
+        - --permission-mode
+        - default
+      model: fable-5
+      requested_model: fable-5
+      fallback_model: opus-4.8
+      max_budget_usd: 12
+      timeout_seconds: 1800
+      max_iterations: 1
+      allowed_tools:
+        - Read
+        - Grep
+        - Glob
+      denied_tools:
+        - Bash(git push *)
+        - Bash(gh pr create *)
+        - Bash(gh pr merge *)
+        - Bash(* deploy *)
+        - Bash(* --no-verify *)
+      transcript_path: .specflow/runs/<slug>/adapter/fable-reviewer.jsonl
+      output_path: .specflow/runs/<slug>/adapter/fable-reviewer.md
+      never_without_human:
+        - git push
+        - open PR
+        - merge
+        - production deploy
+        - --no-verify
+        - override contract
+
+  gpt55-coder:
+    adapter_policy:
+      id: gpt55-coder
+      provider: codex-exec
+      command: codex
+      role: implementer
+      effort: medium
+      args:
+        - --sandbox
+        - workspace-write
+        - --ask-for-approval
+        - never
+      model: gpt-5.5
+      requested_model: gpt-5.5
+      max_budget_usd: 8
+      timeout_seconds: 1800
+      max_iterations: 1
+      allowed_tools: []
+      denied_tools:
+        - git push
+        - gh pr merge
+        - --no-verify
+      transcript_path: .specflow/runs/<slug>/adapter/gpt55-coder.jsonl
+      output_path: .specflow/runs/<slug>/adapter/gpt55-coder.md
+      never_without_human:
+        - git push
+        - open PR
+        - merge
+        - production deploy
+        - --no-verify
+        - override contract
+
+routes:
+  spec-build:
+    discover:
+      policy: fable-planner
+      reason: expensive product/requirements thinking
+    draft:
+      policy: fable-planner
+      reason: expensive PRD shaping
+    adversary:
+      policy: fable-reviewer
+      reason: expensive adversarial review and falsification
+    tickets:
+      policy: gpt55-coder
+      reason: ticket writing is bounded implementation prep
+
+  feature-build:
+    2_contract:
+      policy: gpt55-coder
+      reason: contract expansion from accepted ticket
+    3_e2e:
+      policy: gpt55-coder
+      reason: test authoring
+    4_oracle:
+      policy: gpt55-coder
+      reason: oracle/provenance wiring
+    5_impl:
+      policy: gpt55-coder
+      reason: implementation and local verification
+    review:
+      policy: fable-reviewer
+      reason: independent expensive PR review
