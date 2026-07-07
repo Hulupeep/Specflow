@@ -24,6 +24,7 @@
     "CLAUDE-MD-TEMPLATE.md",
     "CONTRACT-SCHEMA.md",
     "CONTRACT-SCHEMA-EXTENSIONS.md",
+    "MODEL_ROUTING.md",
     "CHANGELOG.md",
     "SKILL.md",
     "LLM-MASTER-PROMPT.md"

@@ -140,6 +140,22 @@ Those CLIs keep their own authentication and subscriptions; Specflow stores no
 Claude/Codex subscription secrets. Provider output is never itself a gate result:
 the owning Specflow verifier must rerun before the run contract advances.
 
+For larger initiatives, use `.specflow/adapter-routing.yml` to declare the
+default split: expensive requirements/planning/review stages can route to a
+frontier Claude/Fable policy, while bounded coding/test/release-prep stages can
+route to Codex CLI with GPT-5.5. Each policy also declares a thinking level
+(`effort`) such as `medium`, `high`, or `xhigh`. The shipped
+`.specflow/adapter-policies/claude-code-large-routing.yml` template requires
+`--confirm-models` before invoking a routed provider, so expensive model choices
+are shown to the operator before spend.
+
+Before any build loop starts, the agent should say either `Model routing active:`
+with the current stage's provider/model choices, or explain how to install the
+routing file. No routed model spend should happen before that confirmation.
+
+See [Specflow Model Routing](MODEL_ROUTING.md) for the operator workflow, the
+technical routing format, and how to change the defaults.
+
 ### The three loops (`QA/loops/`)
 
 | Loop | For | In one line |

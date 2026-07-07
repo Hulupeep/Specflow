@@ -109,6 +109,34 @@ budget where supported, transcript path, output path, allowed/denied tools, and
 actions outside the provider prompt, and requires the owning Specflow gate to
 rerun before state advances.
 
+### Default model routing for larger initiatives
+
+For larger initiatives, install a project routing default:
+
+```bash
+mkdir -p .specflow
+cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml
+```
+
+That default routes expensive requirements/planning/review work to the configured
+Claude/Fable policy and bounded coding/test work to Codex CLI with GPT-5.5. It
+requires confirmation before invoking a routed model:
+
+```bash
+specflow run spec-build --slug auth-system --goal "build auth" --input docs/auth-idea.md --adapter-routing .specflow/adapter-routing.yml
+```
+
+The first run prints the selected provider, role, model, fallback, and budget.
+If the choice is right, rerun with:
+
+```bash
+specflow run spec-build --slug auth-system --adapter-routing .specflow/adapter-routing.yml --confirm-models
+```
+
+The confirmation is intentional: Fable/frontier routes are expensive and should
+not be spent just because an automation resumed. Models do work; Specflow gates,
+CI, and humans still approve.
+
 ## Which repo do I run in?
 
 - **spec-build** produces documents → run where PRDs/journeys live (gmh-docs, or the product repo that owns the spec).
