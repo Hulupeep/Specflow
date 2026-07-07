@@ -135,7 +135,7 @@ const COMMANDS = {
     },
   },
   run: {
-    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--adapter-routing <path>]',
+    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--adapter-routing <path>] | specflow run --setup-routing',
     desc: 'Run or resume a local contracted Specflow loop',
     run: (args) => {
       const code = runSpecflowLoop(args);
@@ -268,6 +268,7 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
+  console.log('  npx @colmbyrne/specflow run --setup-routing');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --adapter-routing .specflow/adapter-routing.yml --confirm-models');
   console.log('  npx @colmbyrne/specflow provenance evidence/provenance-77-78-80.json --git-diff');
   console.log('  npx @colmbyrne/specflow adapter-smoke claude-print --dry-run');

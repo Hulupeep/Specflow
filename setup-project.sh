@@ -50,6 +50,48 @@ echo -e "${GREEN}Source:${NC} $SCRIPT_DIR"
 echo -e "${GREEN}Target:${NC} $TARGET_DIR"
 echo ""
 
+prompt_model_routing() {
+  local template="$TARGET_DIR/.specflow/adapter-policies/claude-code-large-routing.yml"
+  local destination="$TARGET_DIR/.specflow/adapter-routing.yml"
+
+  if [ -f "$destination" ]; then
+    echo -e "${GREEN}✓${NC} Model routing already active → .specflow/adapter-routing.yml"
+    return 0
+  fi
+  if [ ! -f "$template" ]; then
+    echo -e "${YELLOW}⚠️${NC}  Model routing template not found; run specflow update after upgrading Specflow"
+    return 0
+  fi
+
+  case "${SPECFLOW_MODEL_ROUTING:-}" in
+    1|true|TRUE|yes|YES|y|Y)
+      cp "$template" "$destination"
+      echo -e "${GREEN}✓${NC} Enabled model routing → .specflow/adapter-routing.yml"
+      return 0
+      ;;
+    0|false|FALSE|no|NO|n|N)
+      echo -e "${YELLOW}⚠️${NC}  Model routing not enabled"
+      return 0
+      ;;
+  esac
+
+  if [ -t 0 ]; then
+    printf "Enable model routing now? This activates Claude/Fable for planning/review and Codex for coding. [y/N] "
+    read -r answer
+    case "$answer" in
+      y|Y|yes|YES)
+        cp "$template" "$destination"
+        echo -e "${GREEN}✓${NC} Enabled model routing → .specflow/adapter-routing.yml"
+        ;;
+      *)
+        echo -e "${YELLOW}⚠️${NC}  Model routing not enabled. Enable later with: specflow run --setup-routing"
+        ;;
+    esac
+  else
+    echo -e "${YELLOW}⚠️${NC}  Model routing not enabled in non-interactive install. Enable later with: specflow run --setup-routing"
+  fi
+}
+
 # ============================================================================
 # 1. Directory structure
 # ============================================================================
@@ -149,6 +191,7 @@ if [ -d "$SCRIPT_DIR/templates/adapter-policies" ]; then
   mkdir -p "$TARGET_DIR/.specflow/adapter-policies"
   cp "$SCRIPT_DIR/templates/adapter-policies/"*.yml "$TARGET_DIR/.specflow/adapter-policies/" 2>/dev/null || true
   echo -e "${GREEN}✓${NC} Installed adapter policy templates → .specflow/adapter-policies/"
+  prompt_model_routing
 fi
 
 # Hook sources (for reference — .claude/hooks/ is installed separately)

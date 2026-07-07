@@ -16,6 +16,7 @@ const {
   resolveAdapterRouting,
   modelConfirmationPlan,
   modelRoutingBriefing,
+  installDefaultAdapterRouting,
   parseProviderEvents,
   planAdapterSmoke,
   appendStateMemory,
@@ -258,7 +259,7 @@ describe('local contracted loop runner', () => {
     expect(status.ledger_tail).toHaveLength(1);
     expect(status.ledger_summary.gate_passes).toBe(1);
     expect(status.model_routing.status).toBe('not_configured');
-    expect(status.model_routing.setup[0]).toContain('claude-code-large-routing.yml');
+    expect(status.model_routing.setup[0]).toBe('specflow run --setup-routing');
   });
 
   test('prepares isolated delegated worktree metadata without auto merge or push', () => {
@@ -468,6 +469,20 @@ describe('generative adapter policy and command builders', () => {
     });
     expect(briefing.message).toContain('Model routing active');
     expect(briefing.requested_model).toBe('fable-5');
+  });
+
+  test('installs default adapter routing from the local policy template', () => {
+    const dir = tempDir();
+    const template = path.join(dir, '.specflow', 'adapter-policies', 'claude-code-large-routing.yml');
+    const routing = path.join(dir, '.specflow', 'adapter-routing.yml');
+    fs.mkdirSync(path.dirname(template), { recursive: true });
+    fs.writeFileSync(template, 'routes:\n  spec-build.discover:\n    policy: none\n');
+
+    const result = installDefaultAdapterRouting({ adapterRouting: routing, routingTemplate: template });
+
+    expect(result.status).toBe('installed');
+    expect(fs.existsSync(routing)).toBe(true);
+    expect(fs.readFileSync(routing, 'utf8')).toContain('spec-build.discover');
   });
 
   test('runLoop blocks routed adapter execution until model choices are confirmed', () => {

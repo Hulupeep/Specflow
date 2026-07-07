@@ -8,7 +8,7 @@
  */
 
 const { spawnSync } = require('child_process');
-const { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
+const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve } = require('path');
 const yaml = require('js-yaml');
 
@@ -48,6 +48,7 @@ const DEFAULT_ROUTING_PATHS = [
   '.specflow/adapter-routing.yaml',
   '.specflow/adapter-routing.json',
 ];
+const DEFAULT_ROUTING_TEMPLATE = 'claude-code-large-routing.yml';
 
 function ensureDir(path) {
   mkdirSync(dirname(path), { recursive: true });
@@ -130,6 +131,47 @@ function findDefaultAdapterRoutingPath(options = {}) {
     if (existsSync(candidate)) return candidate;
   }
   return null;
+}
+
+function defaultRoutingTemplatePath(options = {}) {
+  const local = join('.specflow', 'adapter-policies', DEFAULT_ROUTING_TEMPLATE);
+  if (options.routingTemplate) return options.routingTemplate;
+  if (existsSync(local)) return local;
+  return resolve(__dirname, '..', 'templates', 'adapter-policies', DEFAULT_ROUTING_TEMPLATE);
+}
+
+function installDefaultAdapterRouting(options = {}) {
+  const destination = options.adapterRouting || '.specflow/adapter-routing.yml';
+  if (existsSync(destination) && !options.force) {
+    return { status: 'exists', routing_path: destination };
+  }
+  const template = defaultRoutingTemplatePath(options);
+  if (!existsSync(template)) {
+    return {
+      status: 'missing_template',
+      routing_path: destination,
+      template_path: template,
+      error: `model routing template not found: ${template}`,
+    };
+  }
+  ensureDir(destination);
+  copyFileSync(template, destination);
+  return {
+    status: 'installed',
+    routing_path: destination,
+    template_path: template,
+  };
+}
+
+function askYesNo(question, defaultYes = false) {
+  if (!process.stdin.isTTY || !process.stdout.isTTY) return null;
+  const suffix = defaultYes ? ' [Y/n] ' : ' [y/N] ';
+  process.stdout.write(`${question}${suffix}`);
+  const buffer = Buffer.alloc(1024);
+  const bytes = require('fs').readSync(0, buffer, 0, buffer.length, null);
+  const answer = buffer.toString('utf8', 0, bytes).trim().toLowerCase();
+  if (!answer) return defaultYes;
+  return answer === 'y' || answer === 'yes';
 }
 
 function writeYaml(path, value) {
@@ -1291,7 +1333,8 @@ function modelRoutingBriefing(options = {}, contract = null) {
     routing_path: null,
     message: 'Model routing inactive: no .specflow/adapter-routing.yml was found.',
     setup: [
-      'cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml',
+      'specflow run --setup-routing',
+      'or: cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml',
       'specflow run <loop> --slug <slug> --goal "<goal>" --input <path>',
       'specflow run <loop> --slug <slug> --confirm-models',
     ],
@@ -1900,8 +1943,17 @@ function planAdapterSmoke(provider, options = {}) {
 function cli(argv = process.argv.slice(2)) {
   const opts = parseKeyValueArgs(argv);
   const loop = opts._[0];
+  if (!loop && opts.setupRouting) {
+    try {
+      console.log(JSON.stringify(installDefaultAdapterRouting(opts), null, 2));
+      return 0;
+    } catch (e) {
+      console.error(`specflow run failed: ${e.message}`);
+      return 1;
+    }
+  }
   if (!loop) {
-    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n]');
+    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n] [--setup-routing]');
     return 2;
   }
   try {
@@ -1910,7 +1962,23 @@ function cli(argv = process.argv.slice(2)) {
       result = runStatus(opts);
     } else if (loop === 'trace') {
       result = verifierTrace({ runDir: opts.runDir, contract: opts.contract, ledger: opts.ledger });
+    } else if (opts.setupRouting) {
+      result = installDefaultAdapterRouting(opts);
     } else {
+      if (!opts.adapterPolicy && !opts.noAdapterRouting && !findDefaultAdapterRoutingPath(opts)) {
+        const enabled = askYesNo('Model routing is not active. Enable the default Claude/Fable + Codex routing now?', false);
+        if (enabled === true) {
+          const installed = installDefaultAdapterRouting(opts);
+          if (installed.status === 'missing_template') {
+            console.error(installed.error);
+            return 1;
+          }
+          console.error(`Model routing enabled: ${installed.routing_path}`);
+        } else if (enabled === false) {
+          console.error('Model routing not enabled. Continuing without routed adapters.');
+          console.error('To enable later: specflow run --setup-routing');
+        }
+      }
       result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
     }
     if (result.status === 'invalid_contract') {
@@ -1950,6 +2018,7 @@ module.exports = {
   resolveAdapterRouting,
   modelConfirmationPlan,
   modelRoutingBriefing,
+  installDefaultAdapterRouting,
   buildAdapterCommand,
   commandExists,
   containsForbiddenAction,

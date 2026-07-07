@@ -12,10 +12,19 @@ Models do work. Models do not approve their own work.
 
 ## Quick Start
 
-After `specflow init`, install the large-initiative routing default:
+During `specflow init` or `specflow update`, Specflow asks:
+
+```text
+Enable model routing now? This activates Claude/Fable for planning/review and Codex for coding. [y/N]
+```
+
+Answer `y` to install the large-initiative routing default at
+`.specflow/adapter-routing.yml`.
+
+If you skipped the prompt, enable it later with:
 
 ```bash
-cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml
+specflow run --setup-routing
 ```
 
 Start a loop normally:
@@ -33,9 +42,10 @@ specflow run spec-build --slug auth-system --confirm-models
 ```
 
 If routing is not installed, Specflow reports that model routing is inactive and
-prints the setup command above. Agents using the Specflow skill must announce
-either `Model routing active:` or the setup instruction before starting
-`spec-build` or `feature-build`.
+prints the setup command above. In an interactive terminal, `specflow run` also
+asks whether to enable the default routing before it continues. Agents using the
+Specflow skill must announce either `Model routing active:` or the setup
+instruction before starting `spec-build` or `feature-build`.
 
 ## What The Default Does
 
@@ -173,6 +183,8 @@ Edit:
 ```text
 .specflow/adapter-routing.yml
 ```
+
+If the file does not exist yet, run `specflow run --setup-routing` first.
 
 To use Opus as the primary reviewer instead of Fable, change the reviewer policy:
 

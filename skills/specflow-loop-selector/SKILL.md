@@ -46,8 +46,8 @@ run_contract:
 ```
 
 Rules:
-- Before starting `spec-build` or `feature-build`, emit a model-routing confirmation. If `.specflow/adapter-routing.yml` exists, state `Model routing active:` and list the route for the current stage, including provider, role, requested model, fallback model, and budget when present. If no routing file exists, stop before build work and tell the user to run:
-  `cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml`.
+- Before starting `spec-build` or `feature-build`, emit a model-routing confirmation. If `.specflow/adapter-routing.yml` exists, state `Model routing active:` and list the route for the current stage, including provider, role, requested model, effort, fallback model, and budget when present. If no routing file exists, stop before build work and tell the user to run:
+  `specflow run --setup-routing`.
 - Routed providers require explicit confirmation before spend. Use `specflow run <loop> --slug <slug> --confirm-models` only after the user has accepted the displayed model choices.
 - If the user explicitly bypasses routing with `--adapter-policy`, still state that this is a one-off override and name the policy/model before invoking it.
 - Load only the selected YAML and its prompt/example if needed.

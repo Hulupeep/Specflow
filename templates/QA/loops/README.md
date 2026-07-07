@@ -111,11 +111,12 @@ rerun before state advances.
 
 ### Default model routing for larger initiatives
 
-For larger initiatives, install a project routing default:
+For larger initiatives, enable the project routing default during `specflow init`
+or `specflow update` by answering `y` to the model-routing prompt. If you skipped
+the prompt, enable it later with:
 
 ```bash
-mkdir -p .specflow
-cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml
+specflow run --setup-routing
 ```
 
 That default routes expensive requirements/planning/review work to the configured
@@ -126,7 +127,7 @@ requires confirmation before invoking a routed model:
 specflow run spec-build --slug auth-system --goal "build auth" --input docs/auth-idea.md --adapter-routing .specflow/adapter-routing.yml
 ```
 
-The first run prints the selected provider, role, model, fallback, and budget.
+The first run prints the selected provider, role, model, effort, fallback, and budget.
 If the choice is right, rerun with:
 
 ```bash
