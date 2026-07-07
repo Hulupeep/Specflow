@@ -33,6 +33,48 @@ echo ""
 echo -e "${GREEN}Target:${NC} $TARGET_DIR"
 echo ""
 
+prompt_model_routing() {
+  local template="$TARGET_DIR/.specflow/adapter-policies/claude-code-large-routing.yml"
+  local destination="$TARGET_DIR/.specflow/adapter-routing.yml"
+
+  if [ -f "$destination" ]; then
+    echo -e "${GREEN}✓${NC} Model routing already active → .specflow/adapter-routing.yml"
+    return 0
+  fi
+  if [ ! -f "$template" ]; then
+    echo -e "${YELLOW}⚠️${NC}  Model routing template not found; run specflow update after upgrading Specflow"
+    return 0
+  fi
+
+  case "${SPECFLOW_MODEL_ROUTING:-}" in
+    1|true|TRUE|yes|YES|y|Y)
+      cp "$template" "$destination"
+      echo -e "${GREEN}✓${NC} Enabled model routing → .specflow/adapter-routing.yml"
+      return 0
+      ;;
+    0|false|FALSE|no|NO|n|N)
+      echo -e "${YELLOW}⚠️${NC}  Model routing not enabled"
+      return 0
+      ;;
+  esac
+
+  if [ -t 0 ]; then
+    printf "Enable model routing now? This activates Claude/Fable for planning/review and Codex for coding. [y/N] "
+    read -r answer
+    case "$answer" in
+      y|Y|yes|YES)
+        cp "$template" "$destination"
+        echo -e "${GREEN}✓${NC} Enabled model routing → .specflow/adapter-routing.yml"
+        ;;
+      *)
+        echo -e "${YELLOW}⚠️${NC}  Model routing not enabled. Enable later with: specflow run --setup-routing"
+        ;;
+    esac
+  else
+    echo -e "${YELLOW}⚠️${NC}  Model routing not enabled in non-interactive install. Enable later with: specflow run --setup-routing"
+  fi
+}
+
 # Determine source directory (where this script lives)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 HOOKS_DIR="$SCRIPT_DIR/hooks"
@@ -259,6 +301,7 @@ if [ -d "$ADAPTER_POLICY_DIR" ]; then
     cp "$policy" "$TARGET_DIR/.specflow/adapter-policies/"
     echo -e "${GREEN}✓${NC} Installed .specflow/adapter-policies/$(basename "$policy")"
   done
+  prompt_model_routing
 else
   echo -e "${YELLOW}⚠️${NC}  Adapter policy templates not found in Specflow source"
 fi
@@ -349,6 +392,7 @@ if [ ! -f "$TARGET_DIR/AGENTS.md" ] || ! grep -q "Specflow Loop Routing" "$TARGE
   INSTALL_OK=false
 fi
 for policy_path in \
+  ".specflow/adapter-policies/claude-code-large-routing.yml" \
   ".specflow/adapter-policies/claude-print.safe.yml" \
   ".specflow/adapter-policies/codex-exec.safe.yml"; do
   if [ ! -f "$TARGET_DIR/$policy_path" ]; then

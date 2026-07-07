@@ -147,7 +147,9 @@ route to Codex CLI with GPT-5.5. Each policy also declares a thinking level
 (`effort`) such as `medium`, `high`, or `xhigh`. The shipped
 `.specflow/adapter-policies/claude-code-large-routing.yml` template requires
 `--confirm-models` before invoking a routed provider, so expensive model choices
-are shown to the operator before spend.
+are shown to the operator before spend. `specflow init`, `specflow update`, and
+interactive `specflow run` can ask whether to enable the default routing; the
+non-interactive shortcut is `specflow run --setup-routing`.
 
 Before any build loop starts, the agent should say either `Model routing active:`
 with the current stage's provider/model choices, or explain how to install the

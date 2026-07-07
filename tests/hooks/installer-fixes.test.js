@@ -51,10 +51,11 @@ describe('install-hooks.sh', () => {
     fs.rmSync(targetDir, { recursive: true, force: true });
   });
 
-  function runInstaller(target) {
+  function runInstaller(target, env = {}) {
     return spawnSync('bash', [INSTALLER_PATH, target || targetDir], {
       encoding: 'utf-8',
       timeout: 15000,
+      env: { ...process.env, ...env },
     });
   }
 
@@ -66,6 +67,21 @@ describe('install-hooks.sh', () => {
       expect(fs.existsSync(path.join(targetDir, '.claude', 'settings.json'))).toBe(true);
       expect(fs.existsSync(path.join(targetDir, '.claude', 'hooks', 'post-build-check.sh'))).toBe(true);
       expect(fs.existsSync(path.join(targetDir, '.claude', 'hooks', 'run-journey-tests.sh'))).toBe(true);
+    });
+
+    test('can enable model routing during update/install', () => {
+      const result = runInstaller(targetDir, { SPECFLOW_MODEL_ROUTING: 'yes' });
+      expect(result.status).toBe(0);
+      expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-policies', 'claude-code-large-routing.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'))).toBe(true);
+      expect(fs.readFileSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'), 'utf8')).toContain('fable-planner');
+    });
+
+    test('leaves model routing inactive when declined', () => {
+      const result = runInstaller(targetDir, { SPECFLOW_MODEL_ROUTING: 'no' });
+      expect(result.status).toBe(0);
+      expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-policies', 'claude-code-large-routing.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'))).toBe(false);
     });
 
     test('hook scripts are executable', () => {

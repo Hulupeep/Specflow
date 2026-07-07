@@ -33,7 +33,7 @@ When this skill is active, Claude Code MUST:
 5. **Never modify `non_negotiable` rules** unless the user explicitly says `override_contract: <contract_id>`.
 6. **Before accepting a ticket as specflow-compliant**: Pre-flight must have run and returned `passed`, `passed_with_warnings`, or a human-acknowledged `override:*` status. A ticket with `blocked`, `stale`, or missing pre-flight section is NOT compliant.
 7. **Before starting spec-build or feature-build work**: Confirm model routing in plain language. If `.specflow/adapter-routing.yml` exists, say `Model routing active:` and list the selected model/policy for the current stage before invoking it. If it does not exist, stop and give the setup command:
-   `cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml`.
+   `specflow run --setup-routing`.
    Expensive/default routed adapters must not run until the user has confirmed the displayed model choices.
 
 ---
