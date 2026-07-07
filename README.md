@@ -24,6 +24,46 @@ Contract tests scan your source code for forbidden patterns. Break a rule → bu
 
 ---
 
+## Core Workflow: `spec-build` → `feature-build`
+
+For serious product work, Specflow is two loops:
+
+| Loop | Use it when | Output |
+|------|-------------|--------|
+| **`spec-build`** | You have an idea, PRD, discovery note, bug cluster, or already-built-product teardown | A hardened PRD plus audited, journey-contracted tickets |
+| **`feature-build`** | You have one approved Specflow ticket ready to implement | A branch/slice that passes contract tests, journey tests, provenance, and Gate C |
+
+Run `spec-build` before code:
+
+```bash
+npx @colmbyrne/specflow run spec-build \
+  --slug auth-system \
+  --goal "ready tickets for auth system" \
+  --input docs/auth-idea.md
+```
+
+Then run `feature-build` for each ready ticket:
+
+```bash
+npx @colmbyrne/specflow run feature-build \
+  --slug auth-system-244 \
+  --goal "branch for #244 green on CI" \
+  --input "#244"
+```
+
+The short version:
+
+```text
+spec-build    = decide what should be built, harden it, slice it into enforceable tickets
+feature-build = build one ticket on rails until CI and evidence say it is ready
+```
+
+For already-built products, start one step earlier with `daily-use-teardown`;
+for merged epics, finish with Gate D. Most day-to-day work is still
+`spec-build` → `feature-build`.
+
+---
+
 ## The Invariant
 
 > **Frontier-model scaffolding is disposable. Gates, ledger, state, verifier evidence, and human boundaries are not.**
@@ -68,32 +108,34 @@ npx @colmbyrne/specflow graph           # Validate contract cross-references
 
 ---
 
-## Recommended workflow: harden the PRD *before* you write tickets
+## Why `spec-build` Comes First
 
 Specflow makes tickets **enforceable**. It does not make them **correct** — a perfectly
 specflow-compliant ticket can still encode the wrong thing, or a plausible lie with a green
-checkmark on it. So put a hostile review *in front* of ticket-writing:
+checkmark on it. `spec-build` puts hostile review and simulation *in front* of
+ticket-writing:
 
-```
-1. ADVERSARY      Harden the PRD with the Adversarial PRD Reviewer until it earns a
-   (build spec)   SHIP / SHIP WITH STIPULATIONS verdict. Catches no-JTBD, untestable
+```text
+1. DISCOVER       Ground the idea against the real artifact, data, repo, and constraints.
+
+2. PRD +          Harden the PRD with the Adversarial PRD Reviewer until it earns a
+   ADVERSARY      SHIP / SHIP WITH STIPULATIONS verdict. Catches no-JTBD, untestable
                   requirements, fake backends, no-data loopholes, skip-to-green, and
                   false claims about the repo — BEFORE any ticket exists.
                   → https://github.com/Hulupeep/adversarial-prd-reviewer
 
-2. SPECFLOW       Turn the hardened PRD into tickets: Gherkin acceptance criteria,
-   (write)        data-testid selectors, contract references, E2E journey files.
-                  (specflow-writer agent)
+3. TICKETS        Turn the hardened PRD into tickets: Gherkin acceptance criteria,
+                  data-testid selectors, contract references, and E2E journey files.
 
-3. BOARD AUDITOR  Uplift the tickets to full compliance — fill missing SQL/RLS,
-   (uplift)       TypeScript interfaces, invariants, data-testid coverage — then re-audit.
-                  npx @colmbyrne/specflow audit <issue>
-                  + the board-auditor / specflow-uplifter agents.
+4. GATE B/B.5     Audit and simulate the tickets before they can feed feature-build.
 ```
 
 **Rule of thumb:** never write a ticket from a PRD that hasn't survived the adversary. **The
 adversary makes the spec honest to begin with; Specflow bakes the truth in** — contracts +
 journey tests enforce it on every build, so it can't drift back.
+
+`feature-build` then takes each approved ticket through contract, E2E, oracle,
+implementation, provenance, human CI handoff, and Gate C.
 
 ---
 
