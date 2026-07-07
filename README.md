@@ -189,7 +189,9 @@ route to Codex CLI with GPT-5.5. Each policy also declares a thinking level
 (`effort`) such as `medium`, `high`, or `xhigh`. The shipped
 `.specflow/adapter-policies/claude-code-large-routing.yml` template requires
 `--confirm-models` before invoking a routed provider, so expensive model choices
-are shown to the operator before spend. `specflow init`, `specflow update`, and
+are shown to the operator before spend or quota use. Budget fields are caps /
+quota guards, not guaranteed costs; ChatGPT-authenticated Codex consumes Codex
+plan quota/credits rather than OpenAI API billing. `specflow init`, `specflow update`, and
 interactive `specflow run` can ask whether to enable the default routing; the
 non-interactive shortcut is `specflow run --setup-routing`.
 

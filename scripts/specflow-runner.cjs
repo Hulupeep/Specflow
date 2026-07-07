@@ -1276,6 +1276,9 @@ function resolveAdapterRouting(options = {}, contract = null) {
 
 function modelConfirmationPlan(resolved, options = {}) {
   const policy = resolved.policy || {};
+  const budgetNote = policy.provider === 'codex-exec'
+    ? 'max_budget_usd is a policy cap/quota guard. If Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing.'
+    : 'max_budget_usd is a policy cap/quota guard, not a guaranteed charge.';
   return {
     status: 'model_confirmation_required',
     routing_path: resolved.routingPath,
@@ -1288,6 +1291,7 @@ function modelConfirmationPlan(resolved, options = {}) {
     requested_model: policy.requested_model || policy.model || null,
     fallback_model: policy.fallback_model || null,
     max_budget_usd: policy.max_budget_usd ?? null,
+    budget_note: budgetNote,
     reason: resolved.reason,
     transcript_path: policy.transcript_path,
     output_path: policy.output_path,
@@ -1299,6 +1303,9 @@ function modelRoutingBriefing(options = {}, contract = null) {
   const resolved = resolveAdapterRouting(options, contract);
   if (resolved.status === 'resolved') {
     const policy = resolved.policy || {};
+    const budgetNote = policy.provider === 'codex-exec'
+      ? 'max_budget_usd is a policy cap/quota guard. If Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing.'
+      : 'max_budget_usd is a policy cap/quota guard, not a guaranteed charge.';
     return {
       active: true,
       status: 'active',
@@ -1312,6 +1319,7 @@ function modelRoutingBriefing(options = {}, contract = null) {
       requested_model: policy.requested_model || policy.model || null,
       fallback_model: policy.fallback_model || null,
       max_budget_usd: policy.max_budget_usd ?? null,
+      budget_note: budgetNote,
       confirmation_required: resolved.confirmationRequired,
       message: `Model routing active: ${policy.requested_model || policy.model || UNKNOWN} for ${resolved.loop}.${resolved.stage} (${policy.role || 'worker'}).`,
     };

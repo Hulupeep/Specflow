@@ -46,9 +46,9 @@ run_contract:
 ```
 
 Rules:
-- Before starting `spec-build` or `feature-build`, emit a model-routing confirmation. If `.specflow/adapter-routing.yml` exists, state `Model routing active:` and list the route for the current stage, including provider, role, requested model, effort, fallback model, and budget when present. If no routing file exists, stop before build work and tell the user to run:
+- Before starting `spec-build` or `feature-build`, emit a model-routing confirmation. If `.specflow/adapter-routing.yml` exists, state `Model routing active:` and list the route for the current stage, including provider, role, requested model, effort, fallback model, and budget cap when present. Say "budget cap / quota guard", not "cost". For `codex-exec`, state that if Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing. If no routing file exists, stop before build work and tell the user to run:
   `specflow run --setup-routing`.
-- Routed providers require explicit confirmation before spend. Use `specflow run <loop> --slug <slug> --confirm-models` only after the user has accepted the displayed model choices.
+- Routed providers require explicit confirmation before spend/quota use. Use `specflow run <loop> --slug <slug> --confirm-models` only after the user has accepted the displayed model choices.
 - If the user explicitly bypasses routing with `--adapter-policy`, still state that this is a one-off override and name the policy/model before invoking it.
 - Load only the selected YAML and its prompt/example if needed.
 - Continue through every currently unblocked stage/rail in the same invocation.

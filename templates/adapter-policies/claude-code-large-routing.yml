@@ -1,6 +1,6 @@
 defaults:
   confirm_models: true
-  reason: Confirm model choices before spending expensive planner/reviewer budget.
+  reason: Confirm model choices before spending budget or Codex plan quota.
 
 policies:
   fable-planner:

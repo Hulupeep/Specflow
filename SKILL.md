@@ -32,7 +32,7 @@ When this skill is active, Claude Code MUST:
 4. **When a contract violation is reported**: Read the contract rule, understand why it exists, fix the code to comply. Never work around the test.
 5. **Never modify `non_negotiable` rules** unless the user explicitly says `override_contract: <contract_id>`.
 6. **Before accepting a ticket as specflow-compliant**: Pre-flight must have run and returned `passed`, `passed_with_warnings`, or a human-acknowledged `override:*` status. A ticket with `blocked`, `stale`, or missing pre-flight section is NOT compliant.
-7. **Before starting spec-build or feature-build work**: Confirm model routing in plain language. If `.specflow/adapter-routing.yml` exists, say `Model routing active:` and list the selected model/policy for the current stage before invoking it. If it does not exist, stop and give the setup command:
+7. **Before starting spec-build or feature-build work**: Confirm model routing in plain language. If `.specflow/adapter-routing.yml` exists, say `Model routing active:` and list the selected model/policy for the current stage before invoking it. Call `max_budget_usd` a budget cap / quota guard, not a guaranteed cost. For `codex-exec`, say that ChatGPT-authenticated Codex consumes Codex plan quota/credits rather than OpenAI API billing. If the routing file does not exist, stop and give the setup command:
    `specflow run --setup-routing`.
    Expensive/default routed adapters must not run until the user has confirmed the displayed model choices.
 

@@ -530,6 +530,7 @@ describe('generative adapter policy and command builders', () => {
     const result = runLoop({ loop: 'feature-build', slug: 'auth', contract, ledger, adapterRouting: routing });
     expect(result.status).toBe('model_confirmation_required');
     expect(result.requested_model).toBe('gpt-5.5');
+    expect(result.budget_note).toContain('not a guaranteed charge');
     expect(fs.existsSync(path.join(dir, 'auth-final.md'))).toBe(false);
     expect(readJsonl(ledger)[0].stop_reason).toBe('model_confirmation_required');
 
@@ -537,6 +538,33 @@ describe('generative adapter policy and command builders', () => {
     expect(confirmed.status).toBe('gate_rerun_required');
     expect(fs.readFileSync(path.join(dir, 'auth-final.md'), 'utf8')).toBe('done');
     expect(readJsonl(ledger).some((entry) => entry.model_confirmation === 'confirmed')).toBe(true);
+  });
+
+  test('Codex routed confirmations explain ChatGPT quota semantics', () => {
+    const resolved = {
+      routingPath: '.specflow/adapter-routing.yml',
+      loop: 'feature-build',
+      stage: '5_impl',
+      policyId: 'gpt55-coder',
+      reason: 'implementation',
+      policy: {
+        id: 'gpt55-coder',
+        provider: 'codex-exec',
+        role: 'implementer',
+        effort: 'medium',
+        requested_model: 'gpt-5.5',
+        max_budget_usd: 8,
+        transcript_path: 'transcript.jsonl',
+        output_path: 'out.md',
+      },
+    };
+
+    const plan = modelConfirmationPlan(resolved, { slug: 'auth' });
+    const briefing = modelRoutingBriefing({ adapterRouting: 'missing.yml' }, null);
+
+    expect(plan.budget_note).toContain('Codex plan quota/credits');
+    expect(plan.budget_note).toContain('rather than OpenAI API billing');
+    expect(briefing.status).toBe('not_configured');
   });
 
   test('detects forbidden human-gate actions in provider output', () => {

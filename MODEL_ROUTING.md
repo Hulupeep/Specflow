@@ -34,7 +34,7 @@ specflow run spec-build --slug auth-system --goal "build auth" --input docs/auth
 ```
 
 If routing is active, Specflow stops before provider spend and prints the selected
-provider, role, requested model, fallback model, thinking level, budget,
+provider, role, requested model, fallback model, thinking level, budget cap,
 transcript path, and output path. Continue only after reviewing the choices:
 
 ```bash
@@ -106,11 +106,35 @@ Effort is policy metadata, not a gate. A high-effort model output still has to
 pass Specflow gates, CI, and any human approvals. Provider effort labels can
 change over time, so keep them thin and easy to edit.
 
+## Budget Caps, Quota, And Codex Auth
+
+`max_budget_usd` is a **policy cap / quota guard**, not a prediction and not a
+guaranteed charge. It exists so a routed adapter has a ceiling when the provider
+supports budget enforcement or reports metered usage.
+
+For Codex specifically, billing depends on how the Codex CLI is authenticated:
+
+- **Signed in with ChatGPT:** Codex usage counts against your Codex plan
+  quota/credits for that ChatGPT plan or workspace.
+- **Signed in with an API key:** Codex uses normal OpenAI API billing for that
+  Platform organization.
+
+So an option like `gpt55-coder, max_budget_usd: 8` should be described as:
+
+```text
+gpt55-coder via codex-exec, effort medium, budget cap/quota guard $8.
+If Codex CLI is signed in with ChatGPT, this consumes Codex plan quota/credits,
+not OpenAI API billing.
+```
+
+Do not present the cap as "`$8` cost" unless the adapter has actually reported
+metered usage.
+
 ## Why Confirmation Is Mandatory
 
 Fable/frontier routes are expensive and easy to trigger accidentally in a resumed
 automation. Specflow therefore treats routed provider execution as a human
-spend decision:
+spend/quota decision:
 
 1. Resolve the current loop stage from the durable run contract.
 2. Look up the matching route in `.specflow/adapter-routing.yml`.
@@ -119,8 +143,8 @@ spend decision:
 5. Run the provider only when the operator reruns with `--confirm-models`.
 
 That confirmation does not approve the work product. It only approves spending
-the selected model on the current stage. The owning Specflow gate must still
-rerun before the loop advances.
+or quota use for the selected model on the current stage. The owning Specflow
+gate must still rerun before the loop advances.
 
 ## How It Works Technically
 

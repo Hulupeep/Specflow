@@ -127,7 +127,9 @@ requires confirmation before invoking a routed model:
 specflow run spec-build --slug auth-system --goal "build auth" --input docs/auth-idea.md --adapter-routing .specflow/adapter-routing.yml
 ```
 
-The first run prints the selected provider, role, model, effort, fallback, and budget.
+The first run prints the selected provider, role, model, effort, fallback, and
+budget cap/quota guard. For `codex-exec`, ChatGPT-authenticated Codex consumes
+Codex plan quota/credits rather than OpenAI API billing.
 If the choice is right, rerun with:
 
 ```bash
