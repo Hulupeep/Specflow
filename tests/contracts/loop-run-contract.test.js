@@ -433,8 +433,8 @@ describe('generative adapter policy and command builders', () => {
             command: 'claude',
             role: 'planner',
             effort: 'xhigh',
-            requested_model: 'fable-5',
-            fallback_model: 'opus-4.8',
+            requested_model: 'claude-fable-5',
+            fallback_model: 'claude-opus-4-8',
             timeout_seconds: 30,
             max_iterations: 1,
             transcript_path: path.join(dir, '<slug>-planner.jsonl'),
@@ -455,7 +455,7 @@ describe('generative adapter policy and command builders', () => {
 
     expect(resolved.status).toBe('resolved');
     expect(resolved.policyId).toBe('planner');
-    expect(resolved.policy.requested_model).toBe('fable-5');
+    expect(resolved.policy.requested_model).toBe('claude-fable-5');
     expect(resolved.policy.transcript_path).toContain('auth-planner.jsonl');
     expect(resolved.confirmationRequired).toBe(true);
 
@@ -468,7 +468,7 @@ describe('generative adapter policy and command builders', () => {
       current_stage_or_rail: 'discover',
     });
     expect(briefing.message).toContain('Model routing active');
-    expect(briefing.requested_model).toBe('fable-5');
+    expect(briefing.requested_model).toBe('claude-fable-5');
   });
 
   test('installs default adapter routing from the local policy template', () => {

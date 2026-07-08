@@ -54,8 +54,8 @@ defines three policies:
 
 | Policy | Runtime | Role | Default model | Thinking level | Fallback | Used for |
 |---|---|---|---|---|---|---|
-| `fable-planner` | `claude -p` | `planner` | `fable-5` | `xhigh` | `opus-4.8` | discovery and PRD shaping |
-| `fable-reviewer` | `claude -p` | `verifier` | `fable-5` | `xhigh` | `opus-4.8` | adversarial review and high-value review |
+| `fable-planner` | `claude -p` | `planner` | `claude-fable-5` | `xhigh` | `claude-opus-4-8` | discovery and PRD shaping |
+| `fable-reviewer` | `claude -p` | `verifier` | `claude-fable-5` | `xhigh` | `claude-opus-4-8` | adversarial review and high-value review |
 | `gpt55-coder` | `codex exec` | `implementer` | `gpt-5.5` | `medium` | none | contracts, E2E, oracle wiring, implementation |
 
 The default route map is:
@@ -78,7 +78,9 @@ routes:
 
 The exact file uses expanded YAML objects so each route can carry a reason and
 each policy can carry tool permissions, budgets, transcript paths, and human
-boundaries.
+boundaries. `model`, `requested_model`, and `fallback_model` must be real
+provider model IDs accepted by the target CLI, not display shorthand. For
+example, Claude policies use `claude-fable-5` and `claude-opus-4-8`.
 
 ## Thinking Level
 
@@ -87,7 +89,7 @@ policies this is the `effort` field:
 
 ```yaml
 adapter_policy:
-  requested_model: fable-5
+  requested_model: claude-fable-5
   role: planner
   effort: xhigh
 ```
@@ -190,8 +192,8 @@ records routing metadata in the JSONL ledger:
   "provider": "claude-print",
   "role": "planner",
   "effort": "xhigh",
-  "requested_model": "fable-5",
-  "fallback_model": "opus-4.8",
+  "requested_model": "claude-fable-5",
+  "fallback_model": "claude-opus-4-8",
   "max_budget_usd": 20
 }
 ```
@@ -216,8 +218,8 @@ To use Opus as the primary reviewer instead of Fable, change the reviewer policy
 policies:
   fable-reviewer:
     adapter_policy:
-      requested_model: opus-4.8
-      model: opus-4.8
+      requested_model: claude-opus-4-8
+      model: claude-opus-4-8
       effort: high
       fallback_model: null
       max_budget_usd: 8
@@ -229,8 +231,8 @@ To lower planning spend, keep Fable but reduce the thinking level:
 policies:
   fable-planner:
     adapter_policy:
-      requested_model: fable-5
-      model: fable-5
+      requested_model: claude-fable-5
+      model: claude-fable-5
       effort: high
       max_budget_usd: 12
 ```

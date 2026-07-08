@@ -16,9 +16,9 @@ policies:
         - stream-json
         - --permission-mode
         - default
-      model: fable-5
-      requested_model: fable-5
-      fallback_model: opus-4.8
+      model: claude-fable-5
+      requested_model: claude-fable-5
+      fallback_model: claude-opus-4-8
       max_budget_usd: 20
       timeout_seconds: 1800
       max_iterations: 1
@@ -55,9 +55,9 @@ policies:
         - stream-json
         - --permission-mode
         - default
-      model: fable-5
-      requested_model: fable-5
-      fallback_model: opus-4.8
+      model: claude-fable-5
+      requested_model: claude-fable-5
+      fallback_model: claude-opus-4-8
       max_budget_usd: 12
       timeout_seconds: 1800
       max_iterations: 1
