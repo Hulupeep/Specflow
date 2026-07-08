@@ -49,6 +49,11 @@ const DEFAULT_ROUTING_PATHS = [
   '.specflow/adapter-routing.json',
 ];
 const DEFAULT_ROUTING_TEMPLATE = 'claude-code-large-routing.yml';
+const ROUTING_MODEL_FIELDS = new Set(['model', 'requested_model', 'fallback_model']);
+const ROUTING_MODEL_ALIAS_REPLACEMENTS = {
+  'fable-5': 'claude-fable-5',
+  'opus-4.8': 'claude-opus-4-8',
+};
 
 function ensureDir(path) {
   mkdirSync(dirname(path), { recursive: true });
@@ -160,6 +165,102 @@ function installDefaultAdapterRouting(options = {}) {
     status: 'installed',
     routing_path: destination,
     template_path: template,
+  };
+}
+
+function routingPolicyIdFromPath(parts, parent = {}) {
+  if (parent && typeof parent.id === 'string') return parent.id;
+  const policyIndex = parts.indexOf('policies');
+  if (policyIndex !== -1 && parts[policyIndex + 1]) return parts[policyIndex + 1];
+  const routeIndex = parts.indexOf('routes');
+  if (routeIndex !== -1) return parts.slice(routeIndex + 1, -1).join('.') || null;
+  return null;
+}
+
+function collectRoutingModelFindings(value, parts = [], findings = []) {
+  if (!value || typeof value !== 'object') return findings;
+  if (Array.isArray(value)) {
+    value.forEach((item, index) => collectRoutingModelFindings(item, [...parts, String(index)], findings));
+    return findings;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    const childParts = [...parts, key];
+    if (ROUTING_MODEL_FIELDS.has(key) && typeof child === 'string') {
+      const replacement = ROUTING_MODEL_ALIAS_REPLACEMENTS[child];
+      if (replacement) {
+        findings.push({
+          severity: 'alias',
+          policy_id: routingPolicyIdFromPath(childParts, value),
+          path: childParts.join('.'),
+          field: key,
+          value: child,
+          replacement,
+          message: `${key} uses shorthand "${child}"; use provider model id "${replacement}".`,
+        });
+      }
+    }
+    collectRoutingModelFindings(child, childParts, findings);
+  }
+  return findings;
+}
+
+function applyRoutingModelAliasUpdates(value) {
+  let updated = 0;
+  if (!value || typeof value !== 'object') return updated;
+  if (Array.isArray(value)) {
+    for (const item of value) updated += applyRoutingModelAliasUpdates(item);
+    return updated;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (ROUTING_MODEL_FIELDS.has(key) && typeof child === 'string' && ROUTING_MODEL_ALIAS_REPLACEMENTS[child]) {
+      value[key] = ROUTING_MODEL_ALIAS_REPLACEMENTS[child];
+      updated += 1;
+      continue;
+    }
+    updated += applyRoutingModelAliasUpdates(child);
+  }
+  return updated;
+}
+
+function checkRoutingModels(options = {}) {
+  const routingPath = findDefaultAdapterRoutingPath(options);
+  if (!routingPath) {
+    return {
+      status: 'missing_routing',
+      routing_path: null,
+      setup: ['specflow run --setup-routing'],
+    };
+  }
+  const routing = loadDataFile(routingPath);
+  if (!routing || typeof routing !== 'object') {
+    return {
+      status: 'invalid_routing',
+      routing_path: routingPath,
+      error: 'adapter routing file must be an object',
+    };
+  }
+  const findings = collectRoutingModelFindings(routing);
+  return {
+    status: findings.length ? 'updates_available' : 'ok',
+    routing_path: routingPath,
+    checked_fields: Array.from(ROUTING_MODEL_FIELDS).sort(),
+    known_replacements: ROUTING_MODEL_ALIAS_REPLACEMENTS,
+    findings,
+    note: 'This check only detects known stale aliases. It does not invent or validate future provider model IDs.',
+  };
+}
+
+function updateRoutingModels(options = {}) {
+  const checked = checkRoutingModels(options);
+  if (checked.status !== 'updates_available') return checked;
+  const routingPath = checked.routing_path;
+  const routing = loadDataFile(routingPath);
+  const updated = applyRoutingModelAliasUpdates(routing);
+  writeYaml(routingPath, routing);
+  return {
+    ...checked,
+    status: 'updated',
+    updated,
   };
 }
 
@@ -1951,6 +2052,16 @@ function planAdapterSmoke(provider, options = {}) {
 function cli(argv = process.argv.slice(2)) {
   const opts = parseKeyValueArgs(argv);
   const loop = opts._[0];
+  if (!loop && (opts.checkRoutingModels || opts.updateRoutingModels)) {
+    try {
+      const result = opts.updateRoutingModels ? updateRoutingModels(opts) : checkRoutingModels(opts);
+      console.log(JSON.stringify(result, null, 2));
+      return result.status === 'invalid_routing' ? 1 : 0;
+    } catch (e) {
+      console.error(`specflow run failed: ${e.message}`);
+      return 1;
+    }
+  }
   if (!loop && opts.setupRouting) {
     try {
       console.log(JSON.stringify(installDefaultAdapterRouting(opts), null, 2));
@@ -1961,7 +2072,7 @@ function cli(argv = process.argv.slice(2)) {
     }
   }
   if (!loop) {
-    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n] [--setup-routing]');
+    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n] [--setup-routing|--check-routing-models|--update-routing-models]');
     return 2;
   }
   try {
@@ -2027,6 +2138,8 @@ module.exports = {
   modelConfirmationPlan,
   modelRoutingBriefing,
   installDefaultAdapterRouting,
+  checkRoutingModels,
+  updateRoutingModels,
   buildAdapterCommand,
   commandExists,
   containsForbiddenAction,

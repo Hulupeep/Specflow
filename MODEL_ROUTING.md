@@ -82,6 +82,28 @@ boundaries. `model`, `requested_model`, and `fallback_model` must be real
 provider model IDs accepted by the target CLI, not display shorthand. For
 example, Claude policies use `claude-fable-5` and `claude-opus-4-8`.
 
+## Checking And Updating Model IDs
+
+When provider model IDs change, first check the project routing file:
+
+```bash
+specflow run --check-routing-models
+```
+
+The command reads `.specflow/adapter-routing.yml` and reports known stale
+shorthands in `model`, `requested_model`, and `fallback_model`. To apply the
+known safe replacements:
+
+```bash
+specflow run --update-routing-models
+```
+
+This updater is deliberately conservative. It rewrites known aliases such as
+`fable-5` to `claude-fable-5` and `opus-4.8` to `claude-opus-4-8`; it does not
+invent the latest provider IDs. For newly released models, check the provider
+CLI/docs, edit `.specflow/adapter-routing.yml`, then rerun
+`specflow run --check-routing-models`.
+
 ## Thinking Level
 
 Model routing includes both the model and how hard it should think. In adapter

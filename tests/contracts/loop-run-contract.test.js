@@ -17,6 +17,8 @@ const {
   modelConfirmationPlan,
   modelRoutingBriefing,
   installDefaultAdapterRouting,
+  checkRoutingModels,
+  updateRoutingModels,
   parseProviderEvents,
   planAdapterSmoke,
   appendStateMemory,
@@ -483,6 +485,77 @@ describe('generative adapter policy and command builders', () => {
     expect(result.status).toBe('installed');
     expect(fs.existsSync(routing)).toBe(true);
     expect(fs.readFileSync(routing, 'utf8')).toContain('spec-build.discover');
+  });
+
+  test('checks routing model ids for known shorthand aliases', () => {
+    const dir = tempDir();
+    const routing = path.join(dir, 'adapter-routing.yml');
+    fs.writeFileSync(routing, yaml.dump({
+      policies: {
+        planner: {
+          adapter_policy: {
+            id: 'planner',
+            provider: 'claude-print',
+            command: 'claude',
+            requested_model: 'fable-5',
+            fallback_model: 'opus-4.8',
+          },
+        },
+      },
+    }));
+
+    const result = checkRoutingModels({ adapterRouting: routing });
+
+    expect(result.status).toBe('updates_available');
+    expect(result.findings).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        policy_id: 'planner',
+        field: 'requested_model',
+        value: 'fable-5',
+        replacement: 'claude-fable-5',
+      }),
+      expect.objectContaining({
+        policy_id: 'planner',
+        field: 'fallback_model',
+        value: 'opus-4.8',
+        replacement: 'claude-opus-4-8',
+      }),
+    ]));
+  });
+
+  test('updates routing model ids using known safe aliases only', () => {
+    const dir = tempDir();
+    const routing = path.join(dir, 'adapter-routing.yml');
+    fs.writeFileSync(routing, yaml.dump({
+      policies: {
+        planner: {
+          adapter_policy: {
+            id: 'planner',
+            provider: 'claude-print',
+            command: 'claude',
+            requested_model: 'fable-5',
+            fallback_model: 'opus-4.8',
+          },
+        },
+        coder: {
+          adapter_policy: {
+            id: 'coder',
+            provider: 'codex-exec',
+            command: 'codex',
+            requested_model: 'gpt-5.5',
+          },
+        },
+      },
+    }));
+
+    const result = updateRoutingModels({ adapterRouting: routing });
+    const updated = yaml.load(fs.readFileSync(routing, 'utf8'));
+
+    expect(result.status).toBe('updated');
+    expect(result.updated).toBe(2);
+    expect(updated.policies.planner.adapter_policy.requested_model).toBe('claude-fable-5');
+    expect(updated.policies.planner.adapter_policy.fallback_model).toBe('claude-opus-4-8');
+    expect(updated.policies.coder.adapter_policy.requested_model).toBe('gpt-5.5');
   });
 
   test('runLoop blocks routed adapter execution until model choices are confirmed', () => {
