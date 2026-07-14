@@ -1,0 +1,10 @@
+stage_evidence:
+  schema_version: 1
+  stage: 2_contract
+  artifacts:
+    - path: docs/specs/routing-confirmation/contract.yml
+      sha256: c1bfcf412ddf204b5d3b7c235470b720c7eaeb54be297d17ed772abf349a374e
+  checks:
+    - name: routing-confirmation-contract
+      command: >-
+        node -e "const y=require('js-yaml').load(require('fs').readFileSync('docs/specs/routing-confirmation/contract.yml','utf8'));if(y.feature!=='routing-confirmation'||y.invariants.length!==5||y.journeys.length!==5)process.exit(1)"

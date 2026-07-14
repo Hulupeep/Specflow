@@ -1,0 +1,38 @@
+{
+  "issues": [123],
+  "feature_build": "run-scoped model confirmation bound to canonical routing semantics",
+  "source_provenance": [
+    {
+      "claim": "Routing confirmation hashes are deterministic under YAML formatting and key-order changes.",
+      "source": "scripts/specflow-runner.cjs canonicalizeSemanticValue and routingConfirmationSemanticSha256",
+      "verification": "tests/contracts/routing-confirmation.test.js compares independently ordered routing documents and deterministic 64-character hashes."
+    },
+    {
+      "claim": "Provider, requested model, effort, fallback, and budget changes invalidate prior confirmation.",
+      "source": "scripts/specflow-runner.cjs routingConfirmationSemantics and modelConfirmationStatus",
+      "verification": "tests/contracts/routing-confirmation.test.js changes each material field and checks routing_semantics_changed without another provider attempt."
+    },
+    {
+      "claim": "Human confirmation is ledgered before provider execution and can be reused only by the same durable run.",
+      "source": "scripts/specflow-runner.cjs runLoop, modelConfirmationRunId, and modelConfirmationFields",
+      "verification": "tests/contracts/provider-confirmation-order.test.js checks ledger ordering; routing-confirmation tests cover restart, later stage, and copied-ledger refusal."
+    },
+    {
+      "claim": "Provider output cannot create approval authority.",
+      "source": "scripts/specflow-runner.cjs modelConfirmationStatus source and scope filters",
+      "verification": "tests/contracts/routing-confirmation.test.js inserts a provider_output confirmation-like record and verifies status remains missing."
+    },
+    {
+      "claim": "Status exposes validity, run scope, semantic hash, confirmation time, and invalidation reason without credentials.",
+      "source": "scripts/specflow-runner.cjs runStatus and modelConfirmationStatus",
+      "verification": "tests/contracts/routing-confirmation.test.js checks valid and invalidated status projections and cost/accounting separation."
+    }
+  ],
+  "checks": [
+    "npx jest tests/contracts/routing-confirmation.test.js tests/contracts/provider-confirmation-order.test.js tests/contracts/loop-run-contract.test.js --runInBand --no-coverage",
+    "npm test -- --runInBand",
+    "node scripts/provenance-gate.cjs evidence/provenance-123.json --git-diff"
+  ],
+  "result": "pass",
+  "notes": "Confirmation is authorization for one run and routing semantic hash. It does not authenticate a provider and stores no provider credentials."
+}

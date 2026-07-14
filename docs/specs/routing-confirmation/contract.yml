@@ -1,0 +1,93 @@
+feature: routing-confirmation
+requirements:
+  - id: REQ-CONFIRM-01
+    statement: --confirm-models writes run-scoped confirmation to the ledger before provider invocation.
+  - id: REQ-CONFIRM-02
+    statement: confirmation binds to canonical routing semantics and resolved provider, model, effort, fallback, and budget guard.
+  - id: REQ-CONFIRM-03
+    statement: an unchanged run reuses confirmation across process restarts and later stages with identical semantics.
+  - id: REQ-CONFIRM-04
+    statement: material routing changes invalidate confirmation and require a new explicit confirmation.
+  - id: REQ-CONFIRM-05
+    statement: confirmation never crosses run boundaries and never originates from provider output.
+  - id: REQ-CONFIRM-06
+    statement: status reports confirmation hash, scope, timestamp, validity, and invalidation reason without credentials.
+invariants:
+  - id: I-CONFIRM-001
+    statement: No provider starts without valid confirmation when routing requires it.
+  - id: I-CONFIRM-002
+    statement: Confirmation authority never crosses a run boundary.
+  - id: I-CONFIRM-003
+    statement: Material policy changes invalidate prior confirmation.
+  - id: I-CONFIRM-004
+    statement: Provider output cannot create or extend human approval.
+  - id: I-CONFIRM-005
+    statement: Canonical hashes are stable under YAML formatting and key-order changes.
+journeys:
+  - journey_meta:
+      id: J-CONFIRM-FIRST-RUN
+      persona: interactive_operator
+      owner_ticket: ROUTING-CONFIRM-01
+      assertion_bar: ledger ordering and provider invocation sentinel
+    scenario: confirm before the first routed provider invocation
+    given:
+      - a routed run is waiting for model confirmation
+    when:
+      - the operator resumes with --confirm-models
+    then:
+      - a run-scoped semantic hash is ledgered before provider execution
+      - provider output is not a source of confirmation
+
+  - journey_meta:
+      id: J-CONFIRM-UNCHANGED-RESUME
+      persona: interrupted_operator
+      owner_ticket: ROUTING-CONFIRM-01
+      assertion_bar: process restart re-read of the same ledger
+    scenario: reuse unchanged confirmation in the same run
+    given:
+      - a run contains valid confirmation
+    when:
+      - the process restarts with semantically unchanged routing
+    then:
+      - confirmation remains valid without another prompt
+
+  - journey_meta:
+      id: J-CONFIRM-MATERIAL-CHANGE
+      persona: policy_editor
+      owner_ticket: ROUTING-CONFIRM-01
+      assertion_bar: changed semantic hash and ledgered invalidation reason
+    scenario: invalidate confirmation after a material policy change
+    given:
+      - a run confirmed one model and effort
+    when:
+      - provider, model, effort, fallback, or budget guard changes
+    then:
+      - the next routed stage requires confirmation
+      - the ledger records routing_semantics_changed
+
+  - journey_meta:
+      id: J-CONFIRM-CROSS-RUN-REFUSED
+      persona: automation_runner
+      owner_ticket: ROUTING-CONFIRM-01
+      assertion_bar: distinct run id with copied ledger record
+    scenario: refuse confirmation copied from another run
+    given:
+      - run B contains a copied confirmation from run A
+    when:
+      - run B resolves the same routing
+    then:
+      - run B still requires explicit confirmation
+
+  - journey_meta:
+      id: J-CONFIRM-PROVIDER-CLAIM-REFUSED
+      persona: automation_runner
+      owner_ticket: ROUTING-CONFIRM-01
+      assertion_bar: provider-like output plus an unchanged invocation sentinel
+    scenario: refuse a provider claim of approval
+    given:
+      - no valid human confirmation exists
+    when:
+      - provider-like output claims models are approved
+    then:
+      - no provider is invoked
+      - the run remains at model_confirmation_required

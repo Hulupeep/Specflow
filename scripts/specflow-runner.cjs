@@ -103,6 +103,7 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }
   return {
     run_contract: {
       loop,
+      run_id: modelConfirmationRunId(slug, contractPath),
       goal,
       input_artifact: input,
       path: LOOP_PATHS[loop],
@@ -1040,7 +1041,8 @@ function costAccounting(entries = []) {
   let acceptedGates = 0;
   for (const e of entries) {
     if (e.result === 'pass') acceptedGates += 1;
-    const isWork = Boolean(e.provider) || e.event === 'adapter' || typeof e.estimated_cost === 'number';
+    const isWork = e.event !== 'model_confirmation'
+      && (Boolean(e.provider) || e.event === 'adapter' || typeof e.estimated_cost === 'number');
     if (!isWork) continue;
     const model = e.effective_model || e.requested_model || UNKNOWN;
     if (typeof e.estimated_cost === 'number') {
@@ -1500,10 +1502,120 @@ function resolveAdapterRouting(options = {}, contract = null) {
     stage: contract.current_stage_or_rail,
     policyId: policyId || policy?.id || null,
     policy,
+    routing,
     route: routeObj,
     confirmationRequired,
     reason: routeObj?.reason || policy?.reason || defaults.reason || null,
   };
+}
+
+function canonicalizeSemanticValue(value) {
+  if (Array.isArray(value)) return value.map(canonicalizeSemanticValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonicalizeSemanticValue(value[key])]));
+}
+
+function routingConfirmationSemantics(resolved) {
+  const policy = resolved.policy || {};
+  return {
+    routing: canonicalizeSemanticValue(resolved.routing || {}),
+    resolved_policy: {
+      provider: policy.provider || null,
+      requested_model: policy.requested_model || policy.model || null,
+      effort: policy.effort || null,
+      fallback_model: policy.fallback_model || null,
+      budget_guard: policy.max_budget_usd ?? null,
+    },
+  };
+}
+
+function routingConfirmationSemanticSha256(resolved) {
+  const canonical = JSON.stringify(canonicalizeSemanticValue(routingConfirmationSemantics(resolved)));
+  return createHash('sha256').update(canonical).digest('hex');
+}
+
+function modelConfirmationRunId(slug, contractPath) {
+  const identity = `${slug || 'run'}\0${resolve(contractPath)}`;
+  return `${slug || 'run'}:${createHash('sha256').update(identity).digest('hex').slice(0, 16)}`;
+}
+
+function modelConfirmationStatus({ ledgerPath, runId, semanticSha256 }) {
+  const confirmations = readLedger(ledgerPath).filter((entry) => (
+    entry.event === 'model_confirmation'
+    && entry.result === 'confirmed'
+    && entry.scope === 'run'
+    && entry.source === 'human_cli_flag'
+  ));
+  const sameRun = confirmations.filter((entry) => entry.run_id === runId).slice(-1)[0] || null;
+  if (!sameRun) {
+    return {
+      status: 'missing',
+      valid: false,
+      run_id: runId,
+      routing_semantic_sha256: semanticSha256,
+      invalidation_reason: confirmations.length ? 'run_scope_mismatch' : 'confirmation_missing',
+    };
+  }
+  if (sameRun.routing_semantic_sha256 !== semanticSha256) {
+    return {
+      status: 'invalidated',
+      valid: false,
+      run_id: runId,
+      routing_semantic_sha256: semanticSha256,
+      prior_routing_semantic_sha256: sameRun.routing_semantic_sha256,
+      confirmed_at: sameRun.confirmed_at,
+      invalidation_reason: 'routing_semantics_changed',
+    };
+  }
+  return {
+    status: 'valid',
+    valid: true,
+    run_id: runId,
+    routing_semantic_sha256: semanticSha256,
+    confirmed_at: sameRun.confirmed_at,
+    scope: 'run',
+    invalidation_reason: null,
+  };
+}
+
+function modelConfirmationFields(resolved, runId, semanticSha256) {
+  const policy = resolved.policy || {};
+  return {
+    scope: 'run',
+    run_id: runId,
+    routing_semantic_sha256: semanticSha256,
+    provider: policy.provider || null,
+    requested_model: policy.requested_model || policy.model || null,
+    effort: policy.effort || null,
+    fallback_model: policy.fallback_model || null,
+    budget_guard: policy.max_budget_usd ?? null,
+    routing_path: resolved.routingPath,
+    policy_id: resolved.policyId || policy.id || null,
+  };
+}
+
+function recordModelConfirmationInvalidation(ledgerPath, contract, fields, status) {
+  if (status.status !== 'invalidated') return null;
+  const existing = readLedger(ledgerPath).filter((entry) => (
+    entry.event === 'model_confirmation'
+    && entry.result === 'invalidated'
+    && entry.run_id === fields.run_id
+    && entry.current_routing_semantic_sha256 === fields.routing_semantic_sha256
+  )).slice(-1)[0];
+  if (existing) return existing;
+  const entry = {
+    stage: contract.current_stage_or_rail,
+    event: 'model_confirmation',
+    result: 'invalidated',
+    ...fields,
+    routing_semantic_sha256: status.prior_routing_semantic_sha256,
+    current_routing_semantic_sha256: fields.routing_semantic_sha256,
+    confirmed_at: status.confirmed_at || null,
+    invalidated_at: new Date().toISOString(),
+    invalidation_reason: status.invalidation_reason,
+  };
+  appendLedger(ledgerPath, entry);
+  return entry;
 }
 
 function modelConfirmationPlan(resolved, options = {}) {
@@ -1914,32 +2026,63 @@ function runLoop(options) {
     return { status: 'human_ci_handoff_required', entry, contractPath, ledgerPath };
   }
 
-  const routed = !options.adapterPolicy ? resolveAdapterRouting({ ...options, slug }, contract) : null;
-  if (routed && routed.status === 'resolved' && routed.confirmationRequired && !options.confirmModels) {
-    const plan = modelConfirmationPlan(routed, { slug });
-    appendLedger(ledgerPath, {
-      stage: contract.current_stage_or_rail,
-      event: 'model_confirmation',
-      result: 'blocked',
-      stop_reason: 'model_confirmation_required',
-      provider: plan.provider,
-      role: plan.role,
-      effort: plan.effort,
-      requested_model: plan.requested_model,
-      fallback_model: plan.fallback_model,
-      max_budget_usd: plan.max_budget_usd,
-      routing_path: plan.routing_path,
-      policy_id: plan.policy_id,
-    });
-    contract.terminal_status = 'blocked';
-    recordRunState(contract, {
-      contractPath,
-      ledgerPath,
-      status: 'model_confirmation_required',
-      stopReason: 'model_confirmation_required',
-    });
-    writeYaml(contractPath, { run_contract: contract });
-    return { ...plan, contractPath, ledgerPath };
+  const runId = contract.run_id || modelConfirmationRunId(slug, contractPath);
+  contract.run_id = runId;
+  const routed = (!options.adapterPolicy && !options.stageEvidence)
+    ? resolveAdapterRouting({ ...options, slug }, contract)
+    : null;
+  let confirmation = null;
+  if (routed && routed.status === 'resolved' && routed.confirmationRequired) {
+    const semanticSha256 = routingConfirmationSemanticSha256(routed);
+    const fields = modelConfirmationFields(routed, runId, semanticSha256);
+    confirmation = modelConfirmationStatus({ ledgerPath, runId, semanticSha256 });
+    recordModelConfirmationInvalidation(ledgerPath, contract, fields, confirmation);
+
+    if (!confirmation.valid && !options.confirmModels) {
+      const plan = modelConfirmationPlan(routed, { slug });
+      appendLedger(ledgerPath, {
+        stage: contract.current_stage_or_rail,
+        event: 'model_confirmation',
+        result: 'blocked',
+        stop_reason: 'model_confirmation_required',
+        ...fields,
+        role: plan.role,
+        confirmed_at: null,
+        invalidated_at: confirmation.status === 'invalidated' ? new Date().toISOString() : null,
+        invalidation_reason: confirmation.invalidation_reason,
+      });
+      contract.terminal_status = 'blocked';
+      recordRunState(contract, {
+        contractPath,
+        ledgerPath,
+        status: 'model_confirmation_required',
+        stopReason: 'model_confirmation_required',
+      });
+      writeYaml(contractPath, { run_contract: contract });
+      return { ...plan, confirmation: { ...confirmation, ...fields }, contractPath, ledgerPath };
+    }
+
+    if (!confirmation.valid && options.confirmModels) {
+      const confirmedAt = new Date().toISOString();
+      const entry = {
+        stage: contract.current_stage_or_rail,
+        event: 'model_confirmation',
+        result: 'confirmed',
+        ...fields,
+        confirmed_at: confirmedAt,
+        invalidated_at: null,
+        invalidation_reason: null,
+        source: 'human_cli_flag',
+      };
+      appendLedger(ledgerPath, entry);
+      confirmation = {
+        status: 'valid',
+        valid: true,
+        ...fields,
+        confirmed_at: confirmedAt,
+        invalidation_reason: null,
+      };
+    }
   }
 
   if (options.adapterPolicy || (routed && routed.status === 'resolved')) {
@@ -1988,6 +2131,8 @@ function runLoop(options) {
       routing_path: routed?.routingPath || null,
       policy_id: routed?.policyId || policy.id,
       model_confirmation: routed ? 'confirmed' : null,
+      model_confirmation_run_id: confirmation?.run_id || null,
+      routing_semantic_sha256: confirmation?.routing_semantic_sha256 || null,
     });
     contract.terminal_status = adapterResult.status === 'gate_rerun_required' ? 'in_progress' : 'blocked';
     contract.current_stage_or_rail = adapterResult.status === 'gate_rerun_required' ? contract.current_stage_or_rail : contract.current_stage_or_rail;
@@ -2098,7 +2243,7 @@ function summarizeLedger(entries) {
       if (entry.result === 'pass') summary.gate_passes += 1;
       if (entry.result === 'fail') summary.gate_failures += 1;
     }
-    if (entry.provider) {
+    if (entry.provider && entry.event !== 'model_confirmation') {
       summary.adapter_attempts += 1;
       if (entry.stop_reason === 'gate_rerun_required') summary.adapter_successes_requiring_gate_rerun += 1;
       if (entry.stop_reason === 'adapter_failed') summary.adapter_failures += 1;
@@ -2106,10 +2251,12 @@ function summarizeLedger(entries) {
       if (entry.estimated_cost_usd === null || entry.estimated_cost_usd === undefined) summary.unknown_usage_entries += 1;
       else summary.known_estimated_cost_usd += Number(entry.estimated_cost_usd);
     }
-    if (entry.requested_model) {
+    if (entry.requested_model && entry.event !== 'model_confirmation') {
       summary.requested_models[entry.requested_model] = (summary.requested_models[entry.requested_model] || 0) + 1;
     }
-    const effective = entry.effective_model || (entry.provider ? UNKNOWN : null);
+    const effective = entry.event === 'model_confirmation'
+      ? null
+      : (entry.effective_model || (entry.provider ? UNKNOWN : null));
     if (effective) {
       summary.effective_models[effective] = (summary.effective_models[effective] || 0) + 1;
     }
@@ -2127,6 +2274,17 @@ function runStatus(options = {}) {
   }
   const contract = loadRunContract(contractPath);
   const ledgerPath = options.ledger || contract.storage?.ledger_path || join(dirname(contractPath), 'ledger.jsonl');
+  const routing = modelRoutingBriefing(options, contract);
+  const resolved = resolveAdapterRouting(options, contract);
+  let confirmation = { status: 'not_required', valid: true, invalidation_reason: null };
+  if (resolved.status === 'resolved' && resolved.confirmationRequired) {
+    const runId = contract.run_id || modelConfirmationRunId(options.slug || basename(dirname(contractPath)), contractPath);
+    confirmation = modelConfirmationStatus({
+      ledgerPath,
+      runId,
+      semanticSha256: routingConfirmationSemanticSha256(resolved),
+    });
+  }
   return {
     status: 'ok',
     contract_path: contractPath,
@@ -2141,7 +2299,8 @@ function runStatus(options = {}) {
     verifier_trace: verifierTrace({ contract: contractPath, ledger: ledgerPath }),
     reentry: reentryBriefing({ contract: contractPath, ledger: ledgerPath }),
     cost: costAccounting(readLedger(ledgerPath)),
-    model_routing: modelRoutingBriefing(options, contract),
+    model_routing: routing,
+    model_confirmation: confirmation,
   };
 }
 
@@ -2296,6 +2455,10 @@ module.exports = {
   normalizeAdapterPolicy,
   resolveAdapterRouting,
   modelConfirmationPlan,
+  routingConfirmationSemantics,
+  routingConfirmationSemanticSha256,
+  modelConfirmationRunId,
+  modelConfirmationStatus,
   modelRoutingBriefing,
   installDefaultAdapterRouting,
   checkRoutingModels,

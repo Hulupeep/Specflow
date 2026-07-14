@@ -1,0 +1,15 @@
+stage_evidence:
+  schema_version: 1
+  stage: 5_impl
+  artifacts:
+    - path: scripts/specflow-runner.cjs
+      sha256: 2e080012508846099258b426189155557e3cf1e842100432825c52593edc4baf
+    - path: MODEL_ROUTING.md
+      sha256: b85040862ffea0a64fa7e37a41f5188309618bafdbead5cbe3e06caaf6a78fac
+    - path: tests/contracts/routing-confirmation.test.js
+      sha256: a51449e21d369dfbd409e2cf0cbec01d9c22dcd0ac03effee5dbf7fe24ce0bed
+    - path: tests/contracts/provider-confirmation-order.test.js
+      sha256: b9da19eac5c6c4a8ad4bca79017b1eddd41bc50daad5d144b69eaa89a82edb56
+  checks:
+    - name: full-regression-suite
+      command: npm test -- --runInBand
