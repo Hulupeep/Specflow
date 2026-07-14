@@ -2,6 +2,11 @@ defaults:
   confirm_models: true
   reason: Confirm model choices before spending budget or Codex plan quota.
 
+routing_profile:
+  id: claude-code-large
+  runtime: claude-code
+  template: claude-code-large-routing.yml
+
 policies:
   fable-planner:
     adapter_policy:
@@ -91,8 +96,13 @@ policies:
       args:
         - --sandbox
         - workspace-write
-        - --ask-for-approval
-        - never
+        - --ephemeral
+        - -c
+        - 'approval_policy="never"'
+        - -c
+        - 'model_reasoning_effort="medium"'
+        - -c
+        - sandbox_workspace_write.network_access=false
       model: gpt-5.5
       requested_model: gpt-5.5
       max_budget_usd: 8

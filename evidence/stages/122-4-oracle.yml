@@ -1,0 +1,9 @@
+stage_evidence:
+  schema_version: 1
+  stage: 4_oracle
+  artifacts:
+    - path: evidence/provenance-122.json
+      sha256: fd5e35aaa9ba4516830d2bde752a7258cc8a1f01b624f3ed53ef0bce7fa39005
+  checks:
+    - name: routing-provenance
+      command: node scripts/provenance-gate.cjs evidence/provenance-122.json --git-diff

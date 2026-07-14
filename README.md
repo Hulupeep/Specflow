@@ -176,6 +176,31 @@ The local runner is not a hosted scheduler. It runs or records the next bounded
 step, preserves state, and stops when a human gate, missing evidence, failed
 gate, or `agent_action_required` state is reached.
 
+After an agent completes a rail that has no built-in verifier, persist a
+hash-bound stage-evidence manifest and resume with `--stage-evidence`:
+
+```yaml
+stage_evidence:
+  schema_version: 1
+  stage: 2_contract
+  artifacts:
+    - path: docs/specs/example/contract.yml
+      sha256: <sha256-of-the-file>
+  checks:
+    - name: contract-tests
+      command: npm test -- --runInBand
+```
+
+```bash
+specflow run feature-build --slug example --stage-evidence evidence/example-2-contract.yml
+```
+
+Specflow re-reads every artifact hash and reruns every check before advancing.
+The manifest is evidence, not a verdict: stale hashes, failed checks, stage
+mismatches, and commands requiring a human action all block advancement. Rail
+`7_ci_handoff` stops with `human_ci_handoff_required`; it never pushes or opens
+a PR automatically.
+
 For generative stages, an optional adapter policy can delegate one turn to an
 operator-owned CLI such as Claude Code (`claude -p`) or Codex (`codex exec`).
 Those CLIs keep their own authentication and subscriptions; Specflow stores no
@@ -183,17 +208,18 @@ Claude/Codex subscription secrets. Provider output is never itself a gate result
 the owning Specflow verifier must rerun before the run contract advances.
 
 For larger initiatives, use `.specflow/adapter-routing.yml` to declare the
-default split: expensive requirements/planning/review stages can route to a
-frontier Claude/Fable policy, while bounded coding/test/release-prep stages can
-route to Codex CLI with GPT-5.5. Each policy also declares a thinking level
+runtime profile. Claude Code uses the shipped Claude/Fable planning and review
+profile; Codex uses the shipped Codex-only GPT-5.6 Sol profile. Each policy also declares a thinking level
 (`effort`) such as `medium`, `high`, or `xhigh`. The shipped
-`.specflow/adapter-policies/claude-code-large-routing.yml` template requires
+runtime-specific template requires
 `--confirm-models` before invoking a routed provider, so expensive model choices
 are shown to the operator before spend or quota use. Budget fields are caps /
 quota guards, not guaranteed costs; ChatGPT-authenticated Codex consumes Codex
-plan quota/credits rather than OpenAI API billing. `specflow init`, `specflow update`, and
-interactive `specflow run` can ask whether to enable the default routing; the
-non-interactive shortcut is `specflow run --setup-routing`.
+plan quota/credits rather than OpenAI API billing. Select the runtime explicitly
+with `specflow init . --runtime codex`, `specflow update . --runtime
+claude-code`, or `specflow run --setup-routing --runtime codex|claude-code`.
+Reruns are idempotent, custom routing is preserved unless `--replace-routing`
+is supplied, and `.specflow/install-state.yml` records routing provenance.
 
 Before any build loop starts, the agent should say either `Model routing active:`
 with the current stage's provider/model choices, or explain how to install the

@@ -13,6 +13,19 @@ RED='\033[0;31m'
 NC='\033[0m' # No Color
 
 TARGET_DIR="$1"
+SPECFLOW_RUNTIME_ARG=""
+REPLACE_ROUTING=false
+PREV_ARG=""
+for arg in "$@"; do
+  if [ "$PREV_ARG" = "--runtime" ]; then
+    SPECFLOW_RUNTIME_ARG="$arg"
+    PREV_ARG=""
+  elif [ "$arg" = "--runtime" ]; then
+    PREV_ARG="--runtime"
+  elif [ "$arg" = "--replace-routing" ]; then
+    REPLACE_ROUTING=true
+  fi
+done
 
 # If no target specified, use current directory
 if [ -z "$TARGET_DIR" ]; then
@@ -34,45 +47,10 @@ echo -e "${GREEN}Target:${NC} $TARGET_DIR"
 echo ""
 
 prompt_model_routing() {
-  local template="$TARGET_DIR/.specflow/adapter-policies/claude-code-large-routing.yml"
-  local destination="$TARGET_DIR/.specflow/adapter-routing.yml"
-
-  if [ -f "$destination" ]; then
-    echo -e "${GREEN}✓${NC} Model routing already active → .specflow/adapter-routing.yml"
-    return 0
-  fi
-  if [ ! -f "$template" ]; then
-    echo -e "${YELLOW}⚠️${NC}  Model routing template not found; run specflow update after upgrading Specflow"
-    return 0
-  fi
-
-  case "${SPECFLOW_MODEL_ROUTING:-}" in
-    1|true|TRUE|yes|YES|y|Y)
-      cp "$template" "$destination"
-      echo -e "${GREEN}✓${NC} Enabled model routing → .specflow/adapter-routing.yml"
-      return 0
-      ;;
-    0|false|FALSE|no|NO|n|N)
-      echo -e "${YELLOW}⚠️${NC}  Model routing not enabled"
-      return 0
-      ;;
-  esac
-
-  if [ -t 0 ]; then
-    printf "Enable model routing now? This activates Claude/Fable for planning/review and Codex for coding. [y/N] "
-    read -r answer
-    case "$answer" in
-      y|Y|yes|YES)
-        cp "$template" "$destination"
-        echo -e "${GREEN}✓${NC} Enabled model routing → .specflow/adapter-routing.yml"
-        ;;
-      *)
-        echo -e "${YELLOW}⚠️${NC}  Model routing not enabled. Enable later with: specflow run --setup-routing"
-        ;;
-    esac
-  else
-    echo -e "${YELLOW}⚠️${NC}  Model routing not enabled in non-interactive install. Enable later with: specflow run --setup-routing"
-  fi
+  local args=(install --source "$SCRIPT_DIR" --target "$TARGET_DIR")
+  [ -n "$SPECFLOW_RUNTIME_ARG" ] && args+=(--runtime "$SPECFLOW_RUNTIME_ARG")
+  [ "$REPLACE_ROUTING" = true ] && args+=(--replace-routing)
+  node "$SCRIPT_DIR/scripts/runtime-routing.cjs" "${args[@]}"
 }
 
 # Determine source directory (where this script lives)
@@ -393,6 +371,7 @@ if [ ! -f "$TARGET_DIR/AGENTS.md" ] || ! grep -q "Specflow Loop Routing" "$TARGE
 fi
 for policy_path in \
   ".specflow/adapter-policies/claude-code-large-routing.yml" \
+  ".specflow/adapter-policies/codex-gpt56-sol-routing.yml" \
   ".specflow/adapter-policies/claude-print.safe.yml" \
   ".specflow/adapter-policies/codex-exec.safe.yml"; do
   if [ ! -f "$TARGET_DIR/$policy_path" ]; then

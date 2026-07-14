@@ -8,9 +8,11 @@
  */
 
 const { spawnSync } = require('child_process');
+const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve } = require('path');
 const yaml = require('js-yaml');
+const { installRuntimeRouting } = require('./runtime-routing.cjs');
 
 const LOOP_PATHS = {
   'spec-build': 'templates/QA/loops/spec-build.yaml',
@@ -146,6 +148,14 @@ function defaultRoutingTemplatePath(options = {}) {
 }
 
 function installDefaultAdapterRouting(options = {}) {
+  if (!options.routingTemplate) {
+    return installRuntimeRouting({
+      sourceRoot: resolve(__dirname, '..'),
+      targetRoot: options.targetRoot || process.cwd(),
+      runtime: options.runtime,
+      replaceRouting: options.replaceRouting === true || options.force === true,
+    });
+  }
   const destination = options.adapterRouting || '.specflow/adapter-routing.yml';
   if (existsSync(destination) && !options.force) {
     return { status: 'exists', routing_path: destination };
@@ -535,6 +545,126 @@ function runCommand(command, options = {}) {
     stderr: result.stderr || '',
     error: result.error ? result.error.message : null,
   };
+}
+
+function fileSha256(path) {
+  return createHash('sha256').update(readFileSync(path)).digest('hex');
+}
+
+function loadStageEvidence(path) {
+  if (!path || !existsSync(path)) {
+    return { ok: false, errors: [`stage evidence file not found: ${path || '(missing)'}`] };
+  }
+  let wrapper;
+  try {
+    wrapper = loadDataFile(path);
+  } catch (error) {
+    return { ok: false, errors: [`stage evidence is invalid: ${error.message}`] };
+  }
+  const evidence = wrapper && wrapper.stage_evidence ? wrapper.stage_evidence : wrapper;
+  const errors = [];
+  if (!evidence || evidence.schema_version !== 1) errors.push('stage_evidence.schema_version must be 1');
+  if (!evidence || !evidence.stage) errors.push('stage_evidence.stage is required');
+  if (!evidence || !Array.isArray(evidence.artifacts) || !evidence.artifacts.length) {
+    errors.push('stage_evidence.artifacts must contain at least one hashed artifact');
+  }
+  if (!evidence || !Array.isArray(evidence.checks) || !evidence.checks.length) {
+    errors.push('stage_evidence.checks must contain at least one verifier command');
+  }
+  return { ok: errors.length === 0, errors, evidence };
+}
+
+function forbiddenStageCheck(command, neverWithoutHuman = []) {
+  const declared = containsForbiddenAction(command, neverWithoutHuman);
+  if (declared) return declared;
+  const patterns = [
+    [/\bgit\s+push\b/i, 'git push'],
+    [/\bgh\s+pr\s+create\b/i, 'open PR'],
+    [/\bgh\s+pr\s+merge\b/i, 'merge'],
+    [/--no-verify\b/i, '--no-verify'],
+  ];
+  const matched = patterns.find(([pattern]) => pattern.test(String(command || '')));
+  return matched ? matched[1] : null;
+}
+
+function executeStageEvidence(contract, evidencePath, options = {}) {
+  const loaded = loadStageEvidence(evidencePath);
+  if (!loaded.ok) {
+    return {
+      status: 'invalid_stage_evidence',
+      advance: false,
+      entries: [{
+        stage: contract.current_stage_or_rail,
+        event: 'stage_evidence',
+        result: 'fail',
+        stop_reason: 'invalid_stage_evidence',
+        evidence_path: evidencePath,
+        errors: loaded.errors,
+      }],
+    };
+  }
+  const evidence = loaded.evidence;
+  const errors = [];
+  if (evidence.stage !== contract.current_stage_or_rail) {
+    errors.push(`stage evidence targets ${evidence.stage}, but durable run is at ${contract.current_stage_or_rail}`);
+  }
+  for (const artifact of evidence.artifacts) {
+    if (!artifact || !artifact.path || !artifact.sha256) {
+      errors.push('every stage evidence artifact requires path and sha256');
+      continue;
+    }
+    if (!existsSync(artifact.path)) {
+      errors.push(`stage evidence artifact not found: ${artifact.path}`);
+      continue;
+    }
+    if (fileSha256(artifact.path) !== artifact.sha256) {
+      errors.push(`stage evidence artifact hash mismatch: ${artifact.path}`);
+    }
+  }
+  for (const check of evidence.checks) {
+    if (!check || !check.name || !check.command) {
+      errors.push('every stage evidence check requires name and command');
+      continue;
+    }
+    const forbidden = forbiddenStageCheck(check.command, contract.never_without_human || []);
+    if (forbidden) errors.push(`stage evidence check requires human action "${forbidden}": ${check.name}`);
+  }
+  if (errors.length) {
+    return {
+      status: 'invalid_stage_evidence',
+      advance: false,
+      entries: [{
+        stage: contract.current_stage_or_rail,
+        event: 'stage_evidence',
+        result: 'fail',
+        stop_reason: 'invalid_stage_evidence',
+        evidence_path: evidencePath,
+        evidence_sha256: fileSha256(evidencePath),
+        errors,
+      }],
+    };
+  }
+
+  const entries = [];
+  for (const check of evidence.checks) {
+    const result = runCommand(check.command, options);
+    const pass = result.exit_code === 0;
+    entries.push({
+      stage: contract.current_stage_or_rail,
+      verifier: check.name,
+      command: check.command,
+      result: pass ? 'pass' : 'fail',
+      exit_code: result.exit_code,
+      stdout: result.stdout,
+      stderr: result.stderr,
+      stop_reason: pass ? null : 'gate_failed',
+      evidence_path: evidencePath,
+      evidence_sha256: fileSha256(evidencePath),
+      artifacts: evidence.artifacts,
+    });
+    if (!pass) return { status: 'gate_failed', entries, advance: false };
+  }
+  return { status: 'gate_passed', entries, advance: true };
 }
 
 function fileMtimeMs(path) {
@@ -1171,6 +1301,7 @@ function verifierCommandsForStage(contract, options = {}) {
 function executeVerifierRegistry(contract, options = {}) {
   const commands = verifierCommandsForStage(contract, options);
   if (!commands.length) {
+    if (options.stageEvidence) return executeStageEvidence(contract, options.stageEvidence, options);
     return {
       status: 'agent_action_required',
       entries: [{
@@ -1769,6 +1900,20 @@ function runLoop(options) {
     return { status: 'invalid_contract', errors: validation.errors, contractPath, ledgerPath };
   }
 
+  if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '7_ci_handoff') {
+    const entry = {
+      stage: '7_ci_handoff',
+      event: 'human_handoff',
+      result: 'blocked',
+      stop_reason: 'human_ci_handoff_required',
+      next_action: 'human pushes the branch or opens the PR so branch-protected Gate C can run',
+    };
+    appendLedger(ledgerPath, entry);
+    contract.terminal_status = 'handoff';
+    writeYaml(contractPath, { run_contract: contract });
+    return { status: 'human_ci_handoff_required', entry, contractPath, ledgerPath };
+  }
+
   const routed = !options.adapterPolicy ? resolveAdapterRouting({ ...options, slug }, contract) : null;
   if (routed && routed.status === 'resolved' && routed.confirmationRequired && !options.confirmModels) {
     const plan = modelConfirmationPlan(routed, { slug });
@@ -1887,6 +2032,16 @@ function runLoop(options) {
   }
   for (const entry of registryResult.entries) appendLedger(ledgerPath, promptPath ? { ...entry, prompt_path: promptPath } : entry);
   if (registryResult.advance) {
+    if (options.stageEvidence) {
+      if (Array.isArray(contract.durable_evidence) && !contract.durable_evidence.includes(options.stageEvidence)) {
+        contract.durable_evidence.push(options.stageEvidence);
+      } else if (!Array.isArray(contract.durable_evidence)) {
+        contract.durable_evidence.stage_evidence = contract.durable_evidence.stage_evidence || [];
+        if (!contract.durable_evidence.stage_evidence.includes(options.stageEvidence)) {
+          contract.durable_evidence.stage_evidence.push(options.stageEvidence);
+        }
+      }
+    }
     contract.current_stage_or_rail = nextStage(contract, options);
     contract.next_gate = `advance to ${contract.current_stage_or_rail}`;
     contract.terminal_status = contract.current_stage_or_rail === 'handoff' ? 'handoff' : 'in_progress';
@@ -2036,7 +2191,7 @@ function planAdapterSmoke(provider, options = {}) {
     command: provider === 'claude-print' ? 'claude' : 'codex',
     args: provider === 'claude-print'
       ? ['-p', '--output-format', 'json']
-      : ['--sandbox', 'read-only', '--ask-for-approval', 'never'],
+      : ['--sandbox', 'read-only', '--ephemeral', '-c', 'approval_policy="never"'],
     timeout_seconds: 120,
     max_iterations: 1,
     transcript_path: `.specflow/runs/adapter-smoke/${provider}.jsonl`,
@@ -2072,7 +2227,7 @@ function cli(argv = process.argv.slice(2)) {
     }
   }
   if (!loop) {
-    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--until-terminal] [--max-iterations n] [--setup-routing|--check-routing-models|--update-routing-models]');
+    console.error('Usage: specflow run <loop|status|trace> --slug <slug> --goal <goal> --input <path> [--contract path] [--run-dir path] [--stage-evidence path] [--until-terminal] [--max-iterations n] [--setup-routing|--check-routing-models|--update-routing-models]');
     return 2;
   }
   try {
@@ -2095,7 +2250,7 @@ function cli(argv = process.argv.slice(2)) {
           console.error(`Model routing enabled: ${installed.routing_path}`);
         } else if (enabled === false) {
           console.error('Model routing not enabled. Continuing without routed adapters.');
-          console.error('To enable later: specflow run --setup-routing');
+          console.error('To enable later: specflow run --setup-routing --runtime codex|claude-code');
         }
       }
       result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
@@ -2107,6 +2262,11 @@ function cli(argv = process.argv.slice(2)) {
     if (result.status === 'missing_contract') {
       console.error(result.error);
       return 2;
+    }
+    if (result.status === 'invalid_stage_evidence') {
+      console.error('specflow run failed: stage evidence did not satisfy the durable rail contract');
+      console.log(JSON.stringify(result, null, 2));
+      return 1;
     }
     console.log(JSON.stringify(result, null, 2));
     return 0;
@@ -2152,6 +2312,8 @@ module.exports = {
   nextStage,
   verifierCommandsForStage,
   executeVerifierRegistry,
+  loadStageEvidence,
+  executeStageEvidence,
   materializeStagePrompt,
   planAdapterSmoke,
   verificationPaths,

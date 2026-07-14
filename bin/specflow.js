@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execSync } = require('child_process');
+const { execFileSync, execSync } = require('child_process');
 const { resolve, dirname, join } = require('path');
 const { existsSync, readFileSync, writeFileSync, readdirSync } = require('fs');
 const { cli: runSpecflowLoop, planAdapterSmoke, runAdapter, scaffoldRoutineManifest } = require('../scripts/specflow-runner.cjs');
@@ -28,12 +28,20 @@ function normalizeShellScripts(root) {
 
 const COMMANDS = {
   init: {
-    usage: 'specflow init [target-dir]',
+    usage: 'specflow init [target-dir] --runtime codex|claude-code [--replace-routing]',
     desc: 'Set up Specflow in a project (safe to re-run)',
     run: (args) => {
-      const target = resolve(args[0] || '.');
+      const runtimeIndex = args.indexOf('--runtime');
+      const runtime = runtimeIndex >= 0 ? args[runtimeIndex + 1] : null;
+      if (runtimeIndex >= 0 && (!runtime || runtime.startsWith('--'))) {
+        console.error('specflow init: --runtime requires codex or claude-code');
+        process.exit(1);
+      }
+      const replaceRouting = args.includes('--replace-routing');
+      const targetArg = args.find((arg, index) => !arg.startsWith('--') && index !== runtimeIndex + 1);
+      const target = resolve(targetArg || '.');
       normalizeShellScripts(SPECFLOW_ROOT);
-      exec(`bash "${SPECFLOW_ROOT}/setup-project.sh" "${target}"`);
+      execFile('bash', [join(SPECFLOW_ROOT, 'setup-project.sh'), target, ...(runtime ? ['--runtime', runtime] : []), ...(replaceRouting ? ['--replace-routing'] : [])]);
     },
   },
   verify: {
@@ -46,13 +54,21 @@ const COMMANDS = {
     },
   },
   update: {
-    usage: 'specflow update [target-dir] [--ci]',
+    usage: 'specflow update [target-dir] [--ci] --runtime codex|claude-code [--replace-routing]',
     desc: 'Update hooks and optionally install CI workflows',
     run: (args) => {
       const ciFlag = args.includes('--ci') ? '--ci' : '';
-      const target = resolve(args.find(a => a !== '--ci') || '.');
+      const runtimeIndex = args.indexOf('--runtime');
+      const runtime = runtimeIndex >= 0 ? args[runtimeIndex + 1] : null;
+      if (runtimeIndex >= 0 && (!runtime || runtime.startsWith('--'))) {
+        console.error('specflow update: --runtime requires codex or claude-code');
+        process.exit(1);
+      }
+      const replaceRouting = args.includes('--replace-routing');
+      const targetArg = args.find((arg, index) => !arg.startsWith('--') && index !== runtimeIndex + 1);
+      const target = resolve(targetArg || '.');
       normalizeShellScripts(SPECFLOW_ROOT);
-      exec(`bash "${SPECFLOW_ROOT}/install-hooks.sh" "${target}" ${ciFlag}`);
+      execFile('bash', [join(SPECFLOW_ROOT, 'install-hooks.sh'), target, ...(ciFlag ? [ciFlag] : []), ...(runtime ? ['--runtime', runtime] : []), ...(replaceRouting ? ['--replace-routing'] : [])]);
     },
   },
   audit: {
@@ -135,7 +151,7 @@ const COMMANDS = {
     },
   },
   run: {
-    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--adapter-routing <path>] | specflow run --setup-routing | specflow run --check-routing-models | specflow run --update-routing-models',
+    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--stage-evidence <path>] [--adapter-routing <path>] | specflow run --setup-routing --runtime codex|claude-code | specflow run --check-routing-models | specflow run --update-routing-models',
     desc: 'Run or resume a local contracted Specflow loop',
     run: (args) => {
       const code = runSpecflowLoop(args);
@@ -234,6 +250,14 @@ function exec(cmd) {
   }
 }
 
+function execFile(command, args) {
+  try {
+    execFileSync(command, args, { stdio: 'inherit' });
+  } catch (e) {
+    process.exit(e.status || 1);
+  }
+}
+
 function execSilent(cmd) {
   try {
     return execSync(cmd, { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] });
@@ -263,12 +287,12 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  • process docs: PROCESS.md / -GUIDE / -CLAUDE / -CODEX');
   console.log('  → then read QA/loops/README.md to run the pipeline.\n');
   console.log('Examples:');
-  console.log('  npx @colmbyrne/specflow init .            # Mac/Linux any terminal; Windows = Git Bash');
-  console.log('  npx @colmbyrne/specflow update . --ci');
+  console.log('  npx @colmbyrne/specflow init . --runtime codex  # Mac/Linux any terminal; Windows = Git Bash');
+  console.log('  npx @colmbyrne/specflow update . --ci --runtime claude-code');
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
-  console.log('  npx @colmbyrne/specflow run --setup-routing');
+  console.log('  npx @colmbyrne/specflow run --setup-routing --runtime codex');
   console.log('  npx @colmbyrne/specflow run --check-routing-models');
   console.log('  npx @colmbyrne/specflow run --update-routing-models');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --adapter-routing .specflow/adapter-routing.yml --confirm-models');

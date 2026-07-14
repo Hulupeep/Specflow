@@ -55,7 +55,7 @@ describe('install-hooks.sh', () => {
     return spawnSync('bash', [INSTALLER_PATH, target || targetDir], {
       encoding: 'utf-8',
       timeout: 15000,
-      env: { ...process.env, ...env },
+      env: { ...process.env, SPECFLOW_RUNTIME: 'codex', ...env },
     });
   }
 
@@ -69,18 +69,19 @@ describe('install-hooks.sh', () => {
       expect(fs.existsSync(path.join(targetDir, '.claude', 'hooks', 'run-journey-tests.sh'))).toBe(true);
     });
 
-    test('can enable model routing during update/install', () => {
-      const result = runInstaller(targetDir, { SPECFLOW_MODEL_ROUTING: 'yes' });
+    test('installs model routing for the selected runtime', () => {
+      const result = runInstaller(targetDir);
       expect(result.status).toBe(0);
       expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-policies', 'claude-code-large-routing.yml'))).toBe(true);
+      expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-policies', 'codex-gpt56-sol-routing.yml'))).toBe(true);
       expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'))).toBe(true);
-      expect(fs.readFileSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'), 'utf8')).toContain('fable-planner');
+      expect(fs.readFileSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'), 'utf8')).toContain('codex-sol-planner');
     });
 
-    test('leaves model routing inactive when declined', () => {
-      const result = runInstaller(targetDir, { SPECFLOW_MODEL_ROUTING: 'no' });
-      expect(result.status).toBe(0);
-      expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-policies', 'claude-code-large-routing.yml'))).toBe(true);
+    test('fails non-interactively without a runtime before activating routing', () => {
+      const result = runInstaller(targetDir, { SPECFLOW_RUNTIME: '' });
+      expect(result.status).toBe(1);
+      expect(result.stderr + result.stdout).toContain('runtime is required in non-interactive mode');
       expect(fs.existsSync(path.join(targetDir, '.specflow', 'adapter-routing.yml'))).toBe(false);
     });
 
