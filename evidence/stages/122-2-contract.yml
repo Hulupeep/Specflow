@@ -1,0 +1,10 @@
+stage_evidence:
+  schema_version: 1
+  stage: 2_contract
+  artifacts:
+    - path: docs/specs/runtime-routing-install/contract.yml
+      sha256: 92623989e3fc8f02599c6d237eda8ef1b7da205740481edc1aa9178957cefc28
+  checks:
+    - name: runtime-routing-contract
+      command: >-
+        node -e "const y=require('js-yaml').load(require('fs').readFileSync('docs/specs/runtime-routing-install/contract.yml','utf8'));if(y.feature!=='runtime-routing-install'||!y.journeys.some(j=>j.journey_meta.id==='J-RUNTIME-ROUTING-INSTALL'))process.exit(1)"

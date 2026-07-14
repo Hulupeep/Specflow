@@ -30,6 +30,7 @@ FAIL=0
 PROJECT_FAIL=0
 WARN=0
 STRICT=0
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 for arg in "$@"; do
     if [ "$arg" = "--strict" ]; then
@@ -594,7 +595,12 @@ else
     check_info ".specflow/ directory not found (optional, created by post-mortem learning)"
 fi
 
-ADAPTER_POLICIES=(".specflow/adapter-policies/claude-print.safe.yml" ".specflow/adapter-policies/codex-exec.safe.yml")
+ADAPTER_POLICIES=(
+    ".specflow/adapter-policies/claude-print.safe.yml"
+    ".specflow/adapter-policies/codex-exec.safe.yml"
+    ".specflow/adapter-policies/claude-code-large-routing.yml"
+    ".specflow/adapter-policies/codex-gpt56-sol-routing.yml"
+)
 for policy in "${ADAPTER_POLICIES[@]}"; do
     if [ -f "$policy" ]; then
         check_pass "$policy installed"
@@ -602,6 +608,23 @@ for policy in "${ADAPTER_POLICIES[@]}"; do
         check_fail "$policy missing — generative loop adapters have no safe starter policy"
     fi
 done
+
+ROUTING_VERIFIER="$SCRIPT_DIR/scripts/runtime-routing.cjs"
+if [ ! -f "$ROUTING_VERIFIER" ]; then
+    ROUTING_VERIFIER="scripts/runtime-routing.cjs"
+fi
+if [ -f "$ROUTING_VERIFIER" ]; then
+    ROUTING_RESULT=$(node "$ROUTING_VERIFIER" verify --target "$(pwd)" 2>&1) || ROUTING_STATUS=$?
+    if [ "${ROUTING_STATUS:-0}" -eq 0 ]; then
+        check_pass "runtime routing install state matches active routing"
+    elif [ "$STRICT" -eq 1 ]; then
+        check_fail "$ROUTING_RESULT"
+    else
+        check_warn "$ROUTING_RESULT"
+    fi
+else
+    check_fail "scripts/runtime-routing.cjs missing — routing install state cannot be verified"
+fi
 
 # Check for fix-patterns.json
 if [ -f ".specflow/fix-patterns.json" ]; then

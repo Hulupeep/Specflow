@@ -12,20 +12,28 @@ Models do work. Models do not approve their own work.
 
 ## Quick Start
 
-During `specflow init` or `specflow update`, Specflow asks:
-
-```text
-Enable model routing now? This activates Claude/Fable for planning/review and Codex for coding. [y/N]
-```
-
-Answer `y` to install the large-initiative routing default at
-`.specflow/adapter-routing.yml`.
-
-If you skipped the prompt, enable it later with:
+Select the active agent runtime during initial install or any later refresh:
 
 ```bash
-specflow run --setup-routing
+specflow init . --runtime codex
+specflow update . --runtime claude-code
 ```
+
+CLI `--runtime` takes precedence over `SPECFLOW_RUNTIME`. A non-interactive run
+without either value fails before changing active routing. Interactive runs may
+prompt for `codex` or `claude-code`.
+
+Activate or refresh routing without reinstalling other files with:
+
+```bash
+specflow run --setup-routing --runtime codex
+```
+
+All paths install both shipped templates, activate the selected profile, and
+write ownership and SHA-256 provenance to `.specflow/install-state.yml`. They do
+not launch Claude or Codex. A rerun refreshes managed routing and switches known
+shipped profiles. Custom routing remains byte-identical and reports
+`custom_routing_preserved`; replace it only with explicit `--replace-routing`.
 
 Start a loop normally:
 
@@ -47,7 +55,22 @@ asks whether to enable the default routing before it continues. Agents using the
 Specflow skill must announce either `Model routing active:` or the setup
 instruction before starting `spec-build` or `feature-build`.
 
-## What The Default Does
+## Runtime-Specific Profiles
+
+The loop-selector chooses a shipped profile from the active agent runtime. It
+does not infer the runtime from installed directories because every project can
+contain `.claude/`, `.codex/`, and `.agents/` together.
+
+| Active runtime | Routing template |
+|---|---|
+| Claude Code | `.specflow/adapter-policies/claude-code-large-routing.yml` |
+| Codex | `.specflow/adapter-policies/codex-gpt56-sol-routing.yml` |
+
+Both profiles require explicit model confirmation before provider execution.
+The Codex profile pins the official `gpt-5.6-sol` model ID and routes planning,
+review, ticket writing, and implementation through `codex exec`.
+
+## What The Claude Code Profile Does
 
 The template at `.specflow/adapter-policies/claude-code-large-routing.yml`
 defines three policies:
@@ -232,7 +255,8 @@ Edit:
 .specflow/adapter-routing.yml
 ```
 
-If the file does not exist yet, run `specflow run --setup-routing` first.
+If the file does not exist yet, run
+`specflow run --setup-routing --runtime codex|claude-code` first.
 
 To use Opus as the primary reviewer instead of Fable, change the reviewer policy:
 
@@ -304,23 +328,16 @@ separate budget control outside Specflow.
 
 ## Claude Code And Codex
 
-Model routing is runtime-agnostic. The file decides which provider command is
-called.
-
-If you are in Claude Code and the default routing file is installed:
+If you are in Claude Code and the Claude profile is installed:
 
 - planning/review routes call `claude -p`
 - coding routes call `codex exec`
 
-If you are in Codex with the same file installed:
-
-- planning/review routes still call `claude -p`, so the Claude CLI must be
-  installed and authenticated
-- coding routes call `codex exec`
-
-For an OpenAI-only setup, create a separate routing file that points planning,
-review, and implementation policies at `codex-exec` with the OpenAI models and
-effort levels you want.
+If you are in Codex, the Codex profile routes every generative stage through
+`codex exec` with `gpt-5.6-sol`. Planning and adversarial review use higher
+reasoning effort than bounded ticket writing and implementation. The policy
+passes `model_reasoning_effort` explicitly because Specflow's `effort` field is
+also retained as routing and ledger metadata.
 
 ## Safety Rules
 

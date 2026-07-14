@@ -9,10 +9,52 @@ const LOOP_FILES = [
   'templates/QA/loops/daily-use-teardown.yaml',
 ];
 
+const ROUTING_FILES = [
+  'templates/adapter-policies/claude-code-large-routing.yml',
+  'templates/adapter-policies/codex-gpt56-sol-routing.yml',
+];
+
 describe('loop YAML contracts', () => {
   test.each(LOOP_FILES)('%s parses as YAML', (rel) => {
     const content = fs.readFileSync(path.join(ROOT, rel), 'utf8');
     expect(() => yaml.load(content)).not.toThrow();
+  });
+
+  test.each(ROUTING_FILES)('%s parses as YAML', (rel) => {
+    const content = fs.readFileSync(path.join(ROOT, rel), 'utf8');
+    expect(() => yaml.load(content)).not.toThrow();
+  });
+
+  test('Codex routing uses GPT-5.6 Sol for every routed policy', () => {
+    const routing = yaml.load(fs.readFileSync(
+      path.join(ROOT, 'templates/adapter-policies/codex-gpt56-sol-routing.yml'),
+      'utf8'
+    ));
+
+    expect(routing.routing_profile).toEqual(expect.objectContaining({
+      runtime: 'codex',
+      template: 'codex-gpt56-sol-routing.yml',
+    }));
+    for (const entry of Object.values(routing.policies)) {
+      expect(entry.adapter_policy.provider).toBe('codex-exec');
+      expect(entry.adapter_policy.model).toBe('gpt-5.6-sol');
+      expect(entry.adapter_policy.requested_model).toBe('gpt-5.6-sol');
+      expect(entry.adapter_policy.args).toContain('approval_policy="never"');
+      expect(entry.adapter_policy.args).not.toContain('--ask-for-approval');
+    }
+  });
+
+  test('loop selector chooses routing by active runtime, not installed directories', () => {
+    const skill = fs.readFileSync(
+      path.join(ROOT, 'skills/specflow-loop-selector/SKILL.md'),
+      'utf8'
+    );
+
+    expect(skill).toContain('Claude Code: use');
+    expect(skill).toContain('claude-code-large-routing.yml');
+    expect(skill).toContain('Codex: use');
+    expect(skill).toContain('codex-gpt56-sol-routing.yml');
+    expect(skill).toContain('never infer the');
   });
 
   test('spec-build Gate B references runnable script paths', () => {

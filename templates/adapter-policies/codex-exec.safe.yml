@@ -7,8 +7,13 @@ adapter_policy:
   args:
     - --sandbox
     - workspace-write
-    - --ask-for-approval
-    - never
+    - --ephemeral
+    - -c
+    - 'approval_policy="never"'
+    - -c
+    - 'model_reasoning_effort="high"'
+    - -c
+    - sandbox_workspace_write.network_access=false
   model: gpt-5
   requested_model: gpt-5
   timeout_seconds: 900

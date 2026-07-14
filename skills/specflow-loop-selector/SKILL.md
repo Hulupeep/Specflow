@@ -27,6 +27,27 @@ Use this before starting any Specflow loop work. Do not rediscover the process b
 
 If two loops look plausible, choose the earlier loop in the lifecycle and state why.
 
+## Select The Runtime Routing Profile
+
+Before starting `spec-build` or `feature-build`, select routing from the active
+agent runtime. Use the agent identity supplied by the host; never infer the
+runtime from `.claude/`, `.codex/`, or `.agents/` directories because Specflow
+installs all three.
+
+- Claude Code: use
+  `.specflow/adapter-policies/claude-code-large-routing.yml`.
+- Codex: use
+  `.specflow/adapter-policies/codex-gpt56-sol-routing.yml`.
+- Any other or unknown runtime: stop and ask the human which routing profile to
+  activate.
+
+Activate or refresh the selected profile with
+`specflow run --setup-routing --runtime <codex|claude-code>`. Creating the
+routing file does not invoke a provider. The installer switches known managed or
+legacy shipped profiles, and preserves custom routing unless the human explicitly
+requests `--replace-routing`. Display a preserved custom file's actual
+current-stage policy during model confirmation.
+
 ## Mandatory Run Contract
 
 After selecting a loop, emit a `run_contract` before doing work. Referencing the YAML is not enough.
@@ -46,8 +67,7 @@ run_contract:
 ```
 
 Rules:
-- Before starting `spec-build` or `feature-build`, emit a model-routing confirmation. If `.specflow/adapter-routing.yml` exists, state `Model routing active:` and list the route for the current stage, including provider, role, requested model, effort, fallback model, and budget cap when present. Say "budget cap / quota guard", not "cost". For `codex-exec`, state that if Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing. If no routing file exists, stop before build work and tell the user to run:
-  `specflow run --setup-routing`.
+- Before starting `spec-build` or `feature-build`, select or validate the runtime routing profile above, then emit a model-routing confirmation. State `Model routing active:` and list the route for the current stage, including provider, role, requested model, effort, fallback model, and budget cap when present. Say "budget cap / quota guard", not "cost". For `codex-exec`, state that if Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing.
 - Routed providers require explicit confirmation before spend/quota use. Use `specflow run <loop> --slug <slug> --confirm-models` only after the user has accepted the displayed model choices.
 - If the user explicitly bypasses routing with `--adapter-policy`, still state that this is a one-off override and name the policy/model before invoking it.
 - Load only the selected YAML and its prompt/example if needed.

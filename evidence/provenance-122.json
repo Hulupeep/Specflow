@@ -1,0 +1,40 @@
+{
+  "issues": [122],
+  "feature_build": "idempotent runtime-aware routing installation and migration",
+  "source_provenance": [
+    {
+      "claim": "Runtime selection uses CLI before SPECFLOW_RUNTIME and rejects missing or unknown non-interactive values before routing mutation.",
+      "source": "scripts/runtime-routing.cjs resolveRuntime and installRuntimeRouting",
+      "verification": "tests/contracts/runtime-routing-install.test.js checks precedence and byte-identical active/state files after invalid input."
+    },
+    {
+      "claim": "Fresh setup installs both profiles, activates the selected runtime, and records package version plus source and installed SHA-256 hashes.",
+      "source": "scripts/runtime-routing.cjs copyShippedTemplates, atomicWrite, and writeState",
+      "verification": "J-RUNTIME-ROUTING-INSTALL re-reads both templates, active model content, install-state.yml, and hashes for Codex and Claude Code."
+    },
+    {
+      "claim": "Managed reruns refresh or switch, semantically unchanged shipped profiles migrate, and custom routing remains byte-identical unless replacement is explicit.",
+      "source": "scripts/runtime-routing.cjs semanticFingerprint and installRuntimeRouting",
+      "verification": "tests/contracts/runtime-routing-install.test.js asserts refreshed, switched, legacy_migrated, custom_routing_preserved, and explicit replacement paths."
+    },
+    {
+      "claim": "init, update, and run --setup-routing use the same installer without invoking a model provider.",
+      "source": "bin/specflow.js, setup-project.sh, install-hooks.sh, and scripts/specflow-runner.cjs",
+      "verification": "installer integration tests and temporary CLI execution returned installed/switched statuses; the shared installer imports no child-process provider launcher."
+    },
+    {
+      "claim": "Strict setup verification blocks missing, stale, or runtime-mismatched state and prints the exact replacement command.",
+      "source": "scripts/runtime-routing.cjs verifyRuntimeRouting and verify-setup.sh",
+      "verification": "tests/contracts/runtime-routing-install.test.js changes managed routing and asserts stale_routing plus the exact repair command; installer tests exercise strict verification."
+    }
+  ],
+  "checks": [
+    "npx jest tests/contracts/runtime-routing-install.test.js tests/contracts/loop-run-contract.test.js tests/hooks/installer-fixes.test.js --runInBand --no-coverage",
+    "npm test -- --runInBand",
+    "node bin/specflow.js run --setup-routing --runtime codex",
+    "SPECFLOW_RUNTIME=claude-code node bin/specflow.js run --setup-routing",
+    "node scripts/runtime-routing.cjs verify --target <temporary-project>"
+  ],
+  "result": "pass",
+  "notes": "No Claude or Codex provider is launched by routing installation. The attempted routed feature-build adapter failed at MCP authentication and was not treated as gate evidence."
+}

@@ -1,0 +1,54 @@
+feature: runtime-routing-install
+requirements:
+  - id: REQ-RUNTIME-01
+    statement: init, update, and run --setup-routing select codex or claude-code from --runtime before SPECFLOW_RUNTIME.
+  - id: REQ-RUNTIME-02
+    statement: non-interactive setup with no valid runtime fails before changing adapter-routing.yml.
+  - id: REQ-RUNTIME-03
+    statement: every successful setup installs both shipped profiles and activates the selected runtime profile without launching a provider.
+  - id: REQ-RUNTIME-04
+    statement: install-state.yml records schema, package version, selected profile, source and installed hashes, and managed ownership.
+  - id: REQ-RUNTIME-05
+    statement: reruns refresh managed routing, switch runtime deterministically, and migrate semantically unchanged shipped legacy routing.
+  - id: REQ-RUNTIME-06
+    statement: custom routing is preserved unless --replace-routing is explicitly supplied.
+  - id: REQ-RUNTIME-07
+    statement: strict verification blocks missing, stale, or runtime-mismatched managed routing with an exact repair command.
+journeys:
+  - journey_meta:
+      id: J-RUNTIME-ROUTING-INSTALL
+      persona: specflow_operator
+      owner_ticket: ROUTING-INSTALL-01
+      assertion_bar: filesystem hashes, result status, process exit status, and provider-spawn sentinel
+    scenario: install and safely rerun runtime-aware adapter routing
+    given:
+      - both Claude Code and Codex routing templates are shipped
+      - a provider-spawn sentinel records any claude or codex process invocation
+    when:
+      - the operator runs init, update, or run --setup-routing with a valid runtime
+      - the operator reruns with the same runtime or switches to the other runtime
+      - the active file is a known legacy profile, a custom profile, or a custom profile with --replace-routing
+    then:
+      - fresh setup reports installed and writes install-state.yml
+      - same-runtime rerun reports refreshed without changing routing semantics
+      - runtime change reports switched and activates the selected template
+      - known legacy routing reports legacy_migrated
+      - custom routing reports custom_routing_preserved and remains byte-identical
+      - --replace-routing replaces custom routing with the selected template
+      - no provider process is invoked
+
+  - journey_meta:
+      id: J-RUNTIME-ROUTING-INVALID
+      persona: ci_maintainer
+      owner_ticket: ROUTING-INSTALL-01
+      assertion_bar: non-zero exit plus byte-identical active routing and install state
+    scenario: reject missing or unknown runtime in non-interactive setup
+    given:
+      - stdin is non-interactive
+      - optional existing routing and install-state files have known hashes
+    when:
+      - no runtime is available from CLI, environment, or existing managed state
+      - or an unknown runtime value is supplied
+    then:
+      - setup exits non-zero and names codex and claude-code as valid values
+      - adapter-routing.yml and install-state.yml remain unchanged

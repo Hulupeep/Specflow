@@ -1,0 +1,21 @@
+stage_evidence:
+  schema_version: 1
+  stage: 5_impl
+  artifacts:
+    - path: scripts/runtime-routing.cjs
+      sha256: 58c1b9e859c9b977b34ca2a7f373986b8241882382314fd4d25b2b5408bcd605
+    - path: bin/specflow.js
+      sha256: 980a60354d45a4431d06fb25226261cf0a24a2e030fac047a5fbf5c6093dffe3
+    - path: setup-project.sh
+      sha256: 771cac39732bd39cc76076ba48cf634d919cc251ca7a7b94a6daea08d8515d2c
+    - path: install-hooks.sh
+      sha256: 95a8dcd4fcd30dd9a28b2a520fd783e3a9f92159bfd4fac9089ee0aaea0cfc42
+    - path: verify-setup.sh
+      sha256: aa3f0ad17c34fb0babf1bfe2a03d35f1cc62ffc015b44600431ce0d229f35bcb
+    - path: scripts/specflow-runner.cjs
+      sha256: 922d4d51da83c0ededefbd0f3f8550d42ef5b3ee2c791586dd2c356a9164d956
+    - path: tests/contracts/loop-run-contract.test.js
+      sha256: 76df403622086add4bfeb4137403012d488206a261cc9f1aaaaa50aa16838a65
+  checks:
+    - name: full-regression-suite
+      command: npm test -- --runInBand

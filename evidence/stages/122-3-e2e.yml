@@ -1,0 +1,9 @@
+stage_evidence:
+  schema_version: 1
+  stage: 3_e2e
+  artifacts:
+    - path: tests/contracts/runtime-routing-install.test.js
+      sha256: 1f9665da0d19e8ca8562f71f15ac61ec40da436af538ff37d723a429f97475f8
+  checks:
+    - name: runtime-routing-journey
+      command: npx jest tests/contracts/runtime-routing-install.test.js --runInBand --no-coverage

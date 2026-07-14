@@ -1,0 +1,158 @@
+defaults:
+  confirm_models: true
+  reason: Confirm GPT-5.6 Sol choices before consuming Codex plan quota or credits.
+
+routing_profile:
+  id: codex-gpt56-sol
+  runtime: codex
+  template: codex-gpt56-sol-routing.yml
+
+policies:
+  codex-sol-planner:
+    adapter_policy:
+      id: codex-sol-planner
+      provider: codex-exec
+      command: codex
+      role: planner
+      effort: xhigh
+      args:
+        - --strict-config
+        - --sandbox
+        - workspace-write
+        - --ephemeral
+        - -c
+        - 'approval_policy="never"'
+        - -c
+        - 'model_reasoning_effort="xhigh"'
+        - -c
+        - sandbox_workspace_write.network_access=false
+      model: gpt-5.6-sol
+      requested_model: gpt-5.6-sol
+      timeout_seconds: 1800
+      max_iterations: 1
+      allowed_tools: []
+      denied_tools:
+        - git push
+        - gh pr create
+        - gh issue create
+        - gh pr merge
+        - --no-verify
+      transcript_path: .specflow/runs/<slug>/adapter/codex-sol-planner.jsonl
+      output_path: .specflow/runs/<slug>/adapter/codex-sol-planner.md
+      never_without_human:
+        - git push
+        - open PR
+        - merge
+        - production deploy
+        - --no-verify
+        - override contract
+
+  codex-sol-reviewer:
+    adapter_policy:
+      id: codex-sol-reviewer
+      provider: codex-exec
+      command: codex
+      role: verifier
+      effort: high
+      args:
+        - --strict-config
+        - --sandbox
+        - workspace-write
+        - --ephemeral
+        - -c
+        - 'approval_policy="never"'
+        - -c
+        - 'model_reasoning_effort="high"'
+        - -c
+        - sandbox_workspace_write.network_access=false
+      model: gpt-5.6-sol
+      requested_model: gpt-5.6-sol
+      timeout_seconds: 1800
+      max_iterations: 1
+      allowed_tools: []
+      denied_tools:
+        - git push
+        - gh pr create
+        - gh issue create
+        - gh pr merge
+        - --no-verify
+      transcript_path: .specflow/runs/<slug>/adapter/codex-sol-reviewer.jsonl
+      output_path: .specflow/runs/<slug>/adapter/codex-sol-reviewer.md
+      never_without_human:
+        - git push
+        - open PR
+        - merge
+        - production deploy
+        - --no-verify
+        - override contract
+
+  codex-sol-implementer:
+    adapter_policy:
+      id: codex-sol-implementer
+      provider: codex-exec
+      command: codex
+      role: implementer
+      effort: medium
+      args:
+        - --strict-config
+        - --sandbox
+        - workspace-write
+        - --ephemeral
+        - -c
+        - 'approval_policy="never"'
+        - -c
+        - 'model_reasoning_effort="medium"'
+        - -c
+        - sandbox_workspace_write.network_access=false
+      model: gpt-5.6-sol
+      requested_model: gpt-5.6-sol
+      timeout_seconds: 1800
+      max_iterations: 1
+      allowed_tools: []
+      denied_tools:
+        - git push
+        - gh pr create
+        - gh issue create
+        - gh pr merge
+        - --no-verify
+      transcript_path: .specflow/runs/<slug>/adapter/codex-sol-implementer.jsonl
+      output_path: .specflow/runs/<slug>/adapter/codex-sol-implementer.md
+      never_without_human:
+        - git push
+        - open PR
+        - merge
+        - production deploy
+        - --no-verify
+        - override contract
+
+routes:
+  spec-build:
+    discover:
+      policy: codex-sol-planner
+      reason: product discovery and requirements grounding
+    draft:
+      policy: codex-sol-planner
+      reason: PRD shaping and executable acceptance design
+    adversary:
+      policy: codex-sol-reviewer
+      reason: adversarial review and falsification
+    tickets:
+      policy: codex-sol-implementer
+      reason: bounded ticket and executable-contract authoring
+
+  feature-build:
+    2_contract:
+      policy: codex-sol-implementer
+      reason: contract expansion from an accepted ticket
+    3_e2e:
+      policy: codex-sol-implementer
+      reason: journey and test authoring
+    4_oracle:
+      policy: codex-sol-implementer
+      reason: oracle and provenance wiring
+    5_impl:
+      policy: codex-sol-implementer
+      reason: implementation and local verification
+    review:
+      policy: codex-sol-reviewer
+      reason: independent high-effort review

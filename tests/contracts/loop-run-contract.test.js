@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
+const { createHash } = require('crypto');
 const yaml = require('js-yaml');
 
 const {
@@ -40,7 +41,109 @@ function readJsonl(file) {
   return fs.readFileSync(file, 'utf8').trim().split('\n').filter(Boolean).map((line) => JSON.parse(line));
 }
 
+function sha256(file) {
+  return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function writeFeatureRun(dir, stage = '2_contract') {
+  const contract = path.join(dir, 'run-contract.yaml');
+  const ledger = path.join(dir, 'ledger.jsonl');
+  fs.writeFileSync(contract, yaml.dump({
+    run_contract: {
+      loop: 'feature-build',
+      goal: 'verified stage completion',
+      input_artifact: 'issue #122',
+      path: 'templates/QA/loops/feature-build.yaml',
+      current_stage_or_rail: stage,
+      next_gate: `advance from ${stage}`,
+      durable_evidence: [contract, ledger],
+      stop_condition: 'human CI handoff',
+      never_without_human: ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
+      storage: { contract_path: contract, ledger_path: ledger },
+    },
+  }));
+  return { contract, ledger };
+}
+
 describe('local contracted loop runner', () => {
+  test('reruns hashed stage evidence checks before advancing an agent rail', () => {
+    const dir = tempDir();
+    const { contract, ledger } = writeFeatureRun(dir);
+    const artifact = path.join(dir, 'contract.yml');
+    const evidence = path.join(dir, 'stage-evidence.yml');
+    fs.writeFileSync(artifact, 'feature: routing-install\n');
+    fs.writeFileSync(evidence, yaml.dump({
+      stage_evidence: {
+        schema_version: 1,
+        stage: '2_contract',
+        artifacts: [{ path: artifact, sha256: sha256(artifact) }],
+        checks: [{ name: 'parse-contract', command: `node -e "require('js-yaml').load(require('fs').readFileSync('${artifact}','utf8'))"` }],
+      },
+    }));
+
+    const result = runLoop({ loop: 'feature-build', contract, ledger, stageEvidence: evidence, noAdapterRouting: true });
+
+    expect(result.status).toBe('gate_passed');
+    expect(yaml.load(fs.readFileSync(contract, 'utf8')).run_contract.current_stage_or_rail).toBe('3_e2e');
+    expect(readJsonl(ledger)[0]).toMatchObject({ verifier: 'parse-contract', result: 'pass', evidence_path: evidence });
+  });
+
+  test('rejects changed artifacts without executing their stage checks', () => {
+    const dir = tempDir();
+    const { contract, ledger } = writeFeatureRun(dir);
+    const artifact = path.join(dir, 'contract.yml');
+    const marker = path.join(dir, 'executed');
+    const evidence = path.join(dir, 'stage-evidence.yml');
+    fs.writeFileSync(artifact, 'feature: before\n');
+    const expectedHash = sha256(artifact);
+    fs.writeFileSync(artifact, 'feature: after\n');
+    fs.writeFileSync(evidence, yaml.dump({
+      stage_evidence: {
+        schema_version: 1,
+        stage: '2_contract',
+        artifacts: [{ path: artifact, sha256: expectedHash }],
+        checks: [{ name: 'must-not-run', command: `node -e "require('fs').writeFileSync('${marker}','bad')"` }],
+      },
+    }));
+
+    const result = runLoop({ loop: 'feature-build', contract, ledger, stageEvidence: evidence, noAdapterRouting: true });
+
+    expect(result.status).toBe('invalid_stage_evidence');
+    expect(fs.existsSync(marker)).toBe(false);
+    expect(yaml.load(fs.readFileSync(contract, 'utf8')).run_contract.current_stage_or_rail).toBe('2_contract');
+  });
+
+  test('rejects stage checks that perform human-gated actions', () => {
+    const dir = tempDir();
+    const { contract, ledger } = writeFeatureRun(dir);
+    const artifact = path.join(dir, 'contract.yml');
+    const evidence = path.join(dir, 'stage-evidence.yml');
+    fs.writeFileSync(artifact, 'feature: routing-install\n');
+    fs.writeFileSync(evidence, yaml.dump({
+      stage_evidence: {
+        schema_version: 1,
+        stage: '2_contract',
+        artifacts: [{ path: artifact, sha256: sha256(artifact) }],
+        checks: [{ name: 'unsafe', command: 'gh pr create --fill' }],
+      },
+    }));
+
+    const result = runLoop({ loop: 'feature-build', contract, ledger, stageEvidence: evidence, noAdapterRouting: true });
+    expect(result.status).toBe('invalid_stage_evidence');
+    expect(readJsonl(ledger)[0].errors[0]).toContain('open PR');
+  });
+
+  test('stops rail 7 at an explicit human CI handoff', () => {
+    const dir = tempDir();
+    const { contract, ledger } = writeFeatureRun(dir, '7_ci_handoff');
+
+    const result = runLoop({ loop: 'feature-build', contract, ledger, noAdapterRouting: true });
+
+    expect(result.status).toBe('human_ci_handoff_required');
+    expect(result.entry.stop_reason).toBe('human_ci_handoff_required');
+    expect(yaml.load(fs.readFileSync(contract, 'utf8')).run_contract.terminal_status).toBe('handoff');
+  });
+
   test('creates a default run_contract and ledger at .specflow/runs/<slug>', () => {
     const dir = tempDir();
     const contract = path.join(dir, '.specflow/runs/demo/run-contract.yaml');
@@ -53,6 +156,7 @@ describe('local contracted loop runner', () => {
       input: 'docs/idea.md',
       contract,
       ledger,
+      noAdapterRouting: true,
     });
 
     expect(result.status).toBe('agent_action_required');
@@ -255,7 +359,7 @@ describe('local contracted loop runner', () => {
     }));
     fs.writeFileSync(ledger, `${JSON.stringify({ stage: '6_provenance', verifier: 'provenance', result: 'pass' })}\n`);
 
-    const status = runStatus({ contract });
+    const status = runStatus({ contract, noAdapterRouting: true });
     expect(status.status).toBe('ok');
     expect(status.current_stage_or_rail).toBe('6_provenance');
     expect(status.ledger_tail).toHaveLength(1);
@@ -385,8 +489,8 @@ describe('generative adapter policy and command builders', () => {
     const command = buildAdapterCommand({
       provider: 'codex-exec',
       command: 'codex',
-      args: ['--sandbox', 'workspace-write', '--ask-for-approval', 'never'],
-      model: 'gpt-5',
+      args: ['--sandbox', 'workspace-write', '-c', 'approval_policy="never"'],
+      model: 'gpt-5.6-sol',
       profile: 'pro',
     });
     expect(command.command).toBe('codex');
@@ -408,7 +512,7 @@ describe('generative adapter policy and command builders', () => {
     const codex = buildAdapterCommand({
       provider: 'codex-exec',
       command: 'codex',
-      args: ['--ask-for-approval', 'never'],
+      args: ['-c', 'approval_policy="never"'],
       session_id: 'codex-session',
     });
 
@@ -420,6 +524,12 @@ describe('generative adapter policy and command builders', () => {
     const smoke = planAdapterSmoke('claude-print', { live: false });
     expect(smoke.policy.prompt).toContain('SPECFLOW_ADAPTER_SMOKE_OK');
     expect(smoke.planned.args.join(' ')).toContain('SPECFLOW_ADAPTER_SMOKE_OK');
+  });
+
+  test('Codex adapter smoke uses the current approval configuration syntax', () => {
+    const smoke = planAdapterSmoke('codex-exec', { live: false });
+    expect(smoke.planned.args).toContain('approval_policy="never"');
+    expect(smoke.planned.args).not.toContain('--ask-for-approval');
   });
 
   test('resolves default adapter routing for the current loop stage', () => {
