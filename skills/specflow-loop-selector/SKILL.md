@@ -41,12 +41,17 @@ installs all three.
 - Any other or unknown runtime: stop and ask the human which routing profile to
   activate.
 
-Activate or refresh the selected profile with
-`specflow run --setup-routing --runtime <codex|claude-code>`. Creating the
-routing file does not invoke a provider. The installer switches known managed or
-legacy shipped profiles, and preserves custom routing unless the human explicitly
-requests `--replace-routing`. Display a preserved custom file's actual
-current-stage policy during model confirmation.
+Activate or refresh the selected profile through the canonical project setup path:
+`npx @colmbyrne/specflow update . --runtime <codex|claude-code>`. Creating the
+routing file does not invoke a provider. The same command refreshes the installed
+loop-selector skills. The installer switches known managed or legacy shipped
+profiles, and preserves custom routing unless the human explicitly requests
+`--replace-routing`. Display a preserved custom file's actual current-stage
+policy during model confirmation.
+
+If a loop returns `code: routing_required`, stop before provider invocation and
+show its `recovery_command` verbatim. Do not substitute a template copy command
+or a separate runner setup command.
 
 ## Mandatory Run Contract
 

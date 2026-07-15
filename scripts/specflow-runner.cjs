@@ -12,7 +12,11 @@ const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve } = require('path');
 const yaml = require('js-yaml');
-const { installRuntimeRouting } = require('./runtime-routing.cjs');
+const {
+  installRuntimeRouting,
+  routingRequired,
+  verifyRuntimeRouting,
+} = require('./runtime-routing.cjs');
 
 const LOOP_PATHS = {
   'spec-build': 'templates/QA/loops/spec-build.yaml',
@@ -236,10 +240,15 @@ function applyRoutingModelAliasUpdates(value) {
 function checkRoutingModels(options = {}) {
   const routingPath = findDefaultAdapterRoutingPath(options);
   if (!routingPath) {
+    const required = routingRequired(
+      'missing_routing',
+      options.runtime || process.env.SPECFLOW_RUNTIME,
+      'managed adapter routing is missing',
+    );
     return {
-      status: 'missing_routing',
+      ...required,
       routing_path: null,
-      setup: ['specflow run --setup-routing'],
+      setup: [required.recovery_command],
     };
   }
   const routing = loadDataFile(routingPath);
@@ -1679,17 +1688,19 @@ function modelRoutingBriefing(options = {}, contract = null) {
       next_step: `Add a route for ${resolved.loop}.${resolved.stage} or run with --adapter-policy <path>.`,
     };
   }
+  const required = routingRequired(
+    'missing_routing',
+    options.runtime || process.env.SPECFLOW_RUNTIME,
+    'managed adapter routing is missing',
+  );
   return {
     active: false,
-    status: 'not_configured',
+    status: 'routing_required',
     routing_path: null,
-    message: 'Model routing inactive: no .specflow/adapter-routing.yml was found.',
-    setup: [
-      'specflow run --setup-routing',
-      'or: cp .specflow/adapter-policies/claude-code-large-routing.yml .specflow/adapter-routing.yml',
-      'specflow run <loop> --slug <slug> --goal "<goal>" --input <path>',
-      'specflow run <loop> --slug <slug> --confirm-models',
-    ],
+    message: required.error,
+    recovery_command: required.recovery_command,
+    provider_invoked: false,
+    setup: [required.recovery_command],
   };
 }
 
@@ -2370,6 +2381,7 @@ function cli(argv = process.argv.slice(2)) {
     try {
       const result = opts.updateRoutingModels ? updateRoutingModels(opts) : checkRoutingModels(opts);
       console.log(JSON.stringify(result, null, 2));
+      if (result.code === 'routing_required') return 2;
       return result.status === 'invalid_routing' ? 1 : 0;
     } catch (e) {
       console.error(`specflow run failed: ${e.message}`);
@@ -2398,7 +2410,7 @@ function cli(argv = process.argv.slice(2)) {
     } else if (opts.setupRouting) {
       result = installDefaultAdapterRouting(opts);
     } else {
-      if (!opts.adapterPolicy && !opts.noAdapterRouting && !findDefaultAdapterRoutingPath(opts)) {
+      if (!opts.stageEvidence && !opts.adapterPolicy && !opts.noAdapterRouting && !opts.adapterRouting && !findDefaultAdapterRoutingPath(opts)) {
         const enabled = askYesNo('Model routing is not active. Enable the default Claude/Fable + Codex routing now?', false);
         if (enabled === true) {
           const installed = installDefaultAdapterRouting(opts);
@@ -2407,12 +2419,24 @@ function cli(argv = process.argv.slice(2)) {
             return 1;
           }
           console.error(`Model routing enabled: ${installed.routing_path}`);
-        } else if (enabled === false) {
-          console.error('Model routing not enabled. Continuing without routed adapters.');
-          console.error('To enable later: specflow run --setup-routing --runtime codex|claude-code');
+        } else {
+          result = routingRequired(
+            'missing_routing',
+            opts.runtime || process.env.SPECFLOW_RUNTIME,
+            'managed adapter routing is required before starting this loop',
+          );
         }
       }
-      result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
+      if (!result && !opts.stageEvidence && !opts.adapterPolicy && !opts.noAdapterRouting && !opts.adapterRouting) {
+        const readiness = verifyRuntimeRouting({
+          sourceRoot: resolve(__dirname, '..'),
+          targetRoot: process.cwd(),
+          runtime: opts.runtime || process.env.SPECFLOW_RUNTIME,
+          verifySkills: true,
+        });
+        if (!readiness.ok) result = readiness;
+      }
+      if (!result) result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
     }
     if (result.status === 'invalid_contract') {
       console.error(`specflow run failed: ${result.errors.join('; ')}`);
@@ -2426,6 +2450,10 @@ function cli(argv = process.argv.slice(2)) {
       console.error('specflow run failed: stage evidence did not satisfy the durable rail contract');
       console.log(JSON.stringify(result, null, 2));
       return 1;
+    }
+    if (result.code === 'routing_required') {
+      console.log(JSON.stringify(result, null, 2));
+      return 2;
     }
     console.log(JSON.stringify(result, null, 2));
     return 0;

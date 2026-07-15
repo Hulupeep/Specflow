@@ -151,7 +151,7 @@ const COMMANDS = {
     },
   },
   run: {
-    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--stage-evidence <path>] [--adapter-routing <path>] | specflow run --setup-routing --runtime codex|claude-code | specflow run --check-routing-models | specflow run --update-routing-models',
+    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--stage-evidence <path>] [--adapter-routing <path>] | specflow run --check-routing-models | specflow run --update-routing-models',
     desc: 'Run or resume a local contracted Specflow loop',
     run: (args) => {
       const code = runSpecflowLoop(args);
@@ -292,7 +292,7 @@ if (!command || command === 'help' || command === '--help' || command === '-h') 
   console.log('  npx @colmbyrne/specflow verify');
   console.log('  npx @colmbyrne/specflow audit 500');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md');
-  console.log('  npx @colmbyrne/specflow run --setup-routing --runtime codex');
+  console.log('  npx @colmbyrne/specflow update . --runtime codex');
   console.log('  npx @colmbyrne/specflow run --check-routing-models');
   console.log('  npx @colmbyrne/specflow run --update-routing-models');
   console.log('  npx @colmbyrne/specflow run spec-build --slug my-feature --adapter-routing .specflow/adapter-routing.yml --confirm-models');

@@ -19,6 +19,7 @@ const {
   modelRoutingBriefing,
   installDefaultAdapterRouting,
   checkRoutingModels,
+  cli,
   updateRoutingModels,
   parseProviderEvents,
   planAdapterSmoke,
@@ -86,6 +87,26 @@ describe('local contracted loop runner', () => {
     expect(result.status).toBe('gate_passed');
     expect(yaml.load(fs.readFileSync(contract, 'utf8')).run_contract.current_stage_or_rail).toBe('3_e2e');
     expect(readJsonl(ledger)[0]).toMatchObject({ verifier: 'parse-contract', result: 'pass', evidence_path: evidence });
+  });
+
+  test('CLI stage-evidence reruns do not require provider routing readiness', () => {
+    const dir = tempDir();
+    const { contract, ledger } = writeFeatureRun(dir);
+    const artifact = path.join(dir, 'contract.yml');
+    const evidence = path.join(dir, 'stage-evidence.yml');
+    fs.writeFileSync(artifact, 'feature: routing-readiness\n');
+    fs.writeFileSync(evidence, yaml.dump({
+      stage_evidence: {
+        schema_version: 1,
+        stage: '2_contract',
+        artifacts: [{ path: artifact, sha256: sha256(artifact) }],
+        checks: [{ name: 'parse-contract', command: `node -e "require('js-yaml').load(require('fs').readFileSync('${artifact}','utf8'))"` }],
+      },
+    }));
+
+    const result = cli(['feature-build', '--slug', 'routing-ready', '--contract', contract, '--ledger', ledger, '--stage-evidence', evidence]);
+    expect(result).toBe(0);
+    expect(yaml.load(fs.readFileSync(contract, 'utf8')).run_contract.current_stage_or_rail).toBe('3_e2e');
   });
 
   test('rejects changed artifacts without executing their stage checks', () => {
@@ -364,8 +385,8 @@ describe('local contracted loop runner', () => {
     expect(status.current_stage_or_rail).toBe('6_provenance');
     expect(status.ledger_tail).toHaveLength(1);
     expect(status.ledger_summary.gate_passes).toBe(1);
-    expect(status.model_routing.status).toBe('not_configured');
-    expect(status.model_routing.setup[0]).toBe('specflow run --setup-routing');
+    expect(status.model_routing.status).toBe('routing_required');
+    expect(status.model_routing.setup[0]).toBe('npx @colmbyrne/specflow update . --runtime <codex|claude-code>');
   });
 
   test('prepares isolated delegated worktree metadata without auto merge or push', () => {
@@ -747,7 +768,7 @@ describe('generative adapter policy and command builders', () => {
 
     expect(plan.budget_note).toContain('Codex plan quota/credits');
     expect(plan.budget_note).toContain('rather than OpenAI API billing');
-    expect(briefing.status).toBe('not_configured');
+    expect(briefing.status).toBe('routing_required');
   });
 
   test('detects forbidden human-gate actions in provider output', () => {

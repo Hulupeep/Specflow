@@ -216,8 +216,8 @@ runtime-specific template requires
 are shown to the operator before spend or quota use. Budget fields are caps /
 quota guards, not guaranteed costs; ChatGPT-authenticated Codex consumes Codex
 plan quota/credits rather than OpenAI API billing. Select the runtime explicitly
-with `specflow init . --runtime codex`, `specflow update . --runtime
-claude-code`, or `specflow run --setup-routing --runtime codex|claude-code`.
+with `npx @colmbyrne/specflow init . --runtime codex` on first install, then
+refresh with `npx @colmbyrne/specflow update . --runtime codex|claude-code`.
 Reruns are idempotent, custom routing is preserved unless `--replace-routing`
 is supplied, and `.specflow/install-state.yml` records routing provenance.
 

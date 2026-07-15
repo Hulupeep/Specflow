@@ -1,0 +1,44 @@
+feature: routing-readiness
+requirements:
+  - id: REQ-READY-01
+    statement: strict verification validates managed routing state, active runtime and hashes, installed template identity, and all installed loop-selector skills against shipped source.
+  - id: REQ-READY-02
+    statement: every routing readiness failure returns code routing_required and one runtime-qualified specflow update recovery command.
+  - id: REQ-READY-03
+    statement: a strict-green install can prepare its first spec-build run with model confirmation as the only provider boundary.
+  - id: REQ-READY-04
+    statement: setup and readiness verification never invoke a Claude or Codex provider.
+journeys:
+  - journey_meta:
+      id: J-ROUTING-STRICT-TO-FIRST-STAGE
+      persona: specflow_operator
+      owner_ticket: 121
+      assertion_bar: process status, structured diagnostic, selector and routing hashes, and provider-spawn sentinel
+    scenario: move from a runtime-qualified install to the first routed stage
+    given:
+      - a fresh project is installed non-interactively with runtime codex
+      - provider command sentinels fail and record any claude or codex invocation
+    when:
+      - strict routing readiness is verified
+      - spec-build starts at discover
+    then:
+      - strict routing readiness is green
+      - the loop stops at model_confirmation_required
+      - no provider command is invoked
+      - removing routing returns code routing_required with the Codex update command
+
+  - journey_meta:
+      id: J-ROUTING-STALE-INSTALL
+      persona: ci_maintainer
+      owner_ticket: 121
+      assertion_bar: non-zero verification with exact runtime-qualified recovery
+    scenario: reject stale selector and runtime-mismatched installations
+    given:
+      - install state records runtime codex
+    when:
+      - an installed selector differs from shipped source
+      - or active routing metadata claims claude-code
+    then:
+      - strict routing readiness fails before provider invocation
+      - the diagnostic identifies the stale component
+      - the recovery command names npx @colmbyrne/specflow update . --runtime codex

@@ -1,0 +1,39 @@
+{
+  "issues": [121],
+  "feature_build": "strict routing readiness aligned with first-loop execution",
+  "source_provenance": [
+    {
+      "claim": "Strict routing verification independently validates install state, active runtime and hash, installed template identity against shipped source, package version, and all three installed selector skill copies.",
+      "source": "scripts/runtime-routing.cjs verifyRuntimeRouting and verifyInstalledSelectorSkills",
+      "verification": "tests/contracts/runtime-routing-install.test.js covers drift, runtime mismatch, shipped-template mismatch, and runtime inference; tests/scripts/routing-readiness.test.js covers outdated installed selectors."
+    },
+    {
+      "claim": "Every readiness failure uses a structured routing_required result and one runtime-qualified project update command.",
+      "source": "scripts/runtime-routing.cjs routingRequired and runtimeRecoveryCommand; scripts/specflow-runner.cjs CLI readiness boundary",
+      "verification": "J-ROUTING-STRICT-TO-FIRST-STAGE asserts exact Codex recovery for missing routing, while unit coverage asserts runtime-qualified stale and mismatch diagnostics."
+    },
+    {
+      "claim": "A fresh Codex installation enters spec-build and stops at explicit model confirmation without invoking a provider.",
+      "source": "install-hooks.sh runtime installer and scripts/specflow-runner.cjs run preflight",
+      "verification": "tests/scripts/routing-readiness.test.js installs into a temporary project, runs strict readiness, starts spec-build, and checks provider command sentinels remain absent."
+    },
+    {
+      "claim": "Mechanical stage-evidence gate reruns remain provider-free and are not blocked by generative routing readiness.",
+      "source": "scripts/specflow-runner.cjs CLI stageEvidence readiness exclusion and runLoop adapter exclusion",
+      "verification": "tests/contracts/loop-run-contract.test.js executes a hashed stage-evidence rail without installed routing and confirms advancement."
+    },
+    {
+      "claim": "Operator help, loop docs, model docs, and the selector skill use the same project update recovery path.",
+      "source": "bin/specflow.js, README.md, MODEL_ROUTING.md, templates/QA/loops/README.md, and skills/specflow-loop-selector/SKILL.md",
+      "verification": "Repository search finds no operator-facing template-copy recovery and the complete test suite passes."
+    }
+  ],
+  "checks": [
+    "npx jest tests/scripts/routing-readiness.test.js tests/contracts/runtime-routing-install.test.js tests/contracts/loop-run-contract.test.js --runInBand --no-coverage",
+    "npm test -- --runInBand",
+    "node scripts/provenance-gate.cjs evidence/provenance-121-routing-readiness.json --git-diff",
+    "git diff --check"
+  ],
+  "result": "pass",
+  "notes": "Routing setup and readiness verification record provider_invoked false and do not execute Claude or Codex. Provider execution remains behind durable run-scoped human model confirmation."
+}

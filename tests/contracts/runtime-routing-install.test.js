@@ -131,7 +131,7 @@ describe('J-RUNTIME-ROUTING-INSTALL', () => {
 
     const result = verifyRuntimeRouting({ targetRoot });
     expect(result).toMatchObject({ ok: false, status: 'stale_routing' });
-    expect(result.error).toContain('npx @colmbyrne/specflow update . --runtime <codex|claude-code> --replace-routing');
+    expect(result.error).toContain('npx @colmbyrne/specflow update . --runtime codex --replace-routing');
   });
 
   test('strict verifier detects active runtime metadata mismatch', () => {
@@ -143,5 +143,33 @@ describe('J-RUNTIME-ROUTING-INSTALL', () => {
     fs.writeFileSync(state(), yaml.dump(recorded));
 
     expect(verifyRuntimeRouting({ targetRoot })).toMatchObject({ ok: false, status: 'runtime_mismatch' });
+  });
+
+  test('strict verifier compares installed template identity to shipped source', () => {
+    install({ runtime: 'codex' });
+    const recorded = yaml.load(fs.readFileSync(state(), 'utf8'));
+    const installedTemplate = path.join(targetRoot, '.specflow', 'adapter-policies', recorded.routing.template);
+    fs.appendFileSync(installedTemplate, '\n# stale template fixture\n');
+    recorded.routing.template_sha256 = sha256(fs.readFileSync(installedTemplate));
+    fs.writeFileSync(state(), yaml.dump(recorded));
+
+    expect(verifyRuntimeRouting({ targetRoot })).toMatchObject({
+      ok: false,
+      status: 'outdated_install',
+      runtime: 'codex',
+      recovery_command: 'npx @colmbyrne/specflow update . --runtime codex',
+    });
+  });
+
+  test('missing install state infers a runtime-qualified recovery from active routing', () => {
+    install({ runtime: 'codex' });
+    fs.rmSync(state());
+
+    expect(verifyRuntimeRouting({ targetRoot })).toMatchObject({
+      ok: false,
+      status: 'missing_install_state',
+      runtime: 'codex',
+      recovery_command: 'npx @colmbyrne/specflow update . --runtime codex',
+    });
   });
 });

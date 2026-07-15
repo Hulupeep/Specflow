@@ -116,7 +116,7 @@ or `specflow update` by answering `y` to the model-routing prompt. If you skippe
 the prompt, enable it later with:
 
 ```bash
-specflow run --setup-routing
+npx @colmbyrne/specflow update . --runtime <codex|claude-code>
 ```
 
 That default routes expensive requirements/planning/review work to the configured
