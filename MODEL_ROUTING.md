@@ -49,6 +49,16 @@ transcript path, and output path. Continue only after reviewing the choices:
 specflow run spec-build --slug auth-system --confirm-models
 ```
 
+Confirmation is scoped to that durable run and the canonical semantics of the
+active routing document plus the resolved provider, requested model, effort,
+fallback, and budget guard. Specflow writes the confirmation event before
+starting the provider. An unchanged run can reuse it after restart; a material
+routing change records `routing_semantics_changed` and requires confirmation
+again. YAML formatting or key-order changes do not invalidate it. Confirmation
+records copied from another run, chat text, and provider output are never
+accepted as approval. `specflow run status --contract <path>` reports the current
+confirmation hash, scope, timestamp, validity, and invalidation reason.
+
 If routing is not installed, Specflow reports that model routing is inactive and
 prints the setup command above. In an interactive terminal, `specflow run` also
 asks whether to enable the default routing before it continues. Agents using the

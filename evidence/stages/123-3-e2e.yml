@@ -1,0 +1,11 @@
+stage_evidence:
+  schema_version: 1
+  stage: 3_e2e
+  artifacts:
+    - path: tests/contracts/routing-confirmation.test.js
+      sha256: a51449e21d369dfbd409e2cf0cbec01d9c22dcd0ac03effee5dbf7fe24ce0bed
+    - path: tests/contracts/provider-confirmation-order.test.js
+      sha256: b9da19eac5c6c4a8ad4bca79017b1eddd41bc50daad5d144b69eaa89a82edb56
+  checks:
+    - name: routing-confirmation-journeys
+      command: npx jest tests/contracts/routing-confirmation.test.js tests/contracts/provider-confirmation-order.test.js tests/contracts/loop-run-contract.test.js --runInBand --no-coverage

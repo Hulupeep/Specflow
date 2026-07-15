@@ -1,0 +1,9 @@
+stage_evidence:
+  schema_version: 1
+  stage: 4_oracle
+  artifacts:
+    - path: evidence/provenance-123.json
+      sha256: 1bd8c0b85b7f6e2ba49520d0f53cc79c30afe18faa52993d43db48738454c494
+  checks:
+    - name: confirmation-provenance
+      command: node scripts/provenance-gate.cjs evidence/provenance-123.json --git-diff
