@@ -25,9 +25,21 @@ The overlap is **the tick**, not the gates. Both loops implement "wake → locat
 | Prompt cost per tick | each tick re-reads YAML + artifacts; `--resume` only if `policy.session_id` set | 1-hour prompt cache; `/cost` hit-rate; effort change no longer busts cache on Fable 5.1 | Ticks under 60 min apart that `--resume` the stage session are cached. Fresh `-p` per tick is not. Adversary must stay fresh; rails 1–5 need not |
 | Scaffolding drift | 360 KB of agent prompts, 83 `NEVER`/`MUST`, written for Sonnet/Haiku era | `/claude-api prompt-audit`, `/skill-doctor` | Measured audit of exactly the drift #94 names |
 
+## Provider scope
+
+Specflow is provider-agnostic. The loop YAMLs do not change. The split below is deliberate:
+
+| Provider-agnostic (runner contract, all adapters) | Claude Code binding only |
+|---|---|
+| CB-001 policy fields are applied or rejected. `claude-print` drops `effort`; `codex-exec` carries it twice (`effort:` field plus a hand-written `-c model_reasoning_effort` arg) so the two can drift | CB-002 model-switch ledger entry via `PostModelSwitch` |
+| CB-004 Specflow never owns a timer | CB-003 top-thinker stage guard via `PreModelSwitch` |
+| CB-005 one Gate C repair owner per repo | `SessionStart` briefing, `--agents` seed JSON, `prompt-audit`, `/skill-doctor` |
+
+Codex gets the same shape through its own binding (`PROCESS-CODEX.md`) when its CLI exposes equivalent hooks. Until then Codex runs are covered by CB-001, CB-004, CB-005 only.
+
 ## Invariants (proposed for `feature_specflow_project` or a new `feature_claude_binding`)
 
-- **CB-001** Every field in an adapter policy that the provider surface supports is passed to the provider or the policy fails validation. No "recorded but not applied" fields.
+- **CB-001** Every field in an adapter policy that the provider surface supports is passed to the provider or the policy fails validation. No "recorded but not applied" fields. Applies to every adapter.
 - **CB-002** A model switch during a loop run appends a ledger entry with requested and effective model before the next stage advances.
 - **CB-003** Any stage tagged `top-thinker` in a loop YAML refuses to run on a model below the policy's planner tier. Enforcement is a hook exit code, not prose.
 - **CB-004** Specflow never owns a timer. Scheduling is delegated to the runtime (Routine, cron, Actions); Specflow owns `done_when`, `never_without_human`, and the stop reason.
