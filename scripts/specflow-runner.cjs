@@ -1693,6 +1693,29 @@ function modelRoutingBriefing(options = {}, contract = null) {
   };
 }
 
+// Effort is a policy field that must reach the provider (CB-001: applied or rejected,
+// never "recorded but not applied"). Each provider surface spells it differently.
+const CLAUDE_EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'];
+const CODEX_EFFORT_RE = /^model_reasoning_effort=(?:"([^"]*)"|'([^']*)'|([^\s"']+))$/;
+
+function applyCodexEffort(args, effort) {
+  const found = [];
+  args.forEach((arg, index) => {
+    const match = typeof arg === 'string' ? arg.match(CODEX_EFFORT_RE) : null;
+    if (match) found.push({ index, value: match[1] ?? match[2] ?? match[3] });
+  });
+  if (!effort) return args;
+  if (!found.length) {
+    args.push('-c', `model_reasoning_effort="${effort}"`);
+    return args;
+  }
+  const mismatch = found.find((entry) => entry.value !== effort);
+  if (mismatch) {
+    throw new Error(`adapter_policy.effort "${effort}" conflicts with hand-written arg model_reasoning_effort="${mismatch.value}"; set effort once in the policy`);
+  }
+  return args;
+}
+
 function buildAdapterCommand(policy, promptPath) {
   const allowedTools = policy.allowed_tools || [];
   const deniedTools = policy.denied_tools || [];
@@ -1702,6 +1725,12 @@ function buildAdapterCommand(policy, promptPath) {
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
     if (policy.fallback_model && !args.includes('--fallback-model')) args.push('--fallback-model', String(policy.fallback_model));
+    if (policy.effort && !args.includes('--effort')) {
+      if (!CLAUDE_EFFORT_LEVELS.includes(policy.effort)) {
+        throw new Error(`adapter_policy.effort "${policy.effort}" is not supported by the claude-print provider surface (${CLAUDE_EFFORT_LEVELS.join(', ')})`);
+      }
+      args.push('--effort', String(policy.effort));
+    }
     if (policy.max_budget_usd !== undefined && !args.includes('--max-budget-usd')) {
       args.push('--max-budget-usd', String(policy.max_budget_usd));
     }
@@ -1727,6 +1756,7 @@ function buildAdapterCommand(policy, promptPath) {
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
     if (policy.profile && !args.includes('--profile')) args.push('--profile', String(policy.profile));
+    applyCodexEffort(args, policy.effort);
     if (policy.output_schema && !args.includes('--output-schema')) args.push('--output-schema', String(policy.output_schema));
     if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
     else if (policy.prompt) args.push(String(policy.prompt));

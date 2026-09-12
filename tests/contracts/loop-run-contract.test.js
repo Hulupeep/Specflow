@@ -500,6 +500,65 @@ describe('generative adapter policy and command builders', () => {
     expect(command.args).toContain('--profile');
   });
 
+  test('applies policy effort to the Claude provider surface (CB-001)', () => {
+    const command = buildAdapterCommand({
+      provider: 'claude-print',
+      command: 'claude',
+      args: [],
+      model: 'claude-fable-5',
+      effort: 'xhigh',
+      allowed_tools: [],
+      denied_tools: [],
+    });
+    const at = command.args.indexOf('--effort');
+    expect(at).toBeGreaterThan(-1);
+    expect(command.args[at + 1]).toBe('xhigh');
+  });
+
+  test('rejects an effort the Claude provider surface cannot apply', () => {
+    expect(() => buildAdapterCommand({
+      provider: 'claude-print',
+      command: 'claude',
+      args: [],
+      effort: 'ultracode',
+      allowed_tools: [],
+      denied_tools: [],
+    })).toThrow('not supported by the claude-print provider surface');
+  });
+
+  test('derives the Codex reasoning effort arg from the policy field', () => {
+    const command = buildAdapterCommand({
+      provider: 'codex-exec',
+      command: 'codex',
+      args: ['--sandbox', 'workspace-write', '-c', 'approval_policy="never"'],
+      model: 'gpt-5.6-sol',
+      effort: 'high',
+    });
+    const at = command.args.indexOf('model_reasoning_effort="high"');
+    expect(at).toBeGreaterThan(0);
+    expect(command.args[at - 1]).toBe('-c');
+    expect(command.args.filter((a) => /^model_reasoning_effort=/.test(a))).toHaveLength(1);
+  });
+
+  test('does not duplicate a matching hand-written Codex effort arg', () => {
+    const command = buildAdapterCommand({
+      provider: 'codex-exec',
+      command: 'codex',
+      args: ['-c', 'model_reasoning_effort="medium"'],
+      effort: 'medium',
+    });
+    expect(command.args.filter((a) => /^model_reasoning_effort=/.test(a))).toHaveLength(1);
+  });
+
+  test('rejects a Codex effort arg that drifts from the policy field', () => {
+    expect(() => buildAdapterCommand({
+      provider: 'codex-exec',
+      command: 'codex',
+      args: ['-c', 'model_reasoning_effort="low"'],
+      effort: 'xhigh',
+    })).toThrow('conflicts with hand-written arg');
+  });
+
   test('builds provider resume commands when a session id exists', () => {
     const claude = buildAdapterCommand({
       provider: 'claude-print',
