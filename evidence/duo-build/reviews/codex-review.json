@@ -1,0 +1,33 @@
+{
+  "batch": "smoke",
+  "at": "2026-09-16T16:05:43.344Z",
+  "outcome": "accepted",
+  "snapshot": "8951596fcd4c0147f7f82c8ce5c3f7317eaada28bbe4fc7fd8f88cdfb59335f3",
+  "peer": {
+    "peer": "codex",
+    "version": "codex-cli 0.154.0",
+    "authenticated": true,
+    "permission": "checked by actual artifact inspection during review"
+  },
+  "review": {
+    "outcome": "accepted",
+    "summary": "AC-1 and AC-2 satisfied: sum(2,3) returns 5, and the executed test has zero skips. Frozen source, raw evidence, and an independent rerun agree. Acceptance covers only this local fixture, not release approval.",
+    "inspected": [
+      "request.json",
+      "goal.md",
+      "manifest.json",
+      "diff.patch",
+      "index.patch",
+      "commits.txt",
+      "schema.json",
+      "tree/goal.md",
+      "tree/task.md",
+      "tree/sum.cjs",
+      "tree/test.cjs",
+      "tree/raw.txt"
+    ],
+    "findings": [],
+    "unrelated": []
+  },
+  "summary": "AC-1 and AC-2 satisfied: sum(2,3) returns 5, and the executed test has zero skips. Frozen source, raw evidence, and an independent rerun agree. Acceptance covers only this local fixture, not release approval."
+}

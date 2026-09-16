@@ -27,6 +27,11 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  'duo-build': {
+    usage: 'specflow duo-build <check|start|review|resume> [options]',
+    desc: 'Durable helper for the native /duo-build or $duo-build workflow',
+    run: (args) => { process.exitCode = require('../scripts/duo-build.cjs').cli(args); },
+  },
   init: {
     usage: 'specflow init [target-dir] --runtime codex|claude-code [--replace-routing]',
     desc: 'Set up Specflow in a project (safe to re-run)',

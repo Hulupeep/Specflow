@@ -1,0 +1,65 @@
+{
+  "batch": "implementation",
+  "at": "2026-09-16T16:04:34.901Z",
+  "outcome": "changes_required",
+  "snapshot": "3538e4baafcd8e4811ac0cd91312d039eeec293f7134573eb549bc8bcf11236c",
+  "peer": {
+    "peer": "claude",
+    "version": "2.1.258 (Claude Code)",
+    "authenticated": true,
+    "permission": "checked by actual artifact inspection during review"
+  },
+  "review": {
+    "outcome": "changes_required",
+    "summary": "Observed facts: the #134 implementation is present and coherent in the frozen tree — scripts/duo-build.cjs (start/review/resume/check, pinned goal+task+reference hashes, per-round frozen tree+manifest+diff+request+invocation, read-only peer invocation, snapshot-drift and recursion guards, initial review plus max three repair rounds), skills/duo-build/SKILL.md, docs/duo-build.md, the bin/specflow.js `duo-build` entry and 13 tests in tests/scripts/duo-build.test.js. I verified the raw evidence file evidence/duo-build/unit-tests.txt lists exactly the 13 tests present in the suite with 0 skipped, and that it explicitly scopes to `/tests\\/scripts\\/duo-build.test.js/i`. Directionally this matches the run goal and bounded objective: the builder stays interactive, the peer is read-only, and acceptance is scoped rather than a release approval (status() and docs/duo-build.md both state accepted never means merged or deployed). Confirmed live (not simulated): the codex→claude direction actually executed — invocation.json records the real `claude -p` flag set, check() ran before the peer was launched, the snapshot includes uncommitted and untracked files (manifest.json lines 355/371/489 cover scripts/duo-build.cjs, skills/duo-build/SKILL.md and the test file, none of which appear in diff.patch or the empty index.patch), and my own session is confined to Read/Glob/Grep with no write tool. The prior round-001 blocker (\"Symlink unsupported: sample apps/mindsplit/node_modules/.bin/acorn\", ../round-001/review.json) is resolved: files() now drops any path containing a node_modules segment and this round captured a full snapshot. Status distinctions: implemented and locally tested with simulated provider responses; the claude-direction CLI call is now genuinely exercised; the codex-direction peer call is NOT exercised; nothing is merged, deployed or customer-validated, and evidence/duo-build/live-cycle.md — named in the ticket's own uplift mapping (tree/evidence/duo-build/story-review.md:34) — is still absent. Those gaps are stated honestly in batch.claims and I am not blocking on them, since batch scope explicitly defers live proof. Two evidenced blockers remain within the stated scope: no required contract/test-suite evidence for a change that adds contract-scoped scripts and a new CLI command, and a peer readiness record that asserts authentication and permission checks it does not perform for the codex direction. Acceptance here would cover only this batch scope and would not imply any release gate.",
+    "inspected": [
+      "goal.md",
+      "request.json",
+      "manifest.json",
+      "diff.patch",
+      "index.patch",
+      "commits.txt",
+      "batch.json",
+      "invocation.json",
+      "tree/evidence/duo-build/task.md",
+      "tree/evidence/duo-build/unit-tests.txt",
+      "tree/evidence/duo-build/story-review.md",
+      "tree/scripts/duo-build.cjs",
+      "tree/skills/duo-build/SKILL.md",
+      "tree/tests/scripts/duo-build.test.js",
+      "tree/bin/specflow.js",
+      "tree/docs/duo-build.md",
+      "tree/CLAUDE.md",
+      "tree/templates/AGENTS.md",
+      "tree/docs/contracts/feature_specflow_project.yml",
+      "tree/install-hooks.sh",
+      "tree/tests/contracts/specflow_self_compliance.test.js",
+      "../run.json",
+      "../round-001/review.json"
+    ],
+    "findings": [
+      {
+        "id": "F1",
+        "basis": "Required repository gate absent, not failed: tree/CLAUDE.md Rule 3 (\"Check docs/contracts/ before modifying protected files ... npm test -- contracts Must pass. Violation = build fails = PR blocked\") and Rule 4 (\"npm test # All tests (558+) ... Work is NOT complete if tests fail\"), reinforced by tree/templates/AGENTS.md:40-42 (\"Existing contracts, required CI checks, and repository invariants apply on every route\"). CLAUDE.md is a listed instruction in request.json. This batch adds two new files under scripts/ and a new COMMANDS entry in bin/specflow.js, both inside contract-enforced structure (docs/contracts/feature_specflow_project.yml PROJ-003 scripts export, PROJ-004 directory structure), so the contract suite is in scope for this change and its result is unknown, not green.",
+        "evidence": "batch.json:12-14 lists a single evidence file. tree/evidence/duo-build/unit-tests.txt:20 states \"Ran all test suites matching /tests\\/scripts\\/duo-build.test.js/i\" — only 1 suite, 13 tests. No contract-suite or full-suite output exists anywhere in the snapshot (manifest.json has no other evidence/*tests* entry). tree/tests/contracts/specflow_self_compliance.test.js:40-43 enumerates scripts/*.js AND scripts/*.cjs, so tree/scripts/duo-build.cjs (manifest.json:355) and scripts/install-agent-instructions.cjs (manifest.json:356) are inside PROJ-003's enforced set. tree/bin/specflow.js:30-34 adds the duo-build command.",
+        "action": "Run `npm test -- contracts` and `npm test` from the repository root with the snapshot's working tree, save the raw output (command line, exit code, suites/tests executed/passed/failed/skipped counts) to a repository-relative file such as evidence/duo-build/contract-tests.txt, add it to batch.evidence, and re-review with the same batch id. If any suite fails or is environment-blocked, report that outcome explicitly rather than omitting it."
+      },
+      {
+        "id": "F2",
+        "basis": "REQ-03 (\"Check installation/auth/permission. Peer unavailable means blocked, never verified.\") and AC-7 (\"labelling simulations/unavailable capabilities accurately\"). check() writes a durable readiness record that asserts two checks it does not actually perform: for the codex peer no authentication signal is inspected at all, and for both peers `permission` is a fixed prose string rather than an observed result. This record is persisted into run history and round-*/review.json as the peer-readiness fact a returning builder relies on.",
+        "evidence": "tree/scripts/duo-build.cjs:47-54 — `const auth = invoke(exe, exe === 'claude' ? ['auth','status'] : ['login','status']); if (exe === 'claude' && jsonText(auth).loggedIn !== true) throw Error('Claude authentication unavailable'); return { peer: exe, version, authenticated: true, permission: 'checked by actual artifact inspection during review' };` — the loggedIn assertion is guarded to claude only, and `authenticated: true` plus the permission string are returned unconditionally. tree/scripts/duo-build.cjs:153 persists this into record.peer. The test double masks the asymmetry: tree/tests/scripts/duo-build.test.js:14-15 returns '{\"loggedIn\":true}' for `auth` and an empty string for `login`, so no test distinguishes an authenticated from an unauthenticated codex peer.",
+        "action": "Inspect the actual `codex login status` output and assert a logged-in signal before returning `authenticated: true`, or record the observed raw signal and set `authenticated` from it (never hardcode true). Replace the fixed `permission` string with the observed value (for example the peer's reported/enforced tool or sandbox mode), or drop the field rather than implying a check occurred. Add a test asserting that an unauthenticated codex peer yields blocked and never records `authenticated: true`."
+      }
+    ],
+    "unrelated": [
+      "Snapshot capture still aborts on any symlink outside node_modules (tree/scripts/duo-build.cjs:23-34, safe()). Repositories with a legitimately committed symlink can never be reviewed at all; consider recording symlinks as an explicit unsupported-entry list in snapshot-policy.json instead of failing the whole run.",
+      "The Claude Code invocation `/duo-build #905` is asserted as a native slash invocation in tree/docs/duo-build.md:21 and README.md, but no .claude/commands/duo-build.md is shipped (the repo does use .claude/commands for readme-audit/readme-restructure, manifest.json lines 2-3) and skills install only to .claude/skills. I could not verify from the snapshot whether an installed skill is invocable as a slash command in the target Claude Code version; worth confirming before publishing that customer-visible instruction.",
+      "tree/skills/README.md documents only specflow-loop-selector and does not mention the new duo-build skill; likewise tree/templates/AGENTS.md work routing does not say which route duo-build belongs to.",
+      "evidence/duo-build/live-cycle.md is named as required contract/test mapping in tree/evidence/duo-build/story-review.md:34 but is absent from the snapshot. Not blocking here because batch.json scope and claims explicitly defer live proof, but it remains outstanding for the ticket's Definition of Done and for AC-3/AC-7 closure.",
+      "Stale-lock recovery in tree/scripts/duo-build.cjs:132-138 rethrows for any process.kill error whose code is not ESRCH, so a corrupt or non-numeric review.lock (NaN pid) leaves the run permanently unreviewable until the file is deleted by hand.",
+      "validateReview only checks that requiredReads appear in the peer's self-reported `inspected` array (tree/scripts/duo-build.cjs:124-126); a peer can list paths it never opened. The single test for this (tests/scripts/duo-build.test.js:88-91) only covers an empty array.",
+      "cli() returns exit 2 only for `action === 'review'` (tree/scripts/duo-build.cjs:223), so `resume` of a run whose stored outcome is blocked exits 0 while printing a blocker — scripted callers could misread that as success."
+    ]
+  },
+  "summary": "Observed facts: the #134 implementation is present and coherent in the frozen tree — scripts/duo-build.cjs (start/review/resume/check, pinned goal+task+reference hashes, per-round frozen tree+manifest+diff+request+invocation, read-only peer invocation, snapshot-drift and recursion guards, initial review plus max three repair rounds), skills/duo-build/SKILL.md, docs/duo-build.md, the bin/specflow.js `duo-build` entry and 13 tests in tests/scripts/duo-build.test.js. I verified the raw evidence file evidence/duo-build/unit-tests.txt lists exactly the 13 tests present in the suite with 0 skipped, and that it explicitly scopes to `/tests\\/scripts\\/duo-build.test.js/i`. Directionally this matches the run goal and bounded objective: the builder stays interactive, the peer is read-only, and acceptance is scoped rather than a release approval (status() and docs/duo-build.md both state accepted never means merged or deployed). Confirmed live (not simulated): the codex→claude direction actually executed — invocation.json records the real `claude -p` flag set, check() ran before the peer was launched, the snapshot includes uncommitted and untracked files (manifest.json lines 355/371/489 cover scripts/duo-build.cjs, skills/duo-build/SKILL.md and the test file, none of which appear in diff.patch or the empty index.patch), and my own session is confined to Read/Glob/Grep with no write tool. The prior round-001 blocker (\"Symlink unsupported: sample apps/mindsplit/node_modules/.bin/acorn\", ../round-001/review.json) is resolved: files() now drops any path containing a node_modules segment and this round captured a full snapshot. Status distinctions: implemented and locally tested with simulated provider responses; the claude-direction CLI call is now genuinely exercised; the codex-direction peer call is NOT exercised; nothing is merged, deployed or customer-validated, and evidence/duo-build/live-cycle.md — named in the ticket's own uplift mapping (tree/evidence/duo-build/story-review.md:34) — is still absent. Those gaps are stated honestly in batch.claims and I am not blocking on them, since batch scope explicitly defers live proof. Two evidenced blockers remain within the stated scope: no required contract/test-suite evidence for a change that adds contract-scoped scripts and a new CLI command, and a peer readiness record that asserts authentication and permission checks it does not perform for the codex direction. Acceptance here would cover only this batch scope and would not imply any release gate."
+}

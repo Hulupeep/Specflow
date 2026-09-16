@@ -32,3 +32,6 @@ gemini_version/node_modules
 .env.local
 *.env.local
 samples/mindsplit/node_modules
+
+# Durable local duo-build snapshots and peer transcripts
+.specflow/duo/

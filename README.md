@@ -307,3 +307,11 @@ invokes; Specflow is a CLI + CI the swarm calls.
 | [CI Integration](https://github.com/Hulupeep/Specflow/blob/main/CI-INTEGRATION.md) | GitHub Actions setup |
 | [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
 | [Issues](https://github.com/Hulupeep/Specflow/issues) | Bugs and ideas |
+
+### Interactive build with a second model
+
+Use `/duo-build #905` in Claude Code or `$duo-build #905` in Codex. Feature text
+works too; the skill reuses spec-build preparation and feature-build implementation,
+then automatically sends each coherent batch to the other CLI for read-only review.
+Resume with `duo-build resume <run-id>` using the same native prefix.
+See [duo-build installation, invocation and evidence](docs/duo-build.md).
