@@ -1,0 +1,28 @@
+PASS tests/scripts/typesafe-client.test.js
+  ✓ J-TSAFE-CLIENT: complete batched request, pinned replay and changed identity rejection (22 ms)
+  ✓ HTTP 401 safely records auth once (3 ms)
+  ✓ HTTP 403 safely records auth once (4 ms)
+  ✓ HTTP 429 safely records rate_limit once (3 ms)
+  ✓ HTTP 500 safely records provider_error once (2 ms)
+  ✓ HTTP 529 safely records provider_error once (1 ms)
+  ✓ absent credentials and oversize/sensitive input never call transport (4 ms)
+  ✓ deadline includes hung transport and streamed response limit (14 ms)
+  ✓ invalid response missing cannot become success (2 ms)
+  ✓ invalid response extra cannot become success (2 ms)
+  ✓ invalid response membership cannot become success (3 ms)
+  ✓ invalid response probability cannot become success (2 ms)
+  ✓ invalid response sum cannot become success (1 ms)
+  ✓ invalid response model cannot become success (1 ms)
+  ✓ invalid response tokens cannot become success (2 ms)
+  ✓ invalid response type cannot become success (1 ms)
+  ✓ invalid response malformed cannot become success (1 ms)
+  ✓ interrupted pending becomes unavailable without another request (1 ms)
+  ✓ alias replay is historical; key precedence and explicit env-file loading (2 ms)
+  ✓ Noul/Score validation preserves semantic shape and rejects invalid definitions (3 ms)
+  ✓ reviewer recursion and symlink destinations are refused (1 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       21 passed, 21 total
+Snapshots:   0 total
+Time:        0.333 s, estimated 1 s
+Ran all test suites matching /tests\/scripts\/typesafe-client.test.js/i.

@@ -1,0 +1,792 @@
+{
+  "simulation": "All provider responses simulated as HTTP503, no external API calls. These are harness outputs, NOT TypeSafe performance measurements.",
+  "mode": "replay",
+  "actualCalls": 0,
+  "heldoutByControl": {
+    "control": {
+      "cases": 15,
+      "unavailable": 15,
+      "actualCalls": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0
+      },
+      "questions": 35,
+      "questionsByKind": {
+        "evidence": 20,
+        "repair": 15
+      },
+      "baseline": {
+        "mechanicalDecisions": 5,
+        "reviewerAvailable": 0,
+        "reviewerMissing": 15
+      },
+      "judgments": {
+        "support": {
+          "total": 10,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "supports": {
+              "unavailable": 10
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 10,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": 0
+        },
+        "coverage": {
+          "total": 10,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "full": {
+              "unavailable": 10
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        },
+        "alignment": {
+          "total": 5,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "insufficient": {
+              "unavailable": 5
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        },
+        "novelty": {
+          "total": 5,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "insufficient": {
+              "unavailable": 5
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        },
+        "relation": {
+          "total": 5,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "insufficient": {
+              "unavailable": 5
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        }
+      },
+      "latencyMs": {
+        "p50": null,
+        "p95": null,
+        "samples": 0
+      }
+    },
+    "edge": {
+      "cases": 15,
+      "unavailable": 15,
+      "actualCalls": 0,
+      "tokens": {
+        "input": 0,
+        "output": 0
+      },
+      "questions": 35,
+      "questionsByKind": {
+        "evidence": 20,
+        "repair": 15
+      },
+      "baseline": {
+        "mechanicalDecisions": 0,
+        "reviewerAvailable": 0,
+        "reviewerMissing": 15
+      },
+      "judgments": {
+        "support": {
+          "total": 10,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "contradicts": {
+              "unavailable": 6
+            },
+            "insufficient": {
+              "unavailable": 3
+            },
+            "supports": {
+              "unavailable": 1
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 9,
+          "detected": 0,
+          "supported": 1,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": 0,
+          "falseAlarmRate": 0
+        },
+        "coverage": {
+          "total": 10,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "full": {
+              "unavailable": 7
+            },
+            "none": {
+              "unavailable": 2
+            },
+            "insufficient": {
+              "unavailable": 1
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        },
+        "alignment": {
+          "total": 5,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "advances_criterion": {
+              "unavailable": 2
+            },
+            "necessary_prerequisite": {
+              "unavailable": 1
+            },
+            "unrelated": {
+              "unavailable": 1
+            },
+            "resolves_finding": {
+              "unavailable": 1
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        },
+        "novelty": {
+          "total": 5,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "contradiction": {
+              "unavailable": 1
+            },
+            "new_observation": {
+              "unavailable": 3
+            },
+            "repetition": {
+              "unavailable": 1
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        },
+        "relation": {
+          "total": 5,
+          "available": 0,
+          "correct": 0,
+          "insufficient": 0,
+          "uncertain": 0,
+          "confusion": {
+            "observed": {
+              "unavailable": 3
+            },
+            "confirmed_cause": {
+              "unavailable": 1
+            },
+            "hypothesis": {
+              "unavailable": 1
+            }
+          },
+          "brierSum": 0,
+          "reliability": [
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            },
+            {
+              "count": 0,
+              "probabilitySum": 0,
+              "correct": 0
+            }
+          ],
+          "thresholds": [
+            {
+              "threshold": 0,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.5,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.8,
+              "count": 0,
+              "errors": 0
+            },
+            {
+              "threshold": 0.95,
+              "count": 0,
+              "errors": 0
+            }
+          ],
+          "unsupported": 0,
+          "detected": 0,
+          "supported": 0,
+          "falseAlarms": 0,
+          "accuracy": 0,
+          "brier": null,
+          "unsupportedRecall": null,
+          "falseAlarmRate": null
+        }
+      },
+      "latencyMs": {
+        "p50": null,
+        "p95": null,
+        "samples": 0
+      }
+    }
+  }
+}

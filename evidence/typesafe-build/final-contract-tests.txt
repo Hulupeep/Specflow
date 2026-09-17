@@ -1,0 +1,41 @@
+
+> @colmbyrne/specflow@0.11.1 test
+> jest --no-coverage contracts --runInBand
+
+PASS tests/contracts/duo-operations.test.js
+PASS tests/contracts/typesafe-duo.test.js
+PASS tests/contracts/teardown-gate.test.js
+PASS tests/contracts/loop-run-contract.test.js
+PASS tests/contracts/verifier-rail.test.js
+PASS tests/contracts/typesafe-evaluation.test.js
+PASS tests/contracts/verifier-runtime-evidence.test.js
+PASS tests/contracts/specflow_self_compliance.test.js
+PASS tests/contracts/runtime-routing-install.test.js
+PASS tests/contracts/routing-confirmation.test.js
+PASS tests/contracts/test_integrity_defaults.test.js
+PASS tests/contracts/security_defaults.test.js
+PASS tests/contracts/production_readiness_defaults.test.js
+PASS tests/contracts/accessibility_defaults.test.js
+PASS tests/contracts/verifier-policy-isolation.test.js
+PASS tests/scripts/loop-contracts.test.js
+PASS tests/contracts/state-reentry.test.js
+PASS tests/contracts/verifier-contract-lifecycle.test.js
+PASS tests/contracts/fable-subordinate-controls.test.js
+PASS tests/contracts/verify-seed.test.js
+PASS tests/contracts/worktree-isolation.test.js
+PASS tests/contracts/provider-confirmation-order.test.js
+PASS tests/contracts/provenance-gate.test.js
+PASS tests/contracts/verify-seams.test.js
+PASS tests/contracts/verifier-impl-rail.test.js
+PASS tests/contracts/typesafe-repair.test.js
+PASS tests/contracts/adversary-spawn.test.js
+PASS tests/contracts/verify-falsification.test.js
+PASS tests/contracts/verifier-trace-divergence.test.js
+PASS tests/contracts/ticket-journey.test.js
+PASS tests/contracts/verify-adr.test.js
+
+Test Suites: 31 passed, 31 total
+Tests:       666 passed, 666 total
+Snapshots:   0 total
+Time:        11.939 s
+Ran all test suites matching /contracts/i.

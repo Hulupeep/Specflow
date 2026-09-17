@@ -116,3 +116,29 @@ evidence, index completeness is confirmed, and no finding remains open. Report
 **Goal / verified criteria / current blocker / next action**, plus the run ID.
 Completed scope still does not mean merged, deployed or customer-validated unless
 those outcomes were required, independently evidenced and verified as criteria.
+
+## Optional TypeSafe advice
+
+Keep the same native entry point. When the user configures TypeSafe, use the
+owner-controlled helper `typesafe <run-id> --session <token> --config <relative-json>
+--reason <reason>`. Config: mode off/shadow/advisory (default shadow), pinned
+model (default jev-1.13.0), maxCalls 1–100 (default20), optional explicitly selected
+.env file. Never read or print keys into conversation, batch inputs or evidence.
+Use TYPESAFE_API_KEY with TYPESAFE_API compatibility. Missing keys are explicit
+unavailable advice, not a block on ordinary peer review.
+
+Populate `batch.typesafe` with `{criterion, claimIndex, assertionPath,
+evidencePaths}` for selected batch criteria. All paths must name frozen source
+or submitted evidence, not environment files, credentials or production logs.
+For a repair add `repair:{description,observation}`; history/finding context is
+loaded by the helper. Minimize sensitive material before selecting it. Missing
+or oversized inputs remain explicit; do not substitute a narrative for raw proof.
+
+Shadow results must not influence builder or reviewer decisions. Advisory
+results are shared as saved records; independently inspect sources and require
+confirmed/rejected/needs_evidence dispositions for flags. A flag never overrides
+acceptance, finding closure, owner fencing, required gates or repair budgets.
+Read the helper status for provider suppression; explicit owner recovery clears
+only the failure streak, never consumed calls. The peer cannot call TypeSafe or
+another reviewer. Evaluation reports stay private. Do not claim production
+reliability or a calibrated confidence threshold from the prototype.

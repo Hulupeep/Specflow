@@ -113,3 +113,101 @@ Review/resume status codes: 0 accepted batch, 1 changes required, 2 blocked. Onl
 `finish` establishes goal completion; it exits nonzero for incomplete goals.
 Durable pending attempts survive interruption. Successful local completion is not
 an implicit CI, merge, deployment or customer-validation claim.
+
+## TypeSafe advice (optional)
+
+The installed workflow includes a small TypeSafe HTTP adapter; Python and the
+Python SDK are not required. Both coding CLIs still perform the build/review
+loop. TypeSafe never approves a batch, closes a finding, skips a required test or
+replaces the peer. Configuration without a key yields `missing_credentials`;
+there is no implicit search for environment files.
+
+Ask the interactive builder to configure TypeSafe for the current run. It writes
+a JSON configuration and invokes the existing helper with its owner session:
+
+```json
+{"mode":"shadow","model":"jev-1.13.0","maxCalls":20,"envFile":".env.local"}
+```
+
+```sh
+node scripts/duo-build.cjs typesafe RUN_ID --session OWNER_SESSION \
+  --config typesafe-config.json --reason "Evaluate optional advice in shadow"
+```
+
+The configuration is explicit; `envFile` is optional, must have a protected
+`.env` filename, and may be absolute. Prefer `TYPESAFE_API_KEY`; `TYPESAFE_API`
+is supported when the primary key is absent/empty. Values never enter run
+configuration or the peer environment. Keep credential files untracked.
+
+Modes: `off` makes no calls; `shadow` saves advice without adding it to the peer
+request; `advisory` shares the same saved advice with both agents and requires
+an evidence-backed disposition for every flag. Default is shadow, with no
+network call until credentials and selected inputs are available. A 0.8
+confidence cutoff only highlights uncertain advice; it is not a calibrated
+acceptance threshold or permission to act.
+
+For each batch, the builder adds selected inputs using existing criterion IDs,
+claim indices and paths in the frozen source/evidence manifest:
+
+```json
+{"typesafe":[{"criterion":"AC-1","claimIndex":0,"assertionPath":"tests/balance.test.js","evidencePaths":["evidence/balance-test.txt"],"repair":{"description":"Correct the scoped calculation","observation":"The rerun now observes 18 days"}}]}
+```
+
+`repair` is optional. Independent questions are batched into one request; the
+adapter records omitted criteria, refuses missing/oversize/sensitive selections,
+and retains explicit unavailable results. Never select raw production logs or
+customer secrets. File filtering and credential-pattern checks are safeguards,
+not a complete sensitive-data classifier: the builder must minimize inputs.
+
+Records live under `.specflow/duo/RUN_ID/typesafe/round-NNN/`, excluded from the
+product fingerprint. Advisory copies are explicitly included for the peer;
+shadow records are absent from its tree and request. Read these records locally;
+they may contain selected source and must not be published automatically.
+
+Default maximum is 20 attempts per run, configurable from 1 to 100. Two consecutive
+provider failures suppress further calls. An owner may submit `{"recover":true}`
+with a recorded reason after resolving an outage; this clears only the failure
+streak. Calls already consumed survive recovery, resume and host takeover. Budget
+exhaustion disables advice while ordinary peer review continues. No automatic
+retry occurs. A new model or question set requires a new evaluation/qualification;
+changing a setting does not establish that it performs well.
+
+### Private evaluation
+
+The synthetic corpus is in `tests/fixtures/typesafe/corpus.json` in the source
+checkout. It is evaluation tooling, not a requirement for installed target
+projects. It contains 50 evidence/coverage cases and 20 repair cases, split by
+originating task family. Controlled paired cases are exploratory and do not
+establish production reliability. No archived peer baseline is invented.
+
+```sh
+node scripts/typesafe-eval.cjs live --corpus tests/fixtures/typesafe/corpus.json \
+  --model jev-1.13.0 --env-file /absolute/path/.env.local
+node scripts/typesafe-eval.cjs replay --corpus tests/fixtures/typesafe/corpus.json \
+  --model jev-1.13.0 --output /private/directory/from/previous/run
+node scripts/typesafe-eval.cjs qualify /private/directory/live-report.json \
+  --mode shadow --reason "Reviewed measured errors and limitations"
+```
+
+The first command prints only a private report location. Default destination is
+`~/.local/share/specflow/typesafe-evals/<timestamp>`; `--output` accepts a selected
+private directory outside Git worktrees. Directories use 0700 and files 0600.
+Reports remain until the operator deletes their selected report directory.
+Never upload provider benchmarks without checking applicable publication
+permission under TypeSafe's agreement. Public synthetic fixtures and simulated
+transport tests are not provider benchmarks.
+
+Qualification records describe an explicit operator decision; they do not
+change workflow mode automatically. Reports separate probabilities from
+confidence, include unavailable cases and split denominators, label replay,
+and retain model/question/dataset identity. Required peer reviews are never
+skipped to claim savings. TypeSafe review itself remains fallible.
+
+The peer request lists `omittedPaths` by name whenever the snapshot excludes
+`.env*`, private-key/credential filenames or identified production-log paths.
+Their contents are withheld from the tree and both diffs. The peer must block
+claims that depend on those missing contents; exclusion is not evidence of
+acceptance. This rule applies even when TypeSafe is off.
+
+Runtime verified for this integration: Node.js 22.19.0. The package and installed
+helpers were exercised on that version; no Python runtime or SDK was involved.

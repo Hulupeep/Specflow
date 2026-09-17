@@ -1,0 +1,25 @@
+contract_meta:
+  id: feature_typesafe_advisory
+  version: 1
+  created_from_spec: "GitHub #138, #139, #140, #141, #142"
+  owner: specflow-core
+  covers_reqs: [REQ-CLIENT-1, REQ-CLIENT-2, REQ-CLIENT-3, REQ-CLIENT-4, REQ-CLIENT-5, REQ-CLIENT-6, REQ-CLIENT-7, REQ-CLIENT-8, REQ-CLIENT-9, REQ-EVAL-1, REQ-EVAL-2, REQ-EVAL-3, REQ-EVAL-4, REQ-EVAL-5, REQ-EVAL-6, REQ-EVAL-7, REQ-EVAL-8, REQ-EVAL-9, REQ-EVAL-10, REQ-DUO-1, REQ-DUO-2, REQ-DUO-3, REQ-DUO-4, REQ-DUO-5, REQ-DUO-6, REQ-DUO-7, REQ-DUO-8, REQ-DUO-9, REQ-DUO-10, REQ-REPAIR-1, REQ-REPAIR-2, REQ-REPAIR-3, REQ-REPAIR-4, REQ-REPAIR-5, REQ-REPAIR-6, REQ-REPAIR-7]
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_typesafe_advisory"
+invariants:
+  - id: I-TSAFE-001
+    rule: Bounded requests and durable records exclude credentials and never invent successful provider results.
+  - id: I-TSAFE-002
+    rule: Judgment and replay identity bind to exact selected state, snapshot, question set and model; stale advice cannot verify acceptance.
+  - id: I-TSAFE-003
+    rule: Advice cannot override ownership, independent review, gates, finding closure or repair budgets.
+  - id: I-TSAFE-004
+    rule: Private evaluations retain missing outcomes, provenance and family-separated held-out cases; simulated and replay evidence is labelled.
+test_hooks:
+  tests:
+    - file: tests/scripts/typesafe-client.test.js
+    - file: tests/contracts/typesafe-evaluation.test.js
+    - file: tests/contracts/typesafe-duo.test.js
+    - file: tests/contracts/typesafe-repair.test.js
