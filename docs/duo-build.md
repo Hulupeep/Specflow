@@ -52,30 +52,64 @@ node_modules, duo run records and nested Claude worktrees (recorded in snapshot-
 submodules block rather than silently reviewing different bytes. The source
 must stay paused during review. Any source or evidence drift rejects acceptance.
 
-The helper pins goal/task/reference content. Resume reads it and past findings;
-changed acceptance requires explicit reconciliation and a linked new run. Use
-the same interactive runtime on resume. Keep the same batch ID for repairs:
-initial review plus at most three repair rounds. Unchanged failed input blocks.
-Optional improvements remain separate from evidenced acceptance/gate/risk findings.
+A run belongs to its goal rather than its initial CLI. Start in Claude, then
+resume the same ID in Codex (or vice versa). The native skill claims the current
+host and automatically selects the opposite reviewer. A recorded takeover rotates
+the owner token; old tokens cannot review, capture, finish or release the run.
+Review/capture and takeover share one operation lock. This governs cooperating
+helpers; it cannot prevent an unrelated editor from modifying files. Snapshot
+freshness checks still detect those changes.
 
-Status always reports **Outcome advanced / Current blocker / Next action** and
-run ID. `accepted` means peer acceptance within the batch's stated scope. Required
-CI, release and human gates still apply; it never means merged or deployed.
+The acceptance index references exact anchors in existing task and gate sources.
+Each row is unverified, verified or blocked. The peer assesses submitted criterion
+IDs with inspected evidence and checks that the index includes all required gates.
+An accepted batch is distinct from a completed goal. `finish` requires all rows
+verified, current source/evidence, peer-confirmed index completeness and no open
+findings. Source changes conservatively invalidate older verification; do a final
+review of the complete acceptance set. Unknown facts do not become supported
+behaviour because a model agreed with another model.
 
-For debugging, the skill calls these helpers automatically:
+Finding IDs persist across reviews, batch names and hosts. Every prior open
+finding requires a peer disposition; closure needs a submitted builder resolution
+and evidence. Progress is newly verified criteria, confirmed closures or new
+observations backed by changed evidence. Two consecutive no-progress reviews stop
+the run; an open repair cycle also has at most three repairs after its initial
+review. Cosmetic edits, renamed batches and host switches cannot reset it.
+
+The native skill runs these helpers for you (examples use Claude as the builder):
 
 ```sh
-node scripts/duo-build.cjs check --builder codex
-node scripts/duo-build.cjs start '#905' --builder codex --context .specflow/duo-context.json
-node scripts/duo-build.cjs review <run-id> --batch .specflow/duo-batch.json
-node scripts/duo-build.cjs resume <run-id>
+node scripts/duo-build.cjs check --builder claude-code
+node scripts/duo-build.cjs start '#905' --builder claude-code --context context.json
+# Keep the returned run ID and Owner session token.
+node scripts/duo-build.cjs capture <id> --session <token> -- npm test -- --runInBand
+node scripts/duo-build.cjs review <id> --session <token> --batch .specflow/duo/<id>/batch.json
+node scripts/duo-build.cjs status <id>
+# In a new Codex conversation, claim the same run explicitly:
+node scripts/duo-build.cjs resume <id> --builder codex --takeover --reason 'User resumed in Codex'
+# Use the newly returned token for subsequent operations.
+node scripts/duo-build.cjs finish <id> --session <new-token>
 ```
 
-`specflow duo-build` exposes the same helper subcommands. It does not start a new
-interactive builder; use the native skill for the single-invocation workflow.
-See [the skill](../skills/duo-build/SKILL.md) for the small context/batch JSON shapes.
+Capture records argv, raw output, exit code and source hashes in the run directory.
+Nonzero exits remain visible and cannot pass an execution gate. A peer may still
+verify a separately observed fact from that output; the overall run remains
+incomplete until the required gate passes. Source-mutating or
+stale captures are rejected. Keep batch metadata inside the run directory too.
+No reviewer suggestion is automatically executed as a shell command.
 
-Attempts are journaled before the provider starts, so an interrupted call remains
-visible and its artifacts are not overwritten on retry. Resume rechecks pinned
-acceptance and invalidates current acceptance if reviewed bytes changed. Helper
-review/resume exit codes are 0 accepted, 1 changes required, 2 blocked.
+Legacy runs preserve their ID/history and budgets when claimed. They need an
+acceptance index before finish can pass. `index <id> --session <token> --criteria
+<array.json>` attaches it or adds a previously omitted required gate; it cannot
+remove/change existing definitions. Pinned source changes need explicit user scope
+reconciliation in a new linked run. No model may silently weaken acceptance.
+
+`specflow duo-build` exposes the same helper subcommands. Use the native skill for
+the single-invocation interactive workflow. Only Claude Code and Codex are supported;
+other CLIs need tested adapters. See [the skill](../skills/duo-build/SKILL.md) for
+context, criterion and batch shapes.
+
+Review/resume status codes: 0 accepted batch, 1 changes required, 2 blocked. Only
+`finish` establishes goal completion; it exits nonzero for incomplete goals.
+Durable pending attempts survive interruption. Successful local completion is not
+an implicit CI, merge, deployment or customer-validation claim.

@@ -1,0 +1,25 @@
+contract_meta:
+  id: feature_duo_operations
+  version: 1
+  created_from_spec: "GitHub #135, #136, #137"
+  covers_reqs: [REQ-P1, REQ-P2, REQ-P3, REQ-P4, REQ-A1, REQ-A2, REQ-A3, REQ-A4, REQ-R1, REQ-R2, REQ-R3, REQ-R4, REQ-R5]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_duo_operations"
+# Behavioural contract; enforced by executable CLI/ledger tests, not source regexes.
+invariants:
+  - id: I-DUOOPS-001
+    rule: "Only the claimed session may mutate a run; host transfer preserves goal, findings and repair budgets."
+    tests: [J-DUO-HANDOFF, owner-fencing, operation-lock, legacy-resume]
+  - id: I-DUOOPS-002
+    rule: "Finish requires all authoritative indexed criteria and required gates verified on current evidence, with no open finding."
+    tests: [J-DUO-GOAL, missing-criteria, stale-evidence, omitted-gate, pinned-acceptance]
+  - id: I-DUOOPS-003
+    rule: "Every open finding requires an explicit evidenced disposition; cosmetic activity cannot reset repair or no-progress limits."
+    tests: [J-DUO-CONVERGE, missing-disposition, captured-failure, no-progress, renamed-batch-budget]
+test_hooks:
+  tests:
+    - file: tests/contracts/duo-operations.test.js
+    - file: tests/scripts/duo-build.test.js

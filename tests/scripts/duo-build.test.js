@@ -6,8 +6,9 @@ const duo = require('../../scripts/duo-build.cjs');
 let root;
 const put = (name, value) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
 const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
-const context = { goal: 'goal.md', task: 'task.md', objective: 'Deliver correct answer', finish: 'AC-1 tested and accepted' };
-const batch = () => ({ id: 'implementation', scope: 'AC-1', claims: ['locally tested'], assumptions: [], evidence: ['raw.txt'], resolutions: [] });
+const context = { goal: 'goal.md', task: 'task.md', objective: 'Deliver correct answer', finish: 'AC-1 tested and accepted', criteria: [{id: 'AC-1', source: 'task.md', anchor: 'AC-1: returns 42', kind: 'acceptance'}] };
+const reviewOwned = (root, id, batch, invoke) => duo.review(root, id, batch, invoke, duo.load(root, id).state.owner.session);
+const batch = () => ({ id: 'implementation', scope: 'AC-1', criteria: ['AC-1'], claims: ['locally tested'], assumptions: [], evidence: ['raw.txt'], resolutions: [] });
 function fakePeer(outcome = 'accepted', effect = () => {}) {
   return (exe, args, options) => {
     if (args[0] === '--version') return 'test-double';
@@ -15,7 +16,8 @@ function fakePeer(outcome = 'accepted', effect = () => {}) {
     if (args[0] === 'login') return 'Logged in using ChatGPT';
     const request = JSON.parse(fs.readFileSync(path.join(options.cwd, 'request.json')));
     // Provider boundary is simulated; state, snapshot and git operations are real.
-    const result = { outcome, summary: outcome, inspected: request.requiredReads, findings: outcome === 'changes_required' ? [{ id: 'F1', basis: 'AC-1', evidence: 'tree/code.js:1', action: 'Correct result' }] : [], unrelated: [] };
+    const result = { outcome, summary: outcome, inspected: request.requiredReads, findings: outcome === 'changes_required' ? [{ id: 'F1', criterion: 'AC-1', kind: 'acceptance', basis: 'AC-1', evidence: 'tree/code.js:1', action: 'Correct result', verification: 'Check the result equals 42' }] : [], unrelated: [] };
+    Object.assign(result, { index_complete: true, assessments: request.batch.criteria.map(id => ({id, status: outcome === 'accepted' ? 'verified' : 'blocked', evidence: request.batch.evidence, reason: 'inspected fixture'})), resolutions: request.open_findings.map(f => ({id: f.id, status: outcome === 'accepted' ? 'closed' : 'open', evidence: request.batch.evidence, reason: 'fixture disposition'})), diagnostics: [{observation: fs.readFileSync(path.join(options.cwd, 'tree/raw.txt'), 'utf8'), evidence: request.batch.evidence}] });
     effect(options, result);
     if (exe === 'codex') fs.writeFileSync(path.join(options.cwd, 'response.json'), JSON.stringify(result));
     return JSON.stringify({ structured_output: result });
@@ -30,10 +32,10 @@ beforeEach(() => {
 afterEach(() => { delete process.env.SPECFLOW_DUO_REVIEWER; fs.rmSync(root, { recursive: true, force: true }); });
 test.each(['codex', 'claude-code'])('J-DUO-REPAIR/J-DUO-RESUME: %s builder repairs and retains evidence', builder => {
   const run = duo.start(root, '#1', builder, context);
-  const first = duo.review(root, run.id, batch(), fakePeer('changes_required'));
+  const first = reviewOwned(root, run.id, batch(), fakePeer('changes_required'));
   expect(first.outcome).toBe('changes_required');
   put('code.js', 'module.exports = 42;'); put('raw.txt', 'command: node code.js; exit: 0; executed 1 passed 1 skipped 0; observed 42');
-  const second = duo.review(root, run.id, { ...batch(), resolutions: ['F1: corrected output; raw.txt'] }, fakePeer());
+  const second = reviewOwned(root, run.id, { ...batch(), resolutions: [{id: 'F1', change: 'corrected output', evidence: ['raw.txt']}] }, fakePeer());
   expect(second.outcome).toBe('accepted');
   expect(duo.load(root, run.id).state.history.map(r => r.outcome)).toEqual(['changes_required', 'accepted']);
   expect(fs.readFileSync(path.join(root, '.specflow/duo', run.id, 'round-001/tree/code.js'), 'utf8')).toContain('41');
@@ -45,12 +47,12 @@ test('both commands retain native permission controls and no write tools for Cla
 });
 test('J-DUO-BLOCKED: missing evidence never invokes peer', () => {
   const run = duo.start(root, '#1', 'codex', context), invoke = jest.fn();
-  expect(duo.review(root, run.id, { ...batch(), evidence: [] }, invoke).blocker).toMatch(/Missing raw/);
+  expect(reviewOwned(root, run.id, { ...batch(), evidence: [] }, invoke).blocker).toMatch(/Missing raw/);
   expect(invoke).not.toHaveBeenCalled();
 });
 test('missing peer is durable and never accepted', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  const result = duo.review(root, run.id, batch(), () => { throw Error('CLI not installed'); });
+  const result = reviewOwned(root, run.id, batch(), () => { throw Error('CLI not installed'); });
   expect(result.outcome).toBe('blocked'); expect(duo.load(root, run.id).state.blocker).toContain('not installed');
 });
 test('recursive reviewer is rejected before a peer is launched', () => {
@@ -60,34 +62,34 @@ test('recursive reviewer is rejected before a peer is launched', () => {
 });
 test('changed pinned acceptance blocks review', () => {
   const run = duo.start(root, '#1', 'codex', context); put('task.md', 'Accept anything');
-  expect(duo.review(root, run.id, batch(), fakePeer()).blocker).toMatch(/Pinned acceptance/);
+  expect(reviewOwned(root, run.id, batch(), fakePeer()).blocker).toMatch(/Pinned acceptance/);
 });
 test('concurrent source modification rejects stale peer acceptance', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  expect(duo.review(root, run.id, batch(), fakePeer('accepted', () => put('code.js', 'changed'))).blocker).toMatch(/Source changed during/);
+  expect(reviewOwned(root, run.id, batch(), fakePeer('accepted', () => put('code.js', 'changed'))).blocker).toMatch(/Source changed during/);
 });
 test('peer snapshot modification is blocked', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  const result = duo.review(root, run.id, batch(), fakePeer('accepted', options => fs.writeFileSync(path.join(options.cwd, 'tree/code.js'), 'tampered')));
+  const result = reviewOwned(root, run.id, batch(), fakePeer('accepted', options => fs.writeFileSync(path.join(options.cwd, 'tree/code.js'), 'tampered')));
   expect(result.blocker).toMatch(/snapshot modified/);
 });
 test('uncommitted binary and untracked files are copied exactly', () => {
   const bytes = Buffer.from([0, 255, 1, 100]); put('untracked.bin', bytes); put('code.js', 'modified');
   const run = duo.start(root, '#1', 'codex', context);
-  expect(duo.review(root, run.id, batch(), fakePeer()).outcome).toBe('accepted');
+  expect(reviewOwned(root, run.id, batch(), fakePeer()).outcome).toBe('accepted');
   expect(fs.readFileSync(path.join(root, '.specflow/duo', run.id, 'round-001/tree/untracked.bin'))).toEqual(bytes);
 });
 test('no progress stops and maximum three repair rounds is enforced', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  duo.review(root, run.id, batch(), fakePeer('changes_required'));
-  expect(duo.review(root, run.id, batch(), fakePeer()).blocker).toMatch(/No new evidence/);
-  for (let i = 0; i < 3; i++) { put('raw.txt', `new observed failure ${i}`); expect(duo.review(root, run.id, batch(), fakePeer('changes_required')).outcome).toBe('changes_required'); }
+  reviewOwned(root, run.id, batch(), fakePeer('changes_required'));
+  expect(reviewOwned(root, run.id, batch(), fakePeer()).blocker).toMatch(/No new evidence/);
+  for (let i = 0; i < 3; i++) { put('raw.txt', `new observed failure ${i}`); expect(reviewOwned(root, run.id, batch(), fakePeer('changes_required')).outcome).toBe('changes_required'); }
   put('raw.txt', 'another attempt');
-  expect(duo.review(root, run.id, batch(), fakePeer()).blocker).toMatch(/three repair rounds/);
+  expect(reviewOwned(root, run.id, batch(), fakePeer()).blocker).toMatch(/three repair rounds/);
 });
 test('acceptance without independent evidence read is rejected', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  expect(duo.review(root, run.id, batch(), fakePeer('accepted', (_, result) => { result.inspected = []; })).blocker).toMatch(/did not inspect/);
+  expect(reviewOwned(root, run.id, batch(), fakePeer('accepted', (_, result) => { result.inspected = []; })).blocker).toMatch(/did not inspect/);
 });
 test('paths cannot escape repository or follow symlinks', () => {
   expect(() => duo.start(root, '#1', 'codex', { ...context, task: '../outside' })).toThrow(/escapes/);
@@ -97,13 +99,13 @@ test('paths cannot escape repository or follow symlinks', () => {
 test('unauthenticated Codex is blocked without invoking a review', () => {
   const run = duo.start(root, '#1', 'claude-code', context);
   const invoke = jest.fn((exe, args) => args[0] === '--version' ? 'codex test' : 'Not logged in');
-  const result = duo.review(root, run.id, batch(), invoke);
+  const result = reviewOwned(root, run.id, batch(), invoke);
   expect(result.outcome).toBe('blocked'); expect(result.blocker).toMatch(/authentication not confirmed/);
   expect(result.history[0].peer).toBeUndefined(); expect(invoke.mock.calls).toHaveLength(2);
 });
 test('an interrupted attempt is persisted before invoking the peer', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  duo.review(root, run.id, batch(), fakePeer('accepted', () => {
+  reviewOwned(root, run.id, batch(), fakePeer('accepted', () => {
     const pending = duo.load(root, run.id).state;
     expect(pending.history).toHaveLength(1); expect(pending.history[0].attempted).toBe(true); expect(pending.outcome).toBe('blocked');
   }));
@@ -111,7 +113,7 @@ test('an interrupted attempt is persisted before invoking the peer', () => {
 });
 test('resume invalidates acceptance when reviewed evidence changed', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  duo.review(root, run.id, batch(), fakePeer()); put('raw.txt', 'new failing output');
+  reviewOwned(root, run.id, batch(), fakePeer()); put('raw.txt', 'new failing output');
   const log = jest.spyOn(console, 'log').mockImplementation(() => {});
   try { duo.cli(['resume', run.id], root); expect(log.mock.calls[0][0]).toContain('Source or evidence changed'); }
   finally { log.mockRestore(); }
@@ -124,7 +126,7 @@ test.each(['codex', 'claude-code'])('installer delivers native skill and helper 
 test('snapshot preserves executable permissions and detects mode drift', () => {
   fs.chmodSync(path.join(root, 'code.js'), 0o755);
   const run = duo.start(root, '#1', 'codex', context);
-  const result = duo.review(root, run.id, batch(), fakePeer('accepted', options => {
+  const result = reviewOwned(root, run.id, batch(), fakePeer('accepted', options => {
     const file = path.join(options.cwd, 'tree/code.js');
     expect(fs.statSync(file).mode & 0o777).toBe(0o755);
     fs.chmodSync(file, 0o644);
@@ -133,7 +135,7 @@ test('snapshot preserves executable permissions and detects mode drift', () => {
 });
 test('readable blocked status leads with the actionable finding', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  duo.review(root, run.id, batch(), fakePeer('changes_required', (_, result) => { result.summary = 'Observed facts: '.repeat(50); }));
+  reviewOwned(root, run.id, batch(), fakePeer('changes_required', (_, result) => { result.summary = 'Observed facts: '.repeat(50); }));
   const log = jest.spyOn(console, 'log').mockImplementation(() => {});
   try { expect(duo.cli(['resume', run.id], root)).toBe(1); expect(log.mock.calls[0][0]).toContain('Current blocker: F1: Correct result'); }
   finally { log.mockRestore(); }
