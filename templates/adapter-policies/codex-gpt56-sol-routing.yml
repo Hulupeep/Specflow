@@ -23,8 +23,6 @@ policies:
         - -c
         - 'approval_policy="never"'
         - -c
-        - 'model_reasoning_effort="xhigh"'
-        - -c
         - sandbox_workspace_write.network_access=false
       model: gpt-5.6-sol
       requested_model: gpt-5.6-sol
@@ -62,8 +60,6 @@ policies:
         - -c
         - 'approval_policy="never"'
         - -c
-        - 'model_reasoning_effort="high"'
-        - -c
         - sandbox_workspace_write.network_access=false
       model: gpt-5.6-sol
       requested_model: gpt-5.6-sol
@@ -100,8 +96,6 @@ policies:
         - --ephemeral
         - -c
         - 'approval_policy="never"'
-        - -c
-        - 'model_reasoning_effort="medium"'
         - -c
         - sandbox_workspace_write.network_access=false
       model: gpt-5.6-sol

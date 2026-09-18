@@ -100,8 +100,6 @@ policies:
         - -c
         - 'approval_policy="never"'
         - -c
-        - 'model_reasoning_effort="medium"'
-        - -c
         - sandbox_workspace_write.network_access=false
       model: gpt-5.5
       requested_model: gpt-5.5

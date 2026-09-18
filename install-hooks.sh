@@ -70,7 +70,7 @@ else
   TEMPLATES_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/templates/hooks"
 
   # NOTE: This list must be updated when new hooks are added to hooks/
-  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh commit-msg pre-push README.md; do
+  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh model-switch-hook.sh check-pipeline-compliance.sh commit-msg pre-push README.md; do
     curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
       echo -e "${YELLOW}Warning: Could not download $file${NC}"
     }

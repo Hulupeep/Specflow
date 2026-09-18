@@ -57,6 +57,8 @@ chmod +x .claude/hooks/*.sh
 | `post-build-check.sh` | Detects build/commit commands, triggers tests |
 | `run-journey-tests.sh` | Finds issues → journeys → runs relevant tests |
 | `check-pipeline-compliance.sh` | Checks written/edited files against contract patterns |
+| `session-start.sh` | SessionStart: prints the re-entry briefing for every non-terminal `.specflow/runs/*` run (durable position, not memory) |
+| `model-switch-hook.sh` | PreModelSwitch: blocks a downgrade during top-thinker stages (adversary, persona, B.5) unless it is the routed policy's declared fallback. PostModelSwitch: ledgers every switch as `model_switch` |
 | `post-push-ci.sh` | Polls GitHub Actions CI status after push |
 | `session-start.sh` | Placeholder (silent) |
 
