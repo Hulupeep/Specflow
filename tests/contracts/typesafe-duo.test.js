@@ -75,3 +75,40 @@ test('native response schema constrains evidence arrays to executable ledger pat
  expect(schema.properties.diagnostics.items.properties.evidence.items.enum).toContain('diff.patch');
  expect(schema.properties.diagnostics.items.properties.evidence.items.enum).not.toContain('tree/test.cjs:3');
 });
+// Deterministic transport tests; the live advisory pilot is recorded separately (#143).
+test('partial TypeSafe selection discloses omitted criteria without narrowing peer acceptance',()=>{
+ const w=worker();installWorker(w);
+ put('task.md','AC-1: balance equals 18\nAC-2: explanation names transactions');
+ const second={id:'AC-2',source:'task.md',anchor:'AC-2: explanation names transactions',kind:'acceptance'};
+ const r=duo.start(root,'#143','codex',{...context,criteria:[...context.criteria,second],typesafe:{mode:'advisory'}});
+ const b={...batch(),criteria:['AC-1','AC-2']};let peerCalls=0;const ordinary=peer();
+ const result=review(r,b,(exe,args,opts)=>{
+  const raw=ordinary(exe,args,opts);if(!opts?.cwd)return raw;
+  peerCalls++;const request=JSON.parse(fs.readFileSync(path.join(opts.cwd,'request.json')));
+  expect(request.batch.criteria).toEqual(['AC-1','AC-2']);
+  expect(Object.keys(request.acceptance).sort()).toEqual(['AC-1','AC-2']);
+  const response=JSON.parse(raw);response.structured_output.assessments.push({id:'AC-2',status:'verified',evidence:['raw.txt'],reason:'Synthetic peer assessment of the unselected criterion'});
+  return JSON.stringify(response);
+ });
+ expect(result.outcome).toBe('accepted');expect(peerCalls).toBe(1);expect(w).toHaveBeenCalledTimes(1);
+ const input=JSON.parse(fs.readFileSync(w.mock.calls[0][1][1]));
+ expect(input.state.omittedCriteria).toEqual(['AC-2']);expect(input.state.items.map(i=>i.criterionId)).toEqual(['AC-1']);
+ const advice=JSON.parse(fs.readFileSync(path.join(root,'.specflow/duo',r.id,'typesafe/round-001/advice.json')));
+ expect(advice.omittedCriteria).toEqual(['AC-2']);expect(advice.selected.map(s=>s.criterion)).toEqual(['AC-1']);
+ expect(result.criteria['AC-2'].status).toBe('verified');
+ expect(duo.finish(root,r.id,r.owner.session).goalStatus).toBe('complete');
+});
+test.each([
+ ['ASCII at limit','a',32768,32768,1],
+ ['ASCII above limit','a',32769,32769,0],
+ ['multibyte at limit','é',16384,32768,1],
+ ['multibyte above limit','é',16385,32770,0],
+])('per-file byte boundary: %s retains ordinary peer review',(label,character,count,bytes,calls)=>{
+ const content=character.repeat(count);expect(Buffer.byteLength(content)).toBe(bytes);put('test.cjs',content);
+ const w=worker();installWorker(w);const r=run();let peerCalls=0;const ordinary=peer();
+ const result=review(r,batch(),(exe,args,opts)=>{if(opts?.cwd)peerCalls++;return ordinary(exe,args,opts);});
+ expect(result.outcome).toBe('accepted');expect(peerCalls).toBe(1);expect(w).toHaveBeenCalledTimes(calls);
+ const check=JSON.parse(fs.readFileSync(path.join(root,'.specflow/duo',r.id,'typesafe/round-001/check.json')));
+ if(calls){expect(check.status).toBe('completed');const input=JSON.parse(fs.readFileSync(w.mock.calls[0][1][1]));expect(input.state.items[0].assertion.text).toBe(content);}
+ else{expect(check.status).toBe('unavailable');expect(check.reason).toBe('input_limit');expect(check.response).toBeUndefined();expect(result.typesafe.calls).toBe(0);}
+});
