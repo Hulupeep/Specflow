@@ -70,6 +70,11 @@ test('AC-3: archived completed runs do not intercept later work in the same conv
   review(); duo.finish(root,run.id,run.owner.session); put('code.js','next task');
   expect(cadence.stop(root,input)).toEqual({});
 });
+test('AC-3: corrupt unrelated run state cannot stop non-duo conversations', () => {
+  put('.specflow/duo/broken/run.json','{');put('.specflow/duo/null/run.json','null');
+  expect(cadence.stop(root,{...input,session_id:'unrelated'})).toEqual({});
+  expect(cadence.stop(root,input).decision).toBe('block');
+});
 test('AC-3: an unexpanded host-session placeholder cannot silently disable binding', () => {
   expect(()=>duo.resume(root,run.id,'claude-code',{session:run.owner.session,hostSession:'${CLAUDE_SESSION_ID}'})).toThrow(/expanded/);
   expect(duo.load(root,run.id).state.owner.hostSession).toBe(input.session_id);

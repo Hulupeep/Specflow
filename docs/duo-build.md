@@ -44,6 +44,12 @@ The Codex sandbox limits writes; as with native coding agents, the reviewer
 instruction also forbids arbitrary provider commands and external mutations.
 This is not an isolation service for hostile agents.
 
+Denied optional parsing utilities do not discard a completed Claude review when
+the raw transcript proves successful Read calls for every required artifact.
+The denials and recovery receipts remain recorded. Missing receipts, denied
+GitHub/artifact access and recursive-review attempts still block; no tool gains
+additional permissions through this recovery.
+
 The builder and reviewer read the same run `goal.md`, generated from an existing
 goal/mission with a bounded objective, finish condition and authoritative task
 references. Timebreez's ambition is accurate, explainable leave entitlements and

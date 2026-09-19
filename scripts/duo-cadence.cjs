@@ -30,8 +30,10 @@ function stop(root, input) {
   const ids = fs.readdirSync(base).filter(id => /^[a-zA-Z0-9-]+$/.test(id)).filter(id => {
     const file = path.join(base, id, 'run.json');
     if (!fs.existsSync(file)) return false;
-    const state = readJson(file);
-    return state.goalStatus !== 'complete' && state.owner?.builder === 'claude-code' && state.owner.hostSession === input.session_id;
+    // Unreadable unrelated state cannot identify an owner and must not stop all
+    // conversations. Direct status/review/finish still reject that corrupt run.
+    let state; try { state = readJson(file); } catch { return false; }
+    return state && state.goalStatus !== 'complete' && state.owner?.builder === 'claude-code' && state.owner.hostSession === input.session_id;
   });
   if (!ids.length) return {}; // Other conversations and non-duo work are unaffected.
   const pending = ids.map(id => {

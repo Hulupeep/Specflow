@@ -26,6 +26,7 @@ function save(dir, state) {
     audit.push(`## Round ${i + 1} — ${r.at}`, '', `Batch: ${r.batch}. ${called}. Outcome: ${r.outcome}.`,
       `Validated feedback: ${r.stage === 'validated' || r.progress ? 'yes' : 'no'}.`, r.summary || '',
       `Raw records: round-${String(i + 1).padStart(3, '0')}/`, '');
+    if (r.permissionDenials?.length) audit.push(`Denied tool calls: ${r.permissionDenials.length}. ${r.permissionRecovery ? 'All required artifacts have successful Read receipts; optional utility denial recovered.' : 'Review access blocked; inspect the raw transcript.'}`, '');
     for (const row of r.review?.assessments || []) audit.push(`- ${row.id}: ${row.status} — ${row.reason}`);
     for (const finding of r.review?.findings || []) audit.push(`- Finding ${finding.id} (${finding.criterion || 'material risk'}): ${finding.action}`);
     for (const resolution of r.review?.resolutions || []) audit.push(`- Resolution ${resolution.id}: ${resolution.status} — ${resolution.reason}`);
@@ -172,6 +173,20 @@ function validateReview(result, request) {
     for (const file of request.requiredReads) if (!result.inspected.includes(file)) throw Error(`Peer did not inspect required artifact: ${file}`);
   }
   return result;
+}
+function recoverOptionalDenials(events, denials, requiredReads, round) {
+  // A denied utility is not missing access when the peer actually read every
+  // required artifact through its permitted Read tool. Never expand permissions.
+  if (denials.some(d => d.tool_name !== 'Bash' || typeof d.tool_input?.command !== 'string' || /\b(?:gh|codex|claude)(?:\s|$)|duo-build\.cjs/.test(d.tool_input.command))) return null;
+  const calls = new Map(), readPaths = new Set();
+  for (const event of events) {
+    const blocks = Array.isArray(event.message?.content) ? event.message.content : [];
+    for (const block of blocks) {
+      if (event.type === 'assistant' && block.type === 'tool_use' && block.name === 'Read' && typeof block.input?.file_path === 'string') calls.set(block.id, path.relative(round, path.resolve(round, block.input.file_path)));
+      if (event.type === 'user' && block.type === 'tool_result' && !block.is_error && calls.has(block.tool_use_id)) readPaths.add(calls.get(block.tool_use_id));
+    }
+  }
+  return requiredReads.every(file => readPaths.has(file)) ? { mechanism: 'successful Read tool receipts in peer transcript', requiredReads: [...new Set(requiredReads)] } : null;
 }
 function locked(root, id, action) {
   guard();
@@ -347,8 +362,13 @@ function reviewLocked(root, dir, state, batch, invoke) {
       raw = invoke(spec.exe, spec.args, { cwd: round, input: prompt, timeout: 600000, recordDir: round, env: { ...typesafe.peerEnv(process.env), ...spec.env, SPECFLOW_DUO_REVIEWER: '1' } });
       write(path.join(round, 'stdout.txt'), raw);
     } catch (e) { write(path.join(round, 'error.txt'), e.message); throw e; }
-    const wrapper = spec.exe === 'claude' ? raw.trim().split('\n').map(jsonText).findLast(event => event.type === 'result' || event.structured_output) : null;
-    if (wrapper?.permission_denials?.length) throw Error('Peer permission denied; see stdout.txt');
+    const events = spec.exe === 'claude' ? raw.trim().split('\n').map(jsonText) : [];
+    const wrapper = events.findLast(event => event.type === 'result' || event.structured_output);
+    if (wrapper?.permission_denials?.length) {
+      record.permissionDenials = wrapper.permission_denials;
+      record.permissionRecovery = recoverOptionalDenials(events, record.permissionDenials, request.requiredReads, round);
+      if (!record.permissionRecovery) throw Error('Peer permission denied without complete permitted artifact access; see stdout.txt');
+    }
     if (wrapper?.is_error) throw Error(`Peer failed: ${wrapper.result}`);
     const result = spec.exe === 'claude' ? (wrapper.structured_output || jsonText(wrapper.result)) : json(path.join(round, 'response.json'));
     typesafe.validate(result, request, round);
