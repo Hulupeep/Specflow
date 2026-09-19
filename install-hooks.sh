@@ -70,7 +70,7 @@ else
   TEMPLATES_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/templates/hooks"
 
   # NOTE: This list must be updated when new hooks are added to hooks/
-  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh commit-msg pre-push README.md; do
+  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh duo-review-check.sh commit-msg pre-push README.md; do
     curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
       echo -e "${YELLOW}Warning: Could not download $file${NC}"
     }
@@ -188,8 +188,11 @@ if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
     if jq -s '
       (.[0].hooks.PostToolUse // []) as $existing |
       (.[1].hooks.PostToolUse // []) as $new |
+      (.[0].hooks.Stop // []) as $existingStop |
+      (.[1].hooks.Stop // []) as $newStop |
       .[0] * .[1] |
-      .hooks.PostToolUse = ($existing + $new | unique_by([.matcher, (.hooks[0].command // "")]))
+      .hooks.PostToolUse = ($existing + $new | unique_by([.matcher, (.hooks[0].command // "")])) |
+      .hooks.Stop = ($existingStop + $newStop | unique)
     ' "$TARGET_DIR/.claude/settings.json" "$HOOKS_DIR/settings.json" > "$TEMP_SETTINGS"; then
       mv "$TEMP_SETTINGS" "$TARGET_DIR/.claude/settings.json"
       echo -e "${GREEN}✓${NC} Merged hooks into existing settings.json (preserved existing hooks)"

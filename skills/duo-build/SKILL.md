@@ -16,6 +16,12 @@ Only these two hosts are supported. Use the actual host identity, never infer it
 from installed configuration directories. Claude builds → Codex reviews; Codex
 builds → Claude reviews. The helper selects the peer from the current owner.
 
+Claude Code session binding for this invocation: `${CLAUDE_SESSION_ID}`.
+In Claude, pass this expanded value as `--host-session <value>` on every start
+or resume. It binds the Stop check to this conversation, not other agents in the
+repository. If the placeholder is not expanded, report cadence enforcement as
+unavailable; continue the explicit per-batch review loop. Codex omits this flag.
+
 ## Start and own the run
 
 1. Read repository and relevant ancestor instructions. Run
@@ -80,6 +86,21 @@ captures cannot prove verification. Capture other relevant PR/CI/raw results as
 needed. Never execute a reviewer-suggested command automatically; select the
 appropriate command yourself within the user's authorization.
 
+**Before ending each work turn or reporting a batch complete, review it now.**
+A batch can be a diagnosis or verification result as well as code. Do not wait
+for the whole application, unrelated gates, owner browser access, a commit, or
+the user's next message. Submit the available evidence honestly; missing gates
+remain unverified/blocked. Read feedback and continue actionable repairs in this
+same conversation. Ask for user input only for a specific dependency that you
+cannot resolve, after reviewing the work already possible.
+
+Both hosts can check `node scripts/duo-cadence.cjs <run-id>` before a final reply.
+Claude's installed Stop hook enforces one corrective continuation for a bound
+session, then reports an explicit blocker if no fresh review appeared. It never
+launches a model itself, bypasses permissions, claims a run, or resets budgets.
+Unchanged reviewed work needs no duplicate review. A blocked peer verdict is
+feedback, not completion; continue any remaining independent work.
+
 Keep batch metadata inside `.specflow/duo/<id>/` so editing it does not change the
 product snapshot. A batch contains:
 ```json
@@ -94,6 +115,17 @@ Pause source edits and source-mutating tests while running:
 Read the returned outcome and latest round/review.json. The peer independently
 inspects the shared goal, task, indexed gates, relevant source and raw evidence.
 It assesses the requested rows and checks the index for omitted obligations.
+For GitHub repositories, the helper checks `gh` authentication and gives the peer
+direct read access to issues, PRs, diffs, checks and raw job logs. Preserve raw
+execution/CI captures too: live remote observations cannot prove local edits were
+tested. The reviewer must identify repository and SHA differences and cannot
+mutate GitHub. Access failure is a specific blocker.
+
+The helper maintains `.specflow/duo/<id>/audit.md` with actual calls, preflight
+failures, validated outcomes, criterion assessments and finding resolutions.
+Keep live interaction logging there: editing a tracked or untracked root
+`audit.md` changes the snapshot and invalidates verification. Existing root logs
+are not overwritten; freeze them before capturing and throughout review.
 
 - `changes_required`: fix evidenced blockers and re-review with new raw evidence.
   Follow the finding's closure-verification step. Optional cleanup stays separate.

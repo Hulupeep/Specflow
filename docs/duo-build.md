@@ -28,12 +28,27 @@ The user runs just the skill. The interactive agent performs preparation and
 implementation using the existing `spec-build` and `feature-build` paths; the
 small helper only saves state, freezes a review copy and invokes the peer.
 
-Codex builds → `claude -p` reviews with only Read/Glob/Grep tools.
-Claude builds → `codex exec --sandbox read-only` reviews. Reviewer recursion is
+Codex builds → `claude -p` reviews with Read/Glob/Grep and allowlisted `gh` reads.
+Claude builds → `codex exec` reviews with a read-only filesystem permissions
+profile and network enabled for authenticated GitHub reads. Only the per-round
+`gh-cache/` directory is writable, so `gh run view --log` can cache downloaded
+job logs without gaining write access to product files. For repositories
+without a GitHub origin it uses `--sandbox read-only` without enabling network.
+The helper checks `gh --version` and `gh auth status` for GitHub repositories.
+The peer can read issues, PRs, diffs, checks and raw job logs directly. It must
+identify the remote head SHA and distinguish it from uncommitted local changes.
+GitHub mutation commands are forbidden by the reviewer instructions; the local
+sandbox does not reduce the token's GitHub scopes. Claude grants the listed GitHub read commands alongside its built-in safe reads. Missing required access returns blocked. Reviewer recursion is
 forbidden in the prompt and rejected by the helper's inherited environment guard.
 The Codex sandbox limits writes; as with native coding agents, the reviewer
 instruction also forbids arbitrary provider commands and external mutations.
 This is not an isolation service for hostile agents.
+
+Denied optional parsing utilities do not discard a completed Claude review when
+the raw transcript proves successful Read calls for every required artifact.
+The denials and recovery receipts remain recorded. Missing receipts, denied
+GitHub/artifact access and recursive-review attempts still block; no tool gains
+additional permissions through this recovery.
 
 The builder and reviewer read the same run `goal.md`, generated from an existing
 goal/mission with a bounded objective, finish condition and authoritative task
@@ -42,7 +57,7 @@ balances across arrangements/jurisdictions, traced to rules, facts, calculation
 evidence and transactions. The goal must separately state current support and
 unknowns. No supported jurisdictions are inferred from this ambition.
 
-Records live at `.specflow/duo/<run-id>/`: `run.json`, `goal.md`, and ordered
+Records live at `.specflow/duo/<run-id>/`: `run.json`, `goal.md`, generated `audit.md`, and ordered
 `round-NNN/` directories containing batch input, exact file/hash manifest, copied
 source tree, staged/working diff, recent commit metadata, request, invocation,
 raw peer stdout/stderr and structured findings. Explicit evidence paths include
@@ -51,6 +66,25 @@ Snapshots use Git's tracked and nonignored untracked file list, excluding
 node_modules, duo run records and nested Claude worktrees (recorded in snapshot-policy.json); symlinks and
 submodules block rather than silently reviewing different bytes. The source
 must stay paused during review. Any source or evidence drift rejects acceptance.
+The generated audit distinguishes actual peer calls from preflight-only failures
+and records feedback and resolutions. It is excluded from product snapshots.
+A root `audit.md` is ordinary source: updating it invalidates captures/reviews.
+
+The builder reviews each completed implementation, diagnosis or verification
+batch immediately, before its turn ends. It does not wait for the full goal or
+unavailable live tests. The peer can review current evidence while retaining
+those missing gates as blockers. Actionable feedback starts the next repair in
+the same conversation; unchanged reviewed work needs no duplicate call.
+
+For Claude, the native skill passes its expanded `CLAUDE_SESSION_ID` via
+`--host-session` when starting/resuming. The installed Stop hook checks only
+runs bound to that conversation. It redirects an unreviewed turn back to review
+once, then reports an explicit blocker if the builder still has no fresh result.
+It does not launch reviewers or take over runs. Other conversations, non-duo
+sessions and reviewers are unaffected. Existing Claude runs must resume through
+the updated skill to bind their session; installing files alone does not bind
+an already-running conversation. Codex follows the same per-batch skill rule
+and can run `node scripts/duo-cadence.cjs <run-id>`; no Codex turn-end hook is installed.
 
 A run belongs to its goal rather than its initial CLI. Start in Claude, then
 resume the same ID in Codex (or vice versa). The native skill claims the current

@@ -91,6 +91,32 @@ test('acceptance without independent evidence read is rejected', () => {
   const run = duo.start(root, '#1', 'codex', context);
   expect(reviewOwned(root, run.id, batch(), fakePeer('accepted', (_, result) => { result.inspected = []; })).blocker).toMatch(/did not inspect/);
 });
+test.each([
+  ['optional parser, complete Read receipts', 'Bash', 'python3 -c "import json"', true, true],
+  ['optional parser, missing receipts', 'Bash', 'python3 -c "import json"', false, false],
+  ['GitHub denial', 'Bash', 'gh pr view 1 --repo owner/repo', true, false],
+  ['artifact denial', 'Read', '', true, false],
+  ['recursive CLI attempt', 'Bash', 'codex exec review', true, false],
+])('permission recovery: %s', (_, toolName, command, receipts, accepted) => {
+  const run=duo.start(root,'#1','codex',context);
+  const invoke=(exe,args,options)=>{
+    const raw=fakePeer()(exe,args,options);
+    if(args[0]!=='-p')return raw;
+    const request=JSON.parse(fs.readFileSync(path.join(options.cwd,'request.json'))), result=JSON.parse(raw);
+    result.permission_denials=[{tool_name:toolName,tool_input:{command}}];
+    const events=receipts ? request.requiredReads.flatMap((file,i)=>[
+      {type:'assistant',message:{content:[{type:'tool_use',name:'Read',id:`r${i}`,input:{file_path:path.join(options.cwd,file)}}]}},
+      {type:'user',message:{content:[{type:'tool_result',tool_use_id:`r${i}`,content:'fixture read result',is_error:false}]}}
+    ]) : [];
+    return [...events,result].map(e=>JSON.stringify(e)).join('\n');
+  };
+  const state=reviewOwned(root,run.id,batch(),invoke);
+  expect(state.outcome).toBe(accepted ? 'accepted' : 'blocked');
+  expect(state.history[0].permissionDenials).toHaveLength(1);
+  expect(Boolean(state.history[0].permissionRecovery)).toBe(accepted);
+  const audit=fs.readFileSync(path.join(root,'.specflow/duo',run.id,'audit.md'),'utf8');
+  expect(audit).toContain('Denied tool calls: 1');
+});
 test('paths cannot escape repository or follow symlinks', () => {
   expect(() => duo.start(root, '#1', 'codex', { ...context, task: '../outside' })).toThrow(/escapes/);
   fs.symlinkSync('/etc/passwd', path.join(root, 'linked'));

@@ -37,6 +37,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/duo-review-check.sh",
+            "timeout": 30
+          }
+        ]
+      }
     ]
   }
 }
