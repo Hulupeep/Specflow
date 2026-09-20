@@ -43,7 +43,9 @@ test.each(['claude-code','codex'])('J-DUO-DIRECTION: %s receives immediate usefu
   if(builder==='claude-code') expect(cadence.stop(root,{session_id:'direction-session'}).decision).toBe('block');
   const round=path.join(root,'.specflow/duo',run.id,'round-001');
   expect(JSON.parse(fs.readFileSync(path.join(round,'invocation.json'))).exe).toBe(builder==='claude-code'?'codex':'claude');
-  expect(fs.readFileSync(path.join(round,'prompt.txt'),'utf8')).toContain('goal-focused technical partner');
+  const prompt=fs.readFileSync(path.join(round,'prompt.txt'),'utf8');
+  expect(prompt).toContain('goal-focused technical partner');
+  expect(prompt).toContain(builder==='claude-code'?'native read-only execution tools available in Codex':'Use Read/Glob/Grep for local files');
   expect(direction.render(result)).toContain('Real connected account observed');
 });
 test('J-DUO-RESUME-DIRECTION: builder responds, reviewer sees decision memory, owner-only handoff stops honestly',()=>{
