@@ -93,3 +93,13 @@ test('AC-CADENCE: accepted partial batch still requires continuation; fully prov
   result=review(batch({id:'finish',direction_response:response()}),peer(r=>{r.outcome='accepted';r.findings=[];for(const a of r.assessments)a.status='verified';r.direction={assessment:'complete',goal_connection:'Synthetic adapter certifies all fixture rows',next_steps:[],preserve:[]};}));
   expect(result.outcome).toBe('accepted');expect(duo.finish(root,run.id,run.owner.session).goalStatus).toBe('complete');
 });
+test('AC-CADENCE: accepted local batch with only owner work returns an explicit blocked handoff',()=>{
+  const result=review(batch({criteria:['AC-DISPLAY']}),peer(r=>{r.outcome='accepted';r.findings=[];r.assessments[0].status='verified';r.direction={assessment:'blocked',goal_connection:'Local display proven; owner consent still required',next_steps:[step('user','LIVE-GATE')],preserve:['Real consent remains unverified']};}));
+  expect(result.outcome).toBe('accepted');expect(result.blocker).toContain('user: Complete real owner consent');
+  expect(cadence.stop(root,{session_id:'direction-session'})).toMatchObject({continue:false,stopReason:expect.stringContaining('Real connected account observed')});
+  expect(()=>duo.finish(root,run.id,run.owner.session)).toThrow(/incomplete/);
+});
+test('AC-DIRECTION: verified goal cannot manufacture another cleanup task',()=>{
+  const result=review(batch(),peer(r=>{r.outcome='accepted';r.findings=[];for(const a of r.assessments)a.status='verified';r.direction={assessment:'on_track',goal_connection:'All criteria proven but suggesting cleanup',next_steps:[{...step(),action:'Rename internal variables'}],preserve:[]};}));
+  expect(result.outcome).toBe('blocked');expect(result.blocker).toContain('must finish');expect(result.continuation).toBeUndefined();
+});

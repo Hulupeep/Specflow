@@ -22,6 +22,7 @@ function peer(outcome = 'accepted') {
       findings: outcome === 'changes_required' ? [{id:'F1',criterion:'AC-1',kind:'acceptance',basis:'AC-1',evidence:'raw.txt',action:'Fix the result',verification:'Run result check'}] : [],
       assessments: [{id:'AC-1',status:outcome === 'accepted' ? 'verified' : 'blocked',evidence:req.batch.evidence,reason:'fixture raw inspection'}] };
     directionFixture.feedback(req, result);
+    if (outcome === 'blocked') Object.assign(result.direction.next_steps[0], {action:'Owner browser: provide access for the required check',done_when:'Owner browser access is available'});
     if (exe === 'codex') fs.writeFileSync(path.join(options.cwd, 'response.json'), JSON.stringify(result));
     return JSON.stringify({structured_output:result});
   };

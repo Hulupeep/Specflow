@@ -15,6 +15,7 @@ function validate(direction, state, outcome) {
   if (!direction || !['on_track', 'redirect', 'blocked', 'complete'].includes(direction.assessment) || !nonempty(direction.goal_connection)) throw Error('Peer must return goal-focused direction');
   if (!Array.isArray(direction.next_steps) || direction.next_steps.length > 3 || !Array.isArray(direction.preserve) || direction.preserve.some(s => !nonempty(s))) throw Error('Invalid direction steps or preserved constraints');
   const complete = outcome === 'accepted' && state.indexComplete && Object.keys(state.criteria).length > 0 && Object.values(state.criteria).every(c => c.status === 'verified') && !Object.values(state.findings).some(f => f.status === 'open');
+  if (complete && direction.assessment !== 'complete') throw Error('A fully verified scoped goal must finish, not generate additional work');
   if (direction.assessment === 'complete') {
     if (!complete || direction.next_steps.length) throw Error('Direction cannot declare completion before all goal gates are verified');
   } else if (!direction.next_steps.length) throw Error('Unfinished direction requires a concrete next action');
@@ -59,7 +60,7 @@ function render(state) {
     `Direction: ${d.assessment}. ${d.goal_connection}`, '',
     ...d.next_steps.map((s, i) => `${i + 1}. ${s.owner} — ${s.action}\n   Criterion: ${s.criterion}. Success: ${s.done_when}`),
     ...d.preserve.map(s => `Preserve: ${s}`), '',
-    'Continue authorized builder work now. Keep owner/external dependencies explicit. Advice does not expand scope or permissions; select commands yourself. Record done/deferred/disputed responses in the next batch and submit raw proof separately.',
+    d.assessment === 'complete' ? 'The scoped criteria are satisfied. Run finish if not already complete, then report the outcome; do not add work outside this goal.' : 'Continue authorized builder work now. Keep owner/external dependencies explicit. Advice does not expand scope or permissions; select commands yourself. Record done/deferred/disputed responses in the next batch and submit raw proof separately.',
     'Use the saved goal and authoritative task. Stop only at verified completion, a specific unavoidable dependency, or an exhausted budget. Log interactions in this run directory, not a root audit file.', '',
   ].join('\n');
 }

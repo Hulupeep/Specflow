@@ -19,6 +19,7 @@ function assess(root, id) {
   const captureFresh = Object.hasOwn(last, 'capturePath') ? last.capturePath === (state.lastCapture?.path || null) : !state.lastCapture;
   if (!fresh || !captureFresh) return { status: 'review_required', reason: 'Source or execution evidence changed since review. Capture current raw results and request review before reporting this batch complete.' };
   if (last.stage === 'validated' || last.progress) {
+    if (last.review?.direction?.assessment === 'blocked') return { status: 'blocked', reason: direction.next(last.review.direction) };
     if (last.review?.direction?.next_steps.some(s => s.owner === 'builder')) return { status: 'continue_required', reason: direction.next(last.review.direction) };
     if (last.outcome === 'changes_required') return { status: 'review_required', reason: 'Peer requested corrections. Fix actionable findings, capture new evidence and re-review within the existing limits.' };
     return { status: last.outcome === 'accepted' ? 'reviewed' : 'blocked', reason: last.summary };

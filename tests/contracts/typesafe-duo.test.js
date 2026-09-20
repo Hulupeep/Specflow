@@ -90,6 +90,7 @@ test('partial TypeSafe selection discloses omitted criteria without narrowing pe
   expect(request.batch.criteria).toEqual(['AC-1','AC-2']);
   expect(Object.keys(request.acceptance).sort()).toEqual(['AC-1','AC-2']);
   const response=JSON.parse(raw);response.structured_output.assessments.push({id:'AC-2',status:'verified',evidence:['raw.txt'],reason:'Synthetic peer assessment of the unselected criterion'});
+  directionFixture.feedback(request,response.structured_output);
   return JSON.stringify(response);
  });
  expect(result.outcome).toBe('accepted');expect(peerCalls).toBe(1);expect(w).toHaveBeenCalledTimes(1);
