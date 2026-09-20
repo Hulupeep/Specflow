@@ -1,3 +1,4 @@
+const directionFixture = require('../helpers/duo-direction.js');
 const fs=require('fs'),os=require('os'),path=require('path'),{execFileSync}=require('child_process');
 const duo=require('../../scripts/duo-build.cjs'),advisory=require('../../scripts/typesafe-duo.cjs'),client=require('../../scripts/typesafe-client.cjs');
 let root,spy;
@@ -11,6 +12,7 @@ function peer(outcome='accepted',omit=false){return(exe,args,opts)=>{
  expect(opts.env.TYPESAFE_API).toBeUndefined();
  const r={outcome,summary:'Synthetic peer transport',inspected:[...req.requiredReads,'tree/test.cjs'],index_complete:true,findings:outcome==='accepted'?[]:[{id:'F1',criterion:'AC-1',kind:'acceptance',basis:'AC-1',evidence:'tree/raw.txt',action:'Fix balance',verification:'Assert 18'}],unrelated:[],assessments:[{id:'AC-1',status:outcome==='accepted'?'verified':'blocked',evidence:['raw.txt'],reason:'Fixture'}],resolutions:req.open_findings.map(f=>({id:f.id,status:outcome==='accepted'?'closed':'open',evidence:['raw.txt'],reason:'Fresh evidence'})),diagnostics:[{observation:fs.readFileSync(path.join(opts.cwd,'tree/raw.txt'),'utf8'),evidence:['raw.txt']}]};
  if(req.typesafe&&!omit)r.typesafe_dispositions=req.typesafe.flags.map(id=>({id,status:'rejected',evidence:['raw.txt','tree/test.cjs'],reason:'Independently inspected fixture; simulated false flag'}));
+ directionFixture.feedback(req, r);
  if(exe==='codex')fs.writeFileSync(path.join(opts.cwd,'response.json'),JSON.stringify(r));return JSON.stringify({structured_output:r});
 };}
 function worker(status='completed') {return jest.fn((exe,args)=>{
@@ -20,7 +22,7 @@ function worker(status='completed') {return jest.fn((exe,args)=>{
 });}
 function installWorker(w){const original=advisory.run;spy=jest.spyOn(advisory,'run').mockImplementation(args=>original({...args,execute:w}));}
 function run(builder='codex',mode='advisory'){return duo.start(root,'#1',builder,{...context,typesafe:{mode}});}
-const review=(r,b=batch(),p=peer())=>duo.review(root,r.id,b,p,r.owner.session);
+const review=(r,b=batch(),p=peer())=>duo.review(root,r.id,directionFixture.respond(duo.load(root,r.id).state, b),p,r.owner.session);
 beforeEach(()=>{root=fs.mkdtempSync(path.join(os.tmpdir(),'ts-duo-'));git('init');git('config','user.name','Fixture');git('config','user.email','fixture@example.test');put('goal.md','Explain correct balance');put('task.md','AC-1: balance equals 18');put('balance.cjs','module.exports=20');put('test.cjs','assert(balance === 18)');put('raw.txt','Observed 20 expected 18; failed');git('add','.');git('commit','-m','fixture');process.env.TYPESAFE_API='test-only-credential';});
 afterEach(()=>{spy?.mockRestore();spy=null;delete process.env.TYPESAFE_API;delete process.env.SPECFLOW_DUO_REVIEWER;fs.rmSync(root,{recursive:true,force:true});});
 test.each(['codex','claude-code'])('J-TSAFE-EPIC/J-TSAFE-DUO: %s correction preserves snapshot, findings and dispositions',builder=>{
@@ -88,6 +90,7 @@ test('partial TypeSafe selection discloses omitted criteria without narrowing pe
   expect(request.batch.criteria).toEqual(['AC-1','AC-2']);
   expect(Object.keys(request.acceptance).sort()).toEqual(['AC-1','AC-2']);
   const response=JSON.parse(raw);response.structured_output.assessments.push({id:'AC-2',status:'verified',evidence:['raw.txt'],reason:'Synthetic peer assessment of the unselected criterion'});
+  directionFixture.feedback(request,response.structured_output);
   return JSON.stringify(response);
  });
  expect(result.outcome).toBe('accepted');expect(peerCalls).toBe(1);expect(w).toHaveBeenCalledTimes(1);

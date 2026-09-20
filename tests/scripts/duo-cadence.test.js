@@ -1,3 +1,4 @@
+const directionFixture = require('../helpers/duo-direction.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -20,11 +21,13 @@ function peer(outcome = 'accepted') {
       inspected: req.requiredReads, index_complete: true, unrelated: [], diagnostics: [], resolutions: [],
       findings: outcome === 'changes_required' ? [{id:'F1',criterion:'AC-1',kind:'acceptance',basis:'AC-1',evidence:'raw.txt',action:'Fix the result',verification:'Run result check'}] : [],
       assessments: [{id:'AC-1',status:outcome === 'accepted' ? 'verified' : 'blocked',evidence:req.batch.evidence,reason:'fixture raw inspection'}] };
+    directionFixture.feedback(req, result);
+    if (outcome === 'blocked') Object.assign(result.direction.next_steps[0], {action:'Owner browser: provide access for the required check',done_when:'Owner browser access is available'});
     if (exe === 'codex') fs.writeFileSync(path.join(options.cwd, 'response.json'), JSON.stringify(result));
     return JSON.stringify({structured_output:result});
   };
 }
-const review = (outcome = 'accepted', invoke = peer(outcome), data = batch()) => duo.review(root, run.id, data, invoke, run.owner.session);
+const review = (outcome = 'accepted', invoke = peer(outcome), data = batch()) => duo.review(root, run.id, directionFixture.respond(duo.load(root, run.id).state, data), invoke, run.owner.session);
 beforeEach(() => {
   root = fs.mkdtempSync(path.join(os.tmpdir(), 'duo-cadence-'));
   git('init'); git('config','user.email','test@example.test'); git('config','user.name','Test');
@@ -52,7 +55,7 @@ test('AC-2: legitimate blocked feedback permits honest stop; actionable findings
   review('blocked'); expect(cadence.stop(root,input)).toMatchObject({continue:false,stopReason:expect.stringContaining('Owner browser')});
 });
 test('AC-2: corrections are requested immediately', () => {
-  review('changes_required'); expect(cadence.stop(root,input).reason).toContain('Fix actionable findings');
+  review('changes_required'); expect(cadence.stop(root,input).reason).toContain('Verify the fixture output');
 });
 test('AC-2: missing peer stops as unavailable, missing raw evidence requests correction', () => {
   review('blocked',peer(),{...batch(),evidence:[]});

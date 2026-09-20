@@ -57,6 +57,11 @@ unavailable; continue the explicit per-batch review loop. Codex omits this flag.
 ## Resume in either host
 
 Read run.json, goal.md, the criterion ledger, open findings and prior evidence.
+Read the latest validated `continuation.md` and recent validated reviews.
+The helper prints the continuation on resume/status/review and labels historical
+advice after source/evidence changes or a failed review. Reassess historical advice
+against current facts; it is not fresh acceptance. Old runs gain direction on their
+next review without rewriting their historical verdicts.
 Within the same conversation, resume using your existing session token:
 `node scripts/duo-build.cjs resume <id> --builder <current-host> --session <token>`.
 A new conversation/host must explicitly claim ownership:
@@ -101,6 +106,17 @@ launches a model itself, bypasses permissions, claims a run, or resets budgets.
 Unchanged reviewed work needs no duplicate review. A blocked peer verdict is
 feedback, not completion; continue any remaining independent work.
 
+**Act on the peer's continuation, not just its verdict.** Read `direction` and its
+prioritized `next_steps`: why this work advances the customer goal, who can do it,
+and the observable `done_when`. Execute authorized builder steps in this same
+session, even when an independent owner/CI gate is blocked. Preserve completed
+work and the stated constraints. If you disagree or a step is no longer possible,
+record the reason and evidence; the next reviewer independently reassesses it.
+Never treat reviewer advice as permission to expand scope or bypass a gate.
+When only user/external steps remain, give the precise required action and proof,
+not a generic "blocked" report. An accepted batch with builder work remaining is
+another continuation, not the end of the goal.
+
 Keep batch metadata inside `.specflow/duo/<id>/` so editing it does not change the
 product snapshot. A batch contains:
 ```json
@@ -109,6 +125,16 @@ product snapshot. A batch contains:
 On repair, resolutions are objects with `id`, `change`, and `evidence` paths.
 Keep finding IDs stable. The peer must explicitly close or retain every open
 finding; accepting a different batch cannot hide an old blocker.
+
+After a validated direction with next steps, include `direction_response` in the
+next batch, bound to that review's round number. Account for every numbered step:
+```json
+{"direction_response":{"round":1,"steps":[{"step":1,"disposition":"done","reason":"Corrected the visible result; execution capture attached"},{"step":2,"disposition":"deferred","reason":"Real owner consent is still required; independent correction is complete"}]}}
+```
+Allowed dispositions: `done`, `deferred`, `disputed`. Reasons are context, not
+proof; submit raw evidence separately. Missing/duplicate responses fail before
+another peer call. The next reviewer receives the last three validated directions,
+their reasoning/dispositions and your response, without copying messages manually.
 
 Pause source edits and source-mutating tests while running:
 `node scripts/duo-build.cjs review <id> --session <token> --batch <batch.json>`.
@@ -126,6 +152,8 @@ failures, validated outcomes, criterion assessments and finding resolutions.
 Keep live interaction logging there: editing a tracked or untracked root
 `audit.md` changes the snapshot and invalidates verification. Existing root logs
 are not overwritten; freeze them before capturing and throughout review.
+Do not update a root interaction log after review and then rerun the same tests
+just to certify that log. Use excluded run-local notes and `direction_response`.
 
 - `changes_required`: fix evidenced blockers and re-review with new raw evidence.
   Follow the finding's closure-verification step. Optional cleanup stays separate.
@@ -141,6 +169,10 @@ and repeated observations do not count. Stop after two consecutive no-progress
 reviews or at most three repairs after the initial review. Renaming batches and
 switching hosts never reset an open repair cycle. An exhausted run remains blocked;
 do not start a replacement merely to evade its limit.
+New invalid/interrupted peer responses have a separate cap of three consecutive
+failures. They retain raw records and the last validated continuation but cannot
+verify criteria or consume validated product repair rounds. A valid review clears
+only that failure streak. Existing recorded budgets are preserved on resume.
 
 Finally run `node scripts/duo-build.cjs finish <id> --session <token>`.
 It refuses completion until every required indexed row has fresh peer-verified
