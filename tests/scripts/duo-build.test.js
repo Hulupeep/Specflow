@@ -1,3 +1,4 @@
+const directionFixture = require('../helpers/duo-direction.js');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -7,7 +8,7 @@ let root;
 const put = (name, value) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
 const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
 const context = { goal: 'goal.md', task: 'task.md', objective: 'Deliver correct answer', finish: 'AC-1 tested and accepted', criteria: [{id: 'AC-1', source: 'task.md', anchor: 'AC-1: returns 42', kind: 'acceptance'}] };
-const reviewOwned = (root, id, batch, invoke) => duo.review(root, id, batch, invoke, duo.load(root, id).state.owner.session);
+const reviewOwned = (root, id, batch, invoke) => duo.review(root, id, directionFixture.respond(duo.load(root, id).state, batch), invoke, duo.load(root, id).state.owner.session);
 const batch = () => ({ id: 'implementation', scope: 'AC-1', criteria: ['AC-1'], claims: ['locally tested'], assumptions: [], evidence: ['raw.txt'], resolutions: [] });
 function fakePeer(outcome = 'accepted', effect = () => {}) {
   return (exe, args, options) => {
@@ -18,6 +19,7 @@ function fakePeer(outcome = 'accepted', effect = () => {}) {
     // Provider boundary is simulated; state, snapshot and git operations are real.
     const result = { outcome, summary: outcome, inspected: request.requiredReads, findings: outcome === 'changes_required' ? [{ id: 'F1', criterion: 'AC-1', kind: 'acceptance', basis: 'AC-1', evidence: 'tree/code.js:1', action: 'Correct result', verification: 'Check the result equals 42' }] : [], unrelated: [] };
     Object.assign(result, { index_complete: true, assessments: request.batch.criteria.map(id => ({id, status: outcome === 'accepted' ? 'verified' : 'blocked', evidence: request.batch.evidence, reason: 'inspected fixture'})), resolutions: request.open_findings.map(f => ({id: f.id, status: outcome === 'accepted' ? 'closed' : 'open', evidence: request.batch.evidence, reason: 'fixture disposition'})), diagnostics: [{observation: fs.readFileSync(path.join(options.cwd, 'tree/raw.txt'), 'utf8'), evidence: request.batch.evidence}] });
+    directionFixture.feedback(request, result);
     effect(options, result);
     if (exe === 'codex') fs.writeFileSync(path.join(options.cwd, 'response.json'), JSON.stringify(result));
     return JSON.stringify({ structured_output: result });
@@ -133,7 +135,7 @@ test('an interrupted attempt is persisted before invoking the peer', () => {
   const run = duo.start(root, '#1', 'codex', context);
   reviewOwned(root, run.id, batch(), fakePeer('accepted', () => {
     const pending = duo.load(root, run.id).state;
-    expect(pending.history).toHaveLength(1); expect(pending.history[0].attempted).toBe(true); expect(pending.outcome).toBe('blocked');
+    expect(pending.history).toHaveLength(1); expect(pending.history[0].attempted).toBe(true); expect(pending.outcome).toBe('blocked'); expect(pending.peerFailures).toBe(1);
   }));
   expect(duo.load(root, run.id).state.history).toHaveLength(1);
 });

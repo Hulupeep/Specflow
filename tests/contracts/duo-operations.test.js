@@ -1,3 +1,4 @@
+const directionFixture = require('../helpers/duo-direction.js');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
@@ -28,11 +29,12 @@ function peer({outcome='accepted', diagnostic='new observation', change=()=>{}, 
       resolutions:request.open_findings.map(f=>({id:f.id,status:outcome==='accepted'?'closed':'open',evidence:[...request.batch.evidence],reason:'fixture disposition'})),
       diagnostics:diagnostic?[{observation:diagnostic,evidence:[...request.batch.evidence]}]:[]};
     change(result,request,opts);
+    directionFixture.feedback(request, result);
     if(exe==='codex') fs.writeFileSync(path.join(opts.cwd,'response.json'),JSON.stringify(result));
     return JSON.stringify({type:'result',structured_output:result});
   };
 }
-const review = (run,b,provider) => duo.review(root,run.id,b || batch(),provider || peer(),token(run.id));
+const review = (run,b,provider) => duo.review(root,run.id,directionFixture.respond(readRun(run.id), b || batch()),provider || peer(),token(run.id));
 beforeEach(()=>{
   root=fs.mkdtempSync(path.join(os.tmpdir(),'duo-ops-'));
   for(const args of [['init'],['config','user.email','test@example.test'],['config','user.name','Test']])execFileSync('git',args,{cwd:root,stdio:'pipe'});

@@ -3,6 +3,36 @@
 One native skill keeps your coding agent interactive and asks the other CLI to
 review each meaningful batch. No message copying, daemon, per-batch commit or PR.
 
+The review also supplies the next instruction to the builder: how the batch
+advances the customer goal, what reasoning needs correcting, and up to three
+prioritized actions with an owner and observable success. The builder follows
+authorized actions in the same session and reports a reasoned response in the
+next batch. Waiting for owner consent or CI does not stop independent work.
+
+`review`, `resume` and `status` print this continuation; the durable copy is
+`.specflow/duo/<id>/continuation.md`. The next reviewer receives the last three
+validated directions and the builder's response. Run `status` before acting:
+historical direction is labelled after source/evidence changes or failed review.
+The pinned goal, acceptance and existing permission/release gates remain
+authoritative. Advice cannot grant permission, and a completed batch is not a
+completed goal. The interactive agent chooses commands; the helper never executes
+reviewer-written shell text.
+
+Malformed/interrupted peer responses are recorded and capped at three consecutive
+failures, separately from the maximum three product repairs after the initial
+validated review. Valid feedback clears only the response-failure streak. Resume
+preserves earlier recorded budgets. Keep narrative notes in the excluded run
+directory: editing a root `audit.md` still changes the source snapshot. The helper
+does not exempt arbitrary source files or require identical tests to run for its
+generated audit/continuation.
+
+Both hosts follow the skill's continuation instructions. Claude's bound Stop hook
+can request one corrective continuation when authorized builder work remains.
+Codex has the explicit per-batch skill loop and cadence command; no background
+daemon or equivalent automatic Codex Stop hook is claimed. Structural validation
+cannot guarantee the quality of model reasoning; executed model demonstrations
+and independent review are still required.
+
 Install the local checkout into your project (after publication the equivalent is
 `npx @colmbyrne/specflow update . --runtime codex`):
 
