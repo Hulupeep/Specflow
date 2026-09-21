@@ -44,3 +44,12 @@ test('external blockage requires a named owner and dependency and directs the ne
  evidence=f.capture('unrelated.cjs');const valid=f.review(f.batch(evidence),f.peer(r=>{Object.assign(r.instruction_assessments[0],{outcome:'externally_blocked',dependencyOwner:'user',missingDependency:'Owner must supply the fixture input'});}));
  expect(valid.history.at(-1).stage).toBe('validated');expect(actions.next(valid)).toMatchObject({status:'blocked',instructionId:'I-R1-S1',reason:expect.stringContaining('user: Owner must supply the fixture input')});
 });
+test.each([true,false])('per-instruction raw citation requires actual top-level inspection, without duplicating paths: %s',inspected=>{
+ f.review(f.batch(f.capture()));const before=f.state();const evidence=f.capture('unrelated.cjs');
+ const result=f.review(f.batch(evidence),f.peer(r=>{
+  r.instruction_assessments[0].inspected=['tree/display.cjs'];r.instruction_assessments[0].outcome='not_attempted';
+  if(!inspected)r.inspected=r.inspected.filter(p=>p!==`tree/${evidence}`);
+ }));
+ if(inspected){expect(result.history.at(-1).stage).toBe('validated');expect(result.instructions['I-R1-S1'].lastAssessment.outcome).toBe('not_attempted');expect(result.instructions['I-R1-S1'].state).toBe('outstanding');}
+ else{expect(result.history.at(-1).stage).toBe('peer_review');expect(result.blocker).toContain(`listed as tree/${evidence} in top-level inspected`);expect(result.instructions).toEqual(before.instructions);expect(result.repairCycle).toEqual(before.repairCycle);}
+});

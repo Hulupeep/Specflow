@@ -389,3 +389,9 @@ recorded in `invocation.json`, to keep review deliberation bounded within the
 existing ten-minute call timeout. Unsupported CLI flags block review explicitly.
 The hooks-only curl installer refuses projects with duo run records; use the full
 package or checkout installer so it can preserve or stage the managed runtime.
+
+An instruction's `evidence` cites exact submitted capture paths. Each capture's
+`tree/` path must appear in the review's top-level `inspected`; the instruction's
+own `inspected` lists its relevant source/artifacts. Capture paths need not be
+repeated in both inspection lists. Missing submitted or inspected evidence still
+rejects the complete response atomically with the exact missing path.

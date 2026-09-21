@@ -67,3 +67,12 @@ process. It made no network calls. This is unavailable evidence, not measured
 semantic accuracy, confidence calibration, cost savings or review-quality benefit.
 Issue #154's live measurement remains open until credentials are supplied and the
 private evaluation is executed. Missing credentials do not stop native peer review.
+
+The first medium-effort reverse proof (`codex-complete-3`) is retained as a failed
+workflow proof even though its product eventually reached verified completion.
+Two intermediate responses were rejected because raw captures listed as inspected
+at review level were not repeated in each instruction's inspected list. They did
+not count as validated detection of the deliberately skipped instruction. The
+validator now accepts a per-instruction evidence citation when that exact submitted
+capture is independently listed in top-level inspected; it still rejects missing
+inspection. A fresh native cycle is required to verify this correction.
