@@ -13,3 +13,30 @@ test('exhausted legacy run retains exact budgets across transfer and evidence re
 test('eligibility reports missing evidence and response warnings together without a model call',()=>{
  f.review(f.batch(f.capture()));const r=duo.eligibility(f.root,f.run.id,f.run.owner.session,f.batch('missing.json'));expect(r.eligible).toBe(false);expect(r.responseWarnings).toEqual([{instructionId:'I-R1-S1',state:'unreported'}]);
 });
+test('a fresh valid review clears only the protocol streak and retains repair history and authority',()=>{
+ f.review(f.batch(f.capture()));const before=f.state();
+ expect(before.findings.TOTAL.status).toBe('open');
+ f.review(f.batch(f.capture()),f.peer(r=>{r.outcome='accepted';}));
+ const invalid=f.state();
+ expect(invalid.peerFailures).toBe(1);
+ expect(invalid.repairCycle).toEqual(before.repairCycle);
+ expect(invalid.batchAttempts).toEqual(before.batchAttempts);
+ // A newly observed wrong result is valid diagnostic progress, not acceptance.
+ f.put('display.cjs','console.log(40)');const evidence=f.capture();
+ f.review(f.batch(evidence),f.peer((result,request)=>{
+  result.diagnostics=[{observation:'Customer total now observed as 40',evidence:request.batch.evidence}];
+ }));
+ const valid=f.state();
+ expect(valid.history.at(-1).stage).toBe('validated');
+ expect(valid.peerFailures).toBe(0);
+ // The valid work review consumes its normal attempt; no previous attempt is refunded.
+ expect(valid.repairCycle.attempts).toBe(before.repairCycle.attempts+1);
+ expect(valid.batchAttempts.total).toBe(before.batchAttempts.total+1);
+ expect(valid.owner).toEqual(before.owner);
+ expect(valid.pinned).toEqual(before.pinned);
+ expect(Object.values(valid.criteria).map(({id,source,anchor,kind})=>({id,source,anchor,kind})))
+  .toEqual(Object.values(before.criteria).map(({id,source,anchor,kind})=>({id,source,anchor,kind})));
+ expect(valid.findings.TOTAL.status).toBe('open');
+ expect(valid.goalStatus).toBe('incomplete');
+ expect(()=>duo.finish(f.root,f.run.id,valid.owner.session)).toThrow(/incomplete/);
+});
