@@ -56,6 +56,13 @@ prompt_model_routing() {
 # Determine source directory (where this script lives)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# A downloaded hooks-only script cannot stage or verify managed duo bytes.
+# Existing run history requires the full kit installer, including for legacy runs.
+if [ ! -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ] && compgen -G "$TARGET_DIR/.specflow/duo/*/run.json" > /dev/null; then
+  echo "Full Specflow kit required: hooks-only installation cannot safely update an existing duo project. Run the installer from the complete package or checkout." >&2
+  exit 2
+fi
+
 # Duo updates are transactions; unfinished runs stage updates before any kit mutation.
 if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
   mkdir -p "$TARGET_DIR/.specflow/duo"

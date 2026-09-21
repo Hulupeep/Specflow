@@ -383,3 +383,9 @@ from the newer kit/package while keeping the old project runtime intact. This
 metadata operation is handled by the current entrypoint, without migrating the
 active run's code. Do not cease a run merely to install an update or avoid a limit;
 it is an explicit owner decision.
+
+Claude non-interactive reviews use the installed CLI’s `--effort medium` setting,
+recorded in `invocation.json`, to keep review deliberation bounded within the
+existing ten-minute call timeout. Unsupported CLI flags block review explicitly.
+The hooks-only curl installer refuses projects with duo run records; use the full
+package or checkout installer so it can preserve or stage the managed runtime.

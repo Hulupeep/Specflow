@@ -26,7 +26,7 @@ function validateCorpus(corpus) {
 }
 function baseline(row) {
   // Deliberately only mechanical evidence presence/execution markers, not a semantic oracle.
-  if (!row.state.evidence) return { support: 'insufficient', reason: 'empty evidence' };
+  if (!row.state.evidence || (Array.isArray(row.state.evidence) && !row.state.evidence.length)) return { support: 'insufficient', reason: 'empty evidence' };
   if (/skipped; executed 0|journey skipped|not attempted|never reached/i.test(row.state.evidence)) return { support: 'insufficient', reason: 'explicit nonexecution' };
   return { support: null, reason: 'mechanical checks cannot establish semantic support' };
 }

@@ -39,3 +39,8 @@ test('current dispatcher refuses to resume an explicitly ceased run through a le
  const log=jest.spyOn(console,'error').mockImplementation(()=>{});const dispatch=jest.spyOn(runtime,'dispatch');
  try{expect(duo.cli(['resume',state.id,'--builder','codex','--takeover','--reason','Cannot restart'],f.root)).toBe(2);expect(dispatch).not.toHaveBeenCalled();expect(f.state().owner).toBeNull();}finally{log.mockRestore();dispatch.mockRestore();}
 });
+test('hooks-only bootstrap refuses existing duo history before downloading or changing managed hooks',()=>{
+ const script=path.join(source,'install-hooks.sh');fs.copyFileSync(path.resolve(__dirname,'../../install-hooks.sh'),script);const before=duo.fingerprint(f.root,[]),state=JSON.stringify(f.state());
+ try{execFileSync('bash',[script,f.root],{encoding:'utf8',stdio:'pipe'});throw Error('Hooks-only installer unexpectedly succeeded');}catch(e){expect(e.status).toBe(2);expect(e.stderr.toString()).toContain('Full Specflow kit required');}
+ expect(duo.fingerprint(f.root,[])).toBe(before);expect(JSON.stringify(f.state())).toBe(state);
+});

@@ -17,7 +17,7 @@ TypeSafe is off in these proofs to isolate the native workflow.
 | Codex builds, Claude reviews | `1789987963843-4ec3293e` | Same three-review progression and independently observed `Total: 42`; finish succeeded. |
 | Claude stops before review | `1789987032061-e7c45cab` | Bound Stop hook blocked before the first review tool call; Claude continued to an accepted review and verified finish. |
 | Owner dependency unavailable | `1789987117659-de393169` | Display corrected and tested; real Google consent remained unavailable. Final result blocked and incomplete, with the owner gate open. |
-| Claude ignores corrective Stop | `1789988499107-e17633ef` | First Stop requested review; second returned `continue:false` with automatic continuation exhausted. No review was fabricated and the goal remained incomplete. |
+| Claude ignores corrective Stop | `1789989027254-4b125c6a` | First Stop requested review; second returned `continue:false` with automatic continuation exhausted. No review was fabricated and the goal remained incomplete. |
 
 Raw builder transcripts, raw peer responses, execution captures, exact invocation
 arguments and runtime manifests are retained privately under
@@ -38,7 +38,7 @@ requires interception before review, reruns the display, and checks the validate
 finish. This is a corrected checker result, not an additional model call.
 The first repeated-ignore case used the same installed native skill through an
 external controlled driver; the reusable `ignore` variant now lives in
-`scripts/duo-live-action-proof.cjs`.
+`scripts/duo-live-action-proof.cjs` and passed as `claude-ignore-2`.
 
 The deterministic suites exercise state transitions, invalid assessment rejection,
 missing evidence, stale evidence, ownership, recursion prevention, bounded cadence,
@@ -51,7 +51,11 @@ The implementation itself is reviewed in duo run `1789985575181-a8b48d4a`.
 Its first broad review timed out without a verdict and earned no acceptance.
 The next review verified 12 scoped criteria but required executable coverage for
 failed-attempt, non-attempt and external-dependency dispositions. Those behavioral
-tests were added; the finding remains open until the peer verifies the new capture.
+tests were added and the committed full suite passed 1067 tests. The following
+re-review also timed out without a structured verdict, so the finding remains open
+until a validated peer response verifies the correction. The next review uses
+medium Claude CLI effort and parsed raw evidence copies; both timeouts remain
+recorded and earn no acceptance.
 
 TypeSafe's instruction-specific selection, separate relevance/support questions,
 uncertainty disclosure, outage behavior and evidence-backed peer disagreement are

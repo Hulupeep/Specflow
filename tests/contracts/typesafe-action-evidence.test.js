@@ -23,3 +23,8 @@ test.each(['missing source','stale source','mailbox under permitted field'])('do
  else f.put('source.json',{duo_capture:1,stable:true,sourceAfter:kind==='stale source'?'previous':'snapshot',exitCode:0,stdout:JSON.stringify(kind==='mailbox under permitted field'?{providerReason:'From: private@example.test\nMessage body'}:{actual:42})});
  const result=advice.select(input);expect(result.items).toHaveLength(0);expect(result.skipped.at(-1).reason).toBe('insufficient_input');
 });
+test('mechanical comparison recognizes empty candidate arrays without inventing semantic support',()=>{
+ const {baseline}=require('../../scripts/typesafe-eval.cjs');
+ expect(baseline({state:{evidence:[]}})).toMatchObject({support:'insufficient'});
+ expect(baseline({state:{evidence:[{actual:42}]}})).toMatchObject({support:null});
+});
