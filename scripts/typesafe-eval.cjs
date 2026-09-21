@@ -61,9 +61,16 @@ async function evaluateCorpus(corpus, options={}) {
   const datasetHash=client.hash(corpus),questionHash=client.hash({evidence:prompts.questions(),repair:prompts.repairQuestions(),instruction:instructionQuestions()});
   const identity={datasetHash,questionHash,model:options.model,questionVersion:prompts.VERSION};
   const manifestFile=path.join(directory,'manifest.json');
-  if(fs.existsSync(manifestFile)&&JSON.stringify(JSON.parse(fs.readFileSync(manifestFile)).identity)!==JSON.stringify(identity))throw Error('Changed evaluation identity requires new output directory and qualification');
-  if(options.mode==='replay'&&!fs.existsSync(manifestFile))throw Error('Replay requires an existing evaluation');
-  if(!fs.existsSync(manifestFile))client.atomic(manifestFile,{identity,at:new Date().toISOString(),corpusVersion:corpus.version,mode:options.mode});
+  const prior=fs.existsSync(manifestFile)?JSON.parse(fs.readFileSync(manifestFile)):null;
+  if(prior&&JSON.stringify(prior.identity)!==JSON.stringify(identity))throw Error('Changed evaluation identity requires new output directory and qualification');
+  if(options.mode==='replay'&&!prior)throw Error('Replay requires an existing evaluation');
+  // Transport describes the original execution boundary, independently of live/replay
+  // mode. Never upgrade historical records without provenance or mix cached mocks
+  // into a provider run. Actual calls/completion remain separate measured fields.
+  const requestedTransport=options.fetchImpl?'simulated':'live';
+  const transport=prior?(prior.transport||'unknown'):requestedTransport;
+  if(options.mode==='live'&&transport!==requestedTransport)throw Error('Changed or unknown evaluation transport requires new output directory');
+  if(!prior)client.atomic(manifestFile,{identity,at:new Date().toISOString(),corpusVersion:corpus.version,mode:options.mode,transport});
   const rows=[];
   for(const row of corpus.cases) {
     const file=path.join(directory,row.id+'.json');
@@ -81,7 +88,7 @@ async function evaluateCorpus(corpus, options={}) {
     repetitions.push({id:row.id,result,comparable:result.status==='completed'&&original.status==='completed',sameChoices:result.status==='completed'&&original.status==='completed'?Object.keys(row.labels).every(k=>result.response.answers[k].choice===original.response.answers[k].choice):null});
   }
   const byControl = selected => Object.fromEntries([true,false].map(value => [value ? 'control' : 'edge', metrics(selected.filter(r => r.control === value))]));
-  const report={version:1,identity,mode:options.mode,at:new Date().toISOString(),recommendation:'shadow',limitations:[...(corpus.limitations||[]),'Confidence concentration is not correctness probability. No automatic promotion or acceptance. Missing peer baselines are not agreement.','Metrics are private; publication requires applicable permission.'],rows,repetitions,summary:metrics(rows),bySplit:Object.fromEntries(['development','heldout'].map(s=>[s,metrics(rows.filter(r=>r.split===s))])),byControl:byControl(rows),heldoutByControl:byControl(rows.filter(r=>r.split==='heldout')),repeatCalls:repetitions.reduce((s,r)=>s+(r.result.networkCalls||0),0)};
+  const report={version:1,identity,mode:options.mode,transport,at:new Date().toISOString(),recommendation:'shadow',limitations:[...(corpus.limitations||[]),'Transport labels the original evaluation boundary, not success: live uses the default provider transport; simulated uses an injected fetch; unknown means legacy provenance was absent. Replay preserves that label and makes no new calls.','Confidence concentration is not correctness probability. No automatic promotion or acceptance. Missing peer baselines are not agreement.','Metrics are private; publication requires applicable permission.'],rows,repetitions,summary:metrics(rows),bySplit:Object.fromEntries(['development','heldout'].map(s=>[s,metrics(rows.filter(r=>r.split===s))])),byControl:byControl(rows),heldoutByControl:byControl(rows.filter(r=>r.split==='heldout')),repeatCalls:repetitions.reduce((s,r)=>s+(r.result.networkCalls||0),0)};
   report.selectionComparison=Object.fromEntries(['broad','instruction'].map(selection=>[selection,metrics(rows.filter(r=>r.split==='heldout'&&r.selection===selection))]));
   const paidResults=[...rows,...repetitions].map(r=>r.result);
   report.cost={networkCallsIncludingRepeats:paidResults.reduce((n,r)=>n+(r.networkCalls||0),0),tokensIncludingRepeats:{input:paidResults.reduce((n,r)=>n+(r.origin==='live'?r.usage?.input_tokens||0:0),0),output:paidResults.reduce((n,r)=>n+(r.origin==='live'?r.usage?.output_tokens||0:0),0)},currencyAmount:null,reason:'Provider response supplies token usage, not a billed currency amount; see actualCalls/tokens/latencyMs. No price estimate is invented.'};
