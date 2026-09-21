@@ -3,9 +3,37 @@ const {fixture}=require('../helpers/duo-action-fixture.cjs');const duo=require('
 let f,source;beforeEach(()=>{f=fixture();source=fs.mkdtempSync(path.join(os.tmpdir(),'duo-kit-'));fs.mkdirSync(path.join(source,'scripts'));fs.writeFileSync(path.join(source,'scripts/duo-build.cjs'),'new version');});afterEach(()=>{f.close();fs.rmSync(source,{recursive:true,force:true});});
 test('J-DUO-RUNTIME-STABLE: stage while unfinished; pinned CLI status survives a modified installed helper',()=>{
  const before=duo.fingerprint(f.root,[]),saved=JSON.stringify(f.state());const updated=runtime.install(source,f.root);expect(updated.state).toBe('staged');expect(duo.fingerprint(f.root,[])).toBe(before);expect(JSON.stringify(f.state())).toBe(saved);
- const pinned=path.join(f.root,'.specflow/duo',f.run.id,'runtime/scripts/duo-build.cjs');const out=execFileSync(process.execPath,[pinned,'status',f.run.id],{cwd:f.root,encoding:'utf8'});expect(out).toContain(f.run.id);expect(out).toContain('staged');
+ const pinned=path.join(f.root,'.specflow/duo',f.run.id,'runtime/scripts/duo-build.cjs');const out=execFileSync(process.execPath,[pinned,'status',f.run.id],{cwd:f.root,encoding:'utf8'});expect(out).toContain(f.run.id);expect(out).toContain(`staged ${updated.stagedVersion}`);
  expect(runtime.dispatch(f.root,f.run.id,path.join(f.root,'scripts'))).toBe(path.dirname(pinned));
  f.put('display.cjs','console.log(0)');expect(duo.fingerprint(f.root,[])).not.toBe(before);
+});
+test('an eligible new run pins the staged installation and reports its exact active version',()=>{
+ const kit=path.resolve(__dirname,'../..');
+ for(const name of runtime.helpers)fs.copyFileSync(path.join(kit,'scripts',name),path.join(source,'scripts',name));
+ fs.appendFileSync(path.join(source,'scripts/duo-build.cjs'),'\n// Distinct next-version fixture bytes.\n');
+ fs.mkdirSync(path.join(source,'skills/duo-build'),{recursive:true});
+ fs.copyFileSync(path.join(kit,'skills/duo-build/SKILL.md'),path.join(source,'skills/duo-build/SKILL.md'));
+ const original=f.state(),staged=runtime.install(source,f.root);
+ expect(staged.state).toBe('staged');
+ expect(runtime.describe(f.root,original)).toMatchObject({active:original.runtime.identity,staged:staged.stagedVersion});
+ expect(duo.status(original)).toContain(`staged ${staged.stagedVersion}`);
+ duo.cease(f.root,original.id,original.owner.session,'Fixture owner explicitly ended this run before a new installation');
+ const active=runtime.install(source,f.root);
+ expect(active).toMatchObject({state:'active',activeVersion:staged.stagedVersion});
+ // Load the installed entry point so pin() reads the new installation's bytes.
+ const installed=require(path.join(f.root,'scripts/duo-build.cjs'));
+ const next=installed.start(f.root,'#153 explicitly requested new fixture run','codex',f.context);
+ const manifest=JSON.parse(fs.readFileSync(path.join(f.root,'.specflow/duo',next.id,'runtime/manifest.json')));
+ const digest=bytes=>require('crypto').createHash('sha256').update(bytes).digest('hex');
+ const expected=Object.fromEntries(runtime.helpers.map(name=>['scripts/'+name,digest(fs.readFileSync(path.join(f.root,'scripts',name)))]));
+ expect(manifest.protocolVersion).toBe('duo-actions-1');
+ expect(manifest.helperHashes).toEqual(expected);
+ expect(manifest.identity).toBe(next.runtime.identity);
+ expect(manifest.identity).not.toBe(original.runtime.identity);
+ expect(runtime.describe(f.root,next)).toMatchObject({active:manifest.identity,installed:active.activeVersion,staged:null});
+ expect(installed.status(next)).toContain(`Runtime: ${manifest.identity}; installed ${active.activeVersion}; staged none`);
+ const oldManifest=JSON.parse(fs.readFileSync(path.join(f.root,'.specflow/duo',original.id,'runtime/manifest.json')));
+ expect(oldManifest.identity).toBe(original.runtime.identity);
 });
 test('new eligible install applies managed bytes, preserves custom files and rolls back failed writes',()=>{
  const target=fs.mkdtempSync(path.join(os.tmpdir(),'duo-install-'));

@@ -19,13 +19,23 @@ test('live transport simulation and zero-call replay retain denominators and mod
  const fetchImpl=jest.fn(async(_,o)=>{const q=JSON.parse(o.body).questions;return Response.json({model:'jev-1.13.0',usage:{input_tokens:10,output_tokens:2},answers:Object.fromEntries(Object.entries(q).map(([id,v])=>[id,{type:'choice',choice:Object.keys(v.criteria)[0],probabilities:Object.fromEntries(Object.keys(v.criteria).map((k,i)=>[k,i?0:1])),confidence:1}]))});});
  const options={model:'jev-1.13.0',mode:'live',output:dir,env:{TYPESAFE_API:'test-credential'},fetchImpl};
  const live=await ev.evaluateCorpus(tiny,options);expect(fetchImpl).toHaveBeenCalledTimes(4);expect(live.report.summary.cases).toBe(2);expect(live.report.byControl.control.cases).toBe(1);expect(live.report.byControl.edge.cases).toBe(1);expect(live.report.summary.questions).toBe(4);expect(live.report.summary.baseline.reviewerMissing).toBe(2);expect(live.report.summary.judgments.support.brier).not.toBeNull();
- const replay=await ev.evaluateCorpus(tiny,{...options,mode:'replay'});expect(fetchImpl).toHaveBeenCalledTimes(4);expect(replay.report.summary.actualCalls).toBe(0);expect(replay.report.repeatCalls).toBe(0);
+ expect(live.report.transport).toBe('simulated');expect(JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'))).transport).toBe('simulated');
+ const replay=await ev.evaluateCorpus(tiny,{...options,fetchImpl:undefined,mode:'replay'});expect(fetchImpl).toHaveBeenCalledTimes(4);expect(replay.report.summary.actualCalls).toBe(0);expect(replay.report.repeatCalls).toBe(0);expect(replay.report.transport).toBe('simulated');
+ await expect(ev.evaluateCorpus(tiny,{...options,fetchImpl:undefined})).rejects.toThrow(/transport/);
  await expect(ev.evaluateCorpus(tiny,{...options,model:'jev-1.14.0'})).rejects.toThrow(/identity/);
  expect(JSON.parse(fs.readFileSync(ev.qualify(live.file,'shadow','Small synthetic sample only'))).identity).toEqual(live.report.identity);
 });
 test('unavailable judgments count as missing rather than silently inflating accuracy',async()=>{
  const r=await ev.evaluateCorpus({...corpus,cases:corpus.cases.slice(0,2)},{mode:'live',model:'jev-1.13.0',output:dir,env:{}});
  expect(r.report.summary.unavailable).toBe(2);expect(r.report.summary.judgments.support.total).toBe(2);expect(r.report.summary.judgments.support.available).toBe(0);expect(r.report.summary.judgments.support.accuracy).toBe(0);
+ expect(r.report.transport).toBe('live');expect(JSON.parse(fs.readFileSync(path.join(dir,'manifest.json'))).transport).toBe('live');expect(r.report.cost.networkCallsIncludingRepeats).toBe(0);
+});
+test('legacy replay keeps unknown transport and cannot be relabelled as a live provider run',async()=>{
+ const tiny={...corpus,cases:corpus.cases.slice(0,2)},options={mode:'live',model:'jev-1.13.0',output:dir,env:{}};
+ await ev.evaluateCorpus(tiny,options);
+ const file=path.join(dir,'manifest.json'),manifest=JSON.parse(fs.readFileSync(file));delete manifest.transport;fs.writeFileSync(file,JSON.stringify(manifest));
+ const replay=await ev.evaluateCorpus(tiny,{...options,mode:'replay'});expect(replay.report.transport).toBe('unknown');expect(replay.report.cost.networkCallsIncludingRepeats).toBe(0);expect(JSON.parse(fs.readFileSync(file)).transport).toBeUndefined();
+ await expect(ev.evaluateCorpus(tiny,options)).rejects.toThrow(/unknown.*transport/);
 });
 test('independently adjudicated corpus represents every evidence/coverage label and marks controls',()=>{
  const rows=corpus.cases.filter(c=>c.kind==='evidence');

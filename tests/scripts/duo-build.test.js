@@ -47,6 +47,16 @@ test('both commands retain native permission controls and no write tools for Cla
   expect(claude.exe).toBe('claude'); expect(claude.args).toContain('-p'); expect(claude.args.slice(claude.args.indexOf('--effort'),claude.args.indexOf('--effort')+2)).toEqual(['--effort','medium']); expect(claude.args).toContain('Read,Glob,Grep'); expect(claude.args).toContain('dontAsk');
   expect(codex.exe).toBe('codex'); expect(codex.args.slice(0, 3)).toEqual(['exec', '--sandbox', 'read-only']);
 });
+test('Claude GitHub inspection permits bare reads without granting API or write access', () => {
+  const spec = duo.invocation('codex', '/tmp/r', { repository: 'owner/repo' });
+  const allowed = spec.args[spec.args.indexOf('--allowedTools') + 1].split(',');
+  expect(allowed).toContain('Bash(gh auth status)');
+  expect(allowed).toContain('Bash(gh auth status *)');
+  expect(allowed).toContain('Bash(gh pr view *)');
+  expect(allowed.some(rule => /api|merge|comment|push|Write|Edit/.test(rule))).toBe(false);
+  expect(spec.args).toContain('--append-system-prompt');
+  expect(spec.args).toContain('dontAsk');
+});
 test('J-DUO-BLOCKED: missing evidence never invokes peer', () => {
   const run = duo.start(root, '#1', 'codex', context), invoke = jest.fn();
   expect(reviewOwned(root, run.id, { ...batch(), evidence: [] }, invoke).blocker).toMatch(/Missing raw/);
