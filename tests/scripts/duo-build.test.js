@@ -44,7 +44,7 @@ test.each(['codex', 'claude-code'])('J-DUO-REPAIR/J-DUO-RESUME: %s builder repai
 });
 test('both commands retain native permission controls and no write tools for Claude', () => {
   const claude = duo.invocation('codex', '/tmp/r'), codex = duo.invocation('claude-code', '/tmp/r');
-  expect(claude.exe).toBe('claude'); expect(claude.args).toContain('-p'); expect(claude.args).toContain('Read,Glob,Grep'); expect(claude.args).toContain('dontAsk');
+  expect(claude.exe).toBe('claude'); expect(claude.args).toContain('-p'); expect(claude.args.slice(claude.args.indexOf('--effort'),claude.args.indexOf('--effort')+2)).toEqual(['--effort','medium']); expect(claude.args).toContain('Read,Glob,Grep'); expect(claude.args).toContain('dontAsk');
   expect(codex.exe).toBe('codex'); expect(codex.args.slice(0, 3)).toEqual(['exec', '--sandbox', 'read-only']);
 });
 test('J-DUO-BLOCKED: missing evidence never invokes peer', () => {

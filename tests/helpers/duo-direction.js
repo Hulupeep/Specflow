@@ -1,5 +1,9 @@
 // Provider-boundary fixtures only; production code never synthesizes peer judgment.
+exports.assessInstructions = (request, result) => {
+  result.instruction_assessments = (request.instruction_review?.instructions || []).map(s => ({instructionId:s.id, outcome:result.assessments.find(a => a.id === s.criterion)?.status === 'verified' ? 'satisfied' : 'unproven', reason:'Explicitly simulated peer assessment; raw fixture output was inspected', snapshotHash:request.snapshot, inspected:request.batch.evidence.map(f => `tree/${f}`), evidence:request.batch.evidence, dependencyOwner:null,missingDependency:null,replacementId:null}));
+};
 exports.feedback = (request, result) => {
+  exports.assessInstructions(request,result);
   const pending = Object.keys(request.acceptance).filter(id => (result.assessments.find(a => a.id === id)?.status || request.acceptance[id].status) !== 'verified');
   const complete = result.outcome === 'accepted' && !pending.length && !result.findings.length;
   result.direction = { assessment: complete ? 'complete' : result.outcome === 'blocked' ? 'blocked' : 'on_track', goal_connection: 'Synthetic peer direction for the observable fixture goal',

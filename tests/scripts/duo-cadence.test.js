@@ -128,9 +128,13 @@ test('AC-5: failed gh authentication blocks before reviewer invocation', () => {
   expect(result.history[0].attempted).toBeUndefined(); expect(cadence.stop(root,input).stopReason).toContain('gh not authenticated');
 });
 test('AC-3: installer preserves existing Stop hooks and does not duplicate on reinstall', () => {
+  // Install before starting a run; updates during an unfinished run are now staged.
+  const prior=duo.load(root,run.id).state;
+  fs.rmSync(path.join(root,'.specflow/duo',run.id),{recursive:true});
   put('.claude/settings.json',JSON.stringify({hooks:{Stop:[{hooks:[{type:'command',command:'existing-stop'}]}]}}));
   const installer=path.resolve(__dirname,'../../install-hooks.sh');
   for(let i=0;i<2;i++) execFileSync('bash',[installer,root,'--runtime','claude-code'],{stdio:'pipe'});
+  run=duo.start(root,'#1','claude-code',prior.context,input.session_id);
   const hooks=JSON.parse(fs.readFileSync(path.join(root,'.claude/settings.json'))).hooks.Stop;
   expect(hooks).toHaveLength(2); expect(hooks.some(h=>h.hooks[0].command==='existing-stop')).toBe(true);
   const output=execFileSync('bash',[path.join(root,'.claude/hooks/duo-review-check.sh')],{cwd:root,env:{...process.env,CLAUDE_PROJECT_DIR:root},input:JSON.stringify(input),encoding:'utf8'});

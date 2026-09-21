@@ -1,5 +1,6 @@
 'use strict';
 // The peer supplies judgment; code preserves, validates and delivers its handoff.
+const actions = require('./duo-actions.cjs');
 const text = { type: 'string', minLength: 1 };
 const object = properties => ({ type: 'object', additionalProperties: false, required: Object.keys(properties), properties });
 const schema = object({
@@ -14,7 +15,7 @@ const nonempty = value => typeof value === 'string' && value.trim().length > 0;
 function validate(direction, state, outcome) {
   if (!direction || !['on_track', 'redirect', 'blocked', 'complete'].includes(direction.assessment) || !nonempty(direction.goal_connection)) throw Error('Peer must return goal-focused direction');
   if (!Array.isArray(direction.next_steps) || direction.next_steps.length > 3 || !Array.isArray(direction.preserve) || direction.preserve.some(s => !nonempty(s))) throw Error('Invalid direction steps or preserved constraints');
-  const complete = outcome === 'accepted' && state.indexComplete && Object.keys(state.criteria).length > 0 && Object.values(state.criteria).every(c => c.status === 'verified') && !Object.values(state.findings).some(f => f.status === 'open');
+  const complete = outcome === 'accepted' && state.indexComplete && Object.keys(state.criteria).length > 0 && Object.values(state.criteria).every(c => c.status === 'verified') && !Object.values(state.findings).some(f => f.status === 'open') && !actions.pending(state).length;
   if (complete && direction.assessment !== 'complete') throw Error('A fully verified scoped goal must finish, not generate additional work');
   if (direction.assessment === 'complete') {
     if (!complete || direction.next_steps.length) throw Error('Direction cannot declare completion before all goal gates are verified');
@@ -26,17 +27,7 @@ function validate(direction, state, outcome) {
   if (direction.assessment === 'blocked' && builder) throw Error('Direction cannot stop at an external blocker while builder work remains');
   if (direction.assessment !== 'complete' && !builder && direction.assessment !== 'blocked') throw Error('Only user/external next steps must be an explicit blocked handoff');
 }
-function response(state, batch) {
-  const prior = state.continuation;
-  if (!prior?.direction.next_steps.length) return;
-  const value = batch.direction_response;
-  if (!value || value.round !== prior.round || !Array.isArray(value.steps) || value.steps.length !== prior.direction.next_steps.length) throw Error(`Respond to every next step from validated round ${prior.round} in batch.direction_response`);
-  const seen = new Set();
-  for (const step of value.steps) {
-    if (!Number.isInteger(step.step) || step.step < 1 || step.step > prior.direction.next_steps.length || seen.has(step.step) || !['done', 'deferred', 'disputed'].includes(step.disposition) || !nonempty(step.reason)) throw Error('Direction response needs unique step numbers, dispositions and reasons');
-    seen.add(step.step);
-  }
-}
+function response(state, batch) { return actions.responses(state, batch); }
 function memory(state) {
   return state.history.map((r, i) => ({ r, round: i + 1 })).filter(({r}) => r.stage === 'validated' && r.review?.direction).slice(-3).map(({r, round}) => ({
     round, summary: r.summary, direction: r.review.direction, builder_response: r.directionResponse || null,

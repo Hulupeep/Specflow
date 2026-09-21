@@ -5,8 +5,11 @@ const fs = require('fs');
 const path = require('path');
 const duo = require('./duo-build.cjs');
 const direction = require('./duo-direction.cjs');
+const actions = require('./duo-actions.cjs');
 const readJson = file => JSON.parse(fs.readFileSync(file, 'utf8'));
 function assess(root, id) {
+  const pinned = require('./duo-runtime.cjs').dispatch(root,id,__dirname);
+  if (pinned) return require(path.join(pinned,'duo-cadence.cjs')).assess(root,id);
   const { dir, state: saved } = duo.load(root, id);
   if (fs.existsSync(path.join(dir, 'review.lock'))) return { status: 'blocked', reason: 'A run operation is active. Wait for its result; do not start another review or edit its snapshot.' };
   const state = duo.inspect(root, id), last = state.history.at(-1);
@@ -17,8 +20,10 @@ function assess(root, id) {
   const batch = readJson(path.join(dir, `round-${String(state.history.length).padStart(3, '0')}`, 'batch.json'));
   const fresh = last.snapshot === duo.fingerprint(root, [...Object.keys(state.pinned), ...(batch.evidence || [])]);
   const captureFresh = Object.hasOwn(last, 'capturePath') ? last.capturePath === (state.lastCapture?.path || null) : !state.lastCapture;
-  if (!fresh || !captureFresh) return { status: 'review_required', reason: 'Source or execution evidence changed since review. Capture current raw results and request review before reporting this batch complete.' };
+  if (!fresh || !captureFresh) return { status: 'review_required', reason: (actions.next(state)?.reason || '') + ' Source or execution evidence changed since review. Capture current raw results and request review before reporting this batch complete.' };
   if (last.stage === 'validated' || last.progress) {
+    const instruction = actions.next(state);
+    if (instruction) return instruction;
     if (last.review?.direction?.assessment === 'blocked') return { status: 'blocked', reason: direction.next(last.review.direction) };
     if (last.review?.direction?.next_steps.some(s => s.owner === 'builder')) return { status: 'continue_required', reason: direction.next(last.review.direction) };
     if (last.outcome === 'changes_required') return { status: 'review_required', reason: 'Peer requested corrections. Fix actionable findings, capture new evidence and re-review within the existing limits.' };

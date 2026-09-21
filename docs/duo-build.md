@@ -275,3 +275,123 @@ acceptance. This rule applies even when TypeSafe is off.
 
 Runtime verified for this integration: Node.js 22.19.0. The package and installed
 helpers were exercised on that version; no Python runtime or SDK was involved.
+
+## Instruction accountability (#149–#155)
+
+Each validated next step receives a stable run-local ID. Every subsequent review
+includes all outstanding instructions, their goal/criterion and observable success,
+regardless of what the builder reports or which criteria its batch selects. A missing
+`direction_response` is `unreported`, not a pre-call refusal. This deliberately replaces
+#147's missing-response behavior; malformed reported responses remain invalid.
+
+The reviewer must independently assess each instruction as `satisfied`,
+`attempted_failed`, `not_attempted`, `unproven`, `externally_blocked`, or
+`replaced_with_justification`. Missing visibility is unproven. Replacements require a
+new linked step under the same criterion and an explicit reason; history remains.
+Only current independently inspected evidence can establish satisfaction. A changed
+source/evidence hash reopens historical satisfaction for reassessment.
+
+Before a costly capture or peer request:
+
+```sh
+node scripts/duo-build.cjs eligibility RUN_ID --session OWNER_TOKEN --batch BATCH_JSON
+```
+
+This returns all known allowance/evidence blockers and unreported-response warnings.
+Protocol-invalid replies retain raw output and leave validated progress intact.
+They use the separate three-failure protocol limit, not a validated repair attempt.
+The existing initial-plus-three-repair and two-no-progress limits remain. Exhaustion
+preserves read-only inspection; renaming or switching hosts cannot replenish it.
+
+Claude's bound Stop hook names outstanding builder work and requests one corrective
+continuation; a second ignored stop reports the blocker. Codex uses the same skill,
+ledger and finish gate, but has no equivalent supported turn-end hook here. Neither
+host's prose instructions constitute an OS sandbox or guarantee arbitrary compliance.
+
+## Stable runtime during a run
+
+New runs save helper/skill bytes and hashes in `runtime/` under their excluded run
+directory. The existing helper entrypoint selects those bytes for run operations.
+Read `runtime/SKILL.md` when resuming. Status shows active, installed and staged
+identities and warns about a goal guide naming a predecessor without modifying it.
+Legacy runs report unknown historical runtime provenance.
+
+The normal installer stages managed duo updates while unfinished runs exist, then
+returns before modifying the installation. After those runs finish, rerun the same
+installer and begin a new native conversation to load the new skill. Custom files,
+concurrent installation/start operations and changed runtime bytes block replacement.
+There is no hot reload, automatic migration of an active conversation, or hidden
+budget refund. Application files and lockfiles retain normal freshness protection.
+
+## What TypeSafe does
+
+TypeSafe is an optional semantic evidence check. In advisory mode its findings go
+to the independent reviewer; shadow mode records them for comparison. Neither mode
+can decide that the goal is complete. The existing client uses the HTTP API; a new
+Python dependency is unnecessary for this Node.js project.
+
+For instruction advice, the batch explicitly selects `typesafe_actions` entries with
+`instructionId`, `claim`, and `evidencePaths`. Prepare small JSON evidence containing
+only `instructionId`, `criterion`, `snapshotHash` (the capture's `sourceAfter`),
+`observation`, `expected`, `actual`, `exitCode`, and `sourceEvidence`. Keep the original
+raw capture in the same batch for independent review. Candidate files must be current
+and scoped to the instruction. Do not include credentials, tokens, mailbox content
+or raw external logs. The helper withholds protected/unscoped candidates and records
+omissions; no usable candidate means no paid call.
+
+Two separate Choice questions ask whether the evidence concerns the requested action
+and whether it establishes the claim. For example, passing unit tests may be unrelated
+to a claim of working live Google consent. A relevant failed request can contradict a
+success claim. Every advisory flag requires the peer's evidenced disposition.
+Confidence reflects answer-distribution concentration, not guaranteed correctness.
+The existing 0.8 disclosure heuristic is unchanged; it never grants acceptance.
+
+Evaluation uses separately labelled broad and instruction evidence on the same
+held-out families, retains errors/unavailable outcomes, and reports actual calls,
+token usage and latency. Synthetic fixtures demonstrate workflow behavior, not
+customer validation. Live native proof and provider results are reported separately
+from deterministic tests that substitute a provider boundary.
+
+For instruction advice, `sourceEvidence` must point to a submitted current
+`duo_capture` record. Its stdout must be a small JSON object containing only
+`status`, `providerReason`, `expected`, `actual`, `passed`, `failed`, `skipped`,
+`success`, or `exitCode`, with scalar values. The helper copies these observed
+fields and the capture's hash/exit into the model input. A prepared observation
+without that actual source capture is insufficient input. Keep `providerReason`
+to a safe enumerated code; never put mailbox content or credentials in it.
+
+Run the native workflow proofs with `node scripts/duo-live-action-proof.cjs
+claude-code complete` and the same command with `codex complete`. The driver
+uses the installed skill and actual opposite CLI, introduces one controlled skipped
+instruction, then lets the builder solve the problem from peer feedback. Variants
+`claude-code stop`, `claude-code ignore` and `claude-code owner` check turn-end
+interception, the bounded second ignored stop, and honest owner-only handoff. They use a synthetic executable product and retain private
+raw records under `~/.local/share/specflow/evidence/duo-actions-149/`. A failed
+attempt is retained; no adapter response is substituted in these live runs.
+
+Keep prepared TypeSafe JSON under `.specflow/duo/<run-id>/`, alongside batch
+metadata. Creating it there after a capture does not change the product snapshot.
+The recorded source capture remains the evidence; the summary is only context.
+
+An owner may explicitly cease a run without claiming it finished:
+`node scripts/duo-build.cjs cease RUN_ID --session OWNER_TOKEN --reason "Owner requested end of this run"`.
+This retains all criteria, findings and budgets, releases ownership, and makes
+that run read-only. It permits a staged installer update between runs. Ceasing
+is never permission to reset an exhausted goal or start an automatic successor.
+A legacy installation without this command may invoke `specflow duo-build cease`
+from the newer kit/package while keeping the old project runtime intact. This
+metadata operation is handled by the current entrypoint, without migrating the
+active run's code. Do not cease a run merely to install an update or avoid a limit;
+it is an explicit owner decision.
+
+Claude non-interactive reviews use the installed CLI’s `--effort medium` setting,
+recorded in `invocation.json`, to keep review deliberation bounded within the
+existing ten-minute call timeout. Unsupported CLI flags block review explicitly.
+The hooks-only curl installer refuses projects with duo run records; use the full
+package or checkout installer so it can preserve or stage the managed runtime.
+
+An instruction's `evidence` cites exact submitted capture paths. Each capture's
+`tree/` path must appear in the review's top-level `inspected`; the instruction's
+own `inspected` lists its relevant source/artifacts. Capture paths need not be
+repeated in both inspection lists. Missing submitted or inspected evidence still
+rejects the complete response atomically with the exact missing path.

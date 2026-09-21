@@ -4,6 +4,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const client = require('./typesafe-client.cjs');
 const prompts = require('./typesafe-questions.cjs');
+const actionAdvice = require('./typesafe-actions.cjs');
 const excluded = name => /(^|\/)(\.env(?:\.[^/]*)?|[^/]*\.(?:pem|key)|credentials(?:\.[^/]*)?)$|(^|\/)(?:production|prod)[-_/].*log|(^|\/)logs\/production|(?:production|prod)\.log$/i.test(name);
 function config(previous = {}, update = {}) {
   const next = { mode: 'shadow', model: 'jev-1.13.0', maxCalls: 20, calls: 0, consecutiveFailures: 0, changes: [], ...previous, ...update };
@@ -21,7 +22,7 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
   const unavailable = reason => { const r = { status: 'unavailable', reason, snapshotHash: snapshot, flags: [] }; client.atomic(recordFile, r); return r; };
   if (cfg.calls >= cfg.maxCalls) return unavailable('budget_exhausted');
   if (cfg.consecutiveFailures >= 2) return unavailable('circuit_open');
-  if (!Array.isArray(batch.typesafe) || !batch.typesafe.length) return unavailable('missing_selection');
+  if ((!Array.isArray(batch.typesafe) || !batch.typesafe.length) && (!Array.isArray(batch.typesafe_actions) || !batch.typesafe_actions.length)) return unavailable('missing_selection');
   const manifest = JSON.parse(fs.readFileSync(path.join(round, 'manifest.json')));
   const selections = []; const allQuestions = {}; const omitted = [];
   function selected(name, evidence = false) {
@@ -34,7 +35,14 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
     return { path: name, sha256: client.hash(bytes.toString('utf8')), text: bytes.toString('utf8') };
   }
   try {
-    for (const [i, selection] of batch.typesafe.entries()) {
+    let actionSkipped=[];
+    if (batch.typesafe_actions) {
+      const selectedActions=actionAdvice.select({state:{...state,reviewSourceFingerprint:state.history.at(-1)?.sourceFingerprint},batch,tree,manifest,snapshot,excluded});
+      selections.push(...selectedActions.items);Object.assign(allQuestions,selectedActions.questions);actionSkipped=selectedActions.skipped;
+      client.atomic(path.join(outDir,'selection.json'),{snapshotHash:snapshot,selected:selections.map(s=>s.instruction.id),omitted:actionSkipped});
+      if(!selections.length)return unavailable('insufficient_input');
+    }
+    for (const [i, selection] of (batch.typesafe || []).entries()) {
       if (!batch.criteria.includes(selection.criterion) || !Number.isInteger(selection.claimIndex) || typeof batch.claims[selection.claimIndex] !== 'string' || !Array.isArray(selection.evidencePaths) || !selection.evidencePaths.length) throw Error('invalid_selection');
       const item = { criterion: state.criteria[selection.criterion].anchor, criterionId: selection.criterion, claim: batch.claims[selection.claimIndex], assertion: selected(selection.assertionPath), evidence: selection.evidencePaths.map(f => selected(f, true)), objective: state.context.objective };
       if (selection.repair) {
@@ -46,10 +54,10 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
       }
       selections.push(item); Object.assign(allQuestions, prompts.questions(`q${i}_`, `items[${i}].`));
     }
-    for (const id of batch.criteria) if (!batch.typesafe.some(s => s.criterion === id)) omitted.push(id);
-    const input = { snapshotHash: snapshot, questionSetId: prompts.SET, questionVersion: prompts.VERSION, model: cfg.model, state: { goal: fs.readFileSync(path.join(round, 'goal.md'), 'utf8'), items: selections, omittedCriteria: omitted }, questions: allQuestions };
+    for (const id of batch.criteria) if (!(batch.typesafe || []).some(s => s.criterion === id) && !selections.some(s => s.instruction?.criterion === state.criteria[id].anchor)) omitted.push(id);
+    const input = { snapshotHash: snapshot, questionSetId: batch.typesafe_actions ? 'specflow-instruction-evidence' : prompts.SET, questionVersion: batch.typesafe_actions ? '1' : prompts.VERSION, model: cfg.model, state: { goal: fs.readFileSync(path.join(round, 'goal.md'), 'utf8'), items: selections, omittedCriteria: omitted, omittedInstructionEvidence: actionSkipped }, questions: allQuestions };
     const key = client.credentials(process.env, cfg.envFile);
-    if (client.sensitive(input, key)) return unavailable('sensitive_input');
+    if (client.sensitive(input, key) || JSON.stringify(input).includes(state.owner?.session || '\u0000')) return unavailable('sensitive_input');
     if (!key) return unavailable('missing_credentials');
     if (Buffer.byteLength(JSON.stringify(input)) > 65536) return unavailable('input_limit');
     const inputFile = path.join(outDir, 'input.json'); client.atomic(inputFile, input);
@@ -63,10 +71,10 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
     cfg.consecutiveFailures = result.status === 'completed' ? 0 : cfg.consecutiveFailures + 1; save();
     const flags = Object.entries(result.response?.answers || {}).filter(([id, answer]) => {
       const kind = id.split('_').at(-1);
-      return answer.confidence < 0.8 || (kind === 'support' ? answer.choice !== 'supports' : kind === 'coverage' ? answer.choice !== 'full' : kind === 'alignment' ? ['optional', 'unrelated', 'insufficient'].includes(answer.choice) : kind === 'novelty' ? answer.choice !== 'new_observation' : ['hypothesis','insufficient'].includes(answer.choice));
+      return answer.confidence < 0.8 || (kind === 'support' ? answer.choice !== 'supports' : kind === 'relevance' ? answer.choice !== 'relevant' : kind === 'coverage' ? answer.choice !== 'full' : kind === 'alignment' ? ['optional', 'unrelated', 'insufficient'].includes(answer.choice) : kind === 'novelty' ? answer.choice !== 'new_observation' : ['hypothesis','insufficient'].includes(answer.choice));
     }).map(([id, answer]) => ({ id, answer }));
     // 0.8 is a disclosure heuristic, never a calibrated acceptance threshold.
-    const summary = { ...result, flags, omittedCriteria: omitted, selected: selections.map(s => ({ criterion: s.criterionId, assertion: s.assertion.path, evidence: s.evidence.map(e => e.path) })) };
+    const summary = { ...result, flags, omittedCriteria: omitted, selected: selections.map(s => ({ instructionId:s.instruction?.id, criterion: s.criterionId || s.instruction?.criterion, assertion: s.assertion?.path, evidence: s.evidence.map(e => e.path) })), omittedInstructionEvidence:actionSkipped };
     client.atomic(path.join(outDir, 'advice.json'), summary);
     return summary;
   } catch (error) { return unavailable(['invalid_selection', 'input_limit'].includes(error.message) ? error.message : 'invalid_selection'); }

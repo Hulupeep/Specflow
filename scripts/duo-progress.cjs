@@ -167,6 +167,7 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
 function finish(state) {
   const pending = Object.values(state.criteria).filter(c => c.status !== 'verified');
   if (!Object.keys(state.criteria).length || pending.length || !state.indexComplete || openFindings(state).length || state.outcome !== 'accepted') throw Error(`Goal incomplete: ${pending.map(c => c.id).join(', ') || 'acceptance index, open findings or latest peer acceptance missing'}`);
+  if (require('./duo-actions.cjs').pending(state).length) throw Error('Goal incomplete: outstanding reviewer instructions');
   state.goalStatus = 'complete';
   state.events.push({ type: 'finished', at: new Date().toISOString() });
 }
