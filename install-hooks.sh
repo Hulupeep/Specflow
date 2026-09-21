@@ -55,6 +55,20 @@ prompt_model_routing() {
 
 # Determine source directory (where this script lives)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# Duo updates are transactions; unfinished runs stage updates before any kit mutation.
+if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
+  mkdir -p "$TARGET_DIR/.specflow/duo"
+  DUO_INSTALL_LOCK="$TARGET_DIR/.specflow/duo/installer.lock"
+  mkdir "$DUO_INSTALL_LOCK" || { echo "Duo installation/start lock active; inspect its owner before recovery" >&2; exit 2; }
+  echo "$$" > "$DUO_INSTALL_LOCK/pid"
+  trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
+  duo_install_exit=0
+  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+  [ "$duo_install_exit" -eq 10 ] && exit 0
+  [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
+fi
+
 HOOKS_DIR="$SCRIPT_DIR/hooks"
 
 # Check if running from Specflow repo or via curl
@@ -129,6 +143,7 @@ echo -e "${BLUE}[3/6]${NC} Installing hook files..."
 for script in "$HOOKS_DIR"/*.sh; do
   [ -f "$script" ] || continue
   SCRIPT_NAME=$(basename "$script")
+  [ "$(basename "$script")" = "duo-review-check.sh" ] && [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ] && continue
   cp "$script" "$TARGET_DIR/.claude/hooks/"
   chmod +x "$TARGET_DIR/.claude/hooks/$SCRIPT_NAME"
   echo -e "${GREEN}✓${NC} Installed .claude/hooks/$SCRIPT_NAME"
@@ -237,6 +252,7 @@ fi
 if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
   mkdir -p "$TARGET_DIR/scripts"
   for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+    case "$(basename "$script")" in duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
   done
@@ -261,6 +277,7 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do
     mkdir -p "$TARGET_DIR/$skill_target"
     for skill_dir in "$SCRIPT_DIR/skills/"*; do
+      [ "$(basename "$skill_dir")" = "duo-build" ] && continue
       if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
         rm -rf "$TARGET_DIR/$skill_target/$(basename "$skill_dir")"
         cp -a "$skill_dir" "$TARGET_DIR/$skill_target/"

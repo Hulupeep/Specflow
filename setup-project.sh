@@ -56,6 +56,20 @@ mkdir -p "$TARGET_DIR"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Duo updates are transactions; unfinished runs stage updates before any kit mutation.
+if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
+  mkdir -p "$TARGET_DIR/.specflow/duo"
+  DUO_INSTALL_LOCK="$TARGET_DIR/.specflow/duo/installer.lock"
+  mkdir "$DUO_INSTALL_LOCK" || { echo "Duo installation/start lock active; inspect its owner before recovery" >&2; exit 2; }
+  echo "$$" > "$DUO_INSTALL_LOCK/pid"
+  trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
+  duo_install_exit=0
+  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+  [ "$duo_install_exit" -eq 10 ] && exit 0
+  [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
+fi
+
+
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║           Specflow Full Project Setup                    ║${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
@@ -148,6 +162,7 @@ echo -e "${BLUE}[4/10]${NC} Copying scripts, examples, and QA loops kit..."
 # teardown-gate, verify-seed, adversary-spawn, verify-ticket-journey, verify-falsification,
 # verify-seams, verify-adr, verify-graph, specflow-compile).
 for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+    case "$(basename "$script")" in duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
   if [ -f "$script" ]; then
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
@@ -212,6 +227,7 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do
     mkdir -p "$TARGET_DIR/$skill_target"
     for skill_dir in "$SCRIPT_DIR/skills/"*; do
+      [ "$(basename "$skill_dir")" = "duo-build" ] && continue
       if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
         rm -rf "$TARGET_DIR/$skill_target/$(basename "$skill_dir")"
         cp -a "$skill_dir" "$TARGET_DIR/$skill_target/"

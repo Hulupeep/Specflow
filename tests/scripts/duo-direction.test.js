@@ -22,6 +22,7 @@ function peer(edit = () => {}) {
       resolutions:req.open_findings.map(f=>({id:f.id,status:'open',evidence:req.batch.evidence,reason:'Still unresolved'})),
       direction:{assessment:'redirect',goal_connection:'Component tests miss what the customer actually sees; fix that before broader work',next_steps:[step('user','LIVE-GATE'),step()],preserve:['Keep consent blocked; preserve completed component checks']}};
     edit(result,req,opts);
+    require('../helpers/duo-direction').assessInstructions(req,result);
     if(exe==='codex') put(path.relative(root,path.join(opts.cwd,'response.json')),result);
     return JSON.stringify({structured_output:result});
   };
@@ -60,11 +61,11 @@ test('J-DUO-RESUME-DIRECTION: builder responds, reviewer sees decision memory, o
   expect(result.progress.findings_closed).toBe(1);expect(result.criteria['AC-DISPLAY'].status).toBe('verified');expect(result.criteria['LIVE-GATE'].status).toBe('blocked');
   expect(cadence.assess(root,run.id).status).toBe('blocked');expect(()=>duo.finish(root,run.id,run.owner.session)).toThrow(/incomplete/);
 });
-test('AC-CONTINUITY: absent or mismatched responses fail before any provider call',()=>{
-  review();const invoke=jest.fn(peer());
-  expect(review(batch(),invoke).blocker).toContain('Respond to every next step');expect(invoke).not.toHaveBeenCalled();
+test('AC-CONTINUITY amendment: absent response is unreported and reviewed; malformed reported steps still fail',()=>{
+  review();put('.specflow/duo/raw.txt','new unrelated green observation');const invoke=jest.fn(peer());
+  const reviewed=review(batch(),invoke);expect(invoke).toHaveBeenCalled();expect(reviewed.history.at(-1).stage).toBe('validated');
   const bad=response();bad.steps[1].step=1;
-  expect(review(batch({direction_response:bad}),invoke).blocker).toContain('unique step');expect(invoke).not.toHaveBeenCalled();
+  expect(()=>require('../../scripts/duo-actions.cjs').responses(load(),batch({direction_response:bad}))).toThrow('unique step');
 });
 test.each(['missing','unknown criterion','false completion','empty steps','blocked with builder'])('AC-DIRECTION: invalid %s cannot change acceptance or deliver direction',kind=>{
   const result=review(batch(),peer(r=>{
