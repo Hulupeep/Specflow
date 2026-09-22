@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const base = root => path.join(root,'.specflow/duo');
-const helpers = ['duo-review-receipts.cjs','typesafe-evidence.cjs','typesafe-questions-v1.cjs','duo-build.cjs','duo-progress.cjs','duo-direction.cjs','duo-actions.cjs','duo-cadence.cjs','duo-runtime.cjs','typesafe-duo.cjs','typesafe-client.cjs','typesafe-questions.cjs','typesafe-actions.cjs'];
+const helpers = ['typesafe-effort-analysis.cjs','typesafe-effort-trial.cjs','typesafe-routing.cjs','typesafe-routing-bridge.cjs','duo-review-receipts.cjs','typesafe-evidence.cjs','typesafe-questions-v1.cjs','duo-build.cjs','duo-progress.cjs','duo-direction.cjs','duo-actions.cjs','duo-cadence.cjs','duo-runtime.cjs','typesafe-duo.cjs','typesafe-client.cjs','typesafe-questions.cjs','typesafe-actions.cjs'];
 const read = file => JSON.parse(fs.readFileSync(noLinks(file),'utf8'));
 function write(file,value) { noLinks(file); fs.mkdirSync(path.dirname(file),{recursive:true}); const tmp=file+'.tmp-'+process.pid; fs.writeFileSync(tmp,JSON.stringify(value,null,2)); fs.renameSync(tmp,file); }
 function noLinks(file) {
@@ -25,6 +25,7 @@ function pin(root,dir,builder) {
   }
   const candidates = [path.resolve(__dirname,'../skills/duo-build/SKILL.md'),path.join(root,builder==='claude-code'?'.claude/skills/duo-build/SKILL.md':'.agents/skills/duo-build/SKILL.md')];
   const skill=candidates.find(f=>fs.existsSync(f));
+  if(skill && fs.existsSync(path.join(path.dirname(skill),'references/routing-study.md'))) { const bytes=fs.readFileSync(path.join(path.dirname(skill),'references/routing-study.md')); fs.mkdirSync(path.join(destination,'references'),{recursive:true}); fs.writeFileSync(path.join(destination,'references/routing-study.md'),bytes); skillHashes['references/routing-study.md']=hash(bytes); }
   if(skill) { const bytes=fs.readFileSync(noLinks(skill)); fs.writeFileSync(path.join(destination,'SKILL.md'),bytes); skillHashes['SKILL.md']=hash(bytes); }
   const result={protocolVersion:'duo-actions-1',helperHashes,skillHashes,provenance:'recorded',identity:hash(JSON.stringify({helperHashes,skillHashes}))};
   write(path.join(destination,'manifest.json'),result);return result;
@@ -47,7 +48,7 @@ function bundle(source) {
   const result={};
   const put=(rel,file)=>{if(fs.existsSync(file)) result[rel]=fs.readFileSync(noLinks(file),'utf8');};
   for(const name of helpers)put('scripts/'+name,path.join(source,'scripts',name));
-  for(const target of ['.claude','.codex','.agents'])put(`${target}/skills/duo-build/SKILL.md`,path.join(source,'skills/duo-build/SKILL.md'));
+  for(const target of ['.claude','.codex','.agents']) { put(`${target}/skills/duo-build/SKILL.md`,path.join(source,'skills/duo-build/SKILL.md')); put(`${target}/skills/duo-build/references/routing-study.md`,path.join(source,'skills/duo-build/references/routing-study.md')); }
   put('.claude/hooks/duo-review-check.sh',path.join(source,'hooks/duo-review-check.sh'));
   return result;
 }

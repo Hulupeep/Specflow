@@ -259,7 +259,7 @@ fi
 if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
   mkdir -p "$TARGET_DIR/scripts"
   for script in "$SCRIPT_DIR/scripts/"*.cjs; do
-    case "$(basename "$script")" in duo-review-receipts.cjs|typesafe-evidence.cjs|typesafe-questions-v1.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
+    case "$(basename "$script")" in typesafe-effort-analysis.cjs|typesafe-effort-trial.cjs|typesafe-routing.cjs|typesafe-routing-bridge.cjs|duo-review-receipts.cjs|typesafe-evidence.cjs|typesafe-questions-v1.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
   done

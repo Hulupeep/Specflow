@@ -10,6 +10,7 @@ const progress = require('./duo-progress.cjs');
 const direction = require('./duo-direction.cjs');
 const actions = require('./duo-actions.cjs');
 const runtime = require('./duo-runtime.cjs');
+const routingShadow = require('./typesafe-routing-bridge.cjs');
 const STATE = '.specflow/duo';
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const read = file => fs.readFileSync(file, 'utf8');
@@ -137,9 +138,24 @@ function startLocked(root, target, builder, context, hostSession) {
   if (state.typesafe.envFile) state.typesafe.envFile = path.resolve(root, state.typesafe.envFile);
   progress.upgrade(state); actions.upgrade(state); progress.addIndex(state, index); progress.claim(state, builder);
   if (builder === 'claude-code' && hostSession) state.owner.hostSession = hostSession;
+  try { state.routingShadow = routingShadow.enrollment(root); } catch (e) { state.routingShadowError = e.message; }
   state.runtime = runtime.pin(root,dir,builder);
   write(path.join(dir, 'goal.md'), goal); save(dir, state);
+  if (state.routingShadow) beginRoutingLocked(root, dir, state, context.routingLoop || 'feature-build', context.routingStage || 'implementation');
   return state;
+}
+function beginRoutingLocked(root, dir, state, loop, stage) {
+  if (state.routingReceipt && !state.routingReceipt.closed) return state;
+  const baseline = state.context.routingBaseline || { model: 'unknown', effort: null };
+  state.routingReceipt = routingShadow.begin(root, state.routingShadow, { taskFamilyId: state.target, runId: state.id, loop, stage, attempt: state.history.length, goal: state.context.objective, acceptance: read(safe(root, state.context.task)), configured: baseline, requested: baseline, context: state.context.objective, recentEvidence: state.history.slice(-1).map(r => ({ outcome: r.outcome, summary: r.summary })), evidenceRefs: [state.context.task] });
+  save(dir, state); return state;
+}
+function beginRouting(root, id, session, loop, stage) {
+  return locked(root, id, ({ dir, state }) => {
+    progress.own(state, session); validatePins(root, dir, state);
+    if (!['spec-build', 'feature-build'].includes(loop) || !stage) throw Error('routing-begin requires loop and stage');
+    return beginRoutingLocked(root, dir, state, loop, stage);
+  });
 }
 function validatePins(root, dir, state) {
   if (hash(read(path.join(dir, 'goal.md'))) !== state.goalHash) throw Error('Shared goal changed; reconcile scope explicitly in a new linked run');
@@ -268,6 +284,7 @@ function cease(root,id,session,reason) {
     progress.own(state,session);if(!reason?.trim())throw Error('Ceasing a run requires an explicit owner reason; it never certifies acceptance or replenishes budgets');
     state.runtimeCeased={at:new Date().toISOString(),reason,builder:state.builder};
     state.events.push({type:'ceased',...state.runtimeCeased});state.owner=null;
+    state.routingTerminal = routingShadow.terminal(state.routingShadow, state.id, 'interrupted', []);
     state.blocker='Run explicitly ceased without implying completion';state.next='Retain this read-only history. Apply staged tooling between runs; do not create a successor to evade unresolved limits.';
     save(dir,state);return state;
   });
@@ -286,7 +303,7 @@ function finish(root, id, session) {
   return locked(root, id, ({dir, state}) => {
     progress.own(state, session); validatePins(root, dir, state); refresh(root, state);
     try { progress.finish(state); state.blocker = null; state.next = 'Scoped goal complete; retain evidence and honour any subsequent release action'; }
-    finally { save(dir, state); }
+    finally { if (state.goalStatus === 'complete') state.routingTerminal = routingShadow.terminal(state.routingShadow, state.id, 'completed', state.history.flatMap(r => r.capturePath ? [r.capturePath] : [])); save(dir, state); }
     return state;
   });
 }
@@ -484,24 +501,30 @@ function reviewLocked(root, dir, state, batch, invoke) {
     state.next = allowed.eligible ? `Correct the review protocol/evidence: ${e.message}. Resubmit within the remaining allowance; prior valid progress is retained.` : allowed.blockers.map(b => b.reason).join('; ');
   } finally {
     state.outcome = record.outcome; state.history[recordIndex] = record;
+    if (state.routingReceipt && !state.routingReceipt.closed) {
+      state.routingReceipt.outcome = routingShadow.end(state.routingShadow, state.routingReceipt, { status: record.outcome === 'accepted' ? 'completed' : record.outcome === 'changes_required' ? 'failed' : 'blocked', terminal: false, evidenceRefs: [path.relative(root, path.join(round, 'review.json'))], observed: { model: null, effort: null } });
+      state.routingReceipt.closed = true;
+    }
     write(path.join(round, 'review.json'), record); save(dir, state);
   }
   return state;
 }
 function status(state) {
   const version = runtime.describe(state.root,state);
+  const routingFailures = [state.routingShadowError, ...[state.routingReceipt, state.routingReceipt?.outcome, state.routingTerminal].filter(r => r?.status === 'unavailable').map(r => r.reason)].filter(Boolean);
+  const routingNotice = routingFailures.length ? '\nRouting collection unavailable: ' + [...new Set(routingFailures)].join('; ') : '';
   const rows = Object.values(state.criteria), open = progress.openFindings(state);
   const pending = rows.filter(c => c.status !== 'verified');
   const limits = state.goalStatus === 'complete' ? [] : eligibility(state.root,state.id).blockers.filter(b => ['protocol_limit','repair_limit','no_progress'].includes(b.kind));
   const blocker = limits.length ? limits.map(b=>b.reason).join('; ') : state.blocker;
   const next = state.runtimeCeased ? state.next : state.continuationFresh !== false && state.continuation?.round === state.history.length && state.history.at(-1)?.stage === 'validated' && state.goalStatus !== 'complete' ? actions.next(state)?.reason || direction.next(state.continuation.direction) : state.goalStatus === 'complete' ? 'Goal complete' : open[0]?.verification || (pending[0] ? `Verify ${pending[0].id}: ${pending[0].anchor}` : rows.length ? 'Run finish to check all goal conditions' : 'Index the existing task acceptance and required gates');
-  return `Run: ${state.id}\nBuilder: ${state.owner?.builder || 'unclaimed'}\nTypeSafe: ${state.typesafe?.mode || 'shadow'} / ${state.history.at(-1)?.typesafe?.reason || state.history.at(-1)?.typesafe?.status || 'not evaluated'}\nGoal: ${state.context.objective}\nProgress: ${rows.length - pending.length}/${rows.length} verified; ${open.length} open findings; ${state.goalStatus}\nRuntime: ${version.active}; installed ${version.installed}; staged ${version.staged || 'none'}${version.staleGuide ? `\n${version.staleGuide}` : ''}\nInstructions: ${actions.pending(state).length} outstanding\nOutcome advanced: ${state.outcome === 'accepted' ? 'accepted within batch scope' : state.outcome}\nCurrent blocker: ${blocker ? blocker.slice(0, 350) : 'none'}\nNext action: ${limits.length ? blocker : state.outcome === 'blocked' && state.blocker ? state.next || next : next}`;
+  return `Run: ${state.id}\nBuilder: ${state.owner?.builder || 'unclaimed'}\nTypeSafe: ${state.typesafe?.mode || 'shadow'} / ${state.history.at(-1)?.typesafe?.reason || state.history.at(-1)?.typesafe?.status || 'not evaluated'}\nGoal: ${state.context.objective}\nProgress: ${rows.length - pending.length}/${rows.length} verified; ${open.length} open findings; ${state.goalStatus}\nRuntime: ${version.active}; installed ${version.installed}; staged ${version.staged || 'none'}${version.staleGuide ? `\n${version.staleGuide}` : ''}\nInstructions: ${actions.pending(state).length} outstanding\nOutcome advanced: ${state.outcome === 'accepted' ? 'accepted within batch scope' : state.outcome}\nCurrent blocker: ${blocker ? blocker.slice(0, 350) : 'none'}\nNext action: ${limits.length ? blocker : state.outcome === 'blocked' && state.blocker ? state.next || next : next}${routingNotice}`;
 }
 function cli(args, root = process.cwd()) {
   try {
     guard(); root = path.resolve(root);
     const [action, target] = args;
-    if (['resume','status','review','capture','finish','release','index','typesafe','eligibility'].includes(action)) { if (action !== 'status' && load(root,target).state.runtimeCeased) throw Error('Run explicitly ceased; history is read-only and no successor is authorized'); const pinned=runtime.dispatch(root,target,__dirname);if(pinned)return require(path.join(pinned,'duo-build.cjs')).cli(args,root); }
+    if (['resume','status','review','capture','finish','release','index','typesafe','eligibility','routing-begin'].includes(action)) { if (action !== 'status' && load(root,target).state.runtimeCeased) throw Error('Run explicitly ceased; history is read-only and no successor is authorized'); const pinned=runtime.dispatch(root,target,__dirname);if(pinned)return require(path.join(pinned,'duo-build.cjs')).cli(args,root); }
     const opt = name => { const i = args.indexOf(`--${name}`); return i < 0 ? undefined : args[i + 1]; };
     if (action === 'eligibility') { const result = eligibility(root,target,opt('session'),opt('batch') ? json(safe(root,opt('batch'))) : undefined); console.log(JSON.stringify(result)); return result.eligible ? 0 : 2; }
     if (action === 'check') { console.log(JSON.stringify(check(opt('builder')))); return 0; }
@@ -515,14 +538,16 @@ function cli(args, root = process.cwd()) {
     else if (action === 'release') state = release(root, target, opt('session'));
     else if (action === 'index') state = indexGoal(root, target, opt('session'), json(safe(root, opt('criteria'))));
     else if (action === 'capture') state = capture(root, target, opt('session'), args.includes('--') ? args.slice(args.indexOf('--') + 1) : []);
+    else if (action === 'routing-begin') state = beginRouting(root, target, opt('session'), opt('loop'), opt('stage'));
     else if (action === 'finish') state = finish(root, target, opt('session'));
     else throw Error('Use native /duo-build (Claude) or $duo-build (Codex). Helper: check, start, resume, status, release, cease, index, eligibility, typesafe, capture, review, finish. Mutations require --session; host takeover requires --builder --takeover --reason.');
     console.log(status(state));
+    if (state.routingShadow) console.log('Routing shadow: ' + JSON.stringify(routingShadow.reportStatus(state.routingShadow)));
     if (['review', 'resume', 'status'].includes(action)) console.log('\n' + direction.render(state) + '\n' + actions.render(state));
     if (action === 'start' || (action === 'resume' && opt('builder'))) console.log(`Owner session: ${state.owner.session}`);
     if (action === 'capture') { console.log(`Evidence: ${state.lastCapture.path}`); return state.lastCapture.exitCode === 0 && state.lastCapture.stable ? 0 : 2; }
     return ['review', 'resume'].includes(action) ? (state.outcome === 'accepted' ? 0 : state.outcome === 'changes_required' ? 1 : 2) : 0;
   } catch (e) { console.error(`Outcome advanced: blocked\nCurrent blocker: ${e.message}\nNext action: inspect eligibility and retained evidence; retry only within the existing allowance`); return 2; }
 }
-module.exports = { cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, fingerprint, load, cli, schema };
+module.exports = { beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, fingerprint, load, cli, schema };
 if (require.main === module) process.exitCode = cli(process.argv.slice(2));
