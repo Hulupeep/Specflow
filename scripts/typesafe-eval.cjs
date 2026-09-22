@@ -4,8 +4,10 @@ const fs = require('fs'), path = require('path'), os = require('os');
 const { spawnSync } = require('child_process');
 const client = require('./typesafe-client.cjs');
 const prompts = require('./typesafe-questions.cjs');
+const legacyPrompts = require('./typesafe-questions-v1.cjs');
 const instructionQuestions = require('./typesafe-actions.cjs').questions;
-const questionsFor = row => row.kind === 'instruction' ? instructionQuestions() : row.kind === 'repair' ? prompts.repairQuestions() : prompts.questions();
+const rubric = corpus => corpus.questionVersion === '2' ? prompts : legacyPrompts;
+const questionsFor = (row, corpus = {}) => row.kind === 'instruction' ? instructionQuestions() : row.kind === 'repair' ? rubric(corpus).repairQuestions() : rubric(corpus).questions();
 function privateDirectory(destination) {
   const full = client.noLinks(destination); let ancestor = full;
   while (!fs.existsSync(ancestor)) ancestor = path.dirname(ancestor);
@@ -13,14 +15,14 @@ function privateDirectory(destination) {
   fs.mkdirSync(full, { recursive: true, mode: 0o700 }); fs.chmodSync(full, 0o700); return full;
 }
 function validateCorpus(corpus) {
-  if (!corpus.version || !Array.isArray(corpus.cases)) throw Error('Invalid corpus');
+  if (!corpus.version || !Array.isArray(corpus.cases) || (corpus.questionVersion !== undefined && !['1','2'].includes(corpus.questionVersion))) throw Error('Invalid corpus');
   const ids = new Set(), families = new Map();
   for (const row of corpus.cases) {
     if (!/^[a-z0-9-]+$/.test(row.id) || ids.has(row.id) || !['development','heldout'].includes(row.split) || !['evidence','repair','instruction'].includes(row.kind) || !row.rationale || !row.source || !['seeded','historical'].includes(row.origin)) throw Error('Invalid labelled case');
     ids.add(row.id);
     if (families.has(row.family) && families.get(row.family) !== row.split) throw Error('Family leakage across splits');
     families.set(row.family,row.split);
-    const q = questionsFor(row);
+    const q = questionsFor(row, corpus);
     if (Object.keys(row.labels).length !== Object.keys(q).length || Object.entries(q).some(([id,v]) => !Object.hasOwn(v.criteria,row.labels[id]))) throw Error('Invalid labels');
   }
 }
@@ -58,8 +60,8 @@ async function evaluateCorpus(corpus, options={}) {
   if(!/^jev-\d+\.\d+\.\d+$/.test(options.model||''))throw Error('Evaluation requires a concrete pinned model');
   if(!['live','replay'].includes(options.mode))throw Error('Choose live or replay explicitly');
   const directory=privateDirectory(options.output || path.join(os.homedir(),'.local/share/specflow/typesafe-evals',String(Date.now())));
-  const datasetHash=client.hash(corpus),questionHash=client.hash({evidence:prompts.questions(),repair:prompts.repairQuestions(),instruction:instructionQuestions()});
-  const identity={datasetHash,questionHash,model:options.model,questionVersion:prompts.VERSION};
+  const datasetHash=client.hash(corpus),questionHash=client.hash({evidence:rubric(corpus).questions(),repair:rubric(corpus).repairQuestions(),instruction:instructionQuestions()});
+  const identity={datasetHash,questionHash,model:options.model,questionVersion:rubric(corpus).VERSION};
   const manifestFile=path.join(directory,'manifest.json');
   const prior=fs.existsSync(manifestFile)?JSON.parse(fs.readFileSync(manifestFile)):null;
   if(prior&&JSON.stringify(prior.identity)!==JSON.stringify(identity))throw Error('Changed evaluation identity requires new output directory and qualification');
@@ -75,15 +77,15 @@ async function evaluateCorpus(corpus, options={}) {
   for(const row of corpus.cases) {
     const file=path.join(directory,row.id+'.json');
     if(options.mode==='replay'&&!fs.existsSync(file))throw Error('Replay missing case record');
-    const q=questionsFor(row);
-    const result=row.kind==='instruction' && !row.state.evidence?.length ? {status:'unavailable',reason:'insufficient_input',origin:'mechanical',networkCalls:0} : await client.evaluate({state:row.state,questions:q,model:options.model,snapshotHash:datasetHash,questionSetId:row.kind==='instruction'?'specflow-instruction-evidence':prompts.SET,questionVersion:prompts.VERSION},{file,envFile:options.envFile,...(options.fetchImpl?{fetchImpl:options.fetchImpl}:{}),...(options.env?{env:options.env}:{})});
+    const q=questionsFor(row, corpus);
+    const result=row.kind==='instruction' && !row.state.evidence?.length ? {status:'unavailable',reason:'insufficient_input',origin:'mechanical',networkCalls:0} : await client.evaluate({state:row.state,questions:q,model:options.model,snapshotHash:datasetHash,questionSetId:row.kind==='instruction'?'specflow-instruction-evidence':prompts.SET,questionVersion:rubric(corpus).VERSION},{file,envFile:options.envFile,...(options.fetchImpl?{fetchImpl:options.fetchImpl}:{}),...(options.env?{env:options.env}:{})});
     if (result.origin==='mechanical') client.atomic(file,result);
     rows.push({id:row.id,family:row.family,selection:row.selection,kind:row.kind,split:row.split,control:Boolean(row.control),labels:row.labels,baseline:baseline(row),reviewerBaseline:row.reviewerBaseline,result});
   }
   const repetitions=[];
   for(const row of corpus.cases.filter(r=>r.split==='development' && (r.kind!=='instruction'||r.state.evidence?.length)).slice(0,3)) {
     const file=path.join(directory,row.id+'-repeat.json');if(options.mode==='replay'&&!fs.existsSync(file))throw Error('Replay missing repeat record');
-    const result=await client.evaluate({state:row.state,questions:questionsFor(row),model:options.model,snapshotHash:datasetHash,questionSetId:row.kind==='instruction'?'specflow-instruction-evidence':prompts.SET,questionVersion:prompts.VERSION},{file,envFile:options.envFile,...(options.fetchImpl?{fetchImpl:options.fetchImpl}:{}),...(options.env?{env:options.env}:{})});
+    const result=await client.evaluate({state:row.state,questions:questionsFor(row, corpus),model:options.model,snapshotHash:datasetHash,questionSetId:row.kind==='instruction'?'specflow-instruction-evidence':prompts.SET,questionVersion:rubric(corpus).VERSION},{file,envFile:options.envFile,...(options.fetchImpl?{fetchImpl:options.fetchImpl}:{}),...(options.env?{env:options.env}:{})});
     const original=rows.find(r=>r.id===row.id).result;
     repetitions.push({id:row.id,result,comparable:result.status==='completed'&&original.status==='completed',sameChoices:result.status==='completed'&&original.status==='completed'?Object.keys(row.labels).every(k=>result.response.answers[k].choice===original.response.answers[k].choice):null});
   }

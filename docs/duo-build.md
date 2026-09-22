@@ -395,3 +395,51 @@ An instruction's `evidence` cites exact submitted capture paths. Each capture's
 own `inspected` lists its relevant source/artifacts. Capture paths need not be
 repeated in both inspection lists. Missing submitted or inspected evidence still
 rejects the complete response atomically with the exact missing path.
+
+## Clearer evidence judgments and comparison (#158)
+
+New runs use version 2 of the evidence questions. Three independent judgments
+separate assertion **coverage**, actual **execution**, and **support for the claim**.
+An assertion can check the correct value and fail; its coverage remains full.
+An absent assertion is insufficient to judge coverage. An actual assertion that
+checks an unrelated title has no coverage. Skips and unknown results cannot prove
+product success or failure, although they can refute a claim that a test passed.
+
+Selections retain named criterion, claim, assertion, raw evidence and execution
+fields. Capture metadata identifies current, stale, unstable and unknown evidence;
+old successes and current failures stay visible together. Null assertionPath is
+allowed when an assertion is absent. Combined instruction and criterion selections
+keep separate item indexes. These judgments remain advisory and confidence is not
+permission to accept work.
+
+Each new review records access-receipts.json from successful native tool results.
+The helper derives inspected paths, so the peer no longer transcribes its reads.
+Claude Read and Grep content are recognized (directory-search lines are checked
+against the frozen file); Codex uses standalone
+cat or numeric-range sed commands. Failed calls, filename discovery and unsupported
+shell expressions earn no receipt. Partial access is labelled explicitly. Tool
+receipts establish content access, not comprehension. Complete direction is
+constrained to an empty next_steps array; finish remains the existing mechanical
+check and is never a newly assigned repair task.
+
+Legacy corpora omit questionVersion or use "1" and keep their exact original
+questions, labels and replay identities. New corpora explicitly use
+`"questionVersion":"2"` and label support, coverage and execution. Do not rewrite
+old labels to fit new predictions. Record independent blind label adjudication;
+ambiguous examples need explicit uncertainty rather than a forced accuracy score.
+
+For a private matched comparison, supply a version-1 pairs array to:
+
+```sh
+node scripts/typesafe-comparison.cjs /private/paired-trials.json /private/results
+```
+
+Each pair names caseHash and labelReview (reviewer, sourceHash), plus off/advisory
+arms with the same runtimeHash and transport (live or simulated). An arm records
+providerCalls, providerUnavailable and rounds. Each round has sourceHash,
+evidenceHash, independently assigned oracle (accept/object/unknown), and observed
+outcome (accepted/changes_required/blocked/invalid/unavailable). The report counts
+wrong endorsements, unnecessary objections, protocol failures and extra review
+rounds. Missing arms/provider evidence remain missing comparisons. Both arms still
+use native peer review. Small samples and synthetic product trials cannot establish
+production benefit; private provider reports must not be uploaded automatically.

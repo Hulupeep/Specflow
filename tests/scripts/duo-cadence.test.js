@@ -24,7 +24,7 @@ function peer(outcome = 'accepted') {
     directionFixture.feedback(req, result);
     if (outcome === 'blocked') Object.assign(result.direction.next_steps[0], {action:'Owner browser: provide access for the required check',done_when:'Owner browser access is available'});
     if (exe === 'codex') fs.writeFileSync(path.join(options.cwd, 'response.json'), JSON.stringify(result));
-    return JSON.stringify({structured_output:result});
+    return directionFixture.transport(result, exe, options.cwd);
   };
 }
 const review = (outcome = 'accepted', invoke = peer(outcome), data = batch()) => duo.review(root, run.id, directionFixture.respond(duo.load(root, run.id).state, data), invoke, run.owner.session);

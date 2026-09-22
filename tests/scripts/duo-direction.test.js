@@ -24,7 +24,7 @@ function peer(edit = () => {}) {
     edit(result,req,opts);
     require('../helpers/duo-direction').assessInstructions(req,result);
     if(exe==='codex') put(path.relative(root,path.join(opts.cwd,'response.json')),result);
-    return JSON.stringify({structured_output:result});
+    return require('../helpers/duo-direction.js').transport(result, exe, opts.cwd);
   };
 }
 const review=(data=batch(),provider=peer())=>duo.review(root,run.id,data,provider,run.owner.session);
@@ -46,7 +46,7 @@ test.each(['claude-code','codex'])('J-DUO-DIRECTION: %s receives immediate usefu
   expect(JSON.parse(fs.readFileSync(path.join(round,'invocation.json'))).exe).toBe(builder==='claude-code'?'codex':'claude');
   const prompt=fs.readFileSync(path.join(round,'prompt.txt'),'utf8');
   expect(prompt).toContain('goal-focused technical partner');
-  expect(prompt).toContain(builder==='claude-code'?'native read-only execution tools available in Codex':'Use Read/Glob/Grep for local files');
+  expect(prompt).toContain(builder==='claude-code'?'For content inspection use standalone cat':'Use Read/Glob/Grep for local files');
   expect(direction.render(result)).toContain('Real connected account observed');
 });
 test('J-DUO-RESUME-DIRECTION: builder responds, reviewer sees decision memory, owner-only handoff stops honestly',()=>{

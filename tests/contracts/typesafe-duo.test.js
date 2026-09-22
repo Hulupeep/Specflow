@@ -13,7 +13,7 @@ function peer(outcome='accepted',omit=false){return(exe,args,opts)=>{
  const r={outcome,summary:'Synthetic peer transport',inspected:[...req.requiredReads,'tree/test.cjs'],index_complete:true,findings:outcome==='accepted'?[]:[{id:'F1',criterion:'AC-1',kind:'acceptance',basis:'AC-1',evidence:'tree/raw.txt',action:'Fix balance',verification:'Assert 18'}],unrelated:[],assessments:[{id:'AC-1',status:outcome==='accepted'?'verified':'blocked',evidence:['raw.txt'],reason:'Fixture'}],resolutions:req.open_findings.map(f=>({id:f.id,status:outcome==='accepted'?'closed':'open',evidence:['raw.txt'],reason:'Fresh evidence'})),diagnostics:[{observation:fs.readFileSync(path.join(opts.cwd,'tree/raw.txt'),'utf8'),evidence:['raw.txt']}]};
  if(req.typesafe&&!omit)r.typesafe_dispositions=req.typesafe.flags.map(id=>({id,status:'rejected',evidence:['raw.txt','tree/test.cjs'],reason:'Independently inspected fixture; simulated false flag'}));
  directionFixture.feedback(req, r);
- if(exe==='codex')fs.writeFileSync(path.join(opts.cwd,'response.json'),JSON.stringify(r));return JSON.stringify({structured_output:r});
+ if(exe==='codex')fs.writeFileSync(path.join(opts.cwd,'response.json'),JSON.stringify(r));return directionFixture.transport(r, exe, opts.cwd);
 };}
 function worker(status='completed') {return jest.fn((exe,args)=>{
  const input=JSON.parse(fs.readFileSync(args[1]));
@@ -30,7 +30,7 @@ test.each(['codex','claude-code'])('J-TSAFE-EPIC/J-TSAFE-DUO: %s correction pres
  expect(review(r,batch(),peer('changes_required')).outcome).toBe('changes_required');expect(duo.fingerprint(root,['raw.txt'])).toBe(before);
  put('balance.cjs','module.exports=18');put('raw.txt','Observed 18 expected 18; executed 1 passed 1 skipped 0');
  const b={...batch(),resolutions:[{id:'F1',change:'Correct balance',evidence:['raw.txt']}]};b.typesafe[0].repair={description:'Correct balance rule',observation:'Observed 18'};
- const second=review(r,b);expect(second.outcome).toBe('accepted');expect(second.typesafe.calls).toBe(2);expect(Object.keys(JSON.parse(fs.readFileSync(w.mock.calls[1][1][1])).questions)).toHaveLength(5);expect(duo.finish(root,r.id,r.owner.session).goalStatus).toBe('complete');
+ const second=review(r,b);expect(second.outcome).toBe('accepted');expect(second.typesafe.calls).toBe(2);expect(Object.keys(JSON.parse(fs.readFileSync(w.mock.calls[1][1][1])).questions)).toHaveLength(6);expect(duo.finish(root,r.id,r.owner.session).goalStatus).toBe('complete');
 });
 test('off makes zero calls; shadow excludes advice from request/tree',()=>{
  const w=worker();installWorker(w);const off=run('codex','off');expect(review(off).outcome).toBe('accepted');expect(w).not.toHaveBeenCalled();
@@ -89,9 +89,9 @@ test('partial TypeSafe selection discloses omitted criteria without narrowing pe
   peerCalls++;const request=JSON.parse(fs.readFileSync(path.join(opts.cwd,'request.json')));
   expect(request.batch.criteria).toEqual(['AC-1','AC-2']);
   expect(Object.keys(request.acceptance).sort()).toEqual(['AC-1','AC-2']);
-  const response=JSON.parse(raw);response.structured_output.assessments.push({id:'AC-2',status:'verified',evidence:['raw.txt'],reason:'Synthetic peer assessment of the unselected criterion'});
+  const response=JSON.parse(raw.split("\n").at(-1));response.structured_output.assessments.push({id:'AC-2',status:'verified',evidence:['raw.txt'],reason:'Synthetic peer assessment of the unselected criterion'});
   directionFixture.feedback(request,response.structured_output);
-  return JSON.stringify(response);
+  return directionFixture.transport(response.structured_output,exe,opts.cwd);
  });
  expect(result.outcome).toBe('accepted');expect(peerCalls).toBe(1);expect(w).toHaveBeenCalledTimes(1);
  const input=JSON.parse(fs.readFileSync(w.mock.calls[0][1][1]));
@@ -114,4 +114,19 @@ test.each([
  const check=JSON.parse(fs.readFileSync(path.join(root,'.specflow/duo',r.id,'typesafe/round-001/check.json')));
  if(calls){expect(check.status).toBe('completed');const input=JSON.parse(fs.readFileSync(w.mock.calls[0][1][1]));expect(input.state.items[0].assertion.text).toBe(content);}
  else{expect(check.status).toBe('unavailable');expect(check.reason).toBe('input_limit');expect(check.response).toBeUndefined();expect(result.typesafe.calls).toBe(0);}
+});
+test('J-TSAFE-QUALITY: correct failing assertion and absent assertion retain distinct request inputs',()=>{
+ put('test.cjs',"require('node:assert/strict').equal(require('./balance.cjs'),18)");
+ const r=run();const captured=duo.capture(root,r.id,r.owner.session,[process.execPath,'test.cjs']);
+ const raw=JSON.parse(fs.readFileSync(path.join(root,captured.lastCapture.path)));expect(raw.exitCode).toBe(1);
+ const state=duo.load(root,r.id).state;state.history=[{sourceFingerprint:raw.sourceAfter}];
+ const round=path.join(root,'.specflow/duo',r.id,'request-proof');fs.mkdirSync(round,{recursive:true});
+ fs.writeFileSync(path.join(round,'goal.md'),'Correct balance');fs.writeFileSync(path.join(round,'manifest.json'),JSON.stringify(duo.manifest(root,[captured.lastCapture.path])));
+ const selection={criterion:'AC-1',claimIndex:0,assertionPath:'test.cjs',evidencePaths:[captured.lastCapture.path]};
+ const b={...batch(),evidence:[captured.lastCapture.path],typesafe:[selection,{...selection,assertionPath:null}]};const w=worker();
+ advisory.run({state,batch:b,tree:root,round,dir:path.dirname(round),snapshot:'snapshot',save:()=>{},execute:w});
+ const request=JSON.parse(fs.readFileSync(w.mock.calls[0][1][1]));
+ expect(request.state.items[0].assertion.text).toContain("equal(require('./balance.cjs'),18)");expect(request.state.items[1].assertion).toBeNull();
+ for(const item of request.state.items){expect(item.execution[0]).toMatchObject({freshness:'current',exitCode:1});expect(item.execution[0].stderr).toContain('20 !== 18');}
+ expect(request.questions.q0_coverage.instructions).toContain('Ignore run success/failure');expect(request.questions.q1_execution).toBeDefined();
 });
