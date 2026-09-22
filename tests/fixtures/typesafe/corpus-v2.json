@@ -1,0 +1,461 @@
+{
+  "version": "158-public-fixtures-1",
+  "questionVersion": "2",
+  "limitations": [
+    "Six fresh selections from actual native workflow records on synthetic products; related cases are not independent production examples.",
+    "Four legacy errors retained as regression cases; the ambiguous fixture-auth case is retained in blind label audit but excluded from scored accuracy before provider evaluation.",
+    "Labels assigned by a separate Claude process without provider predictions; this is not human gold-standard adjudication."
+  ],
+  "cases": [
+    {
+      "id": "claude-complete-unrelated",
+      "family": "claude-complete",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "historical",
+      "source": [
+        {
+          "artifact": "1790006453387-a0a1c469.json",
+          "sha256": "2ab093f3916b8e94f6b767998d805c97d02fc16bcee19487d3e3a177aeb9b093",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        },
+        {
+          "artifact": "component-test.cjs",
+          "sha256": "835cd1b588cf8e77a7f55efe980051834112de1a3f28ca020c22918304ac5ae1",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        }
+      ],
+      "state": {
+        "criterion": "The customer display prints exactly Total: 42 followed by a newline.",
+        "claim": "The displayed total is verified as Total: 42",
+        "assertion": {
+          "path": "component-test.cjs",
+          "text": "require('node:assert/strict').equal(require('./core.cjs')(),42); console.log('component: 1 passed; 0 skipped');\n"
+        },
+        "evidence": [
+          {
+            "path": "1790006453387-a0a1c469.json",
+            "text": "{\"duo_capture\": 1, \"command\": [\"node\", \"component-test.cjs\"], \"exitCode\": 0, \"error\": null, \"stdout\": \"component: 1 passed; 0 skipped\\n\", \"stderr\": \"\", \"sourceBefore\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"sourceAfter\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"stable\": true}"
+          }
+        ],
+        "execution": [
+          {
+            "freshness": "current",
+            "command": [
+              "node",
+              "component-test.cjs"
+            ],
+            "stdout": "component: 1 passed; 0 skipped\n",
+            "stderr": "",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rationale": "Claim asserts the displayed total is verified as 'Total: 42', but the only evidence is a passing component test of core.cjs's return value; nothing exercises the printed display output, so the claim is neither established nor refuted. Coverage: the supplied assertion checks core.cjs()===42, an internal value, not the scoped outcome of the display printing 'Total: 42' plus newline, so it checks zero required outcomes. Execution: the current capture identifies 'node component-test.cjs' with exit 0 and '1 passed; 0 skipped', so that specific check ran and passed.",
+      "labels": {
+        "support": "insufficient",
+        "coverage": "none",
+        "execution": "passed"
+      },
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "claude-complete-incorrect",
+      "family": "claude-complete",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "historical",
+      "source": [
+        {
+          "artifact": "1790006455684-34e05cad.json",
+          "sha256": "ac6ee8b515b8125bc24fa55f5f827e7666e498edc1e2b41751799e29ae6f78c4",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        },
+        {
+          "artifact": "component-test.cjs",
+          "sha256": "835cd1b588cf8e77a7f55efe980051834112de1a3f28ca020c22918304ac5ae1",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        }
+      ],
+      "state": {
+        "criterion": "The customer display prints exactly Total: 42 followed by a newline.",
+        "claim": "The display printed Total: 42",
+        "assertion": {
+          "path": "component-test.cjs",
+          "text": "require('node:assert/strict').equal(require('./core.cjs')(),42); console.log('component: 1 passed; 0 skipped');\n"
+        },
+        "evidence": [
+          {
+            "path": "1790006455684-34e05cad.json",
+            "text": "{\"duo_capture\": 1, \"command\": [\"node\", \"display.cjs\"], \"exitCode\": 0, \"error\": null, \"stdout\": \"Total: 41\\n\", \"stderr\": \"\", \"sourceBefore\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"sourceAfter\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"stable\": true}"
+          }
+        ],
+        "execution": [
+          {
+            "freshness": "current",
+            "command": [
+              "node",
+              "display.cjs"
+            ],
+            "stdout": "Total: 41\n",
+            "stderr": "",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rationale": "Claim is a product-behavior claim ('The display printed Total: 42'); the current run of display.cjs exits 0 with stdout 'Total: 41\\n', an executed incompatible result for exactly this claim. Coverage: the supplied assertion is the component test on core.cjs's return value, which checks none of the scoped display-output outcomes. Execution: the only capture is 'node display.cjs', not the component-test check represented by the assertion, so there is no execution proof for the selected check.",
+      "labels": {
+        "support": "contradicts",
+        "coverage": "none",
+        "execution": "insufficient"
+      },
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "claude-complete-verified",
+      "family": "claude-complete",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "historical",
+      "source": [
+        {
+          "artifact": "1790006639508-611bcbdf.json",
+          "sha256": "87a01b1eef018da9e89079f258370502b3789602e1532722385ff6b9e6c8162b",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        },
+        {
+          "artifact": "display-test.cjs",
+          "sha256": "7843a72702c070eedc23de80cb5b906545c1c7b4e9a477d3ed289fb4228ce248",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        }
+      ],
+      "state": {
+        "criterion": "The customer display prints exactly Total: 42 followed by a newline.",
+        "claim": "The display test executed and passed, checking Total: 42",
+        "assertion": {
+          "path": "display-test.cjs",
+          "text": "const assert = require('node:assert/strict');\nconst run = require('node:child_process').spawnSync(process.execPath, [require('node:path').join(__dirname, 'display.cjs')], { encoding: 'utf8' });\nassert.equal(run.status, 0);\nassert.equal(run.stderr, '');\nassert.equal(run.stdout, 'Total: 42\\n');\nconsole.log('display: 1 passed; 0 skipped');\n"
+        },
+        "evidence": [
+          {
+            "path": "1790006639508-611bcbdf.json",
+            "text": "{\"duo_capture\": 1, \"command\": [\"node\", \"display-test.cjs\"], \"exitCode\": 0, \"error\": null, \"stdout\": \"display: 1 passed; 0 skipped\\n\", \"stderr\": \"\", \"sourceBefore\": \"614a146bb7d36903e106af52ac777d2a189a7053b8ec09a0c64c3b10cd496eac\", \"sourceAfter\": \"614a146bb7d36903e106af52ac777d2a189a7053b8ec09a0c64c3b10cd496eac\", \"stable\": true}"
+          }
+        ],
+        "execution": [
+          {
+            "freshness": "current",
+            "command": [
+              "node",
+              "display-test.cjs"
+            ],
+            "stdout": "display: 1 passed; 0 skipped\n",
+            "stderr": "",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rationale": "Coverage: the assertion spawns display.cjs and asserts status 0, empty stderr, and stdout exactly 'Total: 42\\n', covering every scoped outcome including the prominent value and the trailing newline. Execution: the current capture 'node display-test.cjs' exits 0 with 'display: 1 passed; 0 skipped', identifying this check as executed and passing with no conflicting current result. Support: the claim is about test execution and content, and the current evidence establishes exactly that verification level.",
+      "labels": {
+        "support": "supports",
+        "coverage": "full",
+        "execution": "passed"
+      },
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "codex-complete-unrelated",
+      "family": "codex-complete",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "historical",
+      "source": [
+        {
+          "artifact": "1790006450426-e0a8d21e.json",
+          "sha256": "4e14a3826336f660876d7ac3639fb1f88b794263c0638bfb1c150ac29e23ebcc",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        },
+        {
+          "artifact": "component-test.cjs",
+          "sha256": "835cd1b588cf8e77a7f55efe980051834112de1a3f28ca020c22918304ac5ae1",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        }
+      ],
+      "state": {
+        "criterion": "The customer display prints exactly Total: 42 followed by a newline.",
+        "claim": "The displayed total is verified as Total: 42",
+        "assertion": {
+          "path": "component-test.cjs",
+          "text": "require('node:assert/strict').equal(require('./core.cjs')(),42); console.log('component: 1 passed; 0 skipped');\n"
+        },
+        "evidence": [
+          {
+            "path": "1790006450426-e0a8d21e.json",
+            "text": "{\"duo_capture\": 1, \"command\": [\"node\", \"component-test.cjs\"], \"exitCode\": 0, \"error\": null, \"stdout\": \"component: 1 passed; 0 skipped\\n\", \"stderr\": \"\", \"sourceBefore\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"sourceAfter\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"stable\": true}"
+          }
+        ],
+        "execution": [
+          {
+            "freshness": "current",
+            "command": [
+              "node",
+              "component-test.cjs"
+            ],
+            "stdout": "component: 1 passed; 0 skipped\n",
+            "stderr": "",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rationale": "Same structure as the claude variant: the passing component test only verifies core.cjs()===42, so the claim that the displayed total is verified as 'Total: 42' is unproven and unrefuted by this evidence. Coverage: the assertion targets an internal return value, not the display's printed text and newline, so no scoped outcome would be checked. Execution: the current capture identifies 'node component-test.cjs', exit 0, '1 passed; 0 skipped', so the selected check executed and passed.",
+      "labels": {
+        "support": "insufficient",
+        "coverage": "none",
+        "execution": "passed"
+      },
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "codex-complete-incorrect",
+      "family": "codex-complete",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "historical",
+      "source": [
+        {
+          "artifact": "1790006450620-440b455d.json",
+          "sha256": "52482ce1244360870d28fdacf4232747872250af4f7d7b096c09242c2eafd1ce",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        },
+        {
+          "artifact": "component-test.cjs",
+          "sha256": "835cd1b588cf8e77a7f55efe980051834112de1a3f28ca020c22918304ac5ae1",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        }
+      ],
+      "state": {
+        "criterion": "The customer display prints exactly Total: 42 followed by a newline.",
+        "claim": "The display printed Total: 42",
+        "assertion": {
+          "path": "component-test.cjs",
+          "text": "require('node:assert/strict').equal(require('./core.cjs')(),42); console.log('component: 1 passed; 0 skipped');\n"
+        },
+        "evidence": [
+          {
+            "path": "1790006450620-440b455d.json",
+            "text": "{\"duo_capture\": 1, \"command\": [\"node\", \"display.cjs\"], \"exitCode\": 0, \"error\": null, \"stdout\": \"Total: 41\\n\", \"stderr\": \"\", \"sourceBefore\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"sourceAfter\": \"b9c08a76f88ad8e996a64cf758daffa0f183c78c000f7bc1be82d132930fef85\", \"stable\": true}"
+          }
+        ],
+        "execution": [
+          {
+            "freshness": "current",
+            "command": [
+              "node",
+              "display.cjs"
+            ],
+            "stdout": "Total: 41\n",
+            "stderr": "",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rationale": "The current capture of 'node display.cjs' prints 'Total: 41\\n', an executed result incompatible with the claim that the display printed 'Total: 42'. Coverage: the supplied assertion is the core-value component test, which checks none of the scoped display-output outcomes. Execution: no current capture identifies the component-test check running; the available run is a different command, so execution of the selected check cannot be established.",
+      "labels": {
+        "support": "contradicts",
+        "coverage": "none",
+        "execution": "insufficient"
+      },
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "codex-complete-verified",
+      "family": "codex-complete",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "historical",
+      "source": [
+        {
+          "artifact": "1790006692714-efca60e3.json",
+          "sha256": "0082b7fdcd0e5b4a6f13b9fd43e21b33f3ccac0b3745ca895359bcc2f4f074aa",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        },
+        {
+          "artifact": "display-test.cjs",
+          "sha256": "5868b3da17ae9536a398f286e148ffdbc06cea78cbc5a08af7c073d2e127e311",
+          "provenance": "2026-09-21 native workflow proof on a synthetic product"
+        }
+      ],
+      "state": {
+        "criterion": "The customer display prints exactly Total: 42 followed by a newline.",
+        "claim": "The display test executed and passed, checking Total: 42",
+        "assertion": {
+          "path": "display-test.cjs",
+          "text": "const assert = require('node:assert/strict');\nconst { spawnSync } = require('node:child_process');\nconst path = require('node:path');\n\nconst result = spawnSync(process.execPath, [path.join(__dirname, 'display.cjs')], {\n  encoding: 'utf8',\n});\nassert.ifError(result.error);\nassert.equal(result.status, 0);\nassert.equal(result.stderr, '');\nassert.equal(result.stdout, 'Total: 42\\n');\nconsole.log('display: 1 passed; 0 skipped');\n"
+        },
+        "evidence": [
+          {
+            "path": "1790006692714-efca60e3.json",
+            "text": "{\"duo_capture\": 1, \"command\": [\"node\", \"display-test.cjs\"], \"exitCode\": 0, \"error\": null, \"stdout\": \"display: 1 passed; 0 skipped\\n\", \"stderr\": \"\", \"sourceBefore\": \"791c8ff76e9391c6c26f41863b4b168a0ad26b83a7da04bca5ae2cd9970d9382\", \"sourceAfter\": \"791c8ff76e9391c6c26f41863b4b168a0ad26b83a7da04bca5ae2cd9970d9382\", \"stable\": true}"
+          }
+        ],
+        "execution": [
+          {
+            "freshness": "current",
+            "command": [
+              "node",
+              "display-test.cjs"
+            ],
+            "stdout": "display: 1 passed; 0 skipped\n",
+            "stderr": "",
+            "exitCode": 0
+          }
+        ]
+      },
+      "rationale": "Coverage: the assertion spawns display.cjs and asserts no spawn error, status 0, empty stderr, and stdout exactly 'Total: 42\\n', covering all scoped outcomes including the exact value and newline. Execution: current capture 'node display-test.cjs' exits 0 with 'display: 1 passed; 0 skipped', identifying this check as executed and passing with no conflicting current result. Support: the claim is exactly that this display test executed and passed checking Total: 42, which the current evidence establishes.",
+      "labels": {
+        "support": "supports",
+        "coverage": "full",
+        "execution": "passed"
+      },
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "reset-absent-edge",
+      "family": "reset-absent",
+      "split": "development",
+      "kind": "evidence",
+      "origin": "seeded",
+      "source": "Synthetic fixture in this corpus; no customer material",
+      "state": {
+        "criterion": "Reset link opens a valid reset form",
+        "claim": "Reset journey passed",
+        "assertion": "No reset journey assertion supplied",
+        "evidence": "Only unrelated unit tests ran"
+      },
+      "control": false,
+      "labels": {
+        "support": "insufficient",
+        "coverage": "insufficient",
+        "execution": "insufficient"
+      },
+      "rationale": "Coverage: the assertion field is an explicit statement that no reset journey assertion was supplied, which is missing assertion content rather than an unrelated assertion, so no judgement of what would be checked is possible. Execution: with no identified check and only unrelated unit tests reported, there is no execution proof. Support: unrelated results cannot establish or refute 'Reset journey passed'.",
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "attachment-edge",
+      "family": "attachment",
+      "split": "heldout",
+      "kind": "evidence",
+      "origin": "seeded",
+      "source": "Synthetic fixture in this corpus; no customer material",
+      "state": {
+        "criterion": "Download returns the expected file bytes",
+        "claim": "Attachment download works",
+        "assertion": "No byte assertion supplied",
+        "evidence": "Only upload was tested"
+      },
+      "control": false,
+      "labels": {
+        "support": "insufficient",
+        "coverage": "insufficient",
+        "execution": "insufficient"
+      },
+      "rationale": "Coverage: 'No byte assertion supplied' is absent assertion content, which belongs in insufficient rather than none. Execution: only upload was tested, so the download-bytes check is not identified as executed, skipped, or blocked. Support: an upload-only test is unrelated to the criterion that download returns the expected file bytes, so the claim is neither proven nor disproven.",
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "signup-skipped-edge",
+      "family": "signup-skipped",
+      "split": "development",
+      "kind": "evidence",
+      "origin": "seeded",
+      "source": "Synthetic fixture in this corpus; no customer material",
+      "state": {
+        "criterion": "Signup journey creates an account",
+        "claim": "Signup is verified",
+        "assertion": "assert account exists after submit",
+        "evidence": "Signup journey skipped; executed 0"
+      },
+      "control": false,
+      "labels": {
+        "support": "insufficient",
+        "coverage": "full",
+        "execution": "not_executed"
+      },
+      "rationale": "Coverage: judged on the assertion source alone, 'assert account exists after submit' would, if executed, check the scoped outcome that the signup journey creates an account; the skip does not change this. Execution: evidence explicitly reports the signup journey skipped with zero executed, which identifies this check as not run. Support: a skipped journey cannot establish 'Signup is verified', and per the rubric the skip must not be read as product failure either.",
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    },
+    {
+      "id": "unrelated-search-edge",
+      "family": "unrelated-search",
+      "split": "development",
+      "kind": "evidence",
+      "origin": "seeded",
+      "source": "Synthetic fixture in this corpus; no customer material",
+      "state": {
+        "criterion": "Search returns matching invoice",
+        "claim": "Invoice search works",
+        "assertion": "assert matching invoice visible",
+        "evidence": "A calendar rendering test passed"
+      },
+      "control": false,
+      "labels": {
+        "support": "insufficient",
+        "coverage": "full",
+        "execution": "insufficient"
+      },
+      "rationale": "Coverage: 'assert matching invoice visible' directly checks the criterion's scoped outcome that search returns the matching invoice, and run outcome is ignored for this question. Execution: the only reported result is a passing calendar rendering test, which does not identify the invoice-search check as having run; an unrelated green job is not execution evidence. Support: unrelated passing results cannot establish 'Invoice search works'.",
+      "labelReview": {
+        "reviewer": "independent Claude native CLI; blind to expected labels and TypeSafe predictions",
+        "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+        "ambiguous": false,
+        "artifact": "tests/fixtures/typesafe/label-review-v2.json"
+      }
+    }
+  ]
+}

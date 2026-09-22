@@ -22,7 +22,7 @@ function fakePeer(outcome = 'accepted', effect = () => {}) {
     directionFixture.feedback(request, result);
     effect(options, result);
     if (exe === 'codex') fs.writeFileSync(path.join(options.cwd, 'response.json'), JSON.stringify(result));
-    return JSON.stringify({ structured_output: result });
+    return directionFixture.transport(result, exe, options.cwd);
   };
 }
 beforeEach(() => {
@@ -101,7 +101,7 @@ test('no progress stops and maximum three repair rounds is enforced', () => {
 });
 test('acceptance without independent evidence read is rejected', () => {
   const run = duo.start(root, '#1', 'codex', context);
-  expect(reviewOwned(root, run.id, batch(), fakePeer('accepted', (_, result) => { result.inspected = []; })).blocker).toMatch(/did not inspect/);
+  expect(reviewOwned(root, run.id, batch(), fakePeer('accepted', (_, result) => { result.inspected = []; })).blocker).toMatch(/content-access receipt/);
 });
 test.each([
   ['optional parser, complete Read receipts', 'Bash', 'python3 -c "import json"', true, true],
@@ -114,7 +114,7 @@ test.each([
   const invoke=(exe,args,options)=>{
     const raw=fakePeer()(exe,args,options);
     if(args[0]!=='-p')return raw;
-    const request=JSON.parse(fs.readFileSync(path.join(options.cwd,'request.json'))), result=JSON.parse(raw);
+    const request=JSON.parse(fs.readFileSync(path.join(options.cwd,'request.json'))), result=JSON.parse(raw.split("\n").at(-1));
     result.permission_denials=[{tool_name:toolName,tool_input:{command}}];
     const events=receipts ? request.requiredReads.flatMap((file,i)=>[
       {type:'assistant',message:{content:[{type:'tool_use',name:'Read',id:`r${i}`,input:{file_path:path.join(options.cwd,file)}}]}},

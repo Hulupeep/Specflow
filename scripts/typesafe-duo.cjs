@@ -4,6 +4,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const client = require('./typesafe-client.cjs');
 const prompts = require('./typesafe-questions.cjs');
+const evidenceContext = require('./typesafe-evidence.cjs');
 const actionAdvice = require('./typesafe-actions.cjs');
 const excluded = name => /(^|\/)(\.env(?:\.[^/]*)?|[^/]*\.(?:pem|key)|credentials(?:\.[^/]*)?)$|(^|\/)(?:production|prod)[-_/].*log|(^|\/)logs\/production|(?:production|prod)\.log$/i.test(name);
 function config(previous = {}, update = {}) {
@@ -26,7 +27,7 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
   const manifest = JSON.parse(fs.readFileSync(path.join(round, 'manifest.json')));
   const selections = []; const allQuestions = {}; const omitted = [];
   function selected(name, evidence = false) {
-    if (typeof name !== 'string' || excluded(name) || name.startsWith('.specflow/') || !Object.hasOwn(manifest, name) || (evidence && !batch.evidence.includes(name))) throw Error('invalid_selection');
+    if (typeof name !== 'string' || excluded(name) || (name.startsWith('.specflow/') && !evidence) || !Object.hasOwn(manifest, name) || (evidence && !batch.evidence.includes(name))) throw Error('invalid_selection');
     const file = path.resolve(tree, name);
     if (!file.startsWith(path.resolve(tree) + path.sep)) throw Error('invalid_selection');
     client.noLinks(file);
@@ -40,11 +41,13 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
       const selectedActions=actionAdvice.select({state:{...state,reviewSourceFingerprint:state.history.at(-1)?.sourceFingerprint},batch,tree,manifest,snapshot,excluded});
       selections.push(...selectedActions.items);Object.assign(allQuestions,selectedActions.questions);actionSkipped=selectedActions.skipped;
       client.atomic(path.join(outDir,'selection.json'),{snapshotHash:snapshot,selected:selections.map(s=>s.instruction.id),omitted:actionSkipped});
-      if(!selections.length)return unavailable('insufficient_input');
+      if(!selections.length && !(batch.typesafe || []).length)return unavailable('insufficient_input');
     }
-    for (const [i, selection] of (batch.typesafe || []).entries()) {
+    for (const selection of (batch.typesafe || [])) {
+      const i = selections.length;
       if (!batch.criteria.includes(selection.criterion) || !Number.isInteger(selection.claimIndex) || typeof batch.claims[selection.claimIndex] !== 'string' || !Array.isArray(selection.evidencePaths) || !selection.evidencePaths.length) throw Error('invalid_selection');
-      const item = { criterion: state.criteria[selection.criterion].anchor, criterionId: selection.criterion, claim: batch.claims[selection.claimIndex], assertion: selected(selection.assertionPath), evidence: selection.evidencePaths.map(f => selected(f, true)), objective: state.context.objective };
+      const item = { criterion: state.criteria[selection.criterion].anchor, criterionId: selection.criterion, claim: batch.claims[selection.claimIndex], assertion: selection.assertionPath == null ? null : selected(selection.assertionPath), evidence: selection.evidencePaths.map(f => selected(f, true)), objective: state.context.objective };
+      item.execution = evidenceContext.execution(item.evidence, state.history.at(-1)?.sourceFingerprint);
       if (selection.repair) {
         if (typeof selection.repair.description !== 'string' || typeof selection.repair.observation !== 'string') throw Error('invalid_selection');
         item.repair = selection.repair.description; item.observation = selection.repair.observation;
@@ -55,7 +58,7 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
       selections.push(item); Object.assign(allQuestions, prompts.questions(`q${i}_`, `items[${i}].`));
     }
     for (const id of batch.criteria) if (!(batch.typesafe || []).some(s => s.criterion === id) && !selections.some(s => s.instruction?.criterion === state.criteria[id].anchor)) omitted.push(id);
-    const input = { snapshotHash: snapshot, questionSetId: batch.typesafe_actions ? 'specflow-instruction-evidence' : prompts.SET, questionVersion: batch.typesafe_actions ? '1' : prompts.VERSION, model: cfg.model, state: { goal: fs.readFileSync(path.join(round, 'goal.md'), 'utf8'), items: selections, omittedCriteria: omitted, omittedInstructionEvidence: actionSkipped }, questions: allQuestions };
+    const input = { snapshotHash: snapshot, questionSetId: batch.typesafe_actions ? 'specflow-instruction-evidence' : prompts.SET, questionVersion: prompts.VERSION, model: cfg.model, state: { goal: fs.readFileSync(path.join(round, 'goal.md'), 'utf8'), items: selections, omittedCriteria: omitted, omittedInstructionEvidence: actionSkipped }, questions: allQuestions };
     const key = client.credentials(process.env, cfg.envFile);
     if (client.sensitive(input, key) || JSON.stringify(input).includes(state.owner?.session || '\u0000')) return unavailable('sensitive_input');
     if (!key) return unavailable('missing_credentials');
@@ -71,7 +74,7 @@ function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSy
     cfg.consecutiveFailures = result.status === 'completed' ? 0 : cfg.consecutiveFailures + 1; save();
     const flags = Object.entries(result.response?.answers || {}).filter(([id, answer]) => {
       const kind = id.split('_').at(-1);
-      return answer.confidence < 0.8 || (kind === 'support' ? answer.choice !== 'supports' : kind === 'relevance' ? answer.choice !== 'relevant' : kind === 'coverage' ? answer.choice !== 'full' : kind === 'alignment' ? ['optional', 'unrelated', 'insufficient'].includes(answer.choice) : kind === 'novelty' ? answer.choice !== 'new_observation' : ['hypothesis','insufficient'].includes(answer.choice));
+      return answer.confidence < 0.8 || (kind === 'support' ? answer.choice !== 'supports' : kind === 'relevance' ? answer.choice !== 'relevant' : kind === 'coverage' ? answer.choice !== 'full' : kind === 'execution' ? answer.choice !== 'passed' : kind === 'alignment' ? ['optional', 'unrelated', 'insufficient'].includes(answer.choice) : kind === 'novelty' ? answer.choice !== 'new_observation' : ['hypothesis','insufficient'].includes(answer.choice));
     }).map(([id, answer]) => ({ id, answer }));
     // 0.8 is a disclosure heuristic, never a calibrated acceptance threshold.
     const summary = { ...result, flags, omittedCriteria: omitted, selected: selections.map(s => ({ instructionId:s.instruction?.id, criterion: s.criterionId || s.instruction?.criterion, assertion: s.assertion?.path, evidence: s.evidence.map(e => e.path) })), omittedInstructionEvidence:actionSkipped };

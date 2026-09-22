@@ -31,7 +31,7 @@ function peer({outcome='accepted', diagnostic='new observation', change=()=>{}, 
     change(result,request,opts);
     directionFixture.feedback(request, result);
     if(exe==='codex') fs.writeFileSync(path.join(opts.cwd,'response.json'),JSON.stringify(result));
-    return JSON.stringify({type:'result',structured_output:result});
+    return directionFixture.transport(result,exe,opts.cwd);
   };
 }
 const review = (run,b,provider) => duo.review(root,run.id,directionFixture.respond(readRun(run.id), b || batch()),provider || peer(),token(run.id));

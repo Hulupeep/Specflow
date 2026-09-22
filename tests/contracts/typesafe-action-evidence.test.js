@@ -28,3 +28,15 @@ test('mechanical comparison recognizes empty candidate arrays without inventing 
  expect(baseline({state:{evidence:[]}})).toMatchObject({support:'insufficient'});
  expect(baseline({state:{evidence:[{actual:42}]}})).toMatchObject({support:null});
 });
+test.each([true,false])('mixed instruction and criterion advice selects correct item even with usable action=%s',usable=>{
+ const input=selected({},usable?['scoped.json']:[]),state=input.state;
+ f.put('assertion.cjs','assert.equal(actualTotal,42)');
+ const round=path.join(f.root,'.specflow/duo/mixed/round-001');fs.mkdirSync(round,{recursive:true});fs.writeFileSync(path.join(round,'manifest.json'),JSON.stringify(duo.manifest(f.root)));fs.writeFileSync(path.join(round,'goal.md'),'Correct total');
+ const batch={...input.batch,criteria:['AC-TOTAL'],claims:['Total is correct'],typesafe:[{criterion:'AC-TOTAL',claimIndex:0,assertionPath:'assertion.cjs',evidencePaths:['source.json']}]};
+ state.typesafe={mode:'advisory'};const old=process.env.TYPESAFE_API_KEY;process.env.TYPESAFE_API_KEY='synthetic-only';let request;
+ try {
+  const result=typesafe.run({state,batch,tree:f.root,round,dir:path.dirname(round),snapshot:'snapshot',save:()=>{},execute:(exe,args)=>{request=JSON.parse(fs.readFileSync(args[1]));client.atomic(args[2],{status:'completed',response:{answers:{}}});return {status:0};}});
+  expect(result.status).toBe('completed');const i=usable?1:0;expect(request.state.items[i].criterionId).toBe('AC-TOTAL');expect(request.questions[`q${i}_coverage`].instructions).toContain(`items[${i}].assertion`);expect(request.questions[`q${i}_execution`]).toBeDefined();
+  if(usable)expect(request.questions.a0_relevance.instructions).toContain('items[0].evidence');
+ } finally {if(old===undefined)delete process.env.TYPESAFE_API_KEY;else process.env.TYPESAFE_API_KEY=old;}
+});

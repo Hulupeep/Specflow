@@ -1,6 +1,6 @@
 const fs = require('fs'), os = require('os'), path = require('path');
 const client = require('../../scripts/typesafe-client.cjs');
-const { questions } = require('../../scripts/typesafe-questions.cjs');
+const { questions } = require('../../scripts/typesafe-questions-v1.cjs');
 let dir;
 const input = () => ({ state: { criterion: 'Show 18', claim: 'Shows 18', assertion: 'equals 18', evidence: 'Observed 18' }, questions: questions(), model: 'jev-1.13.0', questionSetId: 'test', questionVersion: '1', snapshotHash: 'abc' });
 function result(i = input()) { return { model: i.model, answers: Object.fromEntries(Object.entries(i.questions).map(([id,q]) => [id, { type:'choice', choice:Object.keys(q.criteria)[0], confidence:1, probabilities:Object.fromEntries(Object.keys(q.criteria).map((k,n) => [k, n === 0 ? 1 : 0])) }])), usage:{input_tokens:10,output_tokens:2} }; }

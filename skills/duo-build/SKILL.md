@@ -261,3 +261,26 @@ from the newer kit/package while keeping the old project runtime intact. This
 metadata operation is handled by the current entrypoint, without migrating the
 active run's code. Do not cease a run merely to install an update or avoid a limit;
 it is an explicit owner decision.
+
+## Evidence judgments and native access receipts (#158)
+
+New runs use evidence question version 2. Select the exact criterion, claim,
+assertionPath (or null when no assertion exists) and evidencePaths. Capture logs
+stay raw; the helper also extracts command, output, exit, source hashes and
+current/stale/unknown freshness. Keep contradictory results in the selection.
+Coverage asks what the assertion would check if executed. Execution asks whether
+that particular check ran and passed/failed. Support asks what the evidence proves
+about the exact claim. A failing test can fully cover a requirement.
+
+The helper builds top-level inspected from successful native tool results and saves
+access-receipts.json. The reviewer no longer types a redundant file-access list.
+Claude uses Read; Grep content records partial access. Directory search lines
+must match the named frozen source file; filenames alone never qualify.
+Codex uses standalone cat -- PATH or sed -n 'START,ENDp' -- PATH; filename searches,
+failed calls, pipelines and ambiguous commands cannot satisfy an inspection gate.
+Partial reads are labelled partial, not proof of complete file contents.
+Instruction citations still require actual content receipts.
+
+Complete direction has no next_steps. Running finish is a helper action printed
+by the continuation, never a new repair instruction. Existing finish checks still
+require current peer-verified criteria and no open findings/instructions.
