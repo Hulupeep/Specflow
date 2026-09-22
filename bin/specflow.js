@@ -27,6 +27,11 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  'routing-shadow': {
+    usage: 'specflow routing-shadow <init|enable|observe|trial|label|report|ack> [arguments]',
+    desc: 'Opt-in private routing study; never changes production model choices',
+    run: args => require('../scripts/typesafe-routing.cjs').cli(args).catch(e => { console.error(e.message); process.exitCode = 2; }),
+  },
   'duo-build': {
     usage: 'specflow duo-build <check|start|resume|status|eligibility|capture|review|finish> [options]',
     desc: 'Durable helper for the native /duo-build or $duo-build workflow',

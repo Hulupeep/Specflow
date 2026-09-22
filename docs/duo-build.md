@@ -443,3 +443,5 @@ wrong endorsements, unnecessary objections, protocol failures and extra review
 rounds. Missing arms/provider evidence remain missing comparisons. Both arms still
 use native peer review. Small samples and synthetic product trials cannot establish
 production benefit; private provider reports must not be uploaded automatically.
+
+Opt-in routing study: [setup, budgets and reports](../skills/duo-build/references/routing-study.md). Existing runs remain pinned; fresh installation alone does not enroll a project.

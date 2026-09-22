@@ -81,6 +81,21 @@ index, or append a required gate discovered by review. Existing definitions may
 not be removed or rewritten. Source changes that alter acceptance require an
 explicit user instruction and a new linked run; preserve the old findings.
 
+## Optional routing shadow study
+
+Only when `.specflow/routing-shadow.json` is enrolled: start records the first
+batch automatically. Before subsequent work batches call
+`node scripts/duo-build.cjs routing-begin <id> --session <token> --loop feature-build --stage <stage>`
+(use `spec-build` for preparation). The receipt does not disclose the proposal.
+Keep the approved host/model/effort unchanged. Missing collection is reported
+separately and does not bypass the independent review or gates.
+
+On status, read any pending private report after the batch outcome is fixed.
+Present its outcome, blocker and next action, then call
+`node scripts/typesafe-routing.cjs ack <private-study-dir> <report-id>`.
+Do not acknowledge an unread report or publish provider details to GitHub.
+Study setup and controlled trial commands: [routing study reference](references/routing-study.md).
+
 ## Build, capture, review, finish
 
 Implement one meaningful batch tied to criterion IDs. Capture actual verification

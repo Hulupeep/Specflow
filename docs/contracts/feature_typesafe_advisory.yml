@@ -1,7 +1,7 @@
 contract_meta:
   id: feature_typesafe_advisory
-  version: 1
-  created_from_spec: "GitHub #138, #139, #140, #141, #142"
+  version: 2
+  created_from_spec: "GitHub #138, #139, #140, #141, #142, #160"
   owner: specflow-core
   covers_reqs: [REQ-CLIENT-1, REQ-CLIENT-2, REQ-CLIENT-3, REQ-CLIENT-4, REQ-CLIENT-5, REQ-CLIENT-6, REQ-CLIENT-7, REQ-CLIENT-8, REQ-CLIENT-9, REQ-EVAL-1, REQ-EVAL-2, REQ-EVAL-3, REQ-EVAL-4, REQ-EVAL-5, REQ-EVAL-6, REQ-EVAL-7, REQ-EVAL-8, REQ-EVAL-9, REQ-EVAL-10, REQ-DUO-1, REQ-DUO-2, REQ-DUO-3, REQ-DUO-4, REQ-DUO-5, REQ-DUO-6, REQ-DUO-7, REQ-DUO-8, REQ-DUO-9, REQ-DUO-10, REQ-REPAIR-1, REQ-REPAIR-2, REQ-REPAIR-3, REQ-REPAIR-4, REQ-REPAIR-5, REQ-REPAIR-6, REQ-REPAIR-7]
 llm_policy:
@@ -23,3 +23,18 @@ test_hooks:
     - file: tests/contracts/typesafe-evaluation.test.js
     - file: tests/contracts/typesafe-duo.test.js
     - file: tests/contracts/typesafe-repair.test.js
+    - file: tests/contracts/typesafe-routing-shadow.test.js
+    - file: tests/scripts/typesafe-routing-report.test.js
+    - file: tests/contracts/typesafe-effort-eval.test.js
+routing_study:
+  issue: 160
+  covers_reqs: [REQ-01, REQ-02, REQ-03, REQ-04, REQ-05, REQ-06, REQ-07, REQ-08, REQ-09, REQ-10, REQ-11, REQ-12, REQ-13, REQ-14]
+  authority: shadow_only
+  dispatch: reserve_study_and_per_run_capacity_before_calls
+  uncertain_dispatch: retain_reservation
+  analysis: frozen_policy_arm_versus_baseline_arm
+  descriptive_pairs: 30
+  confirmatory_pairs: 100
+  skipped_required_checks: noncomparable
+  effective_settings_missing: noncomparable
+  publication: private_reports_only

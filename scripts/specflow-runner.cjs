@@ -8,6 +8,7 @@
  */
 
 const { spawnSync } = require('child_process');
+const routingShadow = require('./typesafe-routing-bridge.cjs');
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve } = require('path');
@@ -1698,6 +1699,11 @@ function buildAdapterCommand(policy, promptPath) {
   const deniedTools = policy.denied_tools || [];
   if (policy.provider === 'claude-print') {
     const args = policy.args.length ? [...policy.args] : ['-p', '--output-format', 'stream-json'];
+    if (policy.effort) {
+      const existing = args.flatMap((arg, i) => arg === '--effort' ? [args[i + 1]] : arg.startsWith('--effort=') ? [arg.slice(9)] : []);
+      if (existing.length > 1 || existing.some(e => e !== policy.effort)) throw Error('Conflicting Claude effort flags');
+      if (!existing.length) args.push('--effort', policy.effort);
+    }
     if (!args.includes('-p') && !args.includes('--print')) args.unshift('-p');
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
@@ -1723,6 +1729,11 @@ function buildAdapterCommand(policy, promptPath) {
     const args = policy.session_id
       ? ['exec', 'resume', String(policy.session_id), ...(policy.args || [])]
       : ['exec', ...(policy.args || [])];
+    if (policy.effort) {
+      const settings = args.filter(a => a.includes('model_reasoning_effort='));
+      if (settings.length > 1 || settings.some(a => !new RegExp('^model_reasoning_effort=["\']?' + policy.effort + '["\']?$').test(a))) throw Error('Conflicting Codex effort flags');
+      if (!settings.length) args.push('-c', `model_reasoning_effort="${policy.effort}"`);
+    }
     if (!args.includes('--json')) args.push('--json');
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
@@ -1967,6 +1978,18 @@ function runAdapter(policy, options = {}) {
 }
 
 function runLoop(options) {
+  const result = runLoopBody(options);
+  if (result.contractPath && existsSync(result.contractPath)) {
+    const contract = loadRunContract(result.contractPath);
+    if (contract.routing_shadow && ['handoff', 'failed', 'blocked'].includes(contract.terminal_status)) {
+      result.routing_shadow_terminal = routingShadow.terminal(contract.routing_shadow, contract.run_id, contract.terminal_status === 'handoff' ? 'completed' : contract.terminal_status, [result.ledgerPath]);
+    }
+    if (contract.routing_shadow) result.routing_shadow = routingShadow.reportStatus(contract.routing_shadow);
+    if (contract.routing_shadow_error) result.routing_shadow_error = contract.routing_shadow_error;
+  }
+  return result;
+}
+function runLoopBody(options) {
   const slug = options.slug || 'specflow-run';
   const { contractPath, ledgerPath } = defaultRunPaths(slug, options);
   let wrapper;
@@ -1983,6 +2006,8 @@ function runLoop(options) {
       contractPath,
       ledgerPath,
     });
+    try { wrapper.run_contract.routing_shadow = routingShadow.enrollment(process.cwd()); }
+    catch (e) { wrapper.run_contract.routing_shadow_error = e.message; }
     writeYaml(contractPath, wrapper);
   }
 
@@ -2119,12 +2144,28 @@ function runLoop(options) {
     }
 
     const prompt = options.prompt ? { promptPath: options.prompt } : materializeStagePrompt(contract, { ...options, contractPath, slug });
+    const shadowTask = contract.routing_shadow ? {
+      taskFamilyId: contract.routing_task_family || contract.input_artifact,
+      runId, stage: contract.current_stage_or_rail, loop: contract.loop,
+      attempt: readLedger(ledgerPath).filter(e => e.event === 'routing_shadow_begin' && e.stage === contract.current_stage_or_rail).length,
+      goal: contract.goal, acceptance: readFileSync(prompt.promptPath, 'utf8'),
+      context: contract.input_artifact, evidenceRefs: [prompt.promptPath],
+      recentEvidence: readLedgerTail(ledgerPath, 3),
+      configured: { model: policy.model || policy.requested_model || UNKNOWN, effort: policy.effort || null },
+      requested: { model: policy.requested_model || policy.model || UNKNOWN, effort: policy.effort || null },
+    } : null;
+    const shadowReceipt = policy.dry_run || options.adapterDryRun ? null : routingShadow.begin(process.cwd(), contract.routing_shadow, shadowTask);
+    if (shadowReceipt) appendLedger(ledgerPath, { event: 'routing_shadow_begin', stage: contract.current_stage_or_rail, ...shadowReceipt });
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
       promptPath: prompt.promptPath,
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
     });
+    if (shadowReceipt) {
+      const result = routingShadow.end(contract.routing_shadow, shadowReceipt, { status: adapterResult.status === 'gate_rerun_required' ? 'completed' : 'blocked', terminal: false, observed: { model: adapterResult.entry.effective_model || UNKNOWN, effort: null }, evidenceRefs: [policy.transcript_path], note: 'Provider completion is not gate acceptance; effective effort is unknown without native metadata.' });
+      appendLedger(ledgerPath, { event: 'routing_shadow_outcome', stage: contract.current_stage_or_rail, ...result });
+    }
     appendLedger(ledgerPath, {
       ...adapterResult.entry,
       prompt_path: prompt.promptPath,
@@ -2301,6 +2342,7 @@ function runStatus(options = {}) {
     cost: costAccounting(readLedger(ledgerPath)),
     model_routing: routing,
     model_confirmation: confirmation,
+    routing_shadow: routingShadow.reportStatus(contract.routing_shadow),
   };
 }
 
