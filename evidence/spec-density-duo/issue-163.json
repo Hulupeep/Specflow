@@ -1,0 +1,39 @@
+{
+  "body": "Epic: #162 \u00b7 Story: SPEC-DENSITY-01 \u00b7 Declared tier: `spec:thin`\n\nThe revised epic/body governs implementation. The [original brief](https://github.com/Hulupeep/Specflow/issues/162#issuecomment-5792444374) supplies the rationale, not conflicting earlier rules.\n\n## Outcome\n\nAn agent can tell what detail is justified now and what readiness has actually been established. Every entry point uses the same tier policy; changing labels or invoking another skill cannot silently expand a thin ticket or bypass a gate.\n\n## Scope\n\nDefine the shared policy and wire it through installation, the loop selector/run contract, spec-build, specflow-simulate, story writer, audit/uplift/pre-flight, feature-build, Duo, and the board-auditor \u2192 waves-controller \u2192 sprint-executor route with their installed instructions/templates. Include the selector/runner `simulation_required` default and installer checks so direct simulation and wave execution cannot retain a contradictory policy. Align the existing policy contracts and their tests through the repository's authorization process; contradictory legacy instructions must not remain silently active. Reuse existing state and verification machinery. #164 owns promotion; #165 owns review budgets; #166 owns discovery invalidation; #167 owns size/reuse checks.\n\n| Tier | Required information | Review depth |\n|---|---|---|\n| `spec:thin` | Outcome, scope, a small set of behaviour ACs, known dependencies and explicit unknowns | No automatic full simulation, adversary or artifact generation; universal safety/publication rules still apply |\n| `spec:contracted` | Applicable shared decisions, interface responsibilities, dependency reasons, reused contracts and evidence needed for material unknowns | Bounded review of relevant irreversible decisions; a paper persona walkthrough for UI flows |\n| `spec:build-ready` | Exact slice behaviour, applicable new/reused contracts, fixture/oracle references and executable check mapping, scoped simulation and pre-flight | Required gates for that slice; passing implementation tests remains a completion requirement |\n\nReadiness depends on relevant evidence, not document count. Reuse existing artifacts. A missing applicable artifact blocks; an inapplicable DB/UI/contract artifact needs a brief reason, not generated filler. No new mandatory schema fields, UI selectors or fixture IDs for distant work. A paper UI walkthrough never replaces execution of a required UI journey before completion.\n\n## Acceptance criteria\n\n- [ ] AC-163-1: Installation supplies the three tier labels idempotently without altering unrelated labels or ticket contents. The selector records the effective tier in `run_contract.tier`; an unlabeled ticket is thin with a warning, and conflicting tier labels block with a correction message.\n- [ ] AC-163-2: Selecting or auditing a thin ticket reports its current planning state and next justified action without generating full-contract artifacts or automatically promoting it. Invoking another installed entry point yields the same policy decision.\n- [ ] AC-163-3: The policy assesses a small eligible change using existing relevant contracts/checks without demanding replacements; #164 owns the promotion transaction. A change introducing a material seam names the additional evidence it needs. Neither a fixed document count nor an artifact unrelated to the change is required.\n- [ ] AC-163-4: A contracted UI flow receives the bounded persona walkthrough as well as applicable irreversible-decision review. Common ownership/privacy/reuse decisions may be reviewed once and referenced by affected slices.\n- [ ] AC-163-5: Every production build route, including feature-build and wave execution through board-auditor/waves-controller/sprint-executor, refuses thin, contracted, stale or manually relabeled-but-unverified work and identifies the unmet readiness condition. The policy distinguishes production building from bounded experimentation; #164 supplies experiment execution without granting production readiness.\n- [ ] AC-163-6: Existing acceptance criteria, repository instructions, permissions, required tests and release gates remain authoritative across tiers. Readiness is separate from implemented, tested, merged and deployed status; reviewer or TypeSafe advice cannot promote a ticket by itself.\n- [ ] AC-163-7: Fresh-install and resumed-run checks exercise both Claude Code and Codex entry points, including direct specflow-simulate and wave execution, missing/conflicting labels, reuse, N/A evidence and a manual label bypass. Stale prompt/template instructions cannot force a different gate policy; any legacy migration limitation is reported explicitly.\n\n## Verification and dependencies\n\nSequencing: AC-163-5/7 verify the shared eligibility decision against supplied current/stale/unverified states now; #164 owns real experiment dispatch and #166 owns discovery-driven invalidation and their integration checks. Missing later capabilities stay unavailable, and the epic integration ACs stay unverified until their owners land; #163 does not depend on those implementations to establish the policy.\n\nNo new database or browser UI surface is introduced by this policy ticket. Verify the installed CLI/skill workflow and its mechanical gates, using simulated provider calls only where clearly labelled. At promotion, bind the ACs to the existing runner/installer tests and the minimal additional executable checks. Do not invent downstream implementation interfaces while this ticket is thin. Done requires those checks to execute, with required skips treated as missing evidence.\n",
+  "comments": [
+    {
+      "id": "IC_kwDOQhZHiM8AAAABWUG1sg",
+      "author": {
+        "login": "Hulupeep"
+      },
+      "authorAssociation": "OWNER",
+      "body": "Before implementing, read the implementation brief on the epic: https://github.com/Hulupeep/Specflow/issues/162#issuecomment-5792444374. It records what worked and what was theatre in the first real spec-build run, and gives the rules this ticket must implement.",
+      "createdAt": "2026-09-23T09:34:17Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/Hulupeep/Specflow/issues/163#issuecomment-5792445874",
+      "viewerDidAuthor": true
+    }
+  ],
+  "labels": [
+    {
+      "id": "LA_kwDOQhZHiM8AAAACRayJXg",
+      "name": "enhancement",
+      "description": "New feature or request",
+      "color": "a2eeef"
+    },
+    {
+      "id": "LA_kwDOQhZHiM8AAAACXgA1Jg",
+      "name": "P1: Ship Next",
+      "description": "High priority - ship after P0s",
+      "color": "D93F0B"
+    }
+  ],
+  "number": 163,
+  "state": "OPEN",
+  "title": "[SPECFLOW] SPEC-DENSITY-01: evidence-based tiers and consistent workflow enforcement",
+  "updatedAt": "2026-09-23T12:40:55Z",
+  "url": "https://github.com/Hulupeep/Specflow/issues/163"
+}

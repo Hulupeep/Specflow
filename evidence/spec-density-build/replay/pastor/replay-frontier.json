@@ -1,0 +1,246 @@
+{
+  "tickets": [
+    {
+      "issue": 5901,
+      "tier": "thin",
+      "scope": "selected",
+      "capability": "planned",
+      "gaps": [],
+      "stale": true,
+      "openDiscoveries": [
+        {
+          "id": "parser-worker-first-attempt",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-structure-oserror",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-root-access-observed",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        }
+      ],
+      "pendingPublications": [
+        {
+          "id": "parser-worker-first-attempt",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-structure-oserror",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-root-access-observed",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        }
+      ],
+      "overdetail": false,
+      "volume": {
+        "bodyCharacters": 387,
+        "linkedMaintainedCharacters": 111577,
+        "historicalCharacters": 1393,
+        "uniqueMaintainedCharacters": 111964,
+        "shared": 1,
+        "reused": 2,
+        "new": 5,
+        "deferred": 1,
+        "inapplicable": 1,
+        "requirements": 0
+      },
+      "next_action": "Keep future work thin. Select the next justified slice or a bounded learning experiment."
+    },
+    {
+      "issue": 5902,
+      "tier": "thin",
+      "scope": "future",
+      "capability": "planned",
+      "gaps": [],
+      "stale": false,
+      "openDiscoveries": [],
+      "pendingPublications": [],
+      "overdetail": false,
+      "volume": {
+        "bodyCharacters": 221,
+        "linkedMaintainedCharacters": 0,
+        "historicalCharacters": 0,
+        "uniqueMaintainedCharacters": 221,
+        "shared": 0,
+        "reused": 0,
+        "new": 0,
+        "deferred": 0,
+        "inapplicable": 0,
+        "requirements": 0
+      },
+      "next_action": "Keep future work thin. Select the next justified slice or a bounded learning experiment."
+    },
+    {
+      "issue": 5903,
+      "tier": "thin",
+      "scope": "future",
+      "capability": "planned",
+      "gaps": [],
+      "stale": false,
+      "openDiscoveries": [],
+      "pendingPublications": [],
+      "overdetail": false,
+      "volume": {
+        "bodyCharacters": 161,
+        "linkedMaintainedCharacters": 0,
+        "historicalCharacters": 0,
+        "uniqueMaintainedCharacters": 161,
+        "shared": 0,
+        "reused": 0,
+        "new": 0,
+        "deferred": 0,
+        "inapplicable": 0,
+        "requirements": 0
+      },
+      "next_action": "Keep future work thin. Select the next justified slice or a bounded learning experiment."
+    },
+    {
+      "issue": 122,
+      "tier": "build-ready",
+      "scope": "future",
+      "capability": "planned",
+      "gaps": [],
+      "stale": true,
+      "openDiscoveries": [
+        {
+          "id": "parser-worker-first-attempt",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-structure-oserror",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-root-access-observed",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        }
+      ],
+      "pendingPublications": [
+        {
+          "id": "parser-worker-first-attempt",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-structure-oserror",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        },
+        {
+          "id": "parser-root-access-observed",
+          "producer": 59,
+          "status": "stale",
+          "publication": {
+            "status": "pending",
+            "targets": {}
+          }
+        }
+      ],
+      "overdetail": true,
+      "volume": {
+        "bodyCharacters": 23,
+        "linkedMaintainedCharacters": 81,
+        "historicalCharacters": 0,
+        "uniqueMaintainedCharacters": 104,
+        "shared": 0,
+        "reused": 0,
+        "new": 3,
+        "deferred": 0,
+        "inapplicable": 0,
+        "requirements": 0
+      },
+      "next_action": "Validate current promotion evidence before production work."
+    },
+    {
+      "issue": 162,
+      "tier": "contracted",
+      "scope": "future",
+      "capability": "planned",
+      "gaps": [],
+      "stale": false,
+      "openDiscoveries": [],
+      "pendingPublications": [],
+      "overdetail": true,
+      "volume": {
+        "bodyCharacters": 876,
+        "linkedMaintainedCharacters": 311,
+        "historicalCharacters": 0,
+        "uniqueMaintainedCharacters": 1187,
+        "shared": 0,
+        "reused": 0,
+        "new": 5,
+        "deferred": 0,
+        "inapplicable": 0,
+        "requirements": 0
+      },
+      "next_action": "Review applicable irreversible decisions and UI walkthrough; deepen only the selected slice when dependencies justify it."
+    }
+  ],
+  "volume": {
+    "bodyCharacters": 1668,
+    "linkedMaintainedCharacters": 111969,
+    "uniqueLinkedMaintainedCharacters": 111969,
+    "historicalCharacters": 1393,
+    "maintainedTotalCharacters": 113637,
+    "warnings": [],
+    "errors": [],
+    "note": "Shared content is counted once in the unique total; repeated body text and copied files remain visible. Smaller bodies alone do not prove reduced specification."
+  }
+}

@@ -27,6 +27,16 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  specification: {
+    usage: 'specflow specification <import|status|frontier|gate|promote|experiment|begin|collect|reconcile|publish|volume|exception> [arguments]',
+    desc: 'Prepare only the selected slice, execute bounded learning and reconcile discoveries',
+    run: args => { process.exitCode = require('../scripts/specflow-specification.cjs').cli(args); },
+  },
+  tier: {
+    usage: 'specflow tier inspect <record.json> [route] [operation] | install-labels',
+    desc: 'Inspect applicable specification depth and evidence-based build eligibility',
+    run: args => { process.exitCode = require('../scripts/specflow-tier.cjs').cli(args); },
+  },
   'routing-shadow': {
     usage: 'specflow routing-shadow <init|enable|observe|trial|label|report|ack> [arguments]',
     desc: 'Opt-in private routing study; never changes production model choices',
@@ -82,7 +92,7 @@ const COMMANDS = {
     },
   },
   audit: {
-    usage: 'specflow audit <issue-number>',
+    usage: 'specflow audit <issue-number> [--tier-record record.json]',
     desc: 'Audit a GitHub issue for specflow compliance',
     run: (args) => {
       const issue = args[0];
@@ -91,7 +101,7 @@ const COMMANDS = {
         process.exit(1);
       }
       // Fetch and check compliance markers
-      const body = execSilent(`gh issue view ${issue} --json title,body,comments`);
+      const body = execSilent(`gh issue view ${issue} --json number,title,body,comments,labels`);
       if (!body) {
         const repo = execSilent('git config --get remote.origin.url')?.trim() || 'unknown';
         console.error(`Could not fetch issue #${issue}.`);
@@ -101,54 +111,20 @@ const COMMANDS = {
         process.exit(1);
       }
       const parsed = JSON.parse(body);
-      const title = parsed.title || '';
-      const fullText = [parsed.body || '', ...(parsed.comments || []).map(c => c.body || '')].join('\n');
-
-      console.log(`\nAUDIT: #${issue} — ${title}\n`);
-
-      const checks = [
-        { name: 'Gherkin', pattern: /Scenario:/i, },
-        { name: 'Acceptance', pattern: /- \[[ x]\]/,  },
-        { name: 'Journey ID', pattern: /J-[A-Z0-9]+(-[A-Z0-9]+)*/,  },
-        { name: 'data-testid', pattern: /data-testid/i,  },
-        { name: 'SQL', pattern: /CREATE\s+(TABLE|FUNCTION|OR REPLACE FUNCTION)/i,  },
-        { name: 'RLS', pattern: /CREATE\s+POLICY|ENABLE\s+ROW\s+LEVEL\s+SECURITY|ROW\s+LEVEL\s+SECURITY/i,  },
-        { name: 'Invariants', pattern: /I-[A-Z]{2,}-\d+/,  },
-        { name: 'TypeScript', pattern: /(?:interface|type)\s+\w+/,  },
-        { name: 'Scope', pattern: /In Scope|Not In Scope/i,  },
-        { name: 'DoD', pattern: /Definition of Done|DoD/i,  },
-        { name: 'Pre-flight', pattern: /simulation_status:\s*\w+/,  },
-      ];
-
-      let passCount = 0;
-      const maxName = Math.max(...checks.map(c => c.name.length));
-
-      for (const check of checks) {
-        const match = fullText.match(check.pattern);
-        const status = match ? '\x1b[32m✅\x1b[0m' : '\x1b[31m❌\x1b[0m';
-        const evidence = match ? match[0].substring(0, 60) : 'MISSING';
-        console.log(`  ${status} ${check.name.padEnd(maxName + 2)} ${evidence}`);
-        if (match) passCount++;
-      }
-
-      console.log(`\n  ${passCount}/${checks.length} checks passed\n`);
-
-      const missing = checks.filter(c => !c.pattern.test(fullText)).map(c => c.name);
-
-      if (missing.length === 0) {
-        console.log('  VERDICT: Compliant\n');
-      } else {
-        console.log(`  VERDICT: ${missing.length > 7 ? 'Non-compliant' : 'Needs uplift'}\n`);
-        console.log('  FIX: Tell Claude Code in your project:\n');
-        console.log(`  "Read scripts/agents/specflow-writer.md and uplift issue #${issue}.`);
-        console.log(`   It's missing: ${missing.join(', ')}.`);
-        console.log('   Add the missing sections to the issue body."\n');
-        console.log('  MISSING:');
-        for (const name of missing) {
-          console.log(`  - ${name}`);
-        }
-        console.log('');
-      }
+      const recordIndex = args.indexOf('--tier-record');
+      const record = recordIndex >= 0
+        ? JSON.parse(readFileSync(args[recordIndex + 1], 'utf8'))
+        : { issue: parsed };
+      // The fetched issue is authoritative: a local record cannot retain an old
+      // body or replace current labels just to make an audit green.
+      record.issue = parsed;
+      const tier = require('../scripts/specflow-tier.cjs');
+      const decision = tier.evaluate(record, {
+        root: process.cwd(), route: 'specflow-audit',
+        operation: tier.tierOf(parsed).tier === 'build-ready' ? 'build' : 'inspect',
+      });
+      console.log(JSON.stringify(decision, null, 2));
+      process.exitCode = decision.status === 'blocked' ? 2 : 0;
     },
   },
   graph: {

@@ -35,3 +35,4 @@ samples/mindsplit/node_modules
 
 # Durable local duo-build snapshots and peer transcripts
 .specflow/duo/
+.specflow/specification/

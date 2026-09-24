@@ -33,7 +33,7 @@ beforeEach(()=>{
   for(const args of [['init'],['config','user.name','Fixture'],['config','user.email','fixture@example.test']]) execFileSync('git',args,{cwd:root,stdio:'pipe'});
   put('goal.md','Customer sees correct result and can connect their own account');put('task.md','AC-DISPLAY: visible value is 42\nLIVE-GATE: real owner consent');put('display.cjs','console.log(41)');put('.specflow/duo/raw.txt','observed 41, component tests green, owner consent unavailable');
   execFileSync('git',['add','goal.md','task.md','display.cjs'],{cwd:root});execFileSync('git',['commit','-m','fixture'],{cwd:root,stdio:'pipe'});
-  run=duo.start(root,'#147','claude-code',{goal:'goal.md',task:'task.md',objective:'Correct customer-visible result',finish:'Visible output and real consent proven',criteria:[{id:'AC-DISPLAY',source:'task.md',anchor:'AC-DISPLAY: visible value is 42',kind:'acceptance'},{id:'LIVE-GATE',source:'task.md',anchor:'LIVE-GATE: real owner consent',kind:'gate'}]},'direction-session');
+  run=duo.start(root,'#147','claude-code',{workKind:'preparation',goal:'goal.md',task:'task.md',objective:'Correct customer-visible result',finish:'Visible output and real consent proven',criteria:[{id:'AC-DISPLAY',source:'task.md',anchor:'AC-DISPLAY: visible value is 42',kind:'acceptance'},{id:'LIVE-GATE',source:'task.md',anchor:'LIVE-GATE: real owner consent',kind:'gate'}]},'direction-session');
 });
 afterEach(()=>fs.rmSync(root,{recursive:true,force:true}));
 test.each(['claude-code','codex'])('J-DUO-DIRECTION: %s receives immediate useful continuation despite owner dependency',builder=>{

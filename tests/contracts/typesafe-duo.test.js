@@ -4,7 +4,7 @@ const duo=require('../../scripts/duo-build.cjs'),advisory=require('../../scripts
 let root,spy;
 const put=(name,value)=>{const p=path.join(root,name);fs.mkdirSync(path.dirname(p),{recursive:true});fs.writeFileSync(p,value);};
 const git=(...args)=>execFileSync('git',args,{cwd:root,stdio:'pipe'});
-const context={goal:'goal.md',task:'task.md',objective:'Correct balance',finish:'AC-1 demonstrated',criteria:[{id:'AC-1',source:'task.md',anchor:'AC-1: balance equals 18',kind:'acceptance'}]};
+const context={workKind:'preparation',goal:'goal.md',task:'task.md',objective:'Correct balance',finish:'AC-1 demonstrated',criteria:[{id:'AC-1',source:'task.md',anchor:'AC-1: balance equals 18',kind:'acceptance'}]};
 const batch=()=>({id:'balance',scope:'Correct balance',criteria:['AC-1'],claims:['Balance equals 18'],assumptions:[],resolutions:[],evidence:['raw.txt'],typesafe:[{criterion:'AC-1',claimIndex:0,assertionPath:'test.cjs',evidencePaths:['raw.txt']}]});
 function peer(outcome='accepted',omit=false){return(exe,args,opts)=>{
  if(args[0]==='--version')return'test-double';if(args[0]==='auth')return'{"loggedIn":true}';if(args[0]==='login')return'Logged in using ChatGPT';

@@ -34,6 +34,7 @@ test('J-CONFIRM-FIRST-RUN ledgers confirmation before provider completion', () =
   fs.writeFileSync(contract, yaml.dump({
     run_contract: {
       loop: 'feature-build',
+      ...require('../helpers/spec-density').fixture(dir),
       run_id: modelConfirmationRunId('order', contract),
       goal: 'ordering',
       input_artifact: 'issue #123',

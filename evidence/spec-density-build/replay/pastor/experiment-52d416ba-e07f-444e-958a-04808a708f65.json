@@ -1,0 +1,23 @@
+{
+  "kind": "experiment",
+  "question": "Can the approved representative PST be opened and its root accessed inside the existing sandbox, independently of the failed folder traversal?",
+  "expectedObservation": "Archive open and root access, with no claim about traversal or extraction",
+  "scope": "0af291045d5b02ba08346b4d7200cff5dcb22007c7e7761be2bef82795d3717c",
+  "planHash": "41c1bff9c5f6df54d38858096cd45fec2177f4004dc9e78546946cedb7ed46ed",
+  "exitCode": 0,
+  "error": null,
+  "stdout": "{\"status\": \"observed\", \"archive_opened\": true, \"root_folder_read\": true, \"private_content_emitted\": false, \"limitation\": \"No folder enumeration or message content inspected\", \"stable_input\": true, \"sandbox_network\": \"denied\", \"source_write\": \"denied\", \"memory_limit_gib\": 2, \"worker_time_limit_seconds\": 20, \"scope\": \"One representative PST, archive open and root access only; previous structure walk failed, not extraction qualification\"}\n",
+  "stderr": "",
+  "outcome": "observed",
+  "limitations": [
+    "Controlled thin starting tier; actual Pastor #59 was contracted and remains unchanged",
+    "Previous bounded structure walk raised OSError; cause unresolved",
+    "No message content or source identifiers emitted"
+  ],
+  "sandboxProbe": {
+    "exitCode": 0,
+    "stdout": "{\"success\": true, \"sandboxReady\": true, \"restrictions\": \"Existing Pastor runtime and synthetic sandbox probes passed\"}\n",
+    "passed": true
+  },
+  "productionAccepted": false
+}

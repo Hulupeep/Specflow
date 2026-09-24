@@ -1,5 +1,13 @@
 # CLAUDE.md Contract Section Template
 
+Specification depth is governed by `SPECIFICATION.md` (source kit:
+`templates/SPECIFICATION.md`) and `scripts/specflow-tier.cjs`. Thin work stays
+at planning depth; contracted reviews cover applicable decisions and UI paper
+walkthroughs. The detailed build-ready procedures below apply only to the
+selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
+Required privacy, permission, executable journey and release gates still apply.
+
+
 This is the **full template** with placeholders for customization.
 
 **Just tell your LLM:**

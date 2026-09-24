@@ -740,7 +740,14 @@ echo ""
 
 echo -e "${BLUE}[9/10]${NC} Installing Claude Code hooks..."
 
-bash "$SCRIPT_DIR/install-hooks.sh" "$TARGET_DIR" 2>&1 | grep -E '(✓|⚠️|✗|Installed|Created)' || true
+# The full setup already owns the Duo installation transaction. Pass that
+# ownership to the direct child instead of reacquiring the same lock. Propagate
+# hook-install failure: a partial install must not report success.
+HOOK_INSTALL_ARGS=("$TARGET_DIR")
+[ -n "${DUO_INSTALL_LOCK:-}" ] && HOOK_INSTALL_ARGS+=(--duo-lock-held)
+[ -n "$SPECFLOW_RUNTIME_ARG" ] && HOOK_INSTALL_ARGS+=(--runtime "$SPECFLOW_RUNTIME_ARG")
+[ "$REPLACE_ROUTING" = true ] && HOOK_INSTALL_ARGS+=(--replace-routing)
+bash "$SCRIPT_DIR/install-hooks.sh" "${HOOK_INSTALL_ARGS[@]}"
 
 echo ""
 

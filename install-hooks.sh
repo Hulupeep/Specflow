@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 TARGET_DIR="$1"
 SPECFLOW_RUNTIME_ARG=""
 REPLACE_ROUTING=false
+DUO_PARENT_LOCK=false
 PREV_ARG=""
 for arg in "$@"; do
   if [ "$PREV_ARG" = "--runtime" ]; then
@@ -22,6 +23,8 @@ for arg in "$@"; do
     PREV_ARG=""
   elif [ "$arg" = "--runtime" ]; then
     PREV_ARG="--runtime"
+  elif [ "$arg" = "--duo-lock-held" ]; then
+    DUO_PARENT_LOCK=true
   elif [ "$arg" = "--replace-routing" ]; then
     REPLACE_ROUTING=true
   fi
@@ -67,13 +70,22 @@ fi
 if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
   mkdir -p "$TARGET_DIR/.specflow/duo"
   DUO_INSTALL_LOCK="$TARGET_DIR/.specflow/duo/installer.lock"
-  mkdir "$DUO_INSTALL_LOCK" || { echo "Duo installation/start lock active; inspect its owner before recovery" >&2; exit 2; }
-  echo "$$" > "$DUO_INSTALL_LOCK/pid"
-  trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
-  duo_install_exit=0
-  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
-  [ "$duo_install_exit" -eq 10 ] && exit 0
-  [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
+  if [ "$DUO_PARENT_LOCK" = true ]; then
+    # setup-project.sh owns the transaction; only its direct child may reuse it.
+    # Do not reacquire, reinstall runtime bytes, or remove the parent's lock.
+    [ -f "$DUO_INSTALL_LOCK/pid" ] && [ "$(cat "$DUO_INSTALL_LOCK/pid")" = "$PPID" ] || {
+      echo "Inherited Duo installer lock is not owned by the parent process" >&2
+      exit 2
+    }
+  else
+    mkdir "$DUO_INSTALL_LOCK" || { echo "Duo installation/start lock active; inspect its owner before recovery" >&2; exit 2; }
+    echo "$$" > "$DUO_INSTALL_LOCK/pid"
+    trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
+    duo_install_exit=0
+    node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+    [ "$duo_install_exit" -eq 10 ] && exit 0
+    [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
+  fi
 fi
 
 HOOKS_DIR="$SCRIPT_DIR/hooks"
@@ -255,11 +267,12 @@ if [ -d "$SCRIPT_DIR/templates/QA" ]; then
     cp -a "$SCRIPT_DIR/templates/PROCESS.md" "$TARGET_DIR/PROCESS.md"
     echo -e "${GREEN}✓${NC} Refreshed PROCESS.md"
   fi
+  cp -a "$SCRIPT_DIR/templates/SPECIFICATION.md" "$TARGET_DIR/SPECIFICATION.md"
 fi
 if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
   mkdir -p "$TARGET_DIR/scripts"
   for script in "$SCRIPT_DIR/scripts/"*.cjs; do
-    case "$(basename "$script")" in typesafe-effort-analysis.cjs|typesafe-effort-trial.cjs|typesafe-routing.cjs|typesafe-routing-bridge.cjs|duo-review-receipts.cjs|typesafe-evidence.cjs|typesafe-questions-v1.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
+    case "$(basename "$script")" in specflow-tier.cjs|specflow-specification.cjs|specflow-volume.cjs|specflow-publication.cjs|specflow-reviews.cjs|typesafe-effort-analysis.cjs|typesafe-effort-trial.cjs|typesafe-routing.cjs|typesafe-routing-bridge.cjs|duo-review-receipts.cjs|typesafe-evidence.cjs|typesafe-questions-v1.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
   done
@@ -277,6 +290,10 @@ if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
     echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
   else
     echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
+    if ! grep -q 'Progressive specification policy' "$TARGET_DIR/AGENTS.md"; then
+      printf '\n## Progressive specification policy\n\nRead SPECIFICATION.md before creating, simulating, auditing or building tickets. The installed tier helper determines applicable depth. Reconcile legacy universal simulation instructions explicitly; a label alone never proves readiness.\n' >> "$TARGET_DIR/AGENTS.md"
+      echo -e "${YELLOW}⚠️${NC} Existing AGENTS.md retained. Reconcile legacy simulation instructions using SPECIFICATION.md and reload the agent session."
+    fi
   fi
   REFRESHED_KIT=true
 fi
@@ -294,8 +311,23 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   done
   REFRESHED_KIT=true
 fi
+if [ -d "$SCRIPT_DIR/agents" ]; then
+  mkdir -p "$TARGET_DIR/scripts/agents"
+  cp -a "$SCRIPT_DIR/agents/." "$TARGET_DIR/scripts/agents/"
+fi
 if [ "$REFRESHED_KIT" = false ]; then
   echo -e "${YELLOW}⚠️${NC}  QA kit/scripts not in source (curl install?) — run 'specflow init' from the package to install them"
+fi
+
+# Tier labels are planning metadata, not readiness evidence. Never rewrite an
+# existing label, unrelated label or issue body. Offline installs stay usable
+# for local planning and explicitly report the unavailable GitHub setup.
+if [ -f "$TARGET_DIR/scripts/specflow-tier.cjs" ]; then
+  if ! (cd "$TARGET_DIR" && node scripts/specflow-tier.cjs install-labels); then
+    echo -e "${YELLOW}⚠️${NC} Tier labels unavailable: run 'node scripts/specflow-tier.cjs install-labels' after restoring GitHub access. Unlabelled tickets remain thin."
+  fi
+else
+  echo -e "${YELLOW}⚠️${NC} Tier policy unavailable or staged for unfinished Duo runs. Legacy runs retain their pinned rules and cannot claim the new tier gate; reload after applying the staged installation."
 fi
 
 ADAPTER_POLICY_DIR="$SCRIPT_DIR/templates/adapter-policies"

@@ -4,6 +4,7 @@ const path = require('path');
 const { spawnSync } = require('child_process');
 const { createHash } = require('crypto');
 const yaml = require('js-yaml');
+const tierFixture = require('../helpers/spec-density').fixture;
 
 const {
   buildAdapterCommand,
@@ -50,6 +51,7 @@ function writeFeatureRun(dir, stage = '2_contract') {
   const ledger = path.join(dir, 'ledger.jsonl');
   fs.writeFileSync(contract, yaml.dump({
     run_contract: {
+      ...tierFixture(dir),
       loop: 'feature-build',
       goal: 'verified stage completion',
       input_artifact: 'issue #122',
@@ -181,6 +183,7 @@ describe('local contracted loop runner', () => {
       run_contract: {
         loop: 'spec-build',
         goal: 'resume demo',
+        ...tierFixture(dir),
         input_artifact: 'docs/idea.md',
         path: 'templates/QA/loops/spec-build.yaml',
         current_stage_or_rail: 'GATE_B5',
@@ -192,7 +195,7 @@ describe('local contracted loop runner', () => {
     }));
 
     const result = runLoop({ loop: 'spec-build', slug: 'demo', contract, ledger });
-    expect(result.status).toBe('agent_action_required');
+    expect(result.status).toBe('scoped_review_required');
     expect(readJsonl(ledger)[0].stage).toBe('GATE_B5');
   });
 
@@ -319,6 +322,7 @@ describe('local contracted loop runner', () => {
       run_contract: {
         loop: 'spec-build',
         goal: 'runtime',
+        ...tierFixture(dir),
         input_artifact: 'docs/specs/genuine-looper/prd.md',
         path: 'templates/QA/loops/spec-build.yaml',
         current_stage_or_rail: 'GATE_B',
@@ -333,10 +337,10 @@ describe('local contracted loop runner', () => {
     const result = runUntilTerminal({ loop: 'spec-build', contract, ledger, specDir, maxIterations: 3 });
     const saved = yaml.load(fs.readFileSync(contract, 'utf8')).run_contract;
 
-    expect(result.status).toBe('agent_action_required');
+    expect(result.status).toBe('scoped_review_required');
     expect(result.iterations).toBe(2);
     expect(saved.current_stage_or_rail).toBe('GATE_B5');
-    expect(readJsonl(ledger).some((entry) => entry.prompt_path && entry.stage === 'GATE_B5')).toBe(true);
+    expect(readJsonl(ledger).some((entry) => entry.event === 'scoped_review' && entry.stage === 'GATE_B5')).toBe(true);
   });
 
   test('run status reports the current contract and ledger tail', () => {
@@ -699,6 +703,7 @@ describe('generative adapter policy and command builders', () => {
       run_contract: {
         loop: 'feature-build',
         goal: 'auth',
+        ...tierFixture(dir),
         input_artifact: 'issue 1',
         path: 'templates/QA/loops/feature-build.yaml',
         current_stage_or_rail: '2_contract',

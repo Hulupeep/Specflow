@@ -1,0 +1,18 @@
+{
+  "offline": {
+    "requiresCloud": true
+  },
+  "corrections": {
+    "store": "generated-parser-cache",
+    "onReparse": "replace"
+  },
+  "identity": {
+    "key": "row-index"
+  },
+  "network": {
+    "sendPrivateContentToProvider": true
+  },
+  "reuse": {
+    "sandbox": "new-custom-wrapper"
+  }
+}

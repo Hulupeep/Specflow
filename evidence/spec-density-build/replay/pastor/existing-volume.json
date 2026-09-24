@@ -1,0 +1,283 @@
+{
+  "observedAt": "2026-09-23T15:59:03.302Z",
+  "source": "Current GitHub issues returned by an E09 search in Hulupeep/pastor; search results can include references, not a claimed exact epic membership",
+  "existingIssues": [
+    {
+      "issue": 71,
+      "bodyCharacters": 2630,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 1
+    },
+    {
+      "issue": 56,
+      "bodyCharacters": 31170,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 6
+    },
+    {
+      "issue": 49,
+      "bodyCharacters": 29827,
+      "linkedMaintainedCharacters": 1053569,
+      "historicalCharacters": 0,
+      "requirementIds": 25,
+      "overMaximum": false,
+      "missingReferenceCount": 69
+    },
+    {
+      "issue": 57,
+      "bodyCharacters": 32316,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 4
+    },
+    {
+      "issue": 54,
+      "bodyCharacters": 32149,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 6
+    },
+    {
+      "issue": 53,
+      "bodyCharacters": 31761,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 64,
+      "bodyCharacters": 14960,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 55,
+      "bodyCharacters": 33144,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 6
+    },
+    {
+      "issue": 52,
+      "bodyCharacters": 31765,
+      "linkedMaintainedCharacters": 28073,
+      "historicalCharacters": 0,
+      "requirementIds": 2,
+      "overMaximum": true,
+      "missingReferenceCount": 10
+    },
+    {
+      "issue": 58,
+      "bodyCharacters": 30376,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 60,
+      "bodyCharacters": 29280,
+      "linkedMaintainedCharacters": 1053569,
+      "historicalCharacters": 0,
+      "requirementIds": 24,
+      "overMaximum": false,
+      "missingReferenceCount": 68
+    },
+    {
+      "issue": 61,
+      "bodyCharacters": 19146,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 50,
+      "bodyCharacters": 26778,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 4
+    },
+    {
+      "issue": 66,
+      "bodyCharacters": 3556,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 1
+    },
+    {
+      "issue": 63,
+      "bodyCharacters": 28753,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 62,
+      "bodyCharacters": 26233,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 70,
+      "bodyCharacters": 2370,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 1
+    },
+    {
+      "issue": 47,
+      "bodyCharacters": 11296,
+      "linkedMaintainedCharacters": 1053569,
+      "historicalCharacters": 0,
+      "requirementIds": 24,
+      "overMaximum": false,
+      "missingReferenceCount": 67
+    },
+    {
+      "issue": 72,
+      "bodyCharacters": 2916,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 51,
+      "bodyCharacters": 3641,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 5
+    },
+    {
+      "issue": 48,
+      "bodyCharacters": 31352,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 11
+    },
+    {
+      "issue": 78,
+      "bodyCharacters": 2133,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 75,
+      "bodyCharacters": 2200,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 59,
+      "bodyCharacters": 31418,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": true,
+      "missingReferenceCount": 7
+    },
+    {
+      "issue": 65,
+      "bodyCharacters": 2564,
+      "linkedMaintainedCharacters": 4399,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 77,
+      "bodyCharacters": 2257,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 76,
+      "bodyCharacters": 2103,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 74,
+      "bodyCharacters": 2141,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    },
+    {
+      "issue": 73,
+      "bodyCharacters": 2282,
+      "linkedMaintainedCharacters": 0,
+      "historicalCharacters": 0,
+      "requirementIds": 0,
+      "overMaximum": false,
+      "missingReferenceCount": 0
+    }
+  ],
+  "aggregate": {
+    "bodyCharacters": 502517,
+    "linkedMaintainedCharacters": 3193179,
+    "uniqueLinkedMaintainedCharacters": 1053569,
+    "historicalCharacters": 0,
+    "maintainedTotalCharacters": 1556086,
+    "unmeasuredOrBrokenReferenceCount": 308,
+    "duplicateWarningCount": 0
+  },
+  "limits": [
+    "Historical brief counts are author-reported, not recomputed acceptance truth.",
+    "Existing Pastor issue bodies and documents were not rewritten.",
+    "Unmeasured or broken linked references prevent claiming complete existing specification volume.",
+    "Small new replay scope is not a percentage reduction of this different historical scope.",
+    "Requirement identifiers are counted mechanically, not evaluated semantically."
+  ]
+}

@@ -33,7 +33,7 @@ beforeEach(() => {
   git('init'); git('config','user.email','test@example.test'); git('config','user.name','Test');
   put('goal.md','Correct observable output'); put('task.md','AC-1: correct output'); put('code.js','result = 1');
   put('.specflow/duo/raw.txt','observed 1'); git('add','goal.md','task.md','code.js'); git('commit','-m','fixture');
-  run = duo.start(root,'#1','claude-code',{goal:'goal.md',task:'task.md',objective:'Correct output',finish:'AC-1 verified',criteria:[{id:'AC-1',source:'task.md',anchor:'AC-1: correct output',kind:'acceptance'}]},input.session_id);
+  run = duo.start(root,'#1','claude-code',{workKind:'preparation',goal:'goal.md',task:'task.md',objective:'Correct output',finish:'AC-1 verified',criteria:[{id:'AC-1',source:'task.md',anchor:'AC-1: correct output',kind:'acceptance'}]},input.session_id);
 });
 afterEach(() => { delete process.env.SPECFLOW_DUO_REVIEWER; fs.rmSync(root,{recursive:true,force:true}); });
 test('J-DUO-CADENCE AC-1/AC-2: unreviewed turn continues once; second refusal stops explicitly blocked', () => {

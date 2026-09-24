@@ -2,6 +2,11 @@
 # The prompt only supplies: goal + issue + automation. Each tick: load this path,
 # LOCATE the current rail from the branch + CI state, advance ONE rail, persist, stop/escalate.
 loop: feature-build
+specification_policy:
+  command: node scripts/specflow-tier.cjs inspect <record.json> feature-build build
+  on_exit_2: stop and report the returned readiness blocker
+  resume: repeat the policy with resume before executing a rail
+  scope: selected build-ready slice only; reuse applicable artifacts
 process_ref: PROCESS.md#step-6-7
 principle: you and any swarm are muscle; per-slice trust lives ONLY in GATE C (branch-protected
   CI vs real data); EPIC-level trust lives in GATE D (epic_gate below) — a slice's contract test
@@ -30,7 +35,7 @@ state:
   gate_c: branch-protected CI vs a real seeded backend
 
 preconditions:
-  - issue has Gherkin ACs + data-testids + contract ref + e2e filename (Rule 1) else escalate
+  - issue has current verified readiness and applicable AC/check/contract mapping; UI stories also require journey/selectors/e2e mapping (Rule 1) else escalate
   - constraint: slice < 1000 lines (else propose a 4–8 slice split)
 
 rails:                        # advance one per tick, in order

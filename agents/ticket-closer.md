@@ -128,12 +128,12 @@ Before closing ANY issue that has UI indicators or `J-*` journey references:
    STOP. Do not proceed to Step 5.
 
 ### Step 5: Close or Update Issues
-- **All criteria met AND Playwright tests pass** → Close the issue with the implementation comment
-- **Partially met** → Add comment with "Partially Implemented" and list remaining items
+- **All criteria met AND Playwright tests pass** → Publish the sanitized implementation comment through `node scripts/specflow-publication.cjs <request.json>`, stop on non-zero exit, then close without attaching another comment
+- **Partially met** → Publish a sanitized "Partially Implemented" comment with remaining items through the same gate; stop on non-zero exit
 - **Not started** → Skip (leave open, no comment)
 
 ### Step 6: Update Project Board
-- Use `gh issue edit <number> --remove-project` / `--add-project` if needed
+- Use the repository’s existing project-board metadata workflow if needed; do not combine it with body/comment publication
 - Move closed issues to Done column automatically
 
 ## Commands Used
@@ -147,8 +147,8 @@ gh issue list --state open --limit 100
 gh issue view <number>
 
 # Update issues
-gh issue comment <number> --body "..."
-gh issue close <number> --comment "..."
+node scripts/specflow-publication.cjs <request.json>
+gh issue close <number>
 
 # Check project
 gh issue view <number> --json projectItems
@@ -175,3 +175,5 @@ gh issue view <number> --json projectItems
 - [ ] No UI issue is closed without Tier 1 journey gate PASS certificate
 - [ ] Implementation comment includes test results (passed/failed/skipped counts)
 - [ ] Project board status matches issue state
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

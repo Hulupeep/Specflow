@@ -28,11 +28,17 @@ Continuation rule: keep advancing through all currently unblocked stages/rails i
 
 ## Specflow Simulation Path
 
-When creating, refining, uplifting, or auditing a Specflow story/ticket, the simulation path is mandatory before build work:
+Read `SPECIFICATION.md` and use `scripts/specflow-tier.cjs` before creating,
+refining, simulating, uplifting or auditing a ticket. Thin work stays thin;
+contracted UI flows receive a paper walkthrough. The following scoped path is
+required for the selected build-ready slice before production work:
 
 `create/refine story -> specflow-simulate -> specflow-audit/uplift -> pre-flight gate -> feature-build`
 
-Do not mark a ticket ready for `feature-build` when simulation is missing, stale, skipped, or only mentioned in chat. The `run_contract` must carry `simulation_required: true` until `specflow-simulate` has produced durable findings or a durable clean result.
+Do not mark a ticket ready for `feature-build` when required simulation is missing,
+stale, skipped or only mentioned in chat. Derive `run_contract.tier` and
+`simulation_required` from the shared policy on start and resume. A tier label
+alone cannot grant readiness. Production routes must validate current evidence.
 
 Lifecycle routing:
 

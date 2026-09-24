@@ -55,6 +55,7 @@ function createRun(dir, slug = 'confirm-run') {
   fs.writeFileSync(contract, yaml.dump({
     run_contract: {
       loop: 'feature-build',
+      ...require('../helpers/spec-density').fixture(path.dirname(contract)),
       run_id: modelConfirmationRunId(slug, contract),
       goal: 'persist confirmation',
       input_artifact: 'issue #123',

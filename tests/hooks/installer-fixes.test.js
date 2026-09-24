@@ -109,8 +109,9 @@ describe('install-hooks.sh', () => {
         expect(fs.existsSync(skillPath)).toBe(true);
         const skill = fs.readFileSync(skillPath, 'utf8');
         expect(skill).toContain('Mandatory Run Contract');
-        expect(skill).toContain('Mandatory Simulation Path');
-        expect(skill).toContain('simulation_required: true');
+        expect(skill).toContain('Tier-scoped Simulation Path');
+        expect(skill).toContain('specflow-tier.cjs');
+        expect(skill).toContain('simulation_required: false');
         expect(skill).toContain('Continue through every currently unblocked stage/rail');
         expect(skill).not.toContain('Advance exactly one stage or rail per tick');
       }

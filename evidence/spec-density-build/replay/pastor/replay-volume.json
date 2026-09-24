@@ -1,0 +1,104 @@
+{
+  "status": "reported",
+  "counts": {
+    "bodyCharacters": 387,
+    "linkedMaintainedCharacters": 111577,
+    "historicalCharacters": 1393,
+    "uniqueMaintainedCharacters": 111964,
+    "shared": 1,
+    "reused": 2,
+    "new": 5,
+    "deferred": 1,
+    "inapplicable": 1,
+    "requirements": 0
+  },
+  "artifacts": [
+    {
+      "id": "sandbox",
+      "path": "existing-sandbox.py",
+      "characters": 9480,
+      "historical": false,
+      "shared": true,
+      "reused": true
+    },
+    {
+      "id": "runtime",
+      "path": "existing-runtime.py",
+      "characters": 8022,
+      "historical": false,
+      "shared": false,
+      "reused": true
+    },
+    {
+      "id": "bounded-instrumentation",
+      "path": "root-access-driver.py",
+      "characters": 3437,
+      "historical": false,
+      "shared": false,
+      "reused": false
+    },
+    {
+      "id": "prior-structure-result",
+      "path": ".specflow/specification/evidence/experiment-e4339e7b-6758-4613-8bea-5a71c4a18d69.json",
+      "characters": 1393,
+      "historical": true,
+      "shared": false,
+      "reused": true
+    },
+    {
+      "id": "docs/decisions/ADR01-A1-catalog-binding.md",
+      "path": "docs/decisions/ADR01-A1-catalog-binding.md",
+      "characters": 2151,
+      "historical": false,
+      "shared": false,
+      "reused": false
+    },
+    {
+      "id": "docs/qualification/t03-build-manifest.json",
+      "path": "docs/qualification/t03-build-manifest.json",
+      "characters": 5166,
+      "historical": false,
+      "shared": false,
+      "reused": false
+    },
+    {
+      "id": "docs/PRD.md",
+      "path": "docs/PRD.md",
+      "characters": 82520,
+      "historical": false,
+      "shared": false,
+      "reused": false
+    },
+    {
+      "id": "docs/qualification/environment.json",
+      "path": "docs/qualification/environment.json",
+      "characters": 801,
+      "historical": false,
+      "shared": false,
+      "reused": false
+    }
+  ],
+  "identifiers": {
+    "AC-PILOT-1": [
+      {
+        "path": "issue",
+        "definition": "AC-PILOT-1: Attempt archive opening and root access using the approved representative input inside the existing sandbox."
+      }
+    ],
+    "AC-PILOT-2": [
+      {
+        "path": "issue",
+        "definition": "AC-PILOT-2: Retain observed and failed results with explicit limits; no message content or private source values reach a provider."
+      }
+    ],
+    "AC-PILOT-3": [
+      {
+        "path": "issue",
+        "definition": "AC-PILOT-3: Leave traversal/extraction unqualified until discriminating evidence exists; do not freeze downstream schema or UI details."
+      }
+    ]
+  },
+  "errors": [],
+  "warnings": [],
+  "judgments": "Counts are mechanical signals. Applicability, scope and meaning require scoped review; length does not prove readiness."
+}

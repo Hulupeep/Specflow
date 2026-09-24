@@ -169,7 +169,7 @@ Based on report, take action:
 
 ```bash
 # Add enforcement comment
-gh issue comment <number> --body "## ⚠️ Journey Enforcement
+node scripts/specflow-publication.cjs <request.json>
 
 This issue has UI components but **no journey coverage**.
 
@@ -258,3 +258,5 @@ Feature "done" requires:
 ```
 
 **Journeys are the final gate. Without them, "done" is a lie.**
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

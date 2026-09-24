@@ -1,5 +1,13 @@
 # PROCESS — idea → merged code you can trust
 
+Specification depth is governed by `SPECIFICATION.md` (source kit:
+`templates/SPECIFICATION.md`) and `scripts/specflow-tier.cjs`. Thin work stays
+at planning depth; contracted reviews cover applicable decisions and UI paper
+walkthroughs. The detailed build-ready procedures below apply only to the
+selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
+Required privacy, permission, executable journey and release gates still apply.
+
+
 The canonical reference for how we run work end to end. The spine in one line:
 
 > **A single hostile critic gates the spec; CI gates the code; the swarm/agent is muscle *inside* a phase, never the thing that approves its own work.**
@@ -16,7 +24,7 @@ Start from something real, not a blank page. Walk the **actual artifact** (a thi
 
 ## Step 1 — PRD, written by a dueling pair
 
-One agent **drafts** the PRD; a second **attacks** it with the `adversarial-prd-reviewer` skill. Round after round: A writes → B challenges on the rubric → A revises *in the document* → B re-reads and closes or reopens. A single model can switch hats.
+For the selected contracted decisions, the builder drafts or reuses the relevant PRD material and the opposite CLI reviews it through Duo. Permit an initial review and one repair review; retain the issue/tier allowance across sessions. Same-family context switching is labelled honestly and does not supply the required independent peer. Thin backlog capture does not trigger this stage.
 
 - **The rubric (7 passes):** JTBD coherence, requirement→implementation traceability, the two-engineer test, scope boundary, dependency/ordering, success-metrics audit, willingness-to-pay — plus a banned-language scan and a Ramen test.
 - **The Special Mandate** (honesty-critical specs): a **reality-grounding ledger** (open every concrete repo claim the author makes and verify it) + a **loophole hunt** (actively try to find the gamed gate / fake backend / skip-to-green / always-green metric *surviving*).
@@ -25,21 +33,21 @@ One agent **drafts** the PRD; a second **attacks** it with the `adversarial-prd-
 
 ## Step 2 — GATE A (HARD) — the adversary verdict
 
-The critic issues `SHIP` / `SHIP WITH STIPULATIONS` / `DO NOT SHIP`, written to a **committed verdict artifact**. **No ticket-writing starts until that artifact says SHIP.** This is a *single hostile critic* — deliberately not the swarm's self-consensus.
+The scoped independent verdict and raw evidence govern promotion of the selected decisions. Local thin backlog capture can precede that review. GitHub issue creation still requires the scoped SHIP verdict and human approval; preserve the path's `never_without_human` actions. Contracted promotion requires its live scoped receipt; an ungraded fix or exhausted allowance stays blocked. Use initial + one repair and a no-new-evidence stop, retained across sessions and run names. Durable local evidence supports uncommitted work, so a per-review commit is not required.
 
 ## Step 3 — Tickets (Specflow)
 
-`specflow-writer` turns the shipped PRD into GitHub issues with Gherkin acceptance, data-testid selectors, contract references, and an e2e file name. For canonical journeys the Gherkin lives **once** in the catalogue (`journeys-must-have.md`); the issue carries a headline + deep-link (don't triplicate the spec). This phase can fan out with ruflo for parallelism.
+`specflow-writer` records thin feature and future tickets with behaviour acceptance and explicit unknowns. Only the selected build-ready slice receives applicable Gherkin, selectors, contract references and executable journey mapping, reusing existing material. For canonical journeys the Gherkin lives **once** in the catalogue (`journeys-must-have.md`); the issue carries a headline + deep-link (don't triplicate the spec). This phase can fan out with ruflo for parallelism.
 
-*Output:* issues + thin **contract YAMLs** (the executable encoding of each journey).
+*Output:* scoped issues and applicable new or reused executable evidence; future tickets need no generated contract package.
 
 ## Step 4 — GATE B (soft) — audit + closure
 
-`board-auditor` + `specflow-uplifter`: every requirement → journey → test → issue, no orphans, no duplicate IDs, gaps hardened.
+`board-auditor` + `specflow-uplifter` check the selected build-ready slice and its material seams: applicable requirement → journey → test → issue links resolve, with no orphan requirements or duplicate IDs. Reuse existing artifacts and explain N/A decisions; future tickets remain thin.
 
 ## Step 5 — GATE B.5 (soft, its own gate) — pre-flight simulation
 
-`pre-flight-simulator` walks real personas through each ticket *before* code. A CRITICAL design gap blocks. (Cheaper to find "new staff land at zero balance" here than in the build.)
+`pre-flight-simulator` examines the selected build-ready slice and its direct seams before production code. A contracted UI decision receives a bounded paper walkthrough. Thin future tickets need no full simulation. A relevant CRITICAL design gap blocks. (Cheaper to find "new staff land at zero balance" here than in the build.)
 
 ## Step 6 — Build (the 5 rails, one journey at a time)
 
@@ -65,7 +73,7 @@ The controller-enforced gates (A, B, B.5) catch most things. But even a *gamed* 
 
 | Gate | Type | Who/what enforces | Blocks |
 |------|------|-------------------|--------|
-| A | **hard** | one hostile critic (adversarial-prd-reviewer) → committed verdict | ticket-writing until SHIP |
+| A | **hard** | native independent scoped Duo review → durable receipt | promotion of the selected decisions without acceptance |
 | B | soft | board-auditor + specflow-uplifter | orphans, dup IDs, gaps |
 | B.5 | soft | pre-flight-simulator | CRITICAL design gaps before code |
 | C | **hard** | branch-protected CI vs real seeded backend | merge on any contract/journey violation |
@@ -96,8 +104,8 @@ A loop is **path + thin prompt + automation (the tick) + durable state (committe
 Separate **what** from **how**:
 
 - **The PATH (what)** — `QA/loops/*.yaml`. Runtime-agnostic stages, gates, repair, `done_when`. Single source of truth.
-- **The RUNTIME / binding (how)** — a complete way to execute that path end-to-end on one tool:
-  - [`PROCESS-CLAUDE.md`](PROCESS-CLAUDE.md) — the **whole** pipeline on Claude Code via the `Workflow` tool (`agent(schema)`, `parallel(critics)`, `pipeline()` + worktree).
-  - [`PROCESS-CODEX.md`](PROCESS-CODEX.md) — the **whole** pipeline on Codex via goals + thread-automations.
+- **The host (how)** — the interactive agent owns the path and invokes the opposite CLI for read-only peer review:
+  - [`PROCESS-CLAUDE.md`](PROCESS-CLAUDE.md) — Claude Code starts `/duo-build`; Codex reviews through `codex exec`.
+  - [`PROCESS-CODEX.md`](PROCESS-CODEX.md) — Codex starts `$duo-build`; Claude reviews through `claude -p`.
 
-**You can run the entire pipeline on Claude Code, or the entire pipeline on Codex** — you don't split a run across both. Each tool has strengths (Claude's `Workflow` shines at the judgment fan-outs; Codex's automations shine at long autonomous grind), but strengths are *guidance, not a forced split* — every runtime runs every stage. **Whichever runtime, the muscle never self-approves; Gate C (external CI) decides.**
+**Start in either host.** The interactive builder stays in charge; the other model inspects frozen evidence and returns findings directly. Stop on missing peer access, missing evidence or an exhausted allowance. Required human approval and release gates remain in force.

@@ -6,7 +6,7 @@ const {execFileSync, spawn} = require('child_process');
 const duo = require('../../scripts/duo-build.cjs');
 let root;
 const put = (name, text) => { const f=path.join(root,name); fs.mkdirSync(path.dirname(f),{recursive:true}); fs.writeFileSync(f,text); };
-const context = () => ({goal:'goal.md', task:'task.md', objective:'Explain a correct balance', finish:'All criteria and required tests verified', criteria:[
+const context = () => ({workKind:'preparation',goal:'goal.md', task:'task.md', objective:'Explain a correct balance', finish:'All criteria and required tests verified', criteria:[
   {id:'AC-1', source:'task.md', anchor:'AC-1: correct value', kind:'acceptance'},
   {id:'AC-2', source:'task.md', anchor:'AC-2: explanation', kind:'acceptance'},
   {id:'GATE-TESTS', source:'CLAUDE.md', anchor:'Tests must pass before finishing.', kind:'gate'},

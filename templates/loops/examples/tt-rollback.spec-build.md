@@ -3,7 +3,7 @@
 A real, filled invocation of [`../prompts/spec-build.prompt.md`](../prompts/spec-build.prompt.md). The grounding is a Codex discovery thread, not a file — so the loop starts at `discover` and writes the PRD itself. **Run with the agent pointed at the timebreez repo** (where `QA/loops/spec-build.yaml`, `PRDs/`, and Timetastic live).
 
 ```
-Goal:   SHIP the TT-ROLLBACK spec (Import Backout & Rehearsal Mode) — a hardened PRD + audited, journey-contracted tickets.
+Goal:   SHIP the TT-ROLLBACK spec (Import Backout & Rehearsal Mode) — a mixed-tier backlog with scoped acceptance and journey evidence for the selected build-ready slice.
 Path:   QA/loops/spec-build.yaml
 Inputs: { slug: tt-rollback, grounding_ref: THIS THREAD — the rollback discussion above; no PRD exists yet }
 Automation: thread automation — re-fire until the path's done_when is met.
@@ -17,7 +17,7 @@ First tick (no artifacts) → start at `discover`: distill grounding from this t
   - schema-hook oracle to verify against the real migrations: import_batches, source_import_run_id, record_provenance, external_id_mappings, timetastic_source_rows, timetastic_import_versions, reconciliation/gap tables —
 then `draft` PRDs/tt-rollback-prd.md. Stop after that gate.
 
-Hard rules: GATE A is a committed SHIP verdict — no tickets before it; human approval before creating issues; never create tickets from a DO-NOT-SHIP PRD.
+Hard rules: local thin backlog capture may precede review. GATE A gates selected-decision promotion and GitHub issue creation; require a scoped SHIP verdict and human approval before creating issues; never create tickets from a DO-NOT-SHIP PRD. Use initial + one repair and a no-new-evidence stop across sessions. Gate B/B.5 and executable journeys apply only to the selected build-ready slice. Preserve never_without_human.
 ```
 
 ## What a correct first tick looks like
@@ -29,4 +29,4 @@ Hard rules: GATE A is a committed SHIP verdict — no tickets before it; human a
 
 ## Then continue
 
-Re-fire the automation → tick 2 runs the adversary, tick 3 writes the verdict (Gate A), and so on until `done_when`: a SHIP verdict + audited tickets. Each of those tickets is then an input to [`../prompts/feature-build.prompt.md`](../prompts/feature-build.prompt.md).
+On the next invocation, inspect the shared tier record and review allowance. Local thin planning may finish here; selected contracted decisions receive bounded Gate A review and human approval precedes GitHub issue creation. Stop on no new evidence or an exhausted allowance. For a build handoff, `done_when` is a mixed-tier backlog with applicable Gate B/B.5 evidence for the selected build-ready slice. Only that slice is an input to [`../prompts/feature-build.prompt.md`](../prompts/feature-build.prompt.md).

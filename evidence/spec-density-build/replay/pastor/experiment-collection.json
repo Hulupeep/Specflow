@@ -1,0 +1,167 @@
+{
+  "batches": {
+    "experiment:representative-parser-structure": {
+      "id": "experiment:representative-parser-structure",
+      "kind": "experiment",
+      "scope": "d122bd50aeded57087048d2eab3c3cf08ebe4d8a8b44b198cdf932c518b86767",
+      "outcome": "failed",
+      "collection": "reported",
+      "startedAt": "2026-09-23T15:33:14.436Z",
+      "reportHash": "cd01c414f3986ac417ceed9eddf64afba0668968ba4815744fef17a9a867cbe1",
+      "atEnd": "2026-09-23T15:35:19.504Z",
+      "discoveryIds": [
+        "parser-worker-first-attempt"
+      ]
+    },
+    "experiment:diagnose-worker-structure": {
+      "id": "experiment:diagnose-worker-structure",
+      "kind": "experiment",
+      "scope": "d122bd50aeded57087048d2eab3c3cf08ebe4d8a8b44b198cdf932c518b86767",
+      "outcome": "failed",
+      "collection": "reported",
+      "startedAt": "2026-09-23T15:36:14.833Z",
+      "reportHash": "f0f685f3eeb6e1c5e042aa1404029a61793866efcfe3b3d0064445572846a669",
+      "atEnd": "2026-09-23T15:46:15.826Z",
+      "discoveryIds": [
+        "parser-structure-oserror"
+      ]
+    },
+    "experiment:thin-root-access:9ea2b333-7dc7-4b91-91ec-f5f4eb7b8f15": {
+      "id": "experiment:thin-root-access:9ea2b333-7dc7-4b91-91ec-f5f4eb7b8f15",
+      "kind": "experiment",
+      "scope": "0af291045d5b02ba08346b4d7200cff5dcb22007c7e7761be2bef82795d3717c",
+      "outcome": "success",
+      "collection": "reported",
+      "startedAt": "2026-09-23T15:55:18.429Z",
+      "reportHash": "af4cf5a45f3e75241d7b74022cf13eed5cbb509f4fbfc519cd168b859681cb60",
+      "atEnd": "2026-09-23T15:56:01.059Z",
+      "discoveryIds": [
+        "parser-root-access-observed"
+      ]
+    }
+  },
+  "experiments": [
+    {
+      "id": "experiment:representative-parser-structure",
+      "planHash": "31119ad027cd10f6164ecbf57c9268a9b5edf2b5516a05da89af47328c8c32d6",
+      "question": "Can the available parser open one approved representative PST and read bounded folder/message structure inside the existing sandbox?",
+      "expectedObservation": "A successful archive open, root-folder read, bounded structural counts and explicit limitations; no message content",
+      "outcome": "failed",
+      "evidence": {
+        "path": ".specflow/specification/evidence/experiment-06f7f977-b456-45f3-84ff-c4d7dd6cd770.json",
+        "sha256": "fca3997168a6caa298604d025f03321dc59396b37c31000fdac1a29b31d2823c"
+      }
+    },
+    {
+      "id": "experiment:diagnose-worker-structure",
+      "planHash": "311c5daa40ffe068c51b988f8feee9fa8cf1faf8f5ed47aee47544a212bed81d",
+      "question": "Can the available parser open one approved representative PST and read bounded folder/message structure inside the existing sandbox?",
+      "expectedObservation": "A successful archive open, root-folder read, bounded structural counts and explicit limitations; no message content",
+      "outcome": "failed",
+      "evidence": {
+        "path": ".specflow/specification/evidence/experiment-e4339e7b-6758-4613-8bea-5a71c4a18d69.json",
+        "sha256": "447388c53c247488bfa9feb53b9928a1d609182c4e8937aee5cc61aa2b6e395a"
+      }
+    },
+    {
+      "id": "experiment:thin-root-access:9ea2b333-7dc7-4b91-91ec-f5f4eb7b8f15",
+      "planHash": "41c1bff9c5f6df54d38858096cd45fec2177f4004dc9e78546946cedb7ed46ed",
+      "question": "Can the approved representative PST be opened and its root accessed inside the existing sandbox, independently of the failed folder traversal?",
+      "expectedObservation": "Archive open and root access, with no claim about traversal or extraction",
+      "outcome": "observed",
+      "evidence": {
+        "path": ".specflow/specification/evidence/experiment-52d416ba-e07f-444e-958a-04808a708f65.json",
+        "sha256": "ac4f51078f1d324b630e118e992f2511a21c86dc53ccef9c4876d82cbc27a278"
+      }
+    }
+  ],
+  "discoveries": [
+    {
+      "id": "parser-worker-first-attempt",
+      "kind": "observation",
+      "observation": "The sandbox readiness probe passed, but the structural parser worker exited with a failure; product versus environment cause is not yet established.",
+      "proposedEdit": "Keep structural parser capability unverified until the worker environment and representative input are diagnosed; do not infer downstream schemas from this failure.",
+      "publicSummary": "A bounded structural-read experiment failed after sandbox readiness passed. Cause remains unconfirmed.",
+      "references": [
+        "parser-capability"
+      ],
+      "tickets": [
+        59
+      ],
+      "evidence": [
+        {
+          "path": ".specflow/specification/evidence/experiment-06f7f977-b456-45f3-84ff-c4d7dd6cd770.json",
+          "sha256": "fca3997168a6caa298604d025f03321dc59396b37c31000fdac1a29b31d2823c"
+        }
+      ],
+      "contentHash": "6fda3fa1f13a32fdacc8bd777b6f08a2ab9c3d7dac63c9bbe7775603ffc88b57",
+      "batch": "experiment:representative-parser-structure",
+      "sourceScope": "d122bd50aeded57087048d2eab3c3cf08ebe4d8a8b44b198cdf932c518b86767",
+      "publication": {
+        "status": "pending",
+        "targets": {}
+      },
+      "resolutions": {}
+    },
+    {
+      "id": "parser-structure-oserror",
+      "kind": "observation",
+      "observation": "The bounded worker reached structure after archive open and root access, then raised OSError. The input was stable and sandbox probes passed. The cause remains unknown.",
+      "proposedEdit": "Distinguish archive/root access from qualified folder/message traversal; downstream interpretation and schema assumptions remain unverified.",
+      "publicSummary": "Archive and root access succeeded before the bounded structure walk raised OSError. This does not establish ingestion capability.",
+      "references": [
+        "parser-capability"
+      ],
+      "tickets": [
+        59
+      ],
+      "evidence": [
+        {
+          "path": ".specflow/specification/evidence/experiment-e4339e7b-6758-4613-8bea-5a71c4a18d69.json",
+          "sha256": "447388c53c247488bfa9feb53b9928a1d609182c4e8937aee5cc61aa2b6e395a"
+        }
+      ],
+      "refines": [
+        "parser-worker-first-attempt"
+      ],
+      "contentHash": "cfda56d017d434c4cfb5915e44cf2bb584ce67d543dc6fd760c473630bab9f3b",
+      "batch": "experiment:diagnose-worker-structure",
+      "sourceScope": "d122bd50aeded57087048d2eab3c3cf08ebe4d8a8b44b198cdf932c518b86767",
+      "publication": {
+        "status": "pending",
+        "targets": {}
+      },
+      "resolutions": {}
+    },
+    {
+      "id": "parser-root-access-observed",
+      "kind": "observation",
+      "observation": "The real sandboxed representative archive opened and its root was accessed. No folder enumeration or message extraction was performed; previous structure-walk OSError remains unresolved.",
+      "proposedEdit": "Treat archive/root access as observed, keep traversal/extraction unqualified and downstream implementation details thin.",
+      "publicSummary": "Bounded archive and root access succeeded; traversal and extraction remain unqualified.",
+      "references": [
+        "parser-capability"
+      ],
+      "tickets": [
+        59
+      ],
+      "evidence": [
+        {
+          "path": ".specflow/specification/evidence/experiment-52d416ba-e07f-444e-958a-04808a708f65.json",
+          "sha256": "ac4f51078f1d324b630e118e992f2511a21c86dc53ccef9c4876d82cbc27a278"
+        }
+      ],
+      "refines": [
+        "parser-structure-oserror"
+      ],
+      "contentHash": "fbf06719a01ec80dc28040e446b48f7af052c2f27f84d0e24732ddd7ef9532c5",
+      "batch": "experiment:thin-root-access:9ea2b333-7dc7-4b91-91ec-f5f4eb7b8f15",
+      "sourceScope": "0af291045d5b02ba08346b4d7200cff5dcb22007c7e7761be2bef82795d3717c",
+      "publication": {
+        "status": "pending",
+        "targets": {}
+      },
+      "resolutions": {}
+    }
+  ]
+}

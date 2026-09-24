@@ -1,0 +1,879 @@
+{
+  "kind": "native-peer-result-export",
+  "round": 2,
+  "protocolValidated": true,
+  "model": "claude-opus-5-5",
+  "structured_output": {
+    "outcome": "accepted",
+    "summary": "All five seeded bad decisions in decisions.json are now corrected, and each new value fits the unchanged task.md acceptance. Both raw captures show node check.cjs exiting 0 with 5 executed, 0 skipped and 0 failed. This accepts only the decision-level scope; it does not show that a parser works, is deployed or is production-ready.",
+    "findings": [],
+    "unrelated": [
+      "check.cjs only checks that each decision field equals an exact string (tree/check.cjs:1). That is enough for this decision-only replay, but it tests nothing about how a parser behaves when running. Any later runtime slice will need real behavioural tests, which are out of scope here.",
+      "The decision fixes in decisions.json and record.json are not committed. commits.txt shows only 4ea423f, and diff.patch shows these changes on top of that commit. The evidence matches the frozen snapshot: the decisions.json hash in record.json equals the manifest hash 0f643b0c\u2026 Committing the changes is bookkeeping, not an acceptance obligation."
+    ],
+    "index_complete": true,
+    "assessments": [
+      {
+        "id": "AC-OFFLINE",
+        "status": "verified",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ],
+        "reason": "tree/decisions.json:3 now sets offline.requiresCloud to false; diff.patch:8-9 shows it was changed from true. The check.cjs AC-OFFLINE assertion passed in both raw captures. Verified at the decision level only, not as a running offline parser."
+      },
+      {
+        "id": "AC-CORRECTIONS",
+        "status": "verified",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ],
+        "reason": "tree/decisions.json:6-7 now sets store to owner-ledger and onReparse to preserve; diff.patch:12-15 shows these replaced generated-parser-cache and replace. With this decision, the generated cache no longer holds the only copy of owner corrections, and corrections are kept when parsing is repeated. AC-CORRECTIONS passed in both captures."
+      },
+      {
+        "id": "AC-IDENTITY",
+        "status": "verified",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ],
+        "reason": "tree/decisions.json:10 now sets the identity key to source-hash-and-item-id; diff.patch:18-19 shows it replaced row-index. The source hash tells archives apart, and the key no longer depends on row position, so it survives sorting and rescanning. AC-IDENTITY passed in both captures."
+      },
+      {
+        "id": "AC-NETWORK",
+        "status": "verified",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ],
+        "reason": "tree/decisions.json:13 now sets sendPrivateContentToProvider to false; diff.patch:22-23 shows it was changed from true. AC-NETWORK passed in both captures. Verified at the decision level only."
+      },
+      {
+        "id": "AC-REUSE",
+        "status": "verified",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ],
+        "reason": "tree/decisions.json:16 now sets the sandbox to existing-reviewed-sandbox; diff.patch:26-27 shows it replaced new-custom-wrapper. The record.json artifact hashes (tree/record.json:38-66) match the manifest hash of decisions.json, so the canonical decisions record points at the corrected file. AC-REUSE passed in both captures."
+      },
+      {
+        "id": "GATE-CHECKS",
+        "status": "verified",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ],
+        "reason": "The duo capture ran node check.cjs: exitCode 0, stdout executed 5, skipped 0, failed 0, all five checks true, sourceBefore equal to sourceAfter (stable true). The specification gate capture also exited 0 with executed 5, skipped 0, failed 0. Reading tree/check.cjs:1 confirms it asserts five checks and sets a nonzero exit on any failure. task.md does not appear in diff.patch, so the stable acceptance was not changed."
+      }
+    ],
+    "resolutions": [],
+    "diagnostics": [
+      {
+        "observation": "Both raw gate captures report exitCode 0 with executed 5, skipped 0, failed 0 for the check.cjs command. Each check result is [ID, true] for AC-OFFLINE, AC-CORRECTIONS, AC-IDENTITY, AC-NETWORK and AC-REUSE.",
+        "evidence": [
+          ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+          ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json"
+        ]
+      },
+      {
+        "observation": "diff.patch changes all five decision values from the seeded bad values to compliant ones. It also updates the five record.json artifact hashes to 0f643b0c\u2026, which equals the decisions.json hash in manifest.json. diff.patch shows no change to task.md.",
+        "evidence": [
+          "diff.patch",
+          "manifest.json"
+        ]
+      }
+    ],
+    "direction": {
+      "assessment": "complete",
+      "goal_connection": "The replay's bounded goal was to find and correct the seeded risks to privacy, offline operation, stable identity, owner corrections and reuse, without changing the stable acceptance. All five decisions now fit acceptance, and the five scoped checks pass with no skips. Parser runtime, extraction and schema work remain unqualified future scope, as goal.md requires.",
+      "next_steps": [],
+      "preserve": [
+        "Acceptance is decision-level only. It is not verification of parser runtime, deployment or production readiness.",
+        "task.md acceptance rows stay unchanged.",
+        "Future extraction and schema details remain unqualified and must not be deepened in this replay."
+      ]
+    },
+    "instruction_assessments": [],
+    "specification_findings": [],
+    "specification_nonblocking": []
+  },
+  "access_receipts": {
+    "version": 1,
+    "mechanism": "successful native tool results",
+    "receipts": [
+      {
+        "path": "request.json",
+        "tool": "Read",
+        "callId": "toolu_01MbPj7gfhyBC1N7hx5TSU1M",
+        "extent": "partial",
+        "outputHash": "cb43c92577125b893afac054c639274009c7f28fbf7c88ec12ec5ac3b20e0b9e"
+      },
+      {
+        "path": "goal.md",
+        "tool": "Read",
+        "callId": "toolu_01CgZyUqDRKihUCjfAgLybG8",
+        "extent": "partial",
+        "outputHash": "57ec4c77cc2598ed2941f2d72c3f93c36eb001f29f1e1a9eddf4765b3ceac1f5"
+      },
+      {
+        "path": "tree/task.md",
+        "tool": "Read",
+        "callId": "toolu_01Lkydb8aKxQ6HC1YgsMoR6Q",
+        "extent": "full",
+        "outputHash": "2d882e0003f76cb0c81d229e64d51d2f2892e83553191ba117f85018497d5a1b"
+      },
+      {
+        "path": "tree/.specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+        "tool": "Read",
+        "callId": "toolu_01JTqWRpdZb53FH8z4wqB2Fp",
+        "extent": "partial",
+        "outputHash": "a39b27d5888920ea6ddb174ab4dce713037179f304b609ab08fb4cb89bdd2d94"
+      },
+      {
+        "path": "tree/.specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json",
+        "tool": "Read",
+        "callId": "toolu_01Dm7EvjPQACaiZhFhnxAwEB",
+        "extent": "full",
+        "outputHash": "e44461294ab510978225a49450087c434552254cb48a80d6b8161cb8a7673859"
+      },
+      {
+        "path": "tree/record.json",
+        "tool": "Read",
+        "callId": "toolu_01LQwGqctSWY6yJkd4tAoPHm",
+        "extent": "full",
+        "outputHash": "d748fe31c796fd9b8dbf8cdfa9a773d0f49bfcec2197bcaf87b1f6cb3da829cf"
+      },
+      {
+        "path": "tree/goal.md",
+        "tool": "Read",
+        "callId": "toolu_01T2Q5t7yb3thXvvcPFFhaZ6",
+        "extent": "full",
+        "outputHash": "96f4e7a1a351bc7e19bae3c2a74b8e9d5ac4545eaaa2d71f05607466dfb694b3"
+      },
+      {
+        "path": "tree/CLAUDE.md",
+        "tool": "Read",
+        "callId": "toolu_013AwQeiG9TV3gNCu5qvqKeW",
+        "extent": "full",
+        "outputHash": "f40667842ee54a8e896fce456073af973d48fb9606039eba2f6e9e32ab83423e"
+      },
+      {
+        "path": "tree/AGENTS.md",
+        "tool": "Read",
+        "callId": "toolu_0125L4MVqM2yPJQtATQUFDAR",
+        "extent": "full",
+        "outputHash": "b897d1873af9c0097c704c0b504f8cd6a50bd033d9246856627472f738a398a5"
+      },
+      {
+        "path": "tree/decisions.json",
+        "tool": "Read",
+        "callId": "toolu_01W7SeioS4MbGgus1nCHkxA9",
+        "extent": "full",
+        "outputHash": "b3b69973bcc444c777967abf2cbfaf6cdfb0982dd83201b6e97a56fff18cdc9a"
+      },
+      {
+        "path": "tree/check.cjs",
+        "tool": "Read",
+        "callId": "toolu_01EGXUMZnwMcTtRaufreHFFy",
+        "extent": "full",
+        "outputHash": "4026b0bebe4c5e694c6719a8761c3581892c64cac61ff95e3c5ae1daee39c95d"
+      },
+      {
+        "path": "diff.patch",
+        "tool": "Read",
+        "callId": "toolu_01XqseRSB8vcnP6bYQ3Rs3VD",
+        "extent": "partial",
+        "outputHash": "6301fc7e0708516724a1ea16d8c7d54926f5a5e2bc34e93a4f348924cedf695e"
+      },
+      {
+        "path": "commits.txt",
+        "tool": "Read",
+        "callId": "toolu_01XtZYkhs9trpCMw9SGbd4WH",
+        "extent": "partial",
+        "outputHash": "0127d7bbdb672fc9eb2b07c0cd96fb35a7e2f37c92e4da9db84606befc9e8561"
+      },
+      {
+        "path": "manifest.json",
+        "tool": "Read",
+        "callId": "toolu_01UZWr5pwe4ATgiAsTHAsM42",
+        "extent": "partial",
+        "outputHash": "f281548d8f27d2754ce806aaa74a53e265beeef5c8c298b50359ae23c7d4f994"
+      },
+      {
+        "path": "tree/context.json",
+        "tool": "Read",
+        "callId": "toolu_01AJz2pqCruWvWnQCnr8NniT",
+        "extent": "full",
+        "outputHash": "0df25da9150c599b277512aad2d73db64d3296de907ce88579f62ec4b36b3755"
+      }
+    ],
+    "inspected": [
+      "commits.txt",
+      "diff.patch",
+      "goal.md",
+      "manifest.json",
+      "request.json",
+      "tree/.specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json",
+      "tree/.specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json",
+      "tree/AGENTS.md",
+      "tree/CLAUDE.md",
+      "tree/check.cjs",
+      "tree/context.json",
+      "tree/decisions.json",
+      "tree/goal.md",
+      "tree/record.json",
+      "tree/task.md"
+    ]
+  },
+  "invocation": {
+    "exe": "claude",
+    "env": {},
+    "args": [
+      "-p",
+      "--effort",
+      "medium",
+      "--append-system-prompt",
+      "You are a read-only duo reviewer. Use Read, Glob and Grep for ALL local inspection, including JSON. Read every path in the required-read checklist before deciding. Bash is ONLY for one standalone allowlisted gh read per call. Never use gh api, local shell utilities, pipes, redirects, command chaining or substitution. Use gh --json/--jq options to select output instead of shell tools. Do not probe permissions, edit files, run skills or launch another model. If required access is unavailable, report blocked with the missing evidence.",
+      "--output-format",
+      "stream-json",
+      "--verbose",
+      "--json-schema",
+      "{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"outcome\",\"summary\",\"findings\",\"unrelated\",\"index_complete\",\"assessments\",\"resolutions\",\"diagnostics\",\"direction\",\"instruction_assessments\",\"specification_findings\",\"specification_nonblocking\"],\"properties\":{\"outcome\":{\"type\":\"string\",\"enum\":[\"accepted\",\"changes_required\",\"blocked\"]},\"summary\":{\"type\":\"string\"},\"findings\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"criterion\",\"kind\",\"basis\",\"evidence\",\"action\",\"verification\"],\"properties\":{\"id\":{\"type\":\"string\"},\"basis\":{\"type\":\"string\"},\"evidence\":{\"type\":\"string\"},\"action\":{\"type\":\"string\"},\"verification\":{\"type\":\"string\"},\"criterion\":{\"type\":[\"string\",\"null\"]},\"kind\":{\"type\":\"string\",\"enum\":[\"acceptance\",\"gate\",\"risk\"]}}}},\"unrelated\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"index_complete\":{\"type\":\"boolean\"},\"assessments\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"status\",\"evidence\",\"reason\"],\"properties\":{\"id\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"verified\",\"unverified\",\"blocked\"]},\"evidence\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"enum\":[\".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json\",\".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json\"]}},\"reason\":{\"type\":\"string\"}}}},\"resolutions\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"status\",\"evidence\",\"reason\"],\"properties\":{\"id\":{\"type\":\"string\"},\"status\":{\"type\":\"string\",\"enum\":[\"open\",\"closed\"]},\"evidence\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"enum\":[\".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json\",\".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json\"]}},\"reason\":{\"type\":\"string\"}}}},\"direction\":{\"anyOf\":[{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"assessment\",\"goal_connection\",\"next_steps\",\"preserve\"],\"properties\":{\"assessment\":{\"type\":\"string\",\"enum\":[\"complete\"]},\"goal_connection\":{\"type\":\"string\",\"minLength\":1},\"next_steps\":{\"type\":\"array\",\"maxItems\":0,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"criterion\",\"owner\",\"action\",\"done_when\"],\"properties\":{\"criterion\":{\"type\":\"string\",\"minLength\":1},\"owner\":{\"type\":\"string\",\"enum\":[\"builder\",\"user\",\"external\"]},\"action\":{\"type\":\"string\",\"minLength\":1},\"done_when\":{\"type\":\"string\",\"minLength\":1}}}},\"preserve\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"minLength\":1}}}},{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"assessment\",\"goal_connection\",\"next_steps\",\"preserve\"],\"properties\":{\"assessment\":{\"type\":\"string\",\"enum\":[\"on_track\",\"redirect\",\"blocked\"]},\"goal_connection\":{\"type\":\"string\",\"minLength\":1},\"next_steps\":{\"type\":\"array\",\"maxItems\":3,\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"criterion\",\"owner\",\"action\",\"done_when\"],\"properties\":{\"criterion\":{\"type\":\"string\",\"minLength\":1},\"owner\":{\"type\":\"string\",\"enum\":[\"builder\",\"user\",\"external\"]},\"action\":{\"type\":\"string\",\"minLength\":1},\"done_when\":{\"type\":\"string\",\"minLength\":1}}},\"minItems\":1},\"preserve\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"minLength\":1}}}}]},\"instruction_assessments\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"instructionId\",\"outcome\",\"reason\",\"snapshotHash\",\"inspected\",\"evidence\",\"dependencyOwner\",\"missingDependency\",\"replacementId\"],\"properties\":{\"instructionId\":{\"type\":\"string\"},\"outcome\":{\"type\":\"string\",\"enum\":[\"satisfied\",\"attempted_failed\",\"not_attempted\",\"unproven\",\"externally_blocked\",\"replaced_with_justification\"]},\"reason\":{\"type\":\"string\"},\"snapshotHash\":{\"type\":\"string\"},\"inspected\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"evidence\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"dependencyOwner\":{\"type\":[\"string\",\"null\"],\"enum\":[\"user\",\"external\",null]},\"missingDependency\":{\"type\":[\"string\",\"null\"]},\"replacementId\":{\"type\":[\"string\",\"null\"]}}}},\"diagnostics\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"observation\",\"evidence\"],\"properties\":{\"observation\":{\"type\":\"string\"},\"evidence\":{\"type\":\"array\",\"items\":{\"type\":\"string\",\"enum\":[\".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json\",\".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json\",\"diff.patch\",\"index.patch\",\"commits.txt\",\"manifest.json\"]}}}}},\"specification_findings\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"severity\",\"origin\",\"repair_evidence\"],\"properties\":{\"id\":{\"type\":\"string\"},\"severity\":{\"type\":\"string\",\"enum\":[\"FATAL\",\"SERIOUS\"]},\"origin\":{\"type\":\"string\",\"enum\":[\"original\",\"repair_induced\",\"unknown\"]},\"repair_evidence\":{\"type\":[\"string\",\"null\"]}}}},\"specification_nonblocking\":{\"type\":\"array\",\"items\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"id\",\"kind\",\"basis\",\"action\",\"impact\",\"evidence\",\"nonimpact\",\"owner_issue\",\"trigger\"],\"properties\":{\"id\":{\"type\":\"string\"},\"kind\":{\"type\":\"string\",\"enum\":[\"P2\",\"deferred\"]},\"basis\":{\"type\":\"string\"},\"action\":{\"type\":\"string\"},\"impact\":{\"type\":\"string\",\"enum\":[\"future\",\"current\",\"unknown\"]},\"evidence\":{\"type\":\"array\",\"items\":{\"type\":\"string\"}},\"nonimpact\":{\"type\":\"string\"},\"owner_issue\":{\"type\":\"string\"},\"trigger\":{\"type\":\"string\"}}}}}}",
+      "--permission-mode",
+      "dontAsk",
+      "--tools",
+      "Read,Glob,Grep",
+      "--allowedTools",
+      "Read,Glob,Grep",
+      "--disable-slash-commands",
+      "--strict-mcp-config",
+      "--mcp-config",
+      "{\"mcpServers\":{}}",
+      "--no-session-persistence",
+      "--setting-sources",
+      "",
+      "--safe-mode"
+    ]
+  },
+  "runtime": {
+    "protocolVersion": "duo-actions-1",
+    "helperHashes": {
+      "scripts/specflow-tier.cjs": "2b167368fcaafcc1c91067c3b987ecbc98037888e5f7f23b9aaa6add369189c2",
+      "scripts/specflow-specification.cjs": "b67ca096e4d5bd852dea815f0520ebb8c6ed41b91f0337746524e272453bcbce",
+      "scripts/specflow-volume.cjs": "c1ebc8e7fefa37a44e52b697e7bdf3f0132d934855f8b3bdaa312977c147377f",
+      "scripts/specflow-publication.cjs": "24128fb70ed257a8a6bf5614f4eb358e95ffec47b3bf36070a5dc49f85872808",
+      "scripts/specflow-reviews.cjs": "626c7fff5803a0fa686126a2197761df280cc44773363dc1753f11292d613eb1",
+      "scripts/typesafe-effort-analysis.cjs": "37d59a7e1385ab41415112548b3b57b4ee3a7b61865444726cc637d5d1559a91",
+      "scripts/typesafe-effort-trial.cjs": "f8ca0f17c2d11262cc693881fbf4242f0041bed1bfd8777234ff19ba470d91c6",
+      "scripts/typesafe-routing.cjs": "2272a70917d20bc724df6b1e6852aa51224fe2b32e512e1649c2c31673ebe5e1",
+      "scripts/typesafe-routing-bridge.cjs": "d5a000f32d9f834b62dc4246e2ee057c57a369988a096d317fd1a1aded83e1da",
+      "scripts/duo-review-receipts.cjs": "89cf06abf109d28ee930ec573e992295fc9b07cfbf420d9e8650122e2e70a4f5",
+      "scripts/typesafe-evidence.cjs": "92fe108ad25527585d1ab1f183d23b914c906fbb326216c5c6169f0561e892c9",
+      "scripts/typesafe-questions-v1.cjs": "65aa23bf71c3c09ced9b622032e32eb8e26cb8cd81df4abb1e56dc2f1fe210af",
+      "scripts/duo-build.cjs": "2c7bf876c34de0fb00c2d3c6d0bc614e23ba140ea3c77a73ed4f860fe7e956ff",
+      "scripts/duo-progress.cjs": "bcb05ab8e1f62e43d443d8af63fb2229c4d0b3f341df803d6cc6e7657cf6919a",
+      "scripts/duo-direction.cjs": "70ace1bb4f344b3e210ff337576eb232c7a67b143663dbb567cd8f2d02a4805e",
+      "scripts/duo-actions.cjs": "5c30b23f01658e4763447f0485b1f864e9fe0fb42e7756fb1212a0116f375320",
+      "scripts/duo-cadence.cjs": "6fbd8d2f7f91dbe90ba96ec2c34afafa9db697bb2a352f44b722790ea0b21882",
+      "scripts/duo-runtime.cjs": "c8911c6b423b8b28e459cdd211ae91724f1383c1a0c2a6431978c36987502ccc",
+      "scripts/typesafe-duo.cjs": "636be38f4b70a11c28c27614063120cf513f2666bb2e8cc603f7213592c5835d",
+      "scripts/typesafe-client.cjs": "d050ad105ef141f68f3ff4ce0d91c8855566cf67575d89ad9977fdb44a388603",
+      "scripts/typesafe-questions.cjs": "a24f491ec2519e9f8c060d7e3bf39ca1b9d686905a4c3bc216537d3d24deb17e",
+      "scripts/typesafe-actions.cjs": "7bbdddf39a020aea4ea8d76015f65008102563cf45a6d4bb0655018a420050b0"
+    },
+    "skillHashes": {
+      "references/routing-study.md": "4ce6a0d6faf797e2f7f5c66604ccc2f1de516efc1a1b9789c506fd69a1c2dfac",
+      "SKILL.md": "00aa6aee348fd67658d01f16066a846b59649581e9a02513969edc33ed033277"
+    },
+    "provenance": "recorded",
+    "identity": "b922eb0c39022bd2d444c3054003eee04e7e40d4fdbac4b33accd48717e1650f"
+  },
+  "source_snapshot": {
+    ".agents/skills/duo-build/SKILL.md": {
+      "sha256": "00aa6aee348fd67658d01f16066a846b59649581e9a02513969edc33ed033277",
+      "mode": 420
+    },
+    ".agents/skills/duo-build/references/routing-study.md": {
+      "sha256": "4ce6a0d6faf797e2f7f5c66604ccc2f1de516efc1a1b9789c506fd69a1c2dfac",
+      "mode": 420
+    },
+    ".agents/skills/specflow-audit/SKILL.md": {
+      "sha256": "32a0bc7c410f92a48e9d866d9b3facd28ecd05c2c495929b7ee5b1775fc7db20",
+      "mode": 436
+    },
+    ".agents/skills/specflow-audit/references/preflight-gate.md": {
+      "sha256": "518c016621540f0ade2f57f64f10183a44d9a9c13df220eb9f5d02d243d03128",
+      "mode": 436
+    },
+    ".agents/skills/specflow-audit/references/uplift-process.md": {
+      "sha256": "132943e1ccf1e8d9f7f8e03c1ded88c191c2b9c3954b17a29f60026f1aa9e757",
+      "mode": 436
+    },
+    ".agents/skills/specflow-loop-selector/SKILL.md": {
+      "sha256": "165749460101fb0d0b5fd0ff2ad402fed886aab59472f6bca3c7c7441fc104a5",
+      "mode": 436
+    },
+    ".agents/skills/specflow-loop-selector/agents/openai.yaml": {
+      "sha256": "536b674696a17d806ef60ade8400349517c6bac84a8fbb09c6d4e353e7fca2a7",
+      "mode": 436
+    },
+    ".agents/skills/specflow-simulate/SKILL.md": {
+      "sha256": "c0b63e6294f0cebbd44e70687c97bc7b5dcd4ac683ceee452cf2162c66bee6a9",
+      "mode": 436
+    },
+    ".agents/skills/specflow-simulate/references/simulation-method.md": {
+      "sha256": "2b162a3422b9f35affc9378742d9ad773e46671dc7fb10cdbf7fa5778b4cc1c6",
+      "mode": 436
+    },
+    ".claude/hooks/README.md": {
+      "sha256": "10c17eb3905e0b03b3a39f6ff603631fdf3f26af07a9bd54dca000f137d0ebe1",
+      "mode": 436
+    },
+    ".claude/hooks/check-pipeline-compliance.sh": {
+      "sha256": "91f260dc89d553de2056e6f487358496d09a8b4d31453af50d0b26b5df5d5502",
+      "mode": 509
+    },
+    ".claude/hooks/duo-review-check.sh": {
+      "sha256": "d13373ec688ff10601eefc3096ed03055e656fd01965985013f50446f091d28f",
+      "mode": 493
+    },
+    ".claude/hooks/post-build-check.sh": {
+      "sha256": "3207c7899a02473f76c0765c80ac16619b4f72a9807651f20b963d7fb740153d",
+      "mode": 509
+    },
+    ".claude/hooks/post-push-ci.sh": {
+      "sha256": "4edcc506edcf3bafaf8b98a9fa75297b539539af6d71c3cdf0730a963ad6940b",
+      "mode": 509
+    },
+    ".claude/hooks/run-journey-tests.sh": {
+      "sha256": "12035a6492c99b616bf1634cce77f5d08a033fa68631b7d51fedb0c67c43bbdd",
+      "mode": 509
+    },
+    ".claude/hooks/session-start.sh": {
+      "sha256": "0213d4c2579c9a5015a31bb7f585986f70117fd99c6386019bbbba6875f7b345",
+      "mode": 509
+    },
+    ".claude/settings.json": {
+      "sha256": "26c103f378ed4827d15ece5d29501cfe47a0b3284abc1fec10a60286f1362327",
+      "mode": 436
+    },
+    ".claude/skills/duo-build/SKILL.md": {
+      "sha256": "00aa6aee348fd67658d01f16066a846b59649581e9a02513969edc33ed033277",
+      "mode": 420
+    },
+    ".claude/skills/duo-build/references/routing-study.md": {
+      "sha256": "4ce6a0d6faf797e2f7f5c66604ccc2f1de516efc1a1b9789c506fd69a1c2dfac",
+      "mode": 420
+    },
+    ".claude/skills/specflow-audit/SKILL.md": {
+      "sha256": "32a0bc7c410f92a48e9d866d9b3facd28ecd05c2c495929b7ee5b1775fc7db20",
+      "mode": 436
+    },
+    ".claude/skills/specflow-audit/references/preflight-gate.md": {
+      "sha256": "518c016621540f0ade2f57f64f10183a44d9a9c13df220eb9f5d02d243d03128",
+      "mode": 436
+    },
+    ".claude/skills/specflow-audit/references/uplift-process.md": {
+      "sha256": "132943e1ccf1e8d9f7f8e03c1ded88c191c2b9c3954b17a29f60026f1aa9e757",
+      "mode": 436
+    },
+    ".claude/skills/specflow-loop-selector/SKILL.md": {
+      "sha256": "165749460101fb0d0b5fd0ff2ad402fed886aab59472f6bca3c7c7441fc104a5",
+      "mode": 436
+    },
+    ".claude/skills/specflow-loop-selector/agents/openai.yaml": {
+      "sha256": "536b674696a17d806ef60ade8400349517c6bac84a8fbb09c6d4e353e7fca2a7",
+      "mode": 436
+    },
+    ".claude/skills/specflow-simulate/SKILL.md": {
+      "sha256": "c0b63e6294f0cebbd44e70687c97bc7b5dcd4ac683ceee452cf2162c66bee6a9",
+      "mode": 436
+    },
+    ".claude/skills/specflow-simulate/references/simulation-method.md": {
+      "sha256": "2b162a3422b9f35affc9378742d9ad773e46671dc7fb10cdbf7fa5778b4cc1c6",
+      "mode": 436
+    },
+    ".codex/skills/duo-build/SKILL.md": {
+      "sha256": "00aa6aee348fd67658d01f16066a846b59649581e9a02513969edc33ed033277",
+      "mode": 420
+    },
+    ".codex/skills/duo-build/references/routing-study.md": {
+      "sha256": "4ce6a0d6faf797e2f7f5c66604ccc2f1de516efc1a1b9789c506fd69a1c2dfac",
+      "mode": 420
+    },
+    ".codex/skills/specflow-audit/SKILL.md": {
+      "sha256": "32a0bc7c410f92a48e9d866d9b3facd28ecd05c2c495929b7ee5b1775fc7db20",
+      "mode": 436
+    },
+    ".codex/skills/specflow-audit/references/preflight-gate.md": {
+      "sha256": "518c016621540f0ade2f57f64f10183a44d9a9c13df220eb9f5d02d243d03128",
+      "mode": 436
+    },
+    ".codex/skills/specflow-audit/references/uplift-process.md": {
+      "sha256": "132943e1ccf1e8d9f7f8e03c1ded88c191c2b9c3954b17a29f60026f1aa9e757",
+      "mode": 436
+    },
+    ".codex/skills/specflow-loop-selector/SKILL.md": {
+      "sha256": "165749460101fb0d0b5fd0ff2ad402fed886aab59472f6bca3c7c7441fc104a5",
+      "mode": 436
+    },
+    ".codex/skills/specflow-loop-selector/agents/openai.yaml": {
+      "sha256": "536b674696a17d806ef60ade8400349517c6bac84a8fbb09c6d4e353e7fca2a7",
+      "mode": 436
+    },
+    ".codex/skills/specflow-simulate/SKILL.md": {
+      "sha256": "c0b63e6294f0cebbd44e70687c97bc7b5dcd4ac683ceee452cf2162c66bee6a9",
+      "mode": 436
+    },
+    ".codex/skills/specflow-simulate/references/simulation-method.md": {
+      "sha256": "2b162a3422b9f35affc9378742d9ad773e46671dc7fb10cdbf7fa5778b4cc1c6",
+      "mode": 436
+    },
+    ".gitignore": {
+      "sha256": "67aaf1ae8b71bda76bbc19812496cbcc16a4f29697b7ecf7ba099e817e459985",
+      "mode": 436
+    },
+    ".specflow/duo/1790178810790-262542ea/evidence/1790179011252-ad9f2c13.json": {
+      "sha256": "23427a79242e8da5147a986c1e41f9f245e56501a5ab443d5a17e558b87021af",
+      "mode": 436
+    },
+    ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json": {
+      "sha256": "f830c862ed9fcf6c0e5291503f64c730d0c8bd8314e264a1c83199ee39e5279f",
+      "mode": 436
+    },
+    "AGENTS.md": {
+      "sha256": "18fb3841f37e6d4b0de6fc7f03cc65372989bcf0ddc294c42ba69150f65f0a38",
+      "mode": 436
+    },
+    "CLAUDE.md": {
+      "sha256": "c2e2f109449bc5eba7e026b265ce5dc14cc34b34392ae1107e5ad2e793195d7a",
+      "mode": 436
+    },
+    "PROCESS.md": {
+      "sha256": "ad6821061693f27635a784c3dabb9e0fced2d62beaa7c7050f7ec6bab0d5f16c",
+      "mode": 436
+    },
+    "QA/README.md": {
+      "sha256": "3313d35af10f4faaaa2d7b1b95ee3235ae26b421ad08fa78b6f5ff66121954fd",
+      "mode": 436
+    },
+    "QA/feature-build-loop.md": {
+      "sha256": "9e4bd4af467f3d8f86e3d98c7b1ea5300c5d2f5e82d7b3f42b95e1c06df33d52",
+      "mode": 436
+    },
+    "QA/journeys-how-to.md": {
+      "sha256": "bda1da2ddcffe1d3e6f187755b95e9b0955eb09d843ecb76a7213e3addf5a973",
+      "mode": 436
+    },
+    "QA/journeys/examples/journey_nol_file.spec.ts": {
+      "sha256": "35bb1f8bc6f756fd4868ad9d8bb6ce1472e46cdfaac6dfe75660b23e54407cdb",
+      "mode": 436
+    },
+    "QA/journeys/examples/journey_nol_file.yml": {
+      "sha256": "29d355c226e4d43e255a3c2860e74ee656e36c533a9ac94439cddd43a37bd702",
+      "mode": 436
+    },
+    "QA/journeys/examples/notice-of-loss.spec.md": {
+      "sha256": "4353f47357de05e8121a30170e4c207875df778ddee9e7a306b3da68b9996213",
+      "mode": 436
+    },
+    "QA/journeys/journey-deck.html": {
+      "sha256": "f1d455c02d9bf9e574d93bc5a59e86b042b01f8aeb4f76756a340c840988bdb8",
+      "mode": 436
+    },
+    "QA/journeys/journey_map_TEMPLATE.csv": {
+      "sha256": "f819259f148b3bd4c9e54ff7721211c35a6ef36d143413af21ac3b8d634d35e3",
+      "mode": 436
+    },
+    "QA/loops/README.md": {
+      "sha256": "a777a0da0fb854e1fce4d8b9d5f7dfeaa7dd1930aff6a3d1d01ee0a0c499fa90",
+      "mode": 436
+    },
+    "QA/loops/adversary-mandate.md": {
+      "sha256": "90a6463bf2407b10eba8b50ba9783b9c72e17a0c7cfd037a75bb2908f8c6b421",
+      "mode": 436
+    },
+    "QA/loops/daily-use-teardown.yaml": {
+      "sha256": "3e48ffcfc41802b6b455b5411f42fe49a0180261507d25635ed30c1eacb94339",
+      "mode": 436
+    },
+    "QA/loops/examples/claim-alert.daily-use-teardown.md": {
+      "sha256": "f369b925cf12dd74a03c7ea7d0b6c46c2e22b4ecd8d5dee6a2b4d16f8bc8d06e",
+      "mode": 436
+    },
+    "QA/loops/examples/tt-rollback.feature-build.md": {
+      "sha256": "cb70db534f7357605cc9f1d0440a5f635295df37394c137ee733bc0ccb1f6e3c",
+      "mode": 436
+    },
+    "QA/loops/examples/tt-rollback.gate-d.md": {
+      "sha256": "65d71337ef0161cd3dee2e97d43b7ef052ddcad3af07c049ab21e3a680acc4f9",
+      "mode": 436
+    },
+    "QA/loops/examples/tt-rollback.spec-build.md": {
+      "sha256": "3f04af97a4e152fff3a8f626746ee1a96ddc5850c119d8f3958b6feaf3baeb8e",
+      "mode": 436
+    },
+    "QA/loops/falsification-template.md": {
+      "sha256": "dafc2c685dde0fbdda65dc7dc4e59e36ada0c250e7d1d14a43918140af698e91",
+      "mode": 436
+    },
+    "QA/loops/feature-build.yaml": {
+      "sha256": "ca47c53522cd05cd11208ba3bc45a58805aa744f77fa3f1da6794b5239b7f297",
+      "mode": 436
+    },
+    "QA/loops/prompts/daily-use-teardown.prompt.md": {
+      "sha256": "f38f42c9e0b24789bbe85982f01b7621df94d3a8096190cf0d7a59c8aba1f21c",
+      "mode": 436
+    },
+    "QA/loops/prompts/feature-build.prompt.md": {
+      "sha256": "98b0028c31f6d1a74daecd00a374f71902f43eaf54df03ec71cfe2122c4fccb2",
+      "mode": 436
+    },
+    "QA/loops/prompts/gate-d.prompt.md": {
+      "sha256": "4a47dfd79aea6c1cfcfac1a3951c88e21a9bc5081a1051a12f15ee19b930dc14",
+      "mode": 436
+    },
+    "QA/loops/prompts/spec-build.prompt.md": {
+      "sha256": "da34155148195e4a7996c44150764476f7aaa1ecde487655153b6aa2b1e65627",
+      "mode": 436
+    },
+    "QA/loops/spec-build.yaml": {
+      "sha256": "23cb067357c58c71e36b23b3b5fe3a9e18ba84c0ee0671be3d37fe4f2bf8a7c9",
+      "mode": 436
+    },
+    "QA/loops/teardown-walkthrough-mandate.md": {
+      "sha256": "c6e7f4c5b9d61e02a58bb0cecb6f5d706ae9e56a876ee226ef07ecdf3bd81aa3",
+      "mode": 436
+    },
+    "QA/qe-prompt-preamble.md": {
+      "sha256": "3b96a6ac254a2ba1dbde7d1baff5fd05343756eb95e2bb458bed7b732320ffd6",
+      "mode": 436
+    },
+    "QA/spec-build-loop.md": {
+      "sha256": "847b6d342855f39c12ec9550ce74066cb8106c86726a7ad93dba0eab9c1edde0",
+      "mode": 436
+    },
+    "QA/spec-build.md": {
+      "sha256": "72fe2dc2659234f6def4ef173b23ee758c558dc86f93a7ab04e4838f4987dc4c",
+      "mode": 436
+    },
+    "SPECIFICATION.md": {
+      "sha256": "14a4f860cf2206afd69a2884b4da2077e9cabf4892ebe092e6df843922c086bc",
+      "mode": 436
+    },
+    "check.cjs": {
+      "sha256": "879846fec0993611972edf33e09d2ce2497691e404c0a86a493c90959cdd1b9e",
+      "mode": 436
+    },
+    "context.json": {
+      "sha256": "926a32db05f7cb14d10d6f4854ef0a593d95977703c8305d6845b130738b7271",
+      "mode": 436
+    },
+    "decisions.json": {
+      "sha256": "0f643b0c6252fb30052042c6f7754ff3ccac23be77dab1281e7f89199a10fe3f",
+      "mode": 436
+    },
+    "goal.md": {
+      "sha256": "d9682a4fa984a29fddf6a0a6bbae2289eb38289e0c2c88e6365a1b887ba635a9",
+      "mode": 436
+    },
+    "issue.json": {
+      "sha256": "628047efce0deabad84c1325696ac5d3ee8dc5b725c11d37fd97eb22a61d728b",
+      "mode": 436
+    },
+    "record.json": {
+      "sha256": "6389230fb78ee248599a99ebf10252c34c32e37fee17a63e190910346e2f9fa3",
+      "mode": 436
+    },
+    "scripts/adversary-spawn.cjs": {
+      "sha256": "a1ded1a86826c063a82fb7da8840d4d4b07ab96fb4582da7fdc5b1344837ccd6",
+      "mode": 436
+    },
+    "scripts/agents/PROTOCOL.md": {
+      "sha256": "8dc601a46e7f15bd5f6a9f876ff664e2f2183f2eb584b15877757131924949cb",
+      "mode": 436
+    },
+    "scripts/agents/README.md": {
+      "sha256": "16d00849600257efc4234bbcb6bbb36f6f5bf300615c5022676a2d332cf73f99",
+      "mode": 436
+    },
+    "scripts/agents/WORKFLOW.md": {
+      "sha256": "6507de0da45c3ac06b7b534c7111060c3d4257f055540623f41e67f2bfcc1c10",
+      "mode": 436
+    },
+    "scripts/agents/agentlist.md": {
+      "sha256": "aac74c96547ab3f95e778accc9d75a123f7fabe0d1643a328d3aac0aca3d4a7a",
+      "mode": 436
+    },
+    "scripts/agents/agentnames.md": {
+      "sha256": "d41d948301e2639c4e950251485214131405f93f53cd6a6c425ad66a9b5b189f",
+      "mode": 436
+    },
+    "scripts/agents/board-auditor.md": {
+      "sha256": "54ce6bed958d5189d7cb090bae9d4a3422856541e5ef44ee5d6072fe3aac11ca",
+      "mode": 436
+    },
+    "scripts/agents/builder-guidance.md": {
+      "sha256": "017b437d6c26740bf869867f62869044eb4a56cd13c33161ead1c63443e9a3d6",
+      "mode": 436
+    },
+    "scripts/agents/contract-generator.md": {
+      "sha256": "a5ee752dcac8da4088afa67667f38aaffbd6f16065ffb4b322c949e4dda5a275",
+      "mode": 436
+    },
+    "scripts/agents/contract-test-generator.md": {
+      "sha256": "6d6fef8a037b8df32243249b52ebf47816db23b57b4fd2a698881e0d92fc2966",
+      "mode": 436
+    },
+    "scripts/agents/contract-validator.md": {
+      "sha256": "abf03f6e51b6bc350b5611a0f2ea356d2a709622aaa8fd0ddde102caaf60e336",
+      "mode": 436
+    },
+    "scripts/agents/db-coordinator.md": {
+      "sha256": "405fcad2e29fc92fb6e5cdf097b31e90703b32470e8134d6857660651727ef87",
+      "mode": 436
+    },
+    "scripts/agents/dependency-mapper.md": {
+      "sha256": "6fb0a2d22f1458f8574b4e276d06e801844cff7abc7d6bc1f7c2a3b372ab0591",
+      "mode": 436
+    },
+    "scripts/agents/e2e-test-auditor.md": {
+      "sha256": "902efcc60b815715244ef1efb450e5ee55dbee1aee736196658cb4837e2ae836",
+      "mode": 436
+    },
+    "scripts/agents/edge-function-builder.md": {
+      "sha256": "ddc2d3edf9d05faf74c621b8b7538c69ddcf9313ad1457419a10559411fe6fa0",
+      "mode": 436
+    },
+    "scripts/agents/frontend-builder.md": {
+      "sha256": "94d7d4190e433cd88940aa59575686d35eb5800111f448caf2d840c3bd60eb11",
+      "mode": 436
+    },
+    "scripts/agents/heal-loop.md": {
+      "sha256": "43cd28a9c225b7b3ec7a71e7dd198285fb14136ef4fc6a8def7170916624dc56",
+      "mode": 436
+    },
+    "scripts/agents/issue-lifecycle.md": {
+      "sha256": "eee0ead77222b016bb342881be415b593f632fa1a4c7f510b919b61c17193a9a",
+      "mode": 436
+    },
+    "scripts/agents/journey-enforcer.md": {
+      "sha256": "31b1526b920fcdad3bd49d0793da9b0ee3c62ed18aa5e800a099c781eb5da684",
+      "mode": 436
+    },
+    "scripts/agents/journey-gate.md": {
+      "sha256": "f8d7abdbbbe882034ea5e165916514066dc577ee8f9e171d7b2b34f8b986a5c3",
+      "mode": 436
+    },
+    "scripts/agents/journey-tester.md": {
+      "sha256": "a111675060dfcb7a078c5eb516a1ce4cbd3ddeaa1f81171c14ae0fa3a8938290",
+      "mode": 436
+    },
+    "scripts/agents/migration-builder.md": {
+      "sha256": "5a7c034d5ab79c2a743f7d14d77ccc945676a3b2f7beec0eaf5cd5e68a2158cf",
+      "mode": 436
+    },
+    "scripts/agents/playwright-from-specflow.md": {
+      "sha256": "5814916c4f7f836c0a27f34390ab1280e09112d5b5eb2f373ccb9a4f0193d10b",
+      "mode": 436
+    },
+    "scripts/agents/pre-flight-simulator.md": {
+      "sha256": "55c2f59b98e95c1700cace2bff324ea50311ac87e1b24b5475537853a93bd5cc",
+      "mode": 436
+    },
+    "scripts/agents/quality-gate.md": {
+      "sha256": "74eb54d892e15f12d292c7b4104d85c42df97253457e50b4123919dfb833d0cc",
+      "mode": 436
+    },
+    "scripts/agents/readme-audit.md": {
+      "sha256": "e21d4012bd4a6e82f9fa098b86f1f5759349c947e09ffa836ba0557ec3d378cb",
+      "mode": 436
+    },
+    "scripts/agents/readme-restructure.md": {
+      "sha256": "dc6232ffff555dd3afed7517f0e7e18402afb3925bef550332cd73e0735f37dd",
+      "mode": 436
+    },
+    "scripts/agents/specflow-uplifter.md": {
+      "sha256": "d287e79d9571734cf114bad071e6a59461176f1295ccdc13cd9916edd627c0d2",
+      "mode": 436
+    },
+    "scripts/agents/specflow-writer.md": {
+      "sha256": "1a6b60f59bb1c944b9ea65743e1051971670c5ca60540852a2fe935f85f54acb",
+      "mode": 436
+    },
+    "scripts/agents/sprint-executor.md": {
+      "sha256": "2b8d3c00260c9255070313e65def309748855345c89d56dc118225dcad0e0b1c",
+      "mode": 436
+    },
+    "scripts/agents/team-names.md": {
+      "sha256": "d3c60620d81bd97c9d72d3fe275a85886548959cef5fbbabb95cbe5f9c0c0f82",
+      "mode": 436
+    },
+    "scripts/agents/test-runner.md": {
+      "sha256": "2ed2db1743091be5cd39603473df4d0bd7a7e1e79f9382435d79748e0d29ba2f",
+      "mode": 436
+    },
+    "scripts/agents/ticket-closer.md": {
+      "sha256": "8875a0d53363725816d45b4d18505308e24aac40bd7c51de5715525aa1db8e78",
+      "mode": 436
+    },
+    "scripts/agents/waves-controller.md": {
+      "sha256": "12394f7c0cd1b02dbbc4aa2584d3a6c2b832a3c2ba41b6ecf052aa55308d6540",
+      "mode": 436
+    },
+    "scripts/duo-actions.cjs": {
+      "sha256": "5c30b23f01658e4763447f0485b1f864e9fe0fb42e7756fb1212a0116f375320",
+      "mode": 420
+    },
+    "scripts/duo-build.cjs": {
+      "sha256": "2c7bf876c34de0fb00c2d3c6d0bc614e23ba140ea3c77a73ed4f860fe7e956ff",
+      "mode": 420
+    },
+    "scripts/duo-cadence.cjs": {
+      "sha256": "6fbd8d2f7f91dbe90ba96ec2c34afafa9db697bb2a352f44b722790ea0b21882",
+      "mode": 420
+    },
+    "scripts/duo-direction.cjs": {
+      "sha256": "70ace1bb4f344b3e210ff337576eb232c7a67b143663dbb567cd8f2d02a4805e",
+      "mode": 420
+    },
+    "scripts/duo-live-action-proof.cjs": {
+      "sha256": "ab46c29532f8178b1c4f9f8b9b6b8609b1c2b0473a8831e92711fc2d2694a128",
+      "mode": 436
+    },
+    "scripts/duo-progress.cjs": {
+      "sha256": "bcb05ab8e1f62e43d443d8af63fb2229c4d0b3f341df803d6cc6e7657cf6919a",
+      "mode": 420
+    },
+    "scripts/duo-review-receipts.cjs": {
+      "sha256": "89cf06abf109d28ee930ec573e992295fc9b07cfbf420d9e8650122e2e70a4f5",
+      "mode": 420
+    },
+    "scripts/duo-runtime.cjs": {
+      "sha256": "c8911c6b423b8b28e459cdd211ae91724f1383c1a0c2a6431978c36987502ccc",
+      "mode": 420
+    },
+    "scripts/normalize-eol.cjs": {
+      "sha256": "0877a4193acf70f8e47272c22ee48b54df5f9d5eca378dc3542e3485fdd4a098",
+      "mode": 436
+    },
+    "scripts/provenance-gate.cjs": {
+      "sha256": "68b65945f9f3fdc9c2767d50c6db00e0978f777de19f484155b4d907bf8af7f2",
+      "mode": 436
+    },
+    "scripts/runtime-routing.cjs": {
+      "sha256": "58c1b9e859c9b977b34ca2a7f373986b8241882382314fd4d25b2b5408bcd605",
+      "mode": 436
+    },
+    "scripts/specflow-compile.cjs": {
+      "sha256": "927970d668aed0113a9d1de236d4cfe28e5f21a6baca2ef0c3072725fc9ad412",
+      "mode": 436
+    },
+    "scripts/specflow-publication.cjs": {
+      "sha256": "24128fb70ed257a8a6bf5614f4eb358e95ffec47b3bf36070a5dc49f85872808",
+      "mode": 420
+    },
+    "scripts/specflow-reviews.cjs": {
+      "sha256": "626c7fff5803a0fa686126a2197761df280cc44773363dc1753f11292d613eb1",
+      "mode": 420
+    },
+    "scripts/specflow-runner.cjs": {
+      "sha256": "8a4cbe1263ece3cd8f9c03375c8dc382fc503e3efc1194995c61ea3d480dfe25",
+      "mode": 436
+    },
+    "scripts/specflow-specification.cjs": {
+      "sha256": "b67ca096e4d5bd852dea815f0520ebb8c6ed41b91f0337746524e272453bcbce",
+      "mode": 420
+    },
+    "scripts/specflow-tier.cjs": {
+      "sha256": "2b167368fcaafcc1c91067c3b987ecbc98037888e5f7f23b9aaa6add369189c2",
+      "mode": 420
+    },
+    "scripts/specflow-volume.cjs": {
+      "sha256": "c1ebc8e7fefa37a44e52b697e7bdf3f0132d934855f8b3bdaa312977c147377f",
+      "mode": 420
+    },
+    "scripts/teardown-gate.cjs": {
+      "sha256": "0934a56d6b9a5f7244c733c08b0b3a4073c3c8fc839edc3d6c70a078a46b6450",
+      "mode": 436
+    },
+    "scripts/typesafe-actions.cjs": {
+      "sha256": "7bbdddf39a020aea4ea8d76015f65008102563cf45a6d4bb0655018a420050b0",
+      "mode": 420
+    },
+    "scripts/typesafe-client.cjs": {
+      "sha256": "d050ad105ef141f68f3ff4ce0d91c8855566cf67575d89ad9977fdb44a388603",
+      "mode": 420
+    },
+    "scripts/typesafe-comparison.cjs": {
+      "sha256": "27fa1f658302982f6d3a4ee23de4c865e3b5cf4833bf223ce6bb53b820cec60e",
+      "mode": 436
+    },
+    "scripts/typesafe-duo.cjs": {
+      "sha256": "636be38f4b70a11c28c27614063120cf513f2666bb2e8cc603f7213592c5835d",
+      "mode": 420
+    },
+    "scripts/typesafe-effort-analysis.cjs": {
+      "sha256": "37d59a7e1385ab41415112548b3b57b4ee3a7b61865444726cc637d5d1559a91",
+      "mode": 420
+    },
+    "scripts/typesafe-effort-trial.cjs": {
+      "sha256": "f8ca0f17c2d11262cc693881fbf4242f0041bed1bfd8777234ff19ba470d91c6",
+      "mode": 420
+    },
+    "scripts/typesafe-eval.cjs": {
+      "sha256": "43a0334fab0cf92ed5ef94ea36853edba595d1ec60bb31c0e1b74ceca2d3814e",
+      "mode": 436
+    },
+    "scripts/typesafe-evidence.cjs": {
+      "sha256": "92fe108ad25527585d1ab1f183d23b914c906fbb326216c5c6169f0561e892c9",
+      "mode": 420
+    },
+    "scripts/typesafe-questions-v1.cjs": {
+      "sha256": "65aa23bf71c3c09ced9b622032e32eb8e26cb8cd81df4abb1e56dc2f1fe210af",
+      "mode": 420
+    },
+    "scripts/typesafe-questions.cjs": {
+      "sha256": "a24f491ec2519e9f8c060d7e3bf39ca1b9d686905a4c3bc216537d3d24deb17e",
+      "mode": 420
+    },
+    "scripts/typesafe-routing-bridge.cjs": {
+      "sha256": "d5a000f32d9f834b62dc4246e2ee057c57a369988a096d317fd1a1aded83e1da",
+      "mode": 420
+    },
+    "scripts/typesafe-routing.cjs": {
+      "sha256": "2272a70917d20bc724df6b1e6852aa51224fe2b32e512e1649c2c31673ebe5e1",
+      "mode": 420
+    },
+    "scripts/verify-adr.cjs": {
+      "sha256": "a6b3e83a34ad7c7f15c680788c71853e2d871c5175159b4145b0ea44207823b8",
+      "mode": 436
+    },
+    "scripts/verify-falsification.cjs": {
+      "sha256": "6c37cfc3f7cb707b53ccd71159fe4806d44811c123a2e8e3e2fbba04b40f02ef",
+      "mode": 436
+    },
+    "scripts/verify-graph.cjs": {
+      "sha256": "b45eeb8d13f395f9ff3c9c915e0c56b767bc2b284f7d26f92c09aea2cfb99d57",
+      "mode": 509
+    },
+    "scripts/verify-seams.cjs": {
+      "sha256": "97fc7932b654de09511a24fba98a687b17f9c330f382712477598af45ef77568",
+      "mode": 436
+    },
+    "scripts/verify-seed.cjs": {
+      "sha256": "34762bda5eee6d93f85942a5492926e2e346688740ccbafe3c8a5a4b52ea26fd",
+      "mode": 436
+    },
+    "scripts/verify-ticket-journey.cjs": {
+      "sha256": "2753dbb4b43976fcae9308a6147fc01a92320d2bc7e1757b099a3e6188a55f40",
+      "mode": 436
+    },
+    "task.md": {
+      "sha256": "869942ceeb64221d3768014b16a65b8962f9d82669a0b0a5b16f360ec3799980",
+      "mode": 436
+    }
+  }
+}

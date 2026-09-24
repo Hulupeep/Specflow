@@ -1,3 +1,5 @@
+> Progressive specification: thin work remains planning without automatic adversary, walkthrough, uplift or pre-flight. The deeper path below applies only to selected work at its applicable tier.
+
 # spec-build — a best-practice loop from idea to delivery
 
 *Read this first if you're new to spec-build. For the runnable files see [`loops/`](./loops/); for the deep version see [`spec-build-loop.md`](./spec-build-loop.md).*
@@ -8,15 +10,15 @@
 
 It strings together two things we already use:
 
-### Pillar 1 — the adversary (before you write tickets)
+### Pillar 1 — independent review of selected decisions
 A **hostile critic** takes your PRD or your stories and *challenges* them — pokes holes, hunts for the cases you didn't think of, checks your claims against the real system. Its job is to make sure you have a **good foundation in your thinking** before anyone builds anything. It's the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer).
 
 ### Pillar 2 — Specflow (around the build)
 Most people think Specflow just *checks* invariants at the end. It does more:
 
 - **It makes sure the invariants are even there** in the first place — not just that they pass.
-- **It audits and uplifts your tickets.** The ticket workflow is: make the ticket Specflow-compliant → **audit** it → **uplift** it (fill the missing SQL/RLS, interfaces, invariants, selectors).
-- **It adds meat with persona walkthroughs / simulations** — walking a real user through each ticket *before* code, so edge cases ("new staff land at zero balance") get caught early.
+- **It audits and uplifts the selected build-ready slice.** Audit the applicable artifacts, then add only missing evidence (SQL/RLS, interfaces or selectors where relevant). Future tickets remain thin.
+- **It adds meat with persona walkthroughs / simulations** — walking a real user through the selected build-ready slice *before* production code, so edge cases ("new staff land at zero balance") get caught early.
 - **Then it checks the invariants after the build** against a real backend, so "the right thing" is what actually shipped.
 
 So: the **adversary makes the spec honest**; **Specflow makes it complete and then enforces it.** Both work together to produce a solid foundation.
@@ -27,7 +29,7 @@ These aren't new steps. We already did them by hand. What's new is **connecting 
 
 It's meant to **evolve**: as a team we'll modify this loop as we learn what catches bugs — for example, adding draft-PR checks or new stages over time. Treat it as a living thing, not a fixed pipeline.
 
-And it is **not full automation**. The loop has deliberate **human-in-the-loop breaks** — you approve the adversary's verdict, you confirm before tickets are created. You stay in control, and you can **adapt it however you wish**.
+And it is **not full automation**. The loop has deliberate **human-in-the-loop breaks** — you approve the adversary's verdict, you confirm before GitHub issues are created; local thin backlog capture may precede review. You stay in control, and you can **adapt it however you wish**.
 
 ## Two ways in
 
@@ -46,8 +48,8 @@ Either way, the output is the same: a corrected/hardened **PRD that becomes the 
   (a discovery chat)┘            (challenges it)               (Specflow writes them)  (fill the gaps)   (cover the edges)
 ```
 
-- Nothing gets built until the PRD **survives the adversary**.
-- Tickets aren't "done" until they're **audited, uplifted, and walked through a persona**.
+- Production building requires current scoped readiness; bounded experiments can resolve unknowns earlier.
+- Thin tickets remain planning outcomes. Selected contracted work gets relevant decision review; build-ready work receives applicable pre-flight.
 - The invariants you set are then **checked after the build** — so you find out if you built the right thing.
 
 That whole string, run as one repeatable practice, **is spec-build**.
@@ -73,7 +75,7 @@ That's it — `init` now also installs the adversary critic into your skills dir
 The loop is a **path** (`QA/loops/spec-build.yaml`) plus a **thin prompt**. You don't re-type the steps — you point at the path. Copy [`loops/prompts/spec-build.prompt.md`](./loops/prompts/spec-build.prompt.md) and fill three things:
 
 ```
-Goal:   SHIP the <thing> spec — a hardened PRD + ready, audited tickets
+Goal:   Prepare the next justified <thing> slice and retain a thin future backlog
 Path:   QA/loops/spec-build.yaml
 Inputs: { slug: <short-name>, grounding_ref: <a file, OR "this discovery chat above; no PRD yet"> }
 ```
@@ -93,7 +95,7 @@ It'll produce the filled-in prompt from your conversation. Then you run that —
 > 1. **Discovery chat:** you and the LLM look at the real import tables and ask "what would make a rollback unsafe?" You surface the real rules (don't delete records someone already edited; recalculate balances, don't subtract them back).
 > 2. **PRD:** the loop drafts a PRD from that chat.
 > 3. **Adversary:** a fresh critic attacks it — and catches that you assumed a table does something it doesn't, and that one rule could be gamed. You fix the PRD.
-> 4. **Tickets:** Specflow turns the hardened PRD into tickets, audits them, uplifts the gaps, walks an admin persona through each one.
+> 4. **Tickets:** Specflow records a thin backlog, reuses shared decisions, and audits only the selected build-ready rollback slice and its material seams. Its admin journey receives applicable simulation and executable acceptance checks; future rehearsal work stays thin.
 > 5. **Build:** your LLM now builds against a comprehensive, edge-covered spec — and the invariants get checked after.
 
 The bugs that *would* have shown up in production mostly got found in steps 3–4, on paper, for minutes of effort instead of a hotfix.
@@ -104,7 +106,7 @@ The bugs that *would* have shown up in production mostly got found in steps 3–
 - **Worth it for:** anything non-trivial — real data, money/leave/balances, auth, things you'll maintain, anything where a production bug hurts. The hour up front saves far more in avoided rework.
 - **Overkill for:** a one-line copy change, a throwaway spike, or pure exploration where you're not shipping. Don't loop a typo fix.
 - **Where it's efficient:** independent tickets can be built in parallel after the spec is ready; discovery + adversary often run while you draft the next thing.
-- **Where it's slower:** a single small story carries the full ceremony, and a weak/rushed adversary pass just adds time without catching anything — give it the real artifact and let it actually dig.
+- **Depth follows the decision:** a small story reuses existing contracts and supplies only applicable missing evidence. Thin capture triggers no full simulation. Selected contracted decisions get initial + one repair; no-new-evidence or an exhausted allowance stops automatic review.
 
 **Rule of thumb:** if a bug in this would embarrass you in front of a customer, run spec-build. If not, just write the ticket.
 
@@ -121,15 +123,15 @@ You point the prompt at one file — [`QA/loops/spec-build.yaml`](./loops/spec-b
 | **`stages`** | The steps, in order ↓ |
 | &nbsp;&nbsp;`discover` | Ground against the **real artifact**; write the problem + the real data it must satisfy. |
 | &nbsp;&nbsp;`draft` | Write the PRD (JTBD, scope, acceptance, metrics, deps). |
-| &nbsp;&nbsp;`adversary` | The hostile critic: 7-pass rubric + reality-grounding + loophole hunt. Repeats until a verdict, fixing each FATAL/SERIOUS in the doc. |
-| &nbsp;&nbsp;**`GATE_A` (hard)** | Verdict must be `SHIP` / `SHIP WITH STIPULATIONS`, written to the committed verdict file. **No tickets until SHIP** + your approval. |
-| &nbsp;&nbsp;`tickets` | Specflow-writer turns the hardened PRD into issues (Gherkin, data-testids, contract refs, e2e file). |
-| &nbsp;&nbsp;`GATE_B` (soft) | board-auditor + uplifter: every requirement→journey→test→issue, no orphans, no duplicate IDs. |
-| &nbsp;&nbsp;`GATE_B.5` (soft) | pre-flight-simulator walks real personas through each ticket; a CRITICAL design gap blocks. |
-| **`repair`** | On a failed gate: retry with a targeted fix (budget: adversary ≤ 4 cycles, uplift ≤ 3), else escalate. |
+| &nbsp;&nbsp;`adversary` | The hostile critic: 7-pass rubric + reality-grounding + loophole hunt. Contracted scope gets an initial review + one repair through scoped Duo; unchanged evidence stops. |
+| &nbsp;&nbsp;**`GATE_A` (hard)** | Verdict must be `SHIP` / `SHIP WITH STIPULATIONS`, written to the committed verdict file. This gates selected-decision promotion and human-approved GitHub issue creation; local thin backlog capture may precede review. |
+| &nbsp;&nbsp;`tickets` | Specflow-writer keeps future outcomes thin and deepens only selected work and its applicable seams. |
+| &nbsp;&nbsp;`GATE_B` (soft) | board-auditor + uplifter: selected build-ready requirement→journey→test→issue, no orphans, no duplicate IDs. |
+| &nbsp;&nbsp;`GATE_B.5` (soft) | pre-flight-simulator walks real personas through the selected build-ready slice; a CRITICAL design gap blocks. |
+| **`repair`** | On a failed gate: retry with a targeted fix (budget: contracted initial + one repair; build-ready initial + one re-grade; no-new-evidence stops), else escalate. |
 | **`escalate_when`** | It stops and asks **you** if: the verdict is DO-NOT-SHIP, the idea turns out wrong, or an open gap has no owner. |
 | **`never_without_human`** | It will **never**: create tickets from a rejected PRD, or fake a green verdict. |
-| **`done_when`** | Verdict = SHIP (committed) + audited, journey-contracted tickets exist → handed off to `feature-build.yaml`. |
+| **`done_when`** | Mixed-tier backlog exists; only the selected verified build-ready slice is handed to `feature-build.yaml`. |
 
 It also prints a little **progress map** at each step so you can see where it is:
 ```
@@ -142,7 +144,7 @@ DISCOVER ─▶ PRD ═╣⛔A╠═▶ TICKETS ─▶ ╎B╎ ─▶ ╎B.5╎ 
 
 **Blank** (the template you copy from [`loops/prompts/spec-build.prompt.md`](./loops/prompts/spec-build.prompt.md)):
 ```
-Goal:   SHIP the <thing> spec — a hardened PRD + ready, audited tickets
+Goal:   Prepare the next justified <thing> slice and retain a thin future backlog
 Path:   QA/loops/spec-build.yaml
 Inputs: { slug: <short-name>, grounding_ref: <a file path, OR "this discovery chat above; no PRD yet"> }
 Follow the path; don't restate it.
@@ -150,7 +152,7 @@ Follow the path; don't restate it.
 
 **Filled** (a real one — rolling back a bad import, started from a discovery chat):
 ```
-Goal:   SHIP the TT-ROLLBACK spec — a hardened PRD + ready, audited tickets for Import Backout & Rehearsal Mode
+Goal:   Prepare the selected Import Backout slice with scoped evidence; retain future Rehearsal Mode outcomes thin
 Path:   QA/loops/spec-build.yaml
 Inputs: { slug: tt-rollback, grounding_ref: "this discovery chat above; no PRD exists yet" }
 Follow the path; don't restate it.
@@ -169,7 +171,7 @@ Three kinds of thing — and only the first group actually *runs*. The rest is o
 | **The path** | `QA/loops/spec-build.yaml` | the steps the loop executes (read out above) |
 | **The adversary skill** | `~/.claude/skills/adversarial-prd-reviewer` | the hostile critic that reviews the PRD (Gate A) |
 | **The critic's mandate** | `QA/loops/adversary-mandate.md` | the critic's fixed, versioned instructions (so every review runs the same rubric) |
-| **The Specflow agents** | `scripts/agents/` — `specflow-writer`, `board-auditor`, `specflow-uplifter`, `pre-flight-simulator` | the muscle: writes the tickets, audits them, uplifts the gaps, walks personas through them |
+| **The Specflow agents** | `scripts/agents/` — `specflow-writer`, `board-auditor`, `specflow-uplifter`, `pre-flight-simulator` | records thin outcomes and audits, uplifts and simulates the selected build-ready slice and relevant seams |
 | **The gate scripts** | `scripts/*.cjs` | the mechanical, model-free checks — described next |
 
 **The gate scripts, in plain terms:**
@@ -184,7 +186,7 @@ Three kinds of thing — and only the first group actually *runs*. The rest is o
 |---|---|---|
 | The hardened PRD | `PRDs/<slug>-prd.md` | the spec, after the adversary |
 | The verdict | `PRDs/<slug>-verdict.md` | the committed Gate A decision (SHIP / not) |
-| The tickets | GitHub issues | the ready, audited, journey-contracted work |
+| The tickets | GitHub issues | a mixed-tier backlog; only the selected build-ready slice has applicable audited acceptance and executable journey evidence |
 
 ### 3. Reference — you *read* these, you don't run them
 

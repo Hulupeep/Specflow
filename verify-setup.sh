@@ -561,7 +561,7 @@ LOOP_SKILLS_FOUND=0
 for root in "${LOOP_SKILL_ROOTS[@]}"; do
     skill="$root/specflow-loop-selector/SKILL.md"
     if [ -f "$skill" ]; then
-        if grep -q "Mandatory Run Contract" "$skill" 2>/dev/null && grep -q "Mandatory Simulation Path" "$skill" 2>/dev/null; then
+        if grep -q "Mandatory Run Contract" "$skill" 2>/dev/null && grep -q "Tier-scoped Simulation Path" "$skill" 2>/dev/null; then
             check_pass "$skill installed"
             ((LOOP_SKILLS_FOUND++))
         else
