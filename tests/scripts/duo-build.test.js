@@ -7,7 +7,7 @@ const duo = require('../../scripts/duo-build.cjs');
 let root;
 const put = (name, value) => { const file = path.join(root, name); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, value); };
 const git = (...args) => execFileSync('git', args, { cwd: root, stdio: 'pipe' });
-const context = { goal: 'goal.md', task: 'task.md', objective: 'Deliver correct answer', finish: 'AC-1 tested and accepted', criteria: [{id: 'AC-1', source: 'task.md', anchor: 'AC-1: returns 42', kind: 'acceptance'}] };
+const context = { workKind: 'preparation', goal: 'goal.md', task: 'task.md', objective: 'Deliver correct answer', finish: 'AC-1 tested and accepted', criteria: [{id: 'AC-1', source: 'task.md', anchor: 'AC-1: returns 42', kind: 'acceptance'}] };
 const reviewOwned = (root, id, batch, invoke) => duo.review(root, id, directionFixture.respond(duo.load(root, id).state, batch), invoke, duo.load(root, id).state.owner.session);
 const batch = () => ({ id: 'implementation', scope: 'AC-1', criteria: ['AC-1'], claims: ['locally tested'], assumptions: [], evidence: ['raw.txt'], resolutions: [] });
 function fakePeer(outcome = 'accepted', effect = () => {}) {
@@ -18,6 +18,8 @@ function fakePeer(outcome = 'accepted', effect = () => {}) {
     const request = JSON.parse(fs.readFileSync(path.join(options.cwd, 'request.json')));
     // Provider boundary is simulated; state, snapshot and git operations are real.
     const result = { outcome, summary: outcome, inspected: request.requiredReads, findings: outcome === 'changes_required' ? [{ id: 'F1', criterion: 'AC-1', kind: 'acceptance', basis: 'AC-1', evidence: 'tree/code.js:1', action: 'Correct result', verification: 'Check the result equals 42' }] : [], unrelated: [] };
+    if(request.specification_review)result.specification_nonblocking=[];
+    if (request.specification_review) result.specification_findings = result.findings.map(f => ({ id: f.id, severity: 'SERIOUS', origin: 'original', repair_evidence: null }));
     Object.assign(result, { index_complete: true, assessments: request.batch.criteria.map(id => ({id, status: outcome === 'accepted' ? 'verified' : 'blocked', evidence: request.batch.evidence, reason: 'inspected fixture'})), resolutions: request.open_findings.map(f => ({id: f.id, status: outcome === 'accepted' ? 'closed' : 'open', evidence: request.batch.evidence, reason: 'fixture disposition'})), diagnostics: [{observation: fs.readFileSync(path.join(options.cwd, 'tree/raw.txt'), 'utf8'), evidence: request.batch.evidence}] });
     directionFixture.feedback(request, result);
     effect(options, result);
@@ -32,6 +34,37 @@ beforeEach(() => {
   git('add', '.'); git('commit', '-m', 'fixture');
 });
 afterEach(() => { delete process.env.SPECFLOW_DUO_REVIEWER; fs.rmSync(root, { recursive: true, force: true }); });
+test('new production Duo starts and stale resumes require actual current readiness state', () => {
+  const { workKind, ...legacy } = context;
+  expect(() => duo.start(root, '#1', 'codex', legacy)).toThrow('Specification gate');
+  const fields = require('../helpers/spec-density').fixture(root);
+  const record = JSON.parse(fs.readFileSync(fields.tier_record));
+  record.issue.body = fs.readFileSync(path.join(root, 'task.md'), 'utf8');
+  require('../helpers/spec-density').seedState(root,record);
+  fs.writeFileSync(fields.tier_record, JSON.stringify(record));
+  const run = duo.start(root, '#1', 'codex', { ...context, workKind: 'implementation', specification: { record: 'tier-record.json' } });
+  fs.writeFileSync(path.join(root, 'tier-preflight'), 'changed');
+  expect(() => duo.resume(root, run.id, 'codex', { session: run.owner.session })).toThrow('changed evidence');
+  expect(() => duo.capture(root, run.id, run.owner.session, ['node', '-e', 'process.exit(0)'])).toThrow('changed evidence');
+  expect(() => duo.finish(root, run.id, run.owner.session)).toThrow('changed evidence');
+});
+test('native Duo review path consumes the shared tier budget before invoking a peer', () => {
+  const record = { issue: { number: 165, body: 'AC-1: returns 42', labels: ['spec:contracted'] }, profile: { ui: false, materialSeams: [] } };
+  put('tier.json', JSON.stringify(record));
+  const scoped = { ...context, specification: { record: 'tier.json', targetTier: 'contracted' } };
+  const run = duo.start(root, '#165', 'codex', scoped);
+  expect(reviewOwned(root, run.id, batch(), fakePeer('changes_required')).outcome).toBe('changes_required');
+  record.profile.repair = 'new evidence'; put('tier.json', JSON.stringify(record)); put('raw.txt', 'Second capture: still wrong, now 43');
+  duo.resume(root, run.id, 'claude-code', { takeover: true, reason: 'Fixture host switch' });
+  expect(reviewOwned(root, run.id, batch(), fakePeer('changes_required')).outcome).toBe('changes_required');
+  // Changing both run and batch names does not replenish the issue/tier budget.
+  const renamed = duo.start(root, '#165 renamed run', 'codex', scoped), invoke = jest.fn(fakePeer());
+  const result = reviewOwned(root, renamed.id, { ...batch(), id: 'another-name' }, invoke);
+  expect(result.outcome).toBe('blocked'); expect(result.blocker).toContain('initial review plus one repair');
+  expect(invoke.mock.calls.some(([, , opts]) => opts?.input)).toBe(false);
+  const rounds = require('../../scripts/specflow-reviews.cjs').load(root, 165).reviews.contracted;
+  expect(rounds).toHaveLength(2); expect(rounds.every(r => r.identity.mode === 'simulated')).toBe(true);
+});
 test.each(['codex', 'claude-code'])('J-DUO-REPAIR/J-DUO-RESUME: %s builder repairs and retains evidence', builder => {
   const run = duo.start(root, '#1', builder, context);
   const first = reviewOwned(root, run.id, batch(), fakePeer('changes_required'));
@@ -177,4 +210,22 @@ test('readable blocked status leads with the actionable finding', () => {
   const log = jest.spyOn(console, 'log').mockImplementation(() => {});
   try { expect(duo.cli(['resume', run.id], root)).toBe(1); expect(log.mock.calls[0][0]).toContain('Current blocker: F1: Correct result'); }
   finally { log.mockRestore(); }
+});
+test('production capture reserves discovery collection and blocks review until an explicit report',()=>{
+ const fields=require('../helpers/spec-density').fixture(root),r=JSON.parse(fs.readFileSync(fields.tier_record));r.issue.body=fs.readFileSync(path.join(root,'task.md'),'utf8');require('../helpers/spec-density').seedState(root,r);fs.writeFileSync(fields.tier_record,JSON.stringify(r));
+ const run=duo.start(root,'#1','codex',{...context,workKind:'implementation',specification:{record:'tier-record.json'}});
+ const captured=duo.capture(root,run.id,run.owner.session,[process.execPath,'-e','console.log("observed: 42")']);
+ const invoke=jest.fn(fakePeer());expect(reviewOwned(root,run.id,batch(),invoke).blocker).toContain('collection missing');expect(invoke).not.toHaveBeenCalled();
+ require('../../scripts/specflow-specification.cjs').collect(root,r,captured.lastCapture.discoveryBatch,{outcome:'success',discoveries:[]});
+ expect(reviewOwned(root,run.id,batch(),fakePeer()).outcome).toBe('accepted');
+});
+test('explicit approved Codex model is bound to the invocation without claiming served-model telemetry',()=>{
+ const spec=duo.invocation('claude-code','/tmp/r',null,'gpt-6-astra');expect(spec.args.slice(spec.args.indexOf('--model'),spec.args.indexOf('--model')+2)).toEqual(['--model','gpt-6-astra']);
+ expect(()=>duo.invocation('claude-code','/tmp/r',null,'claude-peer')).toThrow('supported model family');
+});
+test('scoped review cannot silently omit an ignored applicable artifact from the frozen snapshot',()=>{
+ put('.gitignore','private-planning/\n');put('private-planning/decision.md','An applicable ownership decision');
+ const policy=require('../../scripts/specflow-tier.cjs'),r={issue:{number:165,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[{id:'ownership'}],artifacts:[{id:'ownership',role:'decision:ownership',path:'private-planning/decision.md',sha256:policy.sha('An applicable ownership decision')}]}};
+ put('tier.json',JSON.stringify(r));const run=duo.start(root,'#165','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}}),invoke=jest.fn(fakePeer());
+ expect(reviewOwned(root,run.id,batch(),invoke).blocker).toContain('not in the frozen snapshot');expect(invoke.mock.calls.some(([, , opts])=>opts?.input)).toBe(false);
 });

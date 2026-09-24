@@ -9,6 +9,7 @@
 
 const { spawnSync } = require('child_process');
 const routingShadow = require('./typesafe-routing-bridge.cjs');
+const tierPolicy = require('./specflow-tier.cjs');
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve } = require('path');
@@ -99,7 +100,7 @@ function defaultStatePaths(contractPath, options = {}) {
   };
 }
 
-function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }) {
+function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath, tierRecord, repoRoot }) {
   if (!LOOP_PATHS[loop]) throw new Error(`unknown loop "${loop}"`);
   return {
     run_contract: {
@@ -113,7 +114,10 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }
         ? 'ticket + ACs + journey id confirmed'
         : 'grounding written with problem + oracle',
       durable_evidence: [contractPath, ledgerPath],
-      simulation_required: loop === 'spec-build',
+      tier: 'thin',
+      tier_record: tierRecord || null,
+      repository_root: repoRoot || process.cwd(),
+      simulation_required: false,
       stop_condition: 'continue until handoff, human gate, missing evidence, or failure',
       never_without_human: ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
       budgets: {},
@@ -716,6 +720,8 @@ function fallbackLoopSequence(contract) {
 }
 
 function loopSequence(contract, options = {}) {
+  if (contract.loop === 'spec-build' && contract.tier === 'thin') return ['discover', 'draft', 'tickets', 'handoff'];
+  if (contract.loop === 'spec-build' && contract.tier === 'contracted') return ['discover', 'draft', 'adversary', 'tickets', 'handoff'];
   const fromDefinition = loopSequenceFromDefinition(loadLoopDefinition(contract, options));
   return fromDefinition.length ? fromDefinition : fallbackLoopSequence(contract);
 }
@@ -2005,6 +2011,8 @@ function runLoopBody(options) {
       input: options.input || 'unspecified',
       contractPath,
       ledgerPath,
+      tierRecord: options.tierRecord,
+      repoRoot: options.repoRoot,
     });
     try { wrapper.run_contract.routing_shadow = routingShadow.enrollment(process.cwd()); }
     catch (e) { wrapper.run_contract.routing_shadow_error = e.message; }
@@ -2037,6 +2045,32 @@ function runLoopBody(options) {
     return { status: 'invalid_contract', errors: validation.errors, contractPath, ledgerPath };
   }
 
+  if (['spec-build', 'feature-build'].includes(contract.loop)) {
+    let record;
+    try {
+      record = contract.tier_record ? loadDataFile(contract.tier_record) : { issue: { labels: [] } };
+    } catch (error) {
+      record = null;
+    }
+    const decision = require('./specflow-specification.cjs').boundary(contract.repository_root || process.cwd(), record, {
+      route: contract.loop,
+      operation: contract.loop === 'feature-build' ? (resuming ? 'resume' : 'build') : 'inspect',
+    });
+    contract.tier = decision.tier;
+    contract.simulation_required = decision.simulation_required;
+    contract.tier_warnings = decision.warnings;
+    contract.tier_decision = decision;
+    writeYaml(contractPath, { run_contract: contract });
+    if (decision.status === 'blocked') {
+      const entry = { stage: contract.current_stage_or_rail, event: 'tier_gate', result: 'blocked', stop_reason: 'blocked_specification', errors: decision.errors, next_action: decision.next_action };
+      appendLedger(ledgerPath, entry);
+      return { status: 'blocked_specification', decision, entry, contractPath, ledgerPath };
+    }
+    if (contract.loop === 'spec-build' && contract.tier !== 'build-ready' && !loopSequence(contract, options).includes(contract.current_stage_or_rail)) {
+      return { status: 'planning_complete', decision, contractPath, ledgerPath, next_action: 'The backlog remains at its recorded tier. Promote only the next justified slice.' };
+    }
+  }
+
   if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '7_ci_handoff') {
     const entry = {
       stage: '7_ci_handoff',
@@ -2049,6 +2083,20 @@ function runLoopBody(options) {
     contract.terminal_status = 'handoff';
     writeYaml(contractPath, { run_contract: contract });
     return { status: 'human_ci_handoff_required', entry, contractPath, ledgerPath };
+  }
+
+  // Specification review has one native boundary: Duo reserves the durable
+  // issue/tier budget before invoking the opposite CLI. Generic stage adapters
+  // and supplied stage-evidence cannot bypass that boundary.
+  if (contract.loop === 'spec-build' && ['adversary', 'GATE_B5'].includes(contract.current_stage_or_rail)) {
+    const record = contract.tier_record ? loadDataFile(contract.tier_record) : null;
+    const scoped = require('./specflow-reviews.cjs').stageGate(contract.repository_root || process.cwd(), record, contract.current_stage_or_rail);
+    const entry = { stage: contract.current_stage_or_rail, event: 'scoped_review', result: scoped.passed ? 'pass' : 'blocked', ...scoped };
+    appendLedger(ledgerPath, entry);
+    if (scoped.passed) contract.current_stage_or_rail = nextStage(contract, options);
+    contract.terminal_status = scoped.passed ? 'in_progress' : 'blocked';
+    writeYaml(contractPath, { run_contract: contract });
+    return { status: scoped.passed ? 'scoped_review_accepted' : 'scoped_review_required', entry, contractPath, ledgerPath };
   }
 
   const runId = contract.run_id || modelConfirmationRunId(slug, contractPath);
@@ -2156,12 +2204,19 @@ function runLoopBody(options) {
     } : null;
     const shadowReceipt = policy.dry_run || options.adapterDryRun ? null : routingShadow.begin(process.cwd(), contract.routing_shadow, shadowTask);
     if (shadowReceipt) appendLedger(ledgerPath, { event: 'routing_shadow_begin', stage: contract.current_stage_or_rail, ...shadowReceipt });
+    const discoveryBatch = contract.loop === 'feature-build' && contract.current_stage_or_rail === '5_impl' && !policy.dry_run && !options.adapterDryRun ? `runner-${runId}-${Date.now()}` : null;
+    if(discoveryBatch) require('./specflow-specification.cjs').beginBatch(contract.repository_root || process.cwd(),loadDataFile(contract.tier_record),discoveryBatch);
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
       promptPath: prompt.promptPath,
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
     });
+    if(discoveryBatch) {
+      require('./specflow-reviews.cjs').change(contract.repository_root || process.cwd(),loadDataFile(contract.tier_record).issue.number,journal=>{journal.batches[discoveryBatch].outcome=adapterResult.status==='gate_rerun_required'?'success':'blocked';journal.batches[discoveryBatch].evidence=policy.transcript_path;});
+      adapterResult.discoveryBatch=discoveryBatch;
+      adapterResult.discoveryNextAction=`Collect discoveries or explicit none for ${discoveryBatch} before advancing`;
+    }
     if (shadowReceipt) {
       const result = routingShadow.end(contract.routing_shadow, shadowReceipt, { status: adapterResult.status === 'gate_rerun_required' ? 'completed' : 'blocked', terminal: false, observed: { model: adapterResult.entry.effective_model || UNKNOWN, effort: null }, evidenceRefs: [policy.transcript_path], note: 'Provider completion is not gate acceptance; effective effort is unknown without native metadata.' });
       appendLedger(ledgerPath, { event: 'routing_shadow_outcome', stage: contract.current_stage_or_rail, ...result });
@@ -2358,6 +2413,8 @@ function isTerminalStatus(status) {
     'blocked_verification_required',
     'blocked_verifier_stage',
     'dry_run',
+    'blocked_specification',
+    'planning_complete', 'scoped_review_required',
   ].includes(status);
 }
 
@@ -2470,7 +2527,7 @@ function cli(argv = process.argv.slice(2)) {
       return 1;
     }
     console.log(JSON.stringify(result, null, 2));
-    return 0;
+    return result.status === 'blocked_specification' ? 2 : 0;
   } catch (e) {
     console.error(`specflow run failed: ${e.message}`);
     return 1;

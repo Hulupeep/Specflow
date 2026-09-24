@@ -9,7 +9,7 @@ function fixture(builder='claude-code',extraCriteria=0) {
  put('goal.md','Display the correct customer total; preserve real consent gates.');put('task.md','AC-TOTAL: display 42\nOWNER-GATE: actual owner consent');put('display.cjs','console.log(41)');put('unrelated.cjs','console.log("7 unrelated tests passed")');
  const extra=Array.from({length:extraCriteria},(_,i)=>({id:`AC-EXTRA-${i+1}`,source:'task.md',anchor:`AC-EXTRA-${i+1}: fixture subtask ${i+1} verified`,kind:'acceptance'}));
  if(extra.length)fs.appendFileSync(path.join(root,'task.md'),'\n'+extra.map(c=>c.anchor).join('\n'));git('add','.');git('commit','-m','fixture');
- const context={goal:'goal.md',task:'task.md',objective:'Customer total is accurate',finish:'Total and owner consent verified',criteria:[{id:'AC-TOTAL',source:'task.md',anchor:'AC-TOTAL: display 42',kind:'acceptance'},{id:'OWNER-GATE',source:'task.md',anchor:'OWNER-GATE: actual owner consent',kind:'gate'},...extra],typesafe:{mode:'off'}};
+ const context={workKind:'preparation',goal:'goal.md',task:'task.md',objective:'Customer total is accurate',finish:'Total and owner consent verified',criteria:[{id:'AC-TOTAL',source:'task.md',anchor:'AC-TOTAL: display 42',kind:'acceptance'},{id:'OWNER-GATE',source:'task.md',anchor:'OWNER-GATE: actual owner consent',kind:'gate'},...extra],typesafe:{mode:'off'}};
  let run=duo.start(root,'#149',builder,context,builder==='claude-code'?'fixture-session':undefined);
  const state=()=>duo.load(root,run.id).state;
  const capture=(file='display.cjs')=>{run=duo.capture(root,run.id,run.owner.session,[process.execPath,file]);return run.lastCapture.path;};

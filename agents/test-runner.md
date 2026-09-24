@@ -239,7 +239,7 @@ If issue tracking is available:
 gh issue list --search "checkout cart" --json number,title
 
 # Post failure summary as comment
-gh issue comment <number> --body "## ❌ Test Failure
+node scripts/specflow-publication.cjs <request.json>
 
 **Test:** \`checkout.spec.ts:45\`
 **Error:** Cart total mismatch (expected 99.99, got 89.99)
@@ -401,3 +401,5 @@ This creates a self-learning cycle: successful fixes gain confidence, failed fix
 | Debug | `npx playwright test --debug` | `npm test -- --detectOpenHandles` | `npx cypress open` |
 | Rerun failed | `npx playwright test --last-failed` | `npm test -- --onlyFailures` | N/A |
 | With coverage | N/A | `npm test -- --coverage` | N/A |
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

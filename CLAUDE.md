@@ -84,6 +84,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 | Contract | Protects | Rules |
 |----------|----------|-------|
 | `feature_preflight` | Board-auditor compliance | ARCH-001 through ARCH-008 |
+| `feature_spec_density` | Shared tier applicability and evidence-based readiness | I-DENSITY-001 through I-DENSITY-009 |
 | `feature_specflow_project` | Project structure & code quality | PROJ-001 through PROJ-004 |
 | `security_defaults` | OWASP baseline patterns | SEC-001 through SEC-005 |
 | `test_integrity_defaults` | Test quality and anti-mock rules | TEST-001 through TEST-005 |
@@ -184,6 +185,13 @@ than inventing a fresh layout.
 - Update `CLAUDE.md`, `SKILL.md`, and the CI templates together when the operating model changes so downstream repos receive a coherent kit.
 
 ## About This Repository
+
+Specification depth follows `templates/SPECIFICATION.md` and
+`scripts/specflow-tier.cjs` (#162–167). Thin backlog work does not require a full
+simulation or artifact package. Apply existing templates to the selected slice
+and applicable seams; build-ready evidence never replaces implementation tests,
+permissions or release gates. `docs/contracts/CONTRACT_INDEX.yml` indexes the
+active YAML sources without duplicating their rules.
 
 This is the **Specflow methodology repository** containing:
 - Documentation on specs and contracts

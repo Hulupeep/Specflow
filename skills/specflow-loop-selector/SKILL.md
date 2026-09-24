@@ -7,11 +7,18 @@ description: Selects the correct Specflow loop and forces a concrete run contrac
 
 Use this before starting any Specflow loop work. Do not rediscover the process by grepping the repo unless a named file is missing.
 
+Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Run
+`node scripts/specflow-tier.cjs inspect <record.json> specflow-loop-selector inspect`
+before selecting depth. Missing labels mean thin; conflicting labels block.
+Record the returned `tier` and `simulation_required` in the run contract.
+The detailed lifecycle below applies only to evidence justified for the selected
+slice. Thin selection ends at planning state; it does not generate a full spec.
+
 ## Select The Loop
 
 - Rough idea, discovery, PRD, story slicing, ticket creation, or "turn this into ready tickets":
   use `QA/loops/spec-build.yaml`.
-  Output: audited, journey-contracted tickets.
+  Output: a mixed-tier backlog with only the next justified slice deepened.
 
 - Existing approved Specflow ticket/issue ready to implement:
   use `QA/loops/feature-build.yaml`.
@@ -55,6 +62,9 @@ After selecting a loop, emit a `run_contract` before doing work. Referencing the
 ```yaml
 run_contract:
   loop: spec-build | feature-build | gate-d | daily-use-teardown
+  tier: <effective tier returned by specflow-tier.cjs>
+  tier_record: <current record.json>
+  simulation_required: <returned boolean; false for thin>
   goal: <one sentence done-state>
   input_artifact: <issue/prd/epic/app/discovery path or URL>
   path: QA/loops/<selected>.yaml
@@ -77,17 +87,17 @@ Rules:
 - Stop only at a selected YAML hard gate that truly requires human input, a `never_without_human` action, missing required input/evidence, exhausted repair budget, external wait such as branch-protected CI, or the loop's done/handoff state.
 - Do not stop merely because the next stage is named `GATE_*`, `B.5`, or `handoff`. Soft gates are work to perform now, not boundaries for asking permission.
 
-## Mandatory Simulation Path
+## Tier-scoped Simulation Path
 
-When the selected work creates, refines, uplifts, or audits a Specflow story/ticket, run the simulation path before that story/ticket can feed build work:
+When promoting the selected slice to build-ready, run the scoped simulation path before it can feed production build work:
 
 ```
 create/refine story -> specflow-simulate -> specflow-audit/uplift -> pre-flight gate -> feature-build
 ```
 
 Rules:
-- If the user asks to "simulate", "simulate usage end to end", "run personas through this", "stress-test this story", or "find gaps/edges", use `specflow-simulate` directly.
-- If `spec-build` produces or changes tickets/stories, the run contract must include `simulation_required: true` until `specflow-simulate` has run on those tickets/stories.
+- If the user asks to simulate, use `specflow-simulate` with the same tier policy: thin stays a bounded planning inspection, contracted UI gets a paper walkthrough, build-ready gets scoped simulation.
+- `simulation_required` is derived from the effective tier, never from merely creating or editing a ticket. A required build-ready simulation still must have current durable evidence.
 - A ticket/story is not ready for `feature-build` if simulation is missing, stale, skipped, or only mentioned in chat.
 - Simulation findings must be durable: issue comment, story section, or committed artifact. Record the evidence path or issue comment in the run contract.
 
@@ -98,7 +108,8 @@ Rules:
 ```yaml
 run_contract:
   loop: spec-build
-  goal: SHIP PRD plus audited, journey-contracted tickets
+  goal: define the outcome and deepen only the next justified slice
+  tier: thin
   input_artifact: <grounding_ref>
   path: QA/loops/spec-build.yaml
   current_stage_or_rail: discover
@@ -109,8 +120,8 @@ run_contract:
     falsification: PRDs/<slug>-falsification.md
     hops: PRDs/<slug>-hops.md
     simulation: issue comments or docs/specs/<slug>-simulation.md
-  simulation_required: true until specflow-simulate has run on created/refined tickets
-  stop_condition: audited tickets handed to feature-build
+  simulation_required: false # thin planning; derive from policy on every resume
+  stop_condition: next decision identified; only verified build-ready slices feed feature-build
   never_without_human:
     - create issues from a DO_NOT_SHIP PRD
     - fabricate a green verdict

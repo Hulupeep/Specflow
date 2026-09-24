@@ -1,0 +1,79 @@
+{
+  "kind": "real-discovery-controlled-consumers",
+  "productionConsumer": {
+    "status": "blocked",
+    "tier": "build-ready",
+    "simulation_required": true,
+    "review_scope": [
+      "acceptance-checks",
+      "simulation",
+      "preflight"
+    ],
+    "errors": [
+      "Discovery parser-worker-first-attempt: affected specification stale; reconcile and revalidate (pending publication)",
+      "Discovery parser-structure-oserror: affected specification stale; reconcile and revalidate (pending publication)",
+      "Discovery parser-root-access-observed: affected specification stale; reconcile and revalidate (pending publication)",
+      "Discovery history changed since promotion; revalidation is required"
+    ],
+    "warnings": [],
+    "next_action": "Discovery parser-worker-first-attempt: affected specification stale; reconcile and revalidate (pending publication)",
+    "implementation_status": "not_established",
+    "discoveries": [
+      {
+        "id": "parser-worker-first-attempt",
+        "producer": 59,
+        "status": "stale",
+        "publication": {
+          "status": "pending",
+          "targets": {}
+        }
+      },
+      {
+        "id": "parser-structure-oserror",
+        "producer": 59,
+        "status": "stale",
+        "publication": {
+          "status": "pending",
+          "targets": {}
+        }
+      },
+      {
+        "id": "parser-root-access-observed",
+        "producer": 59,
+        "status": "stale",
+        "publication": {
+          "status": "pending",
+          "targets": {}
+        }
+      }
+    ],
+    "uncollected": []
+  },
+  "unrelated": {
+    "status": "planning",
+    "tier": "thin",
+    "simulation_required": false,
+    "review_scope": [],
+    "errors": [],
+    "warnings": [],
+    "next_action": "Keep future work thin. Select the next justified slice or a bounded learning experiment.",
+    "implementation_status": "not_established",
+    "discoveries": [],
+    "uncollected": []
+  },
+  "artifactDispositions": {
+    "reused": [
+      "existing sandbox",
+      "existing runtime readiness checks"
+    ],
+    "created": [
+      "generic bounded experiment instrumentation",
+      "small local replay acceptance records"
+    ],
+    "deferred": [
+      "full traversal/extraction output schema",
+      "future fixtures and selectors"
+    ]
+  },
+  "provenance": "Experiments and their observations are real; issue records/ready consumer are controlled local fixtures. No remote readiness or production implementation claim."
+}

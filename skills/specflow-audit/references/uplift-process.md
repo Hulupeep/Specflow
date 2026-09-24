@@ -1,12 +1,20 @@
 # Uplift Process — gap analysis + surgical additions
 
+Specification depth is governed by `SPECIFICATION.md` (source kit:
+`templates/SPECIFICATION.md`) and `scripts/specflow-tier.cjs`. Thin work stays
+at planning depth; contracted reviews cover applicable decisions and UI paper
+walkthroughs. The detailed build-ready procedures below apply only to the
+selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
+Required privacy, permission, executable journey and release gates still apply.
+
+
 Condensed from Specflow's `board-auditor.md` + `specflow-uplifter.md`. When the
 full Specflow repo is present (dir containing `CONTRACT-SCHEMA.md`), prefer its
 `agents/*.md` and `SPEC-FORMAT.md` / `CONTRACT-SCHEMA.md` / `USER-JOURNEY-CONTRACTS.md`.
 
 ## Full template — the sections a compliant story carries
 
-A story/ticket is checked against these. Mark each PRESENT or MISSING.
+For the selected build-ready slice, check only applicable sections. Mark each PRESENT, MISSING or N/A with a reason; thin work is not missing a full template.
 
 1. **Parent FEAT / Story ID** — links to epic; stable ID (e.g. `BILL-RATE-002`).
 2. **Personas / two-view framing** — who benefits; "Bob's view" + "Alice's view" or a Persona Simulation block (required for UI / workflow / permissions / agent / multi-actor features).
@@ -23,9 +31,9 @@ A story/ticket is checked against these. Mark each PRESENT or MISSING.
 13. **Relevant ADRs** — architecture decisions the work must honour.
 
 ### Ticket-type pragmatism
-- **Bug ticket**: Data Contract may be N/A (no schema change) — but still document the existing shape + the constraint/trigger being violated. Frontend Interface, Gherkin (happy + the bug's negative path), DoD, testids still required.
+- **Bug ticket**: Data Contract may be N/A (no schema change) — but still document the existing shape + the constraint/trigger being violated. Relevant behaviour checks remain required; frontend interfaces and testids apply only when the bug changes those surfaces.
 - **Journey ticket**: Persona Simulation + Gherkin + journey-test mapping are the core; lighter on schema.
-- **Feature ticket**: all sections.
+- **Feature ticket**: applicable sections for its current tier and selected slice.
 
 ## Surgical additions — generate ONLY what's missing
 
@@ -159,6 +167,8 @@ Rules for the uplift:
 - If the journey genuinely can't run yet, add a deferral line with a linked tracking issue — never a silent skip.
 
 ## Posting the uplift
-- GitHub issue: one `gh issue comment <n> --body-file <tmp>` titled e.g. `## Specflow Uplift: <missing sections>`. Supplement; do not replace the body.
+- GitHub issue: one `node scripts/specflow-publication.cjs <request.json>` titled e.g. `## Specflow Uplift: <missing sections>`. Supplement; do not replace the body.
 - File: append a clearly-marked block; do not rewrite existing sections.
 - Batch (multiple issues in an epic): keep RLS join pattern, invariant registry, and naming consistent across them; run pre-flight per-ticket — never batch-mark compliant.
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

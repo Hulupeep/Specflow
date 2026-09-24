@@ -3,6 +3,13 @@
 # Each invocation: load this path, LOCATE the current stage from committed artifacts,
 # advance through all unblocked gates, persist after each gate, stop only on HITL/block/done.
 loop: spec-build
+specification_policy:
+  command: node scripts/specflow-tier.cjs inspect <record.json> spec-build inspect
+  on_exit_2: stop and report the blocker
+  thin: outcome, scope, behavioural acceptance, dependencies and unknowns only; no automatic full review
+  contracted: applicable irreversible decisions and UI paper walkthrough only
+  build_ready: selected next slice plus directly relevant seams; current scoped evidence required
+  detailed_stages_below: apply only to evidence justified by the effective tier, never to all future tickets
 process_ref: PROCESS.md#steps-0-5
 principle: writers are muscle; trust lives in GATE A (one hostile critic), never self-consensus.
 
@@ -65,7 +72,7 @@ stages:
       adversary still DECIDES (one critic, not a committee).
       Why here: persona walks find PRD-level design flaws — catching them now costs a
       PRD edit; catching them at B.5 costs redone tickets, audit, and uplift.
-    do_until: verdict issued; fix each FATAL/SERIOUS in the document, re-review
+    review_boundary: scoped Duo preparation; initial review plus one repair, persisted by issue/tier; stop on no new evidence
   - id: GATE_A               # HARD — the trust gate
     type: hard
     gate: >
@@ -80,15 +87,15 @@ stages:
       recorded PRD SHA-256 matches the current PRD). A PRD edited after PASS fails until
       re-falsified. Human signing is optional and policy-driven, not a universal Gate A rule.
     rule: >
-      no ticket-writing until SHIP; then human approval before issues are created.
+      selected-slice decision promotion requires accepted scoped review; local thin backlog capture may precede it. GitHub issue creation still requires a human-approved SHIP verdict.
       The hops artifact is hash/provenance-bound at pin time. If the project/contract declares
       signoff_policy.required, post-SHIP changes also require the configured human countersign;
       otherwise changes require a durable amendment trail. The build agent may not silently
       reconcile the oracle it is constrained by. Consumed by GATE D (feature-build epic_gate).
   - id: tickets
-    do: specflow-writer → issues (Gherkin ACs, data-testids, contract refs, e2e filename)
-    gate: every UI story references a journey contract; Gherkin lives once in the catalogue
-    declares: |             # per-ticket declarations consumed by the gates below
+    do: specflow-writer → mixed-tier backlog; selected work gets applicable or reused acceptance, contract and journey references
+    gate: the selected build-ready UI slice references its applicable journey contract; future tickets remain thin and Gherkin stays canonical
+    declares: |             # selected build-ready slice declarations consumed by the gates below
       writes: [<surface>...]   # seam-lite (#61): surfaces this slice CHANGES (route/data-testid, EXACTLY as in code)
       reads:  [<surface>...]   # surfaces this slice DEPENDS ON
       reuses: [<component>...]  # ADR/reuse (#68): existing components this slice builds on
@@ -97,13 +104,13 @@ stages:
   - id: GATE_B               # soft
     type: soft
     do: >
-      board-auditor + specflow-uplifter — wire every ticket to journey + test + contract.
+      board-auditor + specflow-uplifter — wire the selected build-ready slice to applicable journey + test + contract references; keep future tickets thin.
       PLUS seam-lite: `node scripts/verify-seams.cjs <tickets.json> --repo-root .` computes the seam graph
       (writer×writer AND writer×reader pairs on shared surfaces) and ERRORS on any declared
       surface not found in the repo (no silent zero-seam runs). Derived hops are appended to
       ${hops_artifact} — the integration walk is DERIVED from seams, not remembered.
       PLUS conditional ADR/reuse (#68): `node scripts/verify-adr.cjs <tickets.json> --repo-root .` — if the
-      repo has an ADR folder, every ticket cites a RESOLVING ADR (or `adrNone`) and declares
+      repo has an ADR folder, each selected slice cites a RESOLVING ADR (or `adrNone`) and declares
       `reuses` (or a justified new component); if there's no ADR folder it exits 0 silently.
     gate: >
       requirement→journey→test→issue complete; no orphans; no duplicate IDs;
@@ -111,7 +118,7 @@ stages:
       verify-adr passes (skipped automatically when the repo has no ADR folder).
   - id: GATE_B5              # soft — SECOND persona touch (first ran at the adversary stage)
     type: soft
-    do: pre-flight-simulator — walk real personas through each TICKET before code.
+    do: pre-flight-simulator — walk real personas through the selected build-ready TICKET before code.
         Different artifact than the adversary's persona lens — that walked the PRD
         (design flaws); this walks the tickets (ticketization flaws — a journey sliced
         wrong, a missing step, a walk that breaks at a ticket boundary). Top-thinker work.
@@ -121,7 +128,7 @@ repair:
   on_gate_fail: route back to the owning stage with a targeted prompt
   within_run: fix fast failures inline
   across_ticks: slow/blocked state is re-read on the next automation tick
-  budget: adversary cycles ≤ 4; uplift re-audits ≤ 3
+  budget: contracted initial + one repair; build-ready initial + one re-grade; no-new-evidence stops
   on_exhausted: escalate with the open FATAL/SERIOUS list
 
 escalate_when:
@@ -131,6 +138,6 @@ escalate_when:
 never_without_human: [create issues from a DO_NOT_SHIP PRD, fabricate a green verdict]
 
 done_when:
-  - ${verdict_artifact} = SHIP (or SHIP_WITH_STIPULATIONS) and committed
-  - audited, journey-contracted tickets exist; UNRESOLVED items owner-tagged
-  - handoff: those tickets are the INPUT to feature-build.yaml
+  - for selected contracted promotion or GitHub publication, ${verdict_artifact} = SHIP (or SHIP_WITH_STIPULATIONS) with required commitment and human approval; thin local planning can stop earlier
+  - mixed-tier backlog exists; only the next justified slice is deepened; UNRESOLVED items owner-tagged
+  - handoff: only verified build-ready tickets are INPUT to feature-build.yaml

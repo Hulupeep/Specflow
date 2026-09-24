@@ -1,0 +1,13 @@
+contracts:
+  - id: feature_duo_actions
+    path: docs/contracts/feature_duo_actions.yml
+  - id: feature_duo_operations
+    path: docs/contracts/feature_duo_operations.yml
+  - id: feature_preflight
+    path: docs/contracts/feature_preflight.yml
+  - id: feature_spec_density
+    path: docs/contracts/feature_spec_density.yml
+  - id: feature_specflow_project
+    path: docs/contracts/feature_specflow_project.yml
+  - id: feature_typesafe_advisory
+    path: docs/contracts/feature_typesafe_advisory.yml

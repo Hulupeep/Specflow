@@ -110,6 +110,7 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
     fs.writeFileSync(contractPath, yaml.dump({
       run_contract: {
         loop: 'feature-build', goal: 'g', input_artifact: 'x', path: 'templates/QA/loops/feature-build.yaml',
+        ...require('../helpers/spec-density').fixture(dir),
         current_stage_or_rail: '6_provenance', next_gate: 'provenance', durable_evidence: [contractPath],
         stop_condition: 'handoff', never_without_human: ['git push'],
         slice_tags: ['ui'], maker_claim: 'complete',

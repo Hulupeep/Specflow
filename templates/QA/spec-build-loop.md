@@ -5,7 +5,7 @@ This is the **upstream sibling** of [`feature-build-loop.md`](./feature-build-lo
 | | Spec-build loop (this file) | Feature-build loop |
 |---|---|---|
 | Starts at | a rough idea / a real artifact / a half-built repo | a *ready* ticket |
-| Ends at | defensible GH epics + issues (hardened, journey-contracted) | a tested code slice + evidence |
+| Ends at | a mixed-tier backlog; selected work has scoped readiness evidence | a tested code slice + evidence |
 | Output lives in | **gmh-docs** (`PRDs/`, `QA/journeys/`) + the issue tracker | the code repo (claims-monorepo) |
 | Runs in | **gmh-docs** — this is a *documents* loop, not a code loop | claims-monorepo |
 
@@ -49,19 +49,19 @@ stages:
                  verify EVERY repo claim (reality-grounding ledger), hunt loopholes surviving
                  (fake backend, no-data, skip-to-green, weakened assertions, forks)
   3_revise:      writer fixes each FATAL/SERIOUS in the document; critic re-reads to close
-                 loop 2↔3 until verdict issued
+                 at most one repair/review via scoped Duo; then stop or escalate
   GATE_A:        # HARD — the trust gate of this loop (PROCESS.md Step 2)
                  verdict ∈ {SHIP, SHIP WITH STIPULATIONS} written to a COMMITTED verdict artifact;
-                 no ticket-writing starts until the artifact says SHIP; UNRESOLVED items each owner-tagged
-  4_specflow:    specflow-writer → tickets (Gherkin ACs, data-testids, contract refs, E2E filenames)
-                 check: every UI story has a journey contract reference (Gherkin lives once in catalogue)
-  GATE_B:        # soft — board-auditor + specflow-uplifter; fill SQL/RLS, TS interfaces, invariants
-                 check: every requirement→journey→test→issue, no orphans, no dup IDs, gaps hardened
-  GATE_B5:       # soft, its own gate — pre-flight-simulator walks real personas through each ticket
+                 gate selected-decision promotion and human-approved GH issue creation; local thin backlog capture may precede review; UNRESOLVED items owner-tagged
+  4_specflow:    specflow-writer → mixed-tier outcomes; future tickets stay thin
+                 check: selected build-ready UI slice reuses its applicable journey contract reference
+  GATE_B:        # soft — board-auditor + specflow-uplifter; selected build-ready slice and applicable seams only
+                 check: selected scope has applicable requirement→journey→test→issue coverage, no orphans or duplicate IDs
+  GATE_B5:       # soft, its own gate — pre-flight-simulator walks real personas through the selected build-ready slice
                  check: no CRITICAL design gap ("won't work for a real user") survives, before code
 repair:                      # replaces YOU re-prompting between steps
   on_gate_fail: route back to the owning stage with a targeted prompt
-  budget: adversary 2↔3 cycles ≤ 4; uplift re-audits ≤ 3
+  budget: contracted initial + one repair; build-ready initial + one re-grade; no-new-evidence stops
   on_budget_exhausted: ESCALATE with the open FATAL/SERIOUS list
 human_gate:                  # the ONE escape hatch
   escalate_when:
@@ -71,8 +71,8 @@ human_gate:                  # the ONE escape hatch
   approve_before: creating GH issues   # tickets are created only from a human-approved SHIP verdict
   never_without_human: [create epics/issues from a DO-NOT-SHIP PRD, fabricate a green verdict]
 done_when:
-  - PRD hardened (SHIP / SHIP WITH STIPULATIONS) and committed to gmh-docs/PRDs/
-  - defensible epics + issues exist, each journey-contracted, UNRESOLVED items owner-tagged
+  - for selected contracted promotion or GH publication, applicable PRD/verdict has SHIP evidence and required approval; thin planning can stop before this
+  - mixed-tier backlog exists; only the selected build-ready slice has applicable journey evidence; UNRESOLVED items owner-tagged
   - HANDOFF: those ready tickets are the INPUT to the feature-build loop
 ```
 
@@ -85,11 +85,11 @@ Run in gmh-docs: *"Run the spec-build loop from QA/spec-build-loop.md on <source
 > You are the **driver** of the spec-build loop in `QA/spec-build-loop.md` — PROCESS.md Steps 0–5. You turn a rough idea / real artifact into defensible tickets by running the pipeline — you do not free-style a PRD. **The writers are muscle; trust lives in GATE A — one hostile critic, never the agents' self-consensus.**
 >
 > 1. **Discover first.** Read the real artifact the user points at. Surface its actual facts (row counts, edge cases, "31% mismatch") and push on "what breaks it?" before drafting. Never start from a blank PRD on assumptions.
-> 2. **Draft** the PRD to `PRDs/<slug>-prd.md`, then run the **adversarial-prd-reviewer** as a single hostile critic (7-pass rubric + Special Mandate: reality-grounding ledger over every repo claim, loophole hunt). Apply each FATAL/SERIOUS fix *in the document* and re-review until a verdict issues. An honest UNRESOLVED gap with an owner is allowed; a fabricated green is not.
-> 3. **GATE A (hard):** write the verdict (`SHIP` / `SHIP WITH STIPULATIONS` / `DO NOT SHIP`) to a **committed verdict artifact**. Do not begin ticket-writing until it says SHIP. This critic is deliberately not the swarm approving itself.
-> 4. Once SHIPped: **specflow-writer** turns the PRD into tickets (Gherkin ACs + data-testids + contract refs + E2E filenames); **GATE B** = board-auditor + uplifter fill gaps to compliance; **GATE B.5** = pre-flight-simulator walks personas through each ticket and blocks on a CRITICAL design gap.
+> 2. For the selected contracted decisions, **draft or reuse** the relevant PRD material at `PRDs/<slug>-prd.md`, then run the **adversarial-prd-reviewer** as a single hostile critic (7-pass rubric + Special Mandate: reality-grounding ledger over every repo claim, loophole hunt). Apply each FATAL/SERIOUS fix *in the document* and request at most one repair review via scoped Duo; stop on unchanged evidence or exhausted budget. An honest UNRESOLVED gap with an owner is allowed; a fabricated green is not.
+> 3. **GATE A (hard):** write the verdict (`SHIP` / `SHIP WITH STIPULATIONS` / `DO NOT SHIP`) to a **committed verdict artifact**. Use that verdict to gate selected-decision promotion and human-approved GitHub issue creation. Local thin backlog capture can precede this review. This critic is deliberately not the swarm approving itself.
+> 4. Record useful future outcomes as thin tickets. Deepen only the selected slice and directly relevant shared decisions. For that build-ready slice, reuse applicable journey/test/contract references; GATE B checks its coverage and GATE B.5 performs scoped persona pre-flight. Neither gate forces future tickets through full uplift or simulation.
 > 5. **Get human approval of the SHIP verdict before creating GH issues.** Never spec the wrong thing: if discovery shows the idea is wrong, say so and stop. Never create tickets from a DO-NOT-SHIP PRD.
-> 6. End with: the verdict + artifact path, the hardened PRD path, the tickets ready to create (or created, once approved), and every UNRESOLVED gap with its owner — then hand off to the feature-build loop.
+> 6. End with the current tiers, applicable verdict/evidence paths, the mixed-tier backlog and every UNRESOLVED gap with its owner. Hand only verified build-ready work to feature-build; thin planning can stop without producing a full PRD package.
 >
 > Guardrails: honesty over completeness; the adversary makes the spec honest, Specflow bakes the truth in; a gap named with an owner beats a fake green every time.
 

@@ -30,7 +30,7 @@ For serious product work, Specflow is two loops:
 
 | Loop | Use it when | Output |
 |------|-------------|--------|
-| **`spec-build`** | You have an idea, PRD, discovery note, bug cluster, or already-built-product teardown | A hardened PRD plus audited, journey-contracted tickets |
+| **`spec-build`** | You have an idea, PRD, discovery note, bug cluster, or already-built-product teardown | A shared goal, thin backlog and scoped evidence for the selected next slice |
 | **`feature-build`** | You have one approved Specflow ticket ready to implement | A branch/slice that passes contract tests, journey tests, provenance, and Gate C |
 
 Run `spec-build` before code:
@@ -110,32 +110,20 @@ npx @colmbyrne/specflow graph           # Validate contract cross-references
 
 ## Why `spec-build` Comes First
 
-Specflow makes tickets **enforceable**. It does not make them **correct** — a perfectly
-specflow-compliant ticket can still encode the wrong thing, or a plausible lie with a green
-checkmark on it. `spec-build` puts hostile review and simulation *in front* of
-ticket-writing:
+Specflow makes acceptance enforceable. Specification depth follows the next
+useful decision: keep the whole feature and future tickets **thin**, review
+material shared decisions at **contracted** depth, and make only the selected
+implementation slice **build-ready**. Reuse contracts and checks where they fit.
 
-```text
-1. DISCOVER       Ground the idea against the real artifact, data, repo, and constraints.
+A bounded experiment can resolve an empirical unknown before production
+contracts exist. Its observed result deepens affected assumptions; it does not
+establish readiness. Independent review, current dependency evidence and required
+gates govern promotion. Discoveries invalidate affected readiness at the next
+work boundary, including after failure or interruption.
 
-2. PRD +          Harden the PRD with the Adversarial PRD Reviewer until it earns a
-   ADVERSARY      SHIP / SHIP WITH STIPULATIONS verdict. Catches no-JTBD, untestable
-                  requirements, fake backends, no-data loopholes, skip-to-green, and
-                  false claims about the repo — BEFORE any ticket exists.
-                  → https://github.com/Hulupeep/adversarial-prd-reviewer
-
-3. TICKETS        Turn the hardened PRD into tickets: Gherkin acceptance criteria,
-                  data-testid selectors, contract references, and E2E journey files.
-
-4. GATE B/B.5     Audit and simulate the tickets before they can feed feature-build.
-```
-
-**Rule of thumb:** never write a ticket from a PRD that hasn't survived the adversary. **The
-adversary makes the spec honest to begin with; Specflow bakes the truth in** — contracts +
-journey tests enforce it on every build, so it can't drift back.
-
-`feature-build` then takes each approved ticket through contract, E2E, oracle,
-implementation, provenance, human CI handoff, and Gate C.
+`feature-build` then implements the selected ready slice, preserving applicable
+contract, journey, oracle, provenance and release gates. Future siblings do not
+inherit readiness. See [the installed progressive specification procedure](templates/SPECIFICATION.md).
 
 ---
 
@@ -232,7 +220,7 @@ technical routing format, and how to change the defaults.
 
 | Loop | For | In one line |
 |------|-----|-------------|
-| **spec-build** | a new feature / rough idea | discover → PRD → **Gate A** (adversary + persona lens + falsification artifact) → tickets → **Gate B** (audit + seam-lite) → **B.5** (persona walk vs tickets) → defensible, journey-contracted tickets |
+| **spec-build** | a new feature / rough idea | discover → thin backlog → **Gate A** for selected contracted decisions → applicable **Gate B/B.5** for the next build-ready slice; future tickets stay thin |
 | **feature-build** | a ready ticket → tested slice | the 5 rails (ticket → contract → real-backend e2e → oracle-anchored → impl) → **Gate C** (CI vs a real seeded backend); an epic isn't done until **Gate D** — the persona walk on the *merged* tree (catches seam bugs per-slice green is blind to) |
 | **daily-use-teardown** | an *already-built* product | investigate the live app → **human confirms the map (hash-bound sign-off)** → top-thinker persona walks (WORKS/CONFUSING/BROKEN + evidence) → prioritized do-list → feeds spec-build |
 
@@ -268,13 +256,13 @@ does the building. The principle:
 
 | Gate | After | What it is | Type |
 |------|-------|------------|------|
-| **A** | the PRD | The **[Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer)** verdict must be `SHIP` / `SHIP WITH STIPULATIONS`, written to a **committed `verdict` artifact**. The controller refuses to spawn ticket-writing unless that artifact says SHIP. | **HARD** |
+| **A** | the PRD | Independent scoped review of selected contracted decisions through Duo: initial review plus one repair, with a durable receipt. Thin backlog writing does not require full adversary review or per-round commits. | **HARD** |
 | **B** | tickets | `specflow audit` + closure validator — every requirement → journey → test → issue, no orphans, no duplicate IDs. | soft (controller) |
-| **B.5** | tickets | **Pre-flight simulation** — walk real personas through each ticket; a CRITICAL design gap blocks. *Its own gate.* | soft (controller) |
+| **B.5** | tickets | **Pre-flight simulation** — examine the selected build-ready slice and direct seams; a relevant CRITICAL design gap blocks. Future tickets stay thin. *Its own gate.* | soft (controller) |
 | **C** | each build/slice | **Specflow CI** — contract tests + journey tests against a *real seeded backend* + anti-pattern audit + coverage ratchet. Runs in CI under branch protection: a violation **cannot merge**. | **HARD (unfakeable)** |
 | **D** | the *merged* epic | **Persona-walk integration gate** — per-slice green is blind to seam bugs (vertical slices, horizontal collisions). GATE D walks personas across the merged tree; a red hop is dispositioned `bug` or a *human-countersigned* `stale-oracle` — the agent can't reconcile its own oracle. An epic isn't done until D is green. | **HARD** |
 
-Gate A also now carries a **persona/simulation lens** (parallel to the structural review, against the PRD) and a required **falsification artifact** (hash-bound to the PRD); personas walk **twice** — the PRD at Gate A, the tickets at B.5.
+For applicable selected work, Gate A includes the relevant persona and falsification evidence. Contracted UI decisions receive a paper walkthrough; build-ready slices receive scoped simulation. Reuse shared evidence without imposing that package on the entire backlog.
 
 **Who does what:** *Discover* — human + agent vs the real artifact (no swarm). *PRD* — dueling
 writer/adversary, strong models. *Tickets* — `specflow-writer` fanned out by ruflo. *Build* — ruflo
@@ -302,7 +290,7 @@ invokes; Specflow is a CLI + CI the swarm calls.
 | [The loop kit](https://github.com/Hulupeep/Specflow/blob/main/templates/loops/README.md) | Run the pipeline — paths, prompts, the three loops |
 | [Detailed Setup](https://github.com/Hulupeep/Specflow/blob/main/docs/getting-started.md) | Manual paths, updating, SKILL.md |
 | [Agent Library](https://github.com/Hulupeep/Specflow/blob/main/agents/README.md) | 30+ agents for wave execution |
-| [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Harden the PRD *before* writing tickets (Gate A) |
+| [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Review relevant irreversible decisions before promotion (Gate A) |
 | [Contract Schema](https://github.com/Hulupeep/Specflow/blob/main/CONTRACT-SCHEMA.md) | YAML format for contracts |
 | [CI Integration](https://github.com/Hulupeep/Specflow/blob/main/CI-INTEGRATION.md) | GitHub Actions setup |
 | [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
@@ -314,4 +302,29 @@ Use `/duo-build #905` in Claude Code or `$duo-build #905` in Codex. Feature text
 works too; the skill reuses spec-build preparation and feature-build implementation,
 then automatically sends each coherent batch to the other CLI for read-only review.
 Resume with `duo-build resume <run-id>` using the same native prefix.
-See [duo-build installation, invocation and evidence](docs/duo-build.md).
+Install this checkout into the target project, then restart the agent session:
+
+```sh
+bash /path/to/Specflow/install-hooks.sh /path/to/project --runtime claude-code
+# For a Codex starting session, use --runtime codex instead.
+```
+
+Both `claude` and `codex` must be installed and authenticated. The builder remains
+interactive; the other CLI reviews frozen source and raw evidence. Missing peer
+access blocks duo verification. Each run saves its goal, findings, evidence and
+resume ID locally. Updated runs use the tier policy above; older active runs keep
+their pinned runtime until completion.
+
+For optional TypeSafe advice, put the key in the **target project's untracked
+`.env.local`**:
+
+```dotenv
+TYPESAFE_API_KEY=your-key
+```
+
+Tell the builder: “Use TypeSafe in advisory mode for this Duo run, reading
+`.env.local`, with a maximum of 20 calls.” It configures that file explicitly;
+the workflow does not search for keys. TypeSafe checks focused evidence and flags
+uncertainty; it cannot replace peer review or pass a required gate. Shadow mode
+records a comparison without influencing the review. The Python SDK is not needed.
+See [duo-build configuration, invocation and evidence](docs/duo-build.md).

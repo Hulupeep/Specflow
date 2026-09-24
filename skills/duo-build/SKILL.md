@@ -5,6 +5,30 @@ description: Build an issue or feature interactively toward an indexed shared go
 
 # Duo build
 
+## Tier applicability before this procedure
+
+Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Before
+using the detailed procedure below, run
+`node scripts/specflow-tier.cjs inspect <record.json> duo-build inspect`.
+Follow the installed SPECIFICATION.md working procedure to import current scope,
+run bounded experiments, prepare applicable gates and perform promotion inside
+this one invocation. Preparation may remain thin. Before any production implementation, require
+`node scripts/specflow-tier.cjs inspect <record.json> duo-build build`.
+Stop on exit 2 and report the returned blocker. Production work repeats the
+check with `resume` at re-entry and `finish` before claiming completion.
+A missing record cannot prove readiness; retrieve the current issue and scoped
+evidence. Labels alone never grant build-ready status.
+
+The detailed artifact/pre-flight requirements below apply to the selected
+build-ready slice and its relevant seams. Thin work reports planning state and
+the next justified decision without generating full schemas, fixture packages
+or simulations. Contracted work reviews applicable irreversible decisions and
+includes a paper persona walkthrough for UI flows. Reuse shared decisions;
+leave future siblings thin. Required privacy, permission, execution and release
+gates remain in force. Reconcile contradictory custom legacy instructions
+explicitly using the shared policy; do not claim they passed.
+
+
 You remain the interactive builder. The peer reviews frozen artifacts and never
 owns the conversation, edits product code, runs duo-build or launches another
 model. If `SPECFLOW_DUO_REVIEWER` is set, stop.
@@ -23,6 +47,22 @@ repository. If the placeholder is not expanded, report cadence enforcement as
 unavailable; continue the explicit per-batch review loop. Codex omits this flag.
 
 ## Start and own the run
+
+New contexts declare `workKind: preparation` or `implementation` (default).
+Implementation requires `specification: {"record":"<current record.json>"}`;
+the helper checks readiness before start, resume, capture and finish. Preparation
+cannot establish production readiness. For contracted decision review or selected
+build-ready pre-flight, also set `specification.targetTier` to `contracted` or
+`build-ready`. The helper reserves the issue/tier review allowance before launching
+the peer: initial review plus one repair/regrade, retained across hosts and run
+names. This is separate from Duo's product repair budget. Unchanged evidence stops
+another automatic review. Keep FATAL/SERIOUS findings and repair attribution;
+unknown attribution cannot extend the budget. P2 cleanup does not block the goal.
+
+Pinned older runs retain their recorded runtime. They do not gain tier enforcement
+by reinstalling or merely changing a label. Report that migration limitation,
+retain their evidence, and use updated tooling between runs; never restart to
+evade an exhausted review budget.
 
 1. Read repository and relevant ancestor instructions. Run
    `node scripts/duo-build.cjs check --builder claude-code` (or `codex`).
@@ -45,7 +85,7 @@ unavailable; continue the explicit per-batch review loop. Codex omits this flag.
    example, if the task actually contains `AC-1: Explain the displayed balance`
    and CLAUDE.md actually contains `Tests must pass`:
    ```json
-   {"goal":"goal.md","task":"evidence/task.md","references":["docs/product/mission.md"],"objective":"Explain the supported balance with calculation evidence","finish":"All acceptance and required gates verified; no evidenced blocker","criteria":[{"id":"AC-1","source":"evidence/task.md","anchor":"AC-1: Explain the displayed balance","kind":"acceptance"},{"id":"GATE-TESTS","source":"CLAUDE.md","anchor":"Tests must pass","kind":"gate"}]}
+   {"workKind":"implementation","specification":{"record":"evidence/current-specification.json"},"goal":"goal.md","task":"evidence/task.md","references":["docs/product/mission.md"],"objective":"Explain the supported balance with calculation evidence","finish":"All acceptance and required gates verified; no evidenced blocker","criteria":[{"id":"AC-1","source":"evidence/task.md","anchor":"AC-1: Explain the displayed balance","kind":"acceptance"},{"id":"GATE-TESTS","source":"CLAUDE.md","anchor":"Tests must pass","kind":"gate"}]}
    ```
    Include any required CI/release gates as rows too, even when they are currently
    blocked. For preparation work index the current preparation acceptance; an
@@ -101,7 +141,11 @@ Study setup and controlled trial commands: [routing study reference](references/
 Implement one meaningful batch tied to criterion IDs. Capture actual verification
 commands automatically, preserving argv, exit, stdout/stderr and source hashes:
 `node scripts/duo-build.cjs capture <id> --session <token> -- npm test -- --runInBand`.
-Use the returned evidence path. Failure output is retained and can support diagnosis, but cannot pass an execution gate; stale/source-mutating
+Use the returned evidence path. For implementation captures, also read
+`lastCapture.discoveryBatch` and collect discoveries or explicit none with
+`scripts/specflow-specification.cjs collect` before the next review. Failed or
+interrupted work requires the same collection; reconcile affected records before
+resuming. For work outside capture, reserve a batch with `begin` first. Failure output is retained and can support diagnosis, but cannot pass an execution gate; stale/source-mutating
 captures cannot prove verification. Capture other relevant PR/CI/raw results as
 needed. Never execute a reviewer-suggested command automatically; select the
 appropriate command yourself within the user's authorization.
@@ -299,3 +343,12 @@ Instruction citations still require actual content receipts.
 Complete direction has no next_steps. Running finish is a helper action printed
 by the continuation, never a new repair instruction. Existing finish checks still
 require current peer-verified criteria and no open findings/instructions.
+
+Before publishing any review summary or linked evidence to an issue, use
+`node scripts/specflow-publication.cjs <publication-request.json>` with
+`{repo, issue, bodyFile, linkedFiles}`. It runs the project's configured mechanical
+scanner from `.specflow/publication-policy.json` (`command` argv and
+`privateBaselineRequired` boolean). A missing/failing scanner blocks publication
+at every tier; when private inputs apply, require baseline-derived forms and a
+real canary. Keep private sources and raw provider evaluations local. Do not
+bypass a failed gate with a direct `gh issue comment`.

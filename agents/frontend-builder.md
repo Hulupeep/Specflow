@@ -261,7 +261,7 @@ Fix any type errors before considering the task complete.
 ### Step 9: Post Comment on Issue
 
 ```bash
-gh issue comment <number> --body "## Implementation: Frontend
+node scripts/specflow-publication.cjs <request.json>
 
 **Files:**
 - \`src/features/{name}/hooks/use{Name}.ts\` — Data hook
@@ -332,3 +332,5 @@ useEffect(() => {
 - [ ] Column mapping handles snake_case → camelCase
 - [ ] Error states handled (loading, error, empty)
 - [ ] Comment posted on GitHub issue
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.
