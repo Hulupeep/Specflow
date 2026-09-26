@@ -1726,8 +1726,10 @@ function buildAdapterCommand(policy, promptPath) {
     if (policy.session_id && !args.includes('--resume') && !args.includes('--session-id')) {
       args.push('--resume', String(policy.session_id));
     }
-    if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
-    else if (policy.prompt) args.push(String(policy.prompt));
+    // --allowedTools/--disallowedTools are variadic in the Claude CLI and would
+    // swallow a trailing prompt; end option parsing first (#171 discovery).
+    const prompt = promptPath ? readFileSync(promptPath, 'utf8') : policy.prompt ? String(policy.prompt) : null;
+    if (prompt !== null) args.push('--', prompt);
     return { command: policy.command || 'claude', args };
   }
 
@@ -1790,7 +1792,8 @@ function mergeUsage(current, event) {
     event.total_tokens,
     inputTokens !== null || outputTokens !== null ? Number(inputTokens || 0) + Number(outputTokens || 0) : null,
   );
-  const costUsd = pickFirstNumber(usage.cost_usd, usage.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd);
+  // claude -p reports the run total as total_cost_usd on its result event.
+  const costUsd = pickFirstNumber(usage.cost_usd, usage.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd, event.total_cost_usd);
   return {
     input_tokens: current.input_tokens ?? inputTokens,
     output_tokens: current.output_tokens ?? outputTokens,
@@ -1922,6 +1925,10 @@ function runAdapter(policy, options = {}) {
       encoding: 'utf8',
       timeout: Number(policy.timeout_seconds) * 1000,
       maxBuffer: 10 * 1024 * 1024,
+      // Optional isolation for callers such as `specflow improve` (#176):
+      // run inside a delegated worktree with a scrubbed environment.
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+      ...(options.env ? { env: options.env } : {}),
     });
   }
 
@@ -2565,6 +2572,7 @@ module.exports = {
   buildAdapterCommand,
   commandExists,
   containsForbiddenAction,
+  forbiddenStageCheck,
   parseProviderEvents,
   forbiddenFromProviderEvents,
   isSimulationFresh,

@@ -42,6 +42,11 @@ const COMMANDS = {
     desc: 'Opt-in private routing study; never changes production model choices',
     run: args => require('../scripts/typesafe-routing.cjs').cli(args).catch(e => { console.error(e.message); process.exitCode = 2; }),
   },
+  improve: {
+    usage: 'specflow improve --once --target <dir> --mission <file> | <stage> <run-dir>',
+    desc: 'One verified product-improvement cycle: frozen contract, isolated workspace, KEEP/REVERT/INCONCLUSIVE',
+    run: args => require('../scripts/specflow-improve.cjs').cli(args).then(code => { process.exitCode = code; }),
+  },
   'duo-build': {
     usage: 'specflow duo-build <check|start|resume|status|eligibility|capture|review|finish> [options]',
     desc: 'Durable helper for the native /duo-build or $duo-build workflow',

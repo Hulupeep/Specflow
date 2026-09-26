@@ -1,0 +1,51 @@
+contract_meta:
+  id: feature_improve_core
+  version: 2
+  created_from_spec: "GitHub #171, #173, #174, #175, #176, #178 (learning slices 1-2; tickets remain spec:thin)"
+  covers_reqs: [AC-CORE-2, AC-CORE-4, AC-CORE-6, AC-02-1, AC-02-2, AC-02-3, AC-02-4, AC-04-1, AC-04-2, AC-04-3, AC-04-4, AC-06-1, AC-06-2, AC-06-3, AC-06-5]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_improve_core"
+# Behavioural contract; enforced by executable CLI/ledger/git tests, not source regexes.
+invariants:
+  - id: I-IMPROVE-001
+    rule: "No implementation starts without a frozen ImprovementContract and a recorded baseline (or an accepted baseline blocker, which caps the decision at INCONCLUSIVE)."
+    tests: [implementation-without-contract, unevaluable-contract]
+  - id: I-IMPROVE-002
+    rule: "The contract frozen before implementation governs the decision; later versions are recorded but cannot redefine success for that implementation."
+    tests: [acceptance-edited-after-implementation, frozen-check-edited]
+  - id: I-IMPROVE-003
+    rule: "Evidence satisfies a criterion only at or above its required strength and only from a non-builder producer; level 1-2 evidence comes only from frozen executable checks."
+    tests: [judgment-for-deterministic, submitted-level-1, builder-self-review]
+  - id: I-IMPROVE-004
+    rule: "Prohibited external side effects are classified and blocked before execution and recorded; command environments exclude secrets."
+    tests: [side-effect-classification, blocked-exec-ledgered, prohibited-contract-command, secret-scrub]
+  - id: I-IMPROVE-005
+    rule: "Work happens on an isolated worktree branch; the base ref never moves; REVERT and INCONCLUSIVE retain no product change but keep the patch and evidence; KEEP retains one identifiable commit and is never pushed or merged."
+    tests: [keep-isolated-commit, revert-no-product-diff, scope-violation]
+  - id: I-IMPROVE-006
+    rule: "Every applied cycle ends in exactly one of KEEP, REVERT, INCONCLUSIVE; builder claims never decide; an interrupted or mutated-after-evaluation run cannot be reported terminal."
+    tests: [interrupted-not-terminal, builder-claim-divergence]
+  - id: I-IMPROVE-007
+    rule: "Improvement ledger entries are hash-chained; dropping or editing any earlier line is detectable."
+    tests: [ledger-chain]
+  - id: I-IMPROVE-008
+    rule: "A selected candidate is bounded, reversible, not high-risk, not a redesign, argued from a user problem rather than visual novelty, and evaluable at level 1-2; high-value unevaluable work stays an opportunity."
+    tests: [bounded-refinement-selectable, redesign-not-selectable, novelty-rejected, unevaluable-stays-opportunity]
+  - id: I-IMPROVE-009
+    rule: "A contract is frozen only after an independent Duo peer critique says pursue for the selected candidate."
+    tests: [critique-required]
+  - id: I-IMPROVE-010
+    rule: "Deciding checks are hidden holdout artifacts whose exact bytes were written by a recorded evaluator/oracle role before freezing; the builder may not be that author; builder and peer see only practice checks."
+    tests: [holdout-authorship, builder-not-oracle-author, peer-never-sees-holdout]
+  - id: I-IMPROVE-011
+    rule: "Building runs as Duo rounds (duo-build direction schema, prompt and read-only reviewer invocation) within duo-build's repair budget; practice results never count toward the decision; the holdout runs once and any exposure makes the run INCONCLUSIVE."
+    tests: [peer-redirects-rounds, invalid-peer-keep, repair-budget, holdout-decides, holdout-single-use, holdout-exposed]
+  - id: I-IMPROVE-012
+    rule: "The peer advises and never decides: it can withhold a KEEP (INCONCLUSIVE, human decides) but cannot rescue a failed holdout; an oracle dispute by a non-builder role makes a mandatory criterion INCONCLUSIVE."
+    tests: [peer-cannot-rescue, peer-disagreement, oracle-dispute]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-core.test.js
