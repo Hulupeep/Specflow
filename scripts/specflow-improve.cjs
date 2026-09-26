@@ -18,7 +18,10 @@ const http = require('http');
 const crypto = require('crypto');
 const { spawn, spawnSync } = require('child_process');
 const yaml = require('js-yaml');
+const os = require('os');
 const runner = require('./specflow-runner.cjs');
+const duoBuild = require('./duo-build.cjs');
+const duoDirection = require('./duo-direction.cjs');
 
 const DECISIONS = ['KEEP', 'REVERT', 'INCONCLUSIVE'];
 const EVIDENCE_LEVELS = { 1: 'deterministic', 2: 'behavioural-journey', 3: 'heuristic', 4: 'judgment' };
@@ -27,6 +30,12 @@ const MECHANICAL_PRODUCER = 'verifier-mechanical';
 const RUNTIME_CHECK_TYPES = ['playwright', 'api', 'db-reread', 'console', 'network', 'screenshot', 'custom-script'];
 const CANDIDATE_KINDS = ['ux-refinement', 'workflow', 'defect', 'feature', 'cleanup', 'redesign'];
 const MIN_CANDIDATES = 3;
+// Same budget as duo-build: three product repairs after the initial reviewed batch.
+const MAX_REPAIRS = 3;
+const HOLDOUT_DIR = 'holdout/';
+const DEV_DIR = 'dev/';
+const PEER_RECOMMENDATIONS = ['continue', 'keep', 'revert'];
+const CRITIQUE_VERDICTS = ['pursue', 'park', 'kill', 'reselect'];
 const MAX_ACCEPTANCE = 8;
 const MAX_CONTRACT_BYTES = 20000;
 const CONTRACT_FIELDS = [
@@ -384,8 +393,16 @@ function validateContract(runDir, contract, selected) {
         if (!Array.isArray(a.check.command) || !a.check.command.length) errors.push(`${where}: check.command argv is required`);
         if (a.check.type && !RUNTIME_CHECK_TYPES.includes(a.check.type)) errors.push(`${where}: check.type must be one of ${RUNTIME_CHECK_TYPES.join(', ')}`);
         if (![1, 2].includes(a.check.level) || a.check.level > a.required_level) errors.push(`${where}: check.level must be 1 or 2 and no weaker than required_level`);
-        if (a.check.artifact && !fs.existsSync(path.join(runDir, a.check.artifact))) errors.push(`${where}: check artifact ${a.check.artifact} does not exist in the run directory`);
+        if (!nonempty(a.check.artifact) || !a.check.artifact.startsWith(HOLDOUT_DIR)) errors.push(`${where}: the deciding check must be a ${HOLDOUT_DIR} artifact hidden from builder and peer`);
+        else if (!fs.existsSync(path.join(runDir, a.check.artifact))) errors.push(`${where}: check artifact ${a.check.artifact} does not exist in the run directory`);
       }
+    }
+    if (a?.dev_check) {
+      // Builder-visible practice check: in-sample, never decides.
+      if (!Array.isArray(a.dev_check.command) || !a.dev_check.command.length) errors.push(`${where}: dev_check.command argv is required`);
+      if (!nonempty(a.dev_check.artifact) || !a.dev_check.artifact.startsWith(DEV_DIR)) errors.push(`${where}: dev_check artifact must live under ${DEV_DIR}`);
+      else if (!fs.existsSync(path.join(runDir, a.dev_check.artifact))) errors.push(`${where}: dev_check artifact ${a.dev_check.artifact} does not exist in the run directory`);
+      if (a.check && a.dev_check.artifact === a.check.artifact) errors.push(`${where}: dev_check must differ from the holdout check`);
     }
   }
   if (!acceptance.some((a) => a.mandatory && a.required_level <= 2)) {
@@ -404,7 +421,7 @@ function validateContract(runDir, contract, selected) {
   if (contract?.runtime?.serve && (!Array.isArray(contract.runtime.serve.command) || !contract.runtime.serve.port)) {
     errors.push('runtime.serve needs command argv and port');
   }
-  for (const argv of [...list(contract?.runtime?.setup), contract?.runtime?.serve?.command, ...list(contract?.gates).map((g) => g.command), ...acceptance.map((a) => a.check?.command)].filter(Boolean)) {
+  for (const argv of [...list(contract?.runtime?.setup), contract?.runtime?.serve?.command, ...list(contract?.gates).map((g) => g.command), ...acceptance.map((a) => a.check?.command), ...acceptance.map((a) => a.dev_check?.command)].filter(Boolean)) {
     const blocked = classifySideEffect(argv);
     if (blocked) errors.push(`declared command is a prohibited side effect (${blocked.category}): ${argv.join(' ')}`);
   }
@@ -422,6 +439,18 @@ function freezeContract(runDir, file, options = {}) {
   if (previous.length && !nonempty(options.supersede)) throw new Error('A frozen contract exists; a change needs --supersede "<reason>" and creates a new version');
   const contract = readJson(file);
   const validation = validateContract(runDir, contract, selected);
+  // A distinct reviewer must have said "pursue" for this candidate (#175, D7).
+  const critique = evs.filter((e) => e.event === 'critique_recorded' && e.candidate_id === selected.id).slice(-1)[0];
+  if (!critique) validation.errors.push('an independent critique of the selected candidate is required before freezing (improve critique)');
+  else if (critique.verdict !== 'pursue') validation.errors.push(`the latest critique verdict is ${critique.verdict}; only pursue may be frozen`);
+  // Holdout checks must come from a recorded oracle author, byte for byte.
+  const authored = Object.assign({}, ...evs.filter((e) => e.event === 'oracle_authored').map((e) => e.artifacts));
+  for (const a of list(contract?.acceptance)) {
+    const rel = a?.check?.artifact;
+    if (!rel || !fs.existsSync(path.join(runDir, rel))) continue;
+    if (authored[rel] !== fileSha(path.join(runDir, rel))) validation.errors.push(`holdout ${rel} was not authored by a recorded oracle step (or changed since)`);
+  }
+  validation.ok = validation.errors.length === 0;
   if (!validation.ok) {
     append(runDir, 'contract_rejected', { errors: validation.errors });
     return { status: 'rejected', errors: validation.errors };
@@ -429,8 +458,9 @@ function freezeContract(runDir, file, options = {}) {
   const version = previous.length + 1;
   const artifacts = {};
   for (const a of contract.acceptance) {
-    if (a.check?.artifact) artifacts[a.check.artifact] = fileSha(path.join(runDir, a.check.artifact));
+    for (const c of [a.check, a.dev_check]) if (c?.artifact) artifacts[c.artifact] = fileSha(path.join(runDir, c.artifact));
   }
+  const oracle = evs.filter((e) => e.event === 'oracle_authored').map((e) => ({ role: e.role, executor: e.executor, observed_model: e.provenance?.observed_model || null }));
   const implementationStarted = Boolean(lastEvent(evs, 'implementation_started'));
   const frozen = {
     schema: 'specflow.improvement-contract/v1',
@@ -443,6 +473,8 @@ function freezeContract(runDir, file, options = {}) {
     mission_sha256: run.mission.sha256,
     candidate: { id: selected.id, title: selected.title, kind: selected.kind },
     artifact_sha256: artifacts,
+    oracle_authors: oracle,
+    critique: { verdict: critique.verdict, executor: critique.executor },
     contract,
   };
   const digest = writeOnce(p.contractPath(version), `${JSON.stringify(frozen, null, 2)}\n`);
@@ -595,33 +627,13 @@ function lastJsonLine(text) {
   return null;
 }
 
-async function verifyPhase(runDir, phase) {
-  if (!['baseline', 'after'].includes(phase)) throw new Error('phase must be baseline or after');
-  const run = loadRun(runDir);
-  const gov = governingContract(runDir);
-  if (!gov) throw new Error('No frozen ImprovementContract; nothing can be verified');
-  if (gov.tampered || gov.artifactErrors.length) {
-    append(runDir, 'contract_integrity_failed', { phase, tampered: gov.tampered, artifacts: gov.artifactErrors });
-    return { status: 'blocked', reason: 'frozen contract or check artifacts changed after freezing' };
-  }
-  const evs = events(runDir);
-  if (phase === 'after' && !lastEvent(evs, 'implementation_finished')) throw new Error('No recorded implementation to verify');
-  if (phase === 'baseline' && lastEvent(evs, 'implementation_started')) throw new Error('Baseline must be captured before implementation starts');
-  const kind = phase === 'baseline' ? 'baseline' : 'improve';
-  const ws = workspaceFor(run, kind);
-  if (!fs.existsSync(ws.worktreePath)) prepareWorkspace(runDir, kind);
-  const contract = gov.contract;
-  const p = runPaths(runDir);
-  const dir = p.phaseDir(phase);
-  fs.mkdirSync(dir, { recursive: true });
-  const contractVersion = gov.entry.version;
+// Prepare the workspace runtime (setup + serve), run fn, always stop the server.
+async function withRuntime(runDir, ws, contract, dir, phase, fn) {
   const vars = (s) => String(s)
     .replace(/\{workspace\}/g, ws.worktreePath)
     .replace(/\{run_dir\}/g, runDir)
     .replace(/\{evidence_dir\}/g, dir)
     .replace(/\{phase\}/g, phase);
-
-  append(runDir, 'verification_started', { phase, contract_version: contractVersion, workspace: ws.worktreePath });
   for (const argv of list(contract.runtime?.setup)) {
     const r = guardedSpawn(runDir, 'verifier', argv.map(vars), { cwd: ws.worktreePath, timeoutSeconds: 900 });
     if (r.status !== 'ran' || r.exit_code !== 0) {
@@ -630,73 +642,130 @@ async function verifyPhase(runDir, phase) {
     }
   }
   let server = null;
-  let baseUrl = null;
   if (contract.runtime?.serve) {
     server = await startServer(runDir, ws.worktreePath, contract.runtime.serve, path.join(dir, 'server.log'));
     if (!server.ok) {
       append(runDir, 'verification_blocked', { phase, reason: server.reason });
       return { status: 'blocked', reason: server.reason };
     }
-    baseUrl = server.base_url;
   }
-
-  const items = [];
   try {
-    const checks = contract.acceptance.filter((a) => a.check);
-    const outcomes = {};
-    for (const a of checks) {
-      const argv = a.check.command.map(vars).map((s) => s.replace(/\{artifact\}/g, a.check.artifact ? path.join(runDir, a.check.artifact) : ''));
-      const outPath = path.join(dir, `${a.id}.out.txt`);
-      const r = guardedSpawn(runDir, 'verifier', argv, {
-        cwd: ws.worktreePath,
-        timeoutSeconds: a.check.timeout_seconds || 300,
-        env: { BASE_URL: baseUrl || '', IMPROVE_EVIDENCE_DIR: dir, IMPROVE_PHASE: phase, IMPROVE_CRITERION: a.id, IMPROVE_WORKSPACE: ws.worktreePath },
-      });
-      fs.writeFileSync(outPath, `${r.stdout}\n--- stderr ---\n${r.stderr}`);
-      const result = r.status !== 'ran' ? 'unavailable' : r.exit_code === 0 ? 'pass' : r.exit_code === 1 ? 'fail' : 'unavailable';
-      outcomes[a.id] = { result, measurements: lastJsonLine(r.stdout), outPath, exit_code: r.exit_code };
-    }
-    // Findings go through the #102 runtime rail, one findings file per phase.
-    runner.runRuntimeChecks({
-      runDir: dir,
-      makerClaim: phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline',
-      checks: checks.map((a) => ({ id: a.id, type: a.check.type || 'custom-script', assertion: a.statement, required: a.mandatory, evidence_path: outcomes[a.id].outPath })),
-      runner: (c) => (outcomes[c.id].result === 'unavailable'
-        ? { executable: false, reason: `check did not produce a pass/fail result (exit ${outcomes[c.id].exit_code})` }
-        : { executable: true, result: outcomes[c.id].result, evidence_path: outcomes[c.id].outPath }),
+    return await fn({ vars, baseUrl: server?.base_url || '' });
+  } finally {
+    stopServer(server?.child);
+  }
+}
+
+// Run one check set ('holdout' decides, 'dev' is in-sample practice) and
+// optionally the gates. Findings go through the #102 runtime rail per phase.
+function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerClaim, gates }) {
+  const key = set === 'dev' ? 'dev_check' : 'check';
+  const checks = gov.contract.acceptance.filter((a) => a[key]);
+  const outcomes = {};
+  for (const a of checks) {
+    const c = a[key];
+    const argv = c.command.map(vars).map((x) => x.replace(/\{artifact\}/g, c.artifact ? path.join(runDir, c.artifact) : ''));
+    const outPath = path.join(dir, `${a.id}${set === 'dev' ? '.dev' : ''}.out.txt`);
+    const r = guardedSpawn(runDir, 'verifier', argv, {
+      cwd: ws.worktreePath,
+      timeoutSeconds: c.timeout_seconds || 300,
+      env: { BASE_URL: baseUrl, IMPROVE_EVIDENCE_DIR: dir, IMPROVE_PHASE: phase, IMPROVE_CRITERION: a.id, IMPROVE_WORKSPACE: ws.worktreePath, IMPROVE_SET: set },
     });
-    for (const a of checks) {
-      const o = outcomes[a.id];
-      items.push({
-        criterion: a.id, level: a.check.level, kind: 'executable-check', result: o.result, measurements: o.measurements,
-        source: { artifact: a.check.artifact || null, artifact_sha256: gov.entry.artifact_sha256?.[a.check.artifact] || null, command: a.check.command },
-        evidence_path: o.outPath, evidence_sha256: fileSha(o.outPath),
-      });
-    }
-    for (const g of list(contract.gates)) {
+    fs.writeFileSync(outPath, `${r.stdout}\n--- stderr ---\n${r.stderr}`);
+    const result = r.status !== 'ran' ? 'unavailable' : r.exit_code === 0 ? 'pass' : r.exit_code === 1 ? 'fail' : 'unavailable';
+    outcomes[a.id] = { result, measurements: lastJsonLine(r.stdout), outPath, exit_code: r.exit_code };
+  }
+  runner.runRuntimeChecks({
+    runDir: path.join(dir, set),
+    makerClaim,
+    checks: checks.map((a) => ({ id: a.id, type: a[key].type || 'custom-script', assertion: a.statement, required: a.mandatory, evidence_path: outcomes[a.id].outPath })),
+    runner: (c) => (outcomes[c.id].result === 'unavailable'
+      ? { executable: false, reason: `check did not produce a pass/fail result (exit ${outcomes[c.id].exit_code})` }
+      : { executable: true, result: outcomes[c.id].result, evidence_path: outcomes[c.id].outPath }),
+  });
+  const items = checks.map((a) => ({
+    criterion: a.id, level: a[key].level || a.check?.level || 2, kind: 'executable-check', set, result: outcomes[a.id].result, measurements: outcomes[a.id].measurements,
+    source: { artifact: a[key].artifact, artifact_sha256: gov.entry.artifact_sha256?.[a[key].artifact] || null, command: a[key].command },
+    evidence_path: outcomes[a.id].outPath, evidence_sha256: fileSha(outcomes[a.id].outPath),
+  }));
+  if (gates) {
+    for (const g of list(gov.contract.gates)) {
       const outPath = path.join(dir, `gate-${g.id}.out.txt`);
       const r = guardedSpawn(runDir, 'verifier', g.command.map(vars), { cwd: ws.worktreePath, timeoutSeconds: g.timeout_seconds || 600, env: { IMPROVE_PHASE: phase } });
       fs.writeFileSync(outPath, `${r.stdout}\n--- stderr ---\n${r.stderr}`);
       items.push({
-        criterion: `gate:${g.id}`, level: 1, kind: 'gate', result: r.status !== 'ran' ? 'unavailable' : r.exit_code === 0 ? 'pass' : 'fail',
+        criterion: `gate:${g.id}`, level: 1, kind: 'gate', set: 'gate', result: r.status !== 'ran' ? 'unavailable' : r.exit_code === 0 ? 'pass' : 'fail',
         source: { command: g.command }, evidence_path: outPath, evidence_sha256: fileSha(outPath),
       });
     }
-  } finally {
-    stopServer(server?.child);
   }
-  for (const item of items) addEvidenceItem(runDir, { ...item, phase, producer_role: MECHANICAL_PRODUCER, executor: 'specflow-improve', contract_version: contractVersion });
+  for (const item of items) addEvidenceItem(runDir, { ...item, phase, producer_role: MECHANICAL_PRODUCER, executor: 'specflow-improve', contract_version: gov.entry.version });
+  return items;
+}
 
-  const summary = Object.fromEntries(items.map((i) => [i.criterion, i.result]));
+function integrityBlock(runDir, gov, phase) {
+  if (!gov) throw new Error('No frozen ImprovementContract; nothing can be verified');
+  if (gov.tampered || gov.artifactErrors.length) {
+    append(runDir, 'contract_integrity_failed', { phase, tampered: gov.tampered, artifacts: gov.artifactErrors });
+    return { status: 'blocked', reason: 'frozen contract or check artifacts changed after freezing' };
+  }
+  return null;
+}
+
+async function verifyPhase(runDir, phase) {
+  if (!['baseline', 'after'].includes(phase)) throw new Error('phase must be baseline or after');
+  const run = loadRun(runDir);
+  const gov = governingContract(runDir);
+  const blocked = integrityBlock(runDir, gov, phase);
+  if (blocked) return blocked;
+  const evs = events(runDir);
+  if (phase === 'after' && !lastEvent(evs, 'implementation_finished')) throw new Error('No recorded implementation to verify');
+  // The holdout decides once. Re-running it after seeing its result would make it in-sample.
+  if (phase === 'after' && lastEvent(evs, 'holdout_consumed')) throw new Error('The holdout was already consumed for this run; evaluate on that result');
+  if (phase === 'baseline' && lastEvent(evs, 'implementation_started')) throw new Error('Baseline must be captured before implementation starts');
+  const kind = phase === 'baseline' ? 'baseline' : 'improve';
+  const ws = workspaceFor(run, kind);
+  if (!fs.existsSync(ws.worktreePath)) prepareWorkspace(runDir, kind);
+  const dir = runPaths(runDir).phaseDir(phase);
+  fs.mkdirSync(dir, { recursive: true });
+  append(runDir, 'verification_started', { phase, contract_version: gov.entry.version, workspace: ws.worktreePath });
+  const makerClaim = phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline';
+  const outcome = await withRuntime(runDir, ws, gov.contract, dir, phase, ({ vars, baseUrl }) => {
+    const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim };
+    const items = runCheckSet(runDir, { ...ctx, set: 'holdout', gates: true });
+    if (phase === 'baseline') items.push(...runCheckSet(runDir, { ...ctx, set: 'dev', gates: false }));
+    return { items };
+  });
+  if (outcome.status === 'blocked') return outcome;
+  const summary = Object.fromEntries(outcome.items.map((i) => [i.set === 'dev' ? `dev:${i.criterion}` : i.criterion, i.result]));
   if (phase === 'baseline') {
-    const mismatches = contract.acceptance
+    const mismatches = gov.contract.acceptance
       .filter((a) => a.check && a.baseline_expectation !== 'n/a' && summary[a.id] !== a.baseline_expectation)
       .map((a) => ({ criterion: a.id, expected: a.baseline_expectation, observed: summary[a.id] }));
-    append(runDir, mismatches.length ? 'baseline_blocked' : 'baseline_recorded', { contract_version: contractVersion, summary, mismatches });
+    append(runDir, mismatches.length ? 'baseline_blocked' : 'baseline_recorded', { contract_version: gov.entry.version, summary, mismatches });
     return { status: mismatches.length ? 'baseline_blocked' : 'baseline_recorded', summary, mismatches };
   }
-  append(runDir, 'verification_completed', { phase, contract_version: contractVersion, summary });
+  append(runDir, 'holdout_consumed', { contract_version: gov.entry.version, summary });
+  append(runDir, 'verification_completed', { phase, contract_version: gov.entry.version, summary });
   return { status: 'verified', summary };
+}
+
+// Builder-visible practice run inside a Duo round: dev checks only.
+async function devRound(runDir, round) {
+  const run = loadRun(runDir);
+  const gov = governingContract(runDir);
+  const blocked = integrityBlock(runDir, gov, `dev-r${round}`);
+  if (blocked) return blocked;
+  const ws = workspaceFor(run, 'improve');
+  const dir = path.join(runDir, 'dev-runs', `round-${round}`);
+  fs.mkdirSync(dir, { recursive: true });
+  const outcome = await withRuntime(runDir, ws, gov.contract, dir, `dev-r${round}`, ({ vars, baseUrl }) => ({
+    items: runCheckSet(runDir, { ws, gov, dir, phase: `dev-r${round}`, set: 'dev', vars, baseUrl, makerClaim: 'dev-round', gates: false }),
+  }));
+  if (outcome.status === 'blocked') return outcome;
+  const summary = Object.fromEntries(outcome.items.map((i) => [i.criterion, i.result]));
+  append(runDir, 'dev_round_checked', { round, summary });
+  return { status: 'checked', dir, summary, items: outcome.items };
 }
 
 // ---------------------------------------------------------------------------
@@ -781,25 +850,212 @@ function toolCommands(transcriptPath) {
   return out;
 }
 
-function builderPrompt(runDir, gov) {
+// ---------------------------------------------------------------------------
+// Duo peer (#178 slice 2). Reuses duo-build's direction schema and prompt and
+// its hardened read-only Claude reviewer invocation. The peer steers and
+// recommends; it never decides. duo-build pairs vendors (Claude <-> Codex);
+// when only one vendor is available the ledger records a same-vendor peer.
+
+const PEER_ROUND_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['direction', 'recommendation', 'reason'],
+  properties: {
+    direction: duoDirection.schema,
+    recommendation: { type: 'string', enum: PEER_RECOMMENDATIONS },
+    reason: { type: 'string', minLength: 1 },
+  },
+};
+const CRITIQUE_SCHEMA = {
+  type: 'object', additionalProperties: false, required: ['verdict', 'reselect_to', 'challenges', 'contract_requirements', 'risks'],
+  properties: {
+    verdict: { type: 'string', enum: CRITIQUE_VERDICTS },
+    reselect_to: { type: ['string', 'null'] },
+    challenges: { type: 'array', items: { type: 'string', minLength: 1 } },
+    contract_requirements: { type: 'array', items: { type: 'string', minLength: 1 } },
+    risks: { type: 'array', items: { type: 'string', minLength: 1 } },
+  },
+};
+
+function peerArgs(schema, model) {
+  // duo-build invocation('codex') is its Claude-as-reviewer command: Read/Glob/Grep only, dontAsk, no MCP, no settings.
+  const args = [...duoBuild.invocation('codex', os.tmpdir()).args];
+  args[args.indexOf('--json-schema') + 1] = JSON.stringify(schema);
+  if (model) args.push('--model', model);
+  return args;
+}
+
+function defaultInvokePeer({ args, cwd, input, env, timeoutSeconds }) {
+  const r = spawnSync('claude', args, { cwd, input, env, encoding: 'utf8', timeout: timeoutSeconds * 1000, maxBuffer: 32 * 1024 * 1024 });
+  return { status: r.status, stdout: r.stdout || '', stderr: `${r.stderr || ''}${r.error ? `\n${r.error.message}` : ''}` };
+}
+
+function runPeer(runDir, { stage, inputDir, prompt, schema, model, invoke = defaultInvokePeer, builderProvider }) {
+  const dir = path.join(runDir, 'peer');
+  fs.mkdirSync(dir, { recursive: true });
+  const transcript = path.join(dir, `${stage}.transcript.jsonl`);
+  const { env } = scrubbedEnv({ SPECFLOW_DUO_REVIEWER: '1' }, { keepProvider: true });
+  const r = invoke({ args: peerArgs(schema, model), cwd: inputDir, input: prompt, env, timeoutSeconds: 900 });
+  fs.writeFileSync(transcript, `${r.stdout}${r.stderr ? `\n${r.stderr}` : ''}`);
+  const parsed = runner.parseProviderEvents('claude-print', r.stdout);
+  const result = [...parsed.events].reverse().find((e) => e.type === 'result') || {};
+  const tools = toolCommands(transcript);
+  const provenance = {
+    executor: 'duo-peer:claude', requested_model: model || null, observed_model: parsed.effective_model,
+    cost_usd: typeof result.total_cost_usd === 'number' ? result.total_cost_usd : null,
+    cost_status: typeof result.total_cost_usd === 'number' ? 'measured' : 'unknown',
+    independence: builderProvider === 'codex-exec' ? 'cross-vendor' : 'same-vendor',
+    exit_code: r.status, tool_calls: tools.length,
+  };
+  return { output: result.structured_output || null, provenance, transcript, holdoutAccessed: holdoutTouched(runDir, tools) };
+}
+
+// Any tool input naming the run directory's holdout, or the run directory at
+// all for a builder, is exposure: the holdout can no longer decide (#174 L1).
+function holdoutTouched(runDir, tools, { anyRunPath = false } = {}) {
+  const needles = [path.join(runDir, 'holdout'), 'holdout/'];
+  if (anyRunPath) needles.push(runDir);
+  return tools.some((t) => needles.some((n) => JSON.stringify(t.input || {}).includes(n)));
+}
+
+function copyInto(dest, files) {
+  for (const [name, src] of Object.entries(files)) {
+    if (!src || !fs.existsSync(src)) continue;
+    const target = path.join(dest, name);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    if (fs.statSync(src).isDirectory()) fs.cpSync(src, target, { recursive: true, filter: (f) => !/server\.log$/.test(f) });
+    else fs.copyFileSync(src, target);
+  }
+}
+
+// Contract as the builder and peer may see it: statements, scope and the
+// names of practice checks — never holdout artifacts or their commands.
+function publicContract(gov) {
   const c = gov.contract;
+  return {
+    version: gov.entry.version, observation: c.observation, user_problem: c.user_problem, hypothesis: c.hypothesis,
+    affected_journey: c.affected_journey, non_goals: c.non_goals, scope: c.scope, ux_profile: c.ux_profile || null,
+    implementation_notes: c.implementation_notes || null,
+    acceptance: c.acceptance.map((a) => ({ id: a.id, statement: a.statement, required_level: a.required_level, mandatory: a.mandatory, practice_check: a.dev_check ? a.dev_check.artifact : null })),
+  };
+}
+
+function critique(runDir, options = {}) {
+  const run = loadRun(runDir);
+  const evs = events(runDir);
+  if (!lastEvent(evs, 'candidates_recorded')) throw new Error('Record candidates before a critique');
+  if (lastEvent(evs, 'contract_frozen')) throw new Error('Critique happens before the contract is frozen');
+  const p = runPaths(runDir);
+  const candidates = readJson(p.candidatesPath);
+  const selected = candidates.candidates.find((c) => c.status === 'selected');
+  const inputDir = path.join(runDir, 'critique-input');
+  fs.rmSync(inputDir, { recursive: true, force: true });
+  fs.mkdirSync(inputDir, { recursive: true });
+  fs.writeFileSync(path.join(inputDir, 'mission.md'), run.mission.text);
+  copyInto(inputDir, { 'candidates.json': p.candidatesPath, 'UX_REFINEMENT_PROFILE.md': RUBRIC, ...(options.draft ? { 'contract.draft.json': options.draft } : {}) });
+  for (const f of list(options.include)) copyInto(inputDir, { [path.basename(f)]: f });
+  const prompt = [
+    `You are the Duo peer for Specflow improvement run ${run.run_id}: the builder's partner, not a total adversary.`,
+    'Read every file here. Decide whether the SELECTED candidate should be pursued now: pursue, park (valuable, not now), kill (not worth it), or reselect (another candidate is clearly better; name it).',
+    'Posture: refinement over redesign, removal over addition, workflow over decoration, clarity over novelty. Challenge overstated value, unevaluable claims and anything argued from aesthetics.',
+    'If a draft contract is present, list the requirements it must add or change before freezing (contract_requirements). List concrete risks.',
+    `Selected: ${selected.id} — ${selected.title}`,
+  ].join('\n');
+  const peer = runPeer(runDir, { stage: 'critique', inputDir, prompt, schema: CRITIQUE_SCHEMA, model: options.model || 'opus', invoke: options.invokePeer });
+  const out = peer.output;
+  if (!out || !CRITIQUE_VERDICTS.includes(out.verdict)) {
+    append(runDir, 'critique_failed', { provenance: peer.provenance });
+    return { status: 'blocked', reason: 'peer returned no valid critique', provenance: peer.provenance };
+  }
+  append(runDir, 'critique_recorded', {
+    candidate_id: selected.id, verdict: out.verdict, reselect_to: out.reselect_to, challenges: out.challenges,
+    contract_requirements: out.contract_requirements, risks: out.risks, executor: peer.provenance.executor, provenance: peer.provenance,
+  });
+  return { status: 'recorded', ...out, provenance: peer.provenance };
+}
+
+// The deciding checks are written by an evaluator role, not by the scout,
+// contract writer or builder. `oracle` runs that role through an adapter in
+// a scratch directory and records exactly which bytes it authored.
+function recordOracle(runDir, { role, executor, files, provenance = null }) {
+  loadRun(runDir);
+  if (!nonempty(role) || !nonempty(executor) || ['builder', 'scout', 'contract-writer'].includes(role)) throw new Error('oracle author must be an evaluator role');
+  if (lastEvent(events(runDir), 'contract_frozen')) throw new Error('The oracle is authored before the contract is frozen');
+  const artifacts = {};
+  for (const rel of list(files)) {
+    if (!rel.startsWith(HOLDOUT_DIR)) throw new Error(`oracle files must live under ${HOLDOUT_DIR}`);
+    artifacts[rel] = fileSha(path.join(runDir, rel));
+  }
+  return append(runDir, 'oracle_authored', { role, executor, artifacts, provenance });
+}
+
+function oracle(runDir, options = {}) {
+  loadRun(runDir);
+  if (!options.policy || !options.prompt) throw new Error('oracle needs --policy and --prompt');
+  const raw = loadPolicy(options.policy);
+  const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, 'oracle-author');
+  const draftDir = path.join(runDir, 'oracle-draft');
+  fs.mkdirSync(path.join(draftDir, 'holdout'), { recursive: true });
+  const promptPath = path.join(runDir, 'adapters', 'oracle-author.prompt.md');
+  fs.mkdirSync(path.dirname(promptPath), { recursive: true });
+  fs.writeFileSync(promptPath, fs.readFileSync(options.prompt, 'utf8'));
+  const { env } = scrubbedEnv({}, { keepProvider: true });
+  const result = runner.runAdapter(policy, { promptPath, stage: 'improve.oracle', cwd: draftDir, env });
+  const files = [];
+  for (const name of fs.readdirSync(path.join(draftDir, 'holdout'))) {
+    const rel = `${HOLDOUT_DIR}${name}`;
+    fs.mkdirSync(path.join(runDir, 'holdout'), { recursive: true });
+    fs.copyFileSync(path.join(draftDir, 'holdout', name), path.join(runDir, rel));
+    files.push(rel);
+  }
+  if (!files.length) {
+    append(runDir, 'oracle_failed', { provenance: roleProvenance(policy, result) });
+    return { status: 'blocked', reason: 'oracle author produced no holdout files', provenance: roleProvenance(policy, result) };
+  }
+  recordOracle(runDir, { role: 'oracle-author', executor: policy.id, files, provenance: roleProvenance(policy, result) });
+  return { status: 'authored', files, provenance: roleProvenance(policy, result) };
+}
+
+function builderPrompt(runDir, gov, round, feedback) {
   return [
-    `You are the BUILDER for Specflow improvement run ${path.basename(runDir)}.`,
-    'Implement the smallest change that satisfies the frozen ImprovementContract below. You do not decide whether it worked; an independent evaluator and frozen checks do.',
+    `You are the BUILDER for Specflow improvement run ${path.basename(runDir)}, round ${round}.`,
+    'Implement the smallest change that satisfies the frozen ImprovementContract below. You do not decide whether it worked: hidden holdout checks and an independent evaluator do. You cannot see those checks; do not look for them.',
     'Rules: edit only files matching scope.allowed_paths. Do not commit, push, merge, deploy, contact anyone, touch env files, secrets, migrations or CI. Do not modify tests to make them pass. Prefer removing or reordering UI over adding UI. Preserve the listed visual language and navigation.',
-    'When done, reply with a short summary of the diff and one line: CLAIM: complete | CLAIM: partial | CLAIM: unable.',
+    'When done, reply with a short summary of the diff, your response to each peer next step (done / deferred / disputed + why), and one line: CLAIM: complete | CLAIM: partial | CLAIM: unable.',
     '',
     '```json',
-    JSON.stringify({
-      observation: c.observation, user_problem: c.user_problem, hypothesis: c.hypothesis, affected_journey: c.affected_journey,
-      acceptance: c.acceptance.map((a) => ({ id: a.id, statement: a.statement })), non_goals: c.non_goals, scope: c.scope,
-      ux_profile: c.ux_profile || null, implementation_notes: c.implementation_notes || null,
-    }, null, 2),
+    JSON.stringify(publicContract(gov), null, 2),
     '```',
+    feedback ? `\n## Duo peer direction and practice-check results from round ${round - 1}\n\n${feedback}` : '',
   ].join('\n');
 }
 
-function build(runDir, options = {}) {
+function renderFeedback(peerOut, dev) {
+  const d = peerOut.direction;
+  return [
+    `Peer recommendation: ${peerOut.recommendation} — ${peerOut.reason}`,
+    `Direction: ${d.assessment}. ${d.goal_connection}`,
+    ...d.next_steps.map((s, i) => `${i + 1}. ${s.owner} — ${s.action} (criterion ${s.criterion}). Success: ${s.done_when}`),
+    ...d.preserve.map((x) => `Preserve: ${x}`),
+    '',
+    `Practice checks (in-sample; passing them is not success): ${JSON.stringify(dev?.summary || {})}`,
+    ...list(dev?.items).map((i) => `- ${i.criterion}: ${i.result} ${i.measurements ? JSON.stringify(i.measurements).slice(0, 600) : ''}`),
+  ].join('\n');
+}
+
+// Duo semantics adapted to improve: a continue needs builder work; keep
+// needs every practice check to pass; direction steps name known criteria.
+function validatePeerRound(out, gov, devSummary) {
+  if (!out || !PEER_RECOMMENDATIONS.includes(out.recommendation) || !nonempty(out.reason)) return 'missing recommendation';
+  const d = out.direction;
+  if (!d || !['on_track', 'redirect', 'blocked', 'complete'].includes(d.assessment) || !nonempty(d.goal_connection)) return 'missing goal-focused direction';
+  if (!Array.isArray(d.next_steps) || d.next_steps.length > 3 || !Array.isArray(d.preserve)) return 'invalid next steps';
+  const ids = new Set(gov.contract.acceptance.map((a) => a.id));
+  if (d.next_steps.some((st) => !ids.has(st.criterion) || !nonempty(st.action) || !nonempty(st.done_when))) return 'next step names an unknown criterion or lacks an observable outcome';
+  if (out.recommendation === 'continue' && !d.next_steps.some((st) => st.owner === 'builder')) return 'continue without builder work';
+  if (out.recommendation === 'keep' && Object.values(devSummary || {}).some((r) => r !== 'pass')) return 'keep recommended while a practice check fails';
+  return null;
+}
+
+async function build(runDir, options = {}) {
   const run = loadRun(runDir);
   const evs = events(runDir);
   const gov = governingContract(runDir);
@@ -814,32 +1070,93 @@ function build(runDir, options = {}) {
   }
   if (lastEvent(evs, 'implementation_started')) throw new Error('This run already has an implementation attempt; --once allows one');
   const raw = loadPolicy(options.policy);
-  const policy = rolePolicy(runDir, { ...raw, role: raw.role || 'implementer' }, 'builder');
+  const policyFor = (round) => {
+    const p = rolePolicy(runDir, { ...raw, role: raw.role || 'implementer' }, `builder-r${round}`);
+    // The builder may not read the run directory: holdout, peer notes and evidence stay out of reach.
+    return { ...p, denied_tools: [...p.denied_tools, `Read(/${runDir}/**)`, `Grep(/${runDir}/**)`, `Glob(/${runDir}/**)`] };
+  };
+  const oracleExecutors = evs.filter((e) => e.event === 'oracle_authored').map((e) => e.executor);
+  if (oracleExecutors.includes(policyFor(1).id)) throw new Error('The builder policy authored the oracle; use a different builder');
   const ws = workspaceFor(run, 'improve');
   if (!fs.existsSync(ws.worktreePath)) prepareWorkspace(runDir, 'improve');
-  const promptPath = path.join(runDir, 'adapters', 'builder.prompt.md');
-  fs.mkdirSync(path.dirname(promptPath), { recursive: true });
-  fs.writeFileSync(promptPath, options.prompt ? `${builderPrompt(runDir, gov)}\n\n${fs.readFileSync(options.prompt, 'utf8')}` : builderPrompt(runDir, gov));
   append(runDir, 'implementation_started', {
-    role: 'builder', executor: policy.id, contract_version: gov.entry.version, contract_sha256: gov.entry.contract_sha256,
+    role: 'builder', executor: policyFor(1).id, contract_version: gov.entry.version, contract_sha256: gov.entry.contract_sha256,
     workspace: ws.worktreePath, branch: ws.branch, baseline_blocker_accepted: baseline ? null : options.acceptBaselineBlocker,
+    max_rounds: 1 + MAX_REPAIRS,
   });
-  const { env } = scrubbedEnv({}, { keepProvider: true });
-  const result = runner.runAdapter(policy, { promptPath, stage: 'improve.builder', dryRun: options.dryRun, cwd: ws.worktreePath, env });
-  const attempted = toolCommands(policy.transcript_path)
-    .filter((t) => t.tool === 'Bash')
-    .map((t) => ({ command: t.input?.command, violation: classifySideEffect(t.input?.command) }))
-    .filter((t) => t.violation);
-  for (const a of attempted) append(runDir, 'side_effect_attempted', { role: 'builder', command: a.command, ...a.violation });
-  const finalText = fs.existsSync(policy.output_path) ? fs.readFileSync(policy.output_path, 'utf8') : '';
-  const claim = (/CLAIM:\s*(complete|partial|unable)/i.exec(finalText)?.[1] || 'unknown').toLowerCase();
+
+  const rounds = [];
+  let feedback = null;
+  let stop = null;
+  let claim = 'unknown';
+  for (let round = 1; round <= 1 + MAX_REPAIRS && !stop; round += 1) {
+    const policy = policyFor(round);
+    const promptPath = path.join(runDir, 'adapters', `builder-r${round}.prompt.md`);
+    fs.mkdirSync(path.dirname(promptPath), { recursive: true });
+    fs.writeFileSync(promptPath, builderPrompt(runDir, gov, round, feedback) + (options.prompt ? `\n\n${fs.readFileSync(options.prompt, 'utf8')}` : ''));
+    const { env } = scrubbedEnv({}, { keepProvider: true });
+    const result = runner.runAdapter(policy, { promptPath, stage: `improve.builder.r${round}`, dryRun: options.dryRun, cwd: ws.worktreePath, env });
+    const tools = toolCommands(policy.transcript_path);
+    const attempted = tools.filter((t) => t.tool === 'Bash')
+      .map((t) => ({ command: t.input?.command, violation: classifySideEffect(t.input?.command) }))
+      .filter((t) => t.violation);
+    for (const a of attempted) append(runDir, 'side_effect_attempted', { role: 'builder', round, command: a.command, ...a.violation });
+    if (holdoutTouched(runDir, tools, { anyRunPath: true })) append(runDir, 'holdout_exposed', { role: 'builder', round });
+    if (options.afterBuilderRound) await options.afterBuilderRound(ws.worktreePath, round);
+    const finalText = fs.existsSync(policy.output_path) ? fs.readFileSync(policy.output_path, 'utf8') : '';
+    claim = (/CLAIM:\s*(complete|partial|unable)/i.exec(finalText)?.[1] || 'unknown').toLowerCase();
+    const record = { round, adapter_status: result.status, claim, provenance: roleProvenance(policy, result), side_effects_attempted: attempted.length };
+    append(runDir, 'builder_round', record);
+    if (!['gate_rerun_required', 'dry_run'].includes(result.status)) { stop = `builder ${result.status}`; rounds.push(record); break; }
+
+    const dev = await devRound(runDir, round);
+    if (dev.status === 'blocked') { stop = `practice checks blocked: ${dev.reason}`; rounds.push(record); break; }
+    const diff = workspaceDiff(run);
+    const inputDir = path.join(runDir, 'peer-input', `round-${round}`);
+    fs.rmSync(inputDir, { recursive: true, force: true });
+    fs.mkdirSync(inputDir, { recursive: true });
+    fs.writeFileSync(path.join(inputDir, 'contract.json'), JSON.stringify(publicContract(gov), null, 2));
+    fs.writeFileSync(path.join(inputDir, 'workspace.patch'), diff?.patch || '');
+    fs.writeFileSync(path.join(inputDir, 'builder-summary.md'), finalText);
+    fs.writeFileSync(path.join(inputDir, 'direction-memory.json'), JSON.stringify(rounds.filter((r) => r.peer).slice(-3).map((r) => ({ round: r.round, peer: r.peer, builder_claim: r.claim })), null, 2));
+    copyInto(inputDir, { 'practice-checks': dev.dir, 'UX_REFINEMENT_PROFILE.md': RUBRIC });
+    const prompt = [
+      duoDirection.prompt,
+      `Specflow improve, run ${run.run_id}, round ${round} of at most ${1 + MAX_REPAIRS}. Files: contract.json (frozen), workspace.patch, builder-summary.md, practice-checks/ (in-sample results and screenshots), direction-memory.json, UX_REFINEMENT_PROFILE.md.`,
+      'Recommend: continue (with builder next_steps), keep (practice checks all pass and the change serves the contract without UX harm), or revert (wrong approach or harm that more rounds will not fix).',
+      'Your recommendation is advisory. Hidden holdout checks and an independent evaluator decide; you cannot see them and must not look for them.',
+    ].join('\n');
+    const peer = runPeer(runDir, { stage: `round-${round}`, inputDir, prompt, schema: PEER_ROUND_SCHEMA, model: options.peerModel || 'opus', invoke: options.invokePeer, builderProvider: policy.provider });
+    if (peer.holdoutAccessed) append(runDir, 'holdout_exposed', { role: 'peer', round });
+    const invalid = validatePeerRound(peer.output, gov, dev.summary);
+    append(runDir, 'peer_review', {
+      round, recommendation: peer.output?.recommendation || null, assessment: peer.output?.direction?.assessment || null,
+      reason: peer.output?.reason || null, direction: peer.output?.direction || null, invalid, provenance: peer.provenance, dev_summary: dev.summary,
+    });
+    rounds.push({ ...record, dev: dev.summary, peer: peer.output, invalid });
+    if (invalid) stop = `peer review invalid: ${invalid}`;
+    else if (peer.output.recommendation !== 'continue') stop = `peer recommends ${peer.output.recommendation}`;
+    else if (round === 1 + MAX_REPAIRS) stop = 'repair budget exhausted';
+    else feedback = renderFeedback(peer.output, dev);
+  }
+  const final = rounds.filter((r) => r.peer && !r.invalid).slice(-1)[0];
   // verifierTrace() compatibility: a maker_claim entry on the rail ledger.
-  runner.appendLedger(runPaths(runDir).ledgerPath, { stage: 'verifier_stage', event: 'maker_claim', claim, output_path: policy.output_path, transcript_path: policy.transcript_path });
+  runner.appendLedger(runPaths(runDir).ledgerPath, { stage: 'verifier_stage', event: 'maker_claim', claim, output_path: path.join(runDir, 'adapters'), transcript_path: path.join(runDir, 'adapters') });
   append(runDir, 'implementation_finished', {
-    role: 'builder', adapter_status: result.status, claim, side_effects_attempted: attempted.length,
-    forbidden_action_detected: result.entry?.forbidden_action_detected || null, provenance: roleProvenance(policy, result),
+    role: 'builder', rounds: rounds.length, stop_reason: stop, claim,
+    peer_recommendation: final?.peer?.recommendation || null,
+    side_effects_attempted: rounds.reduce((n, r) => n + r.side_effects_attempted, 0),
   });
-  return { status: result.status, claim, provenance: roleProvenance(policy, result), side_effects_attempted: attempted.length };
+  return { status: 'built', rounds: rounds.map((r) => ({ round: r.round, claim: r.claim, dev: r.dev, recommendation: r.peer?.recommendation || null, invalid: r.invalid || null, cost_usd: r.provenance.cost_usd })), stop_reason: stop, peer_recommendation: final?.peer?.recommendation || null };
+}
+
+function dispute(runDir, { criterion, reason, role, executor }) {
+  loadRun(runDir);
+  const gov = governingContract(runDir);
+  if (!gov?.contract.acceptance.some((a) => a.id === criterion)) throw new Error(`unknown criterion ${criterion}`);
+  if (!nonempty(reason) || !nonempty(role) || !nonempty(executor)) throw new Error('dispute needs criterion, reason, role and executor');
+  if (role === 'builder' || executor === lastEvent(events(runDir), 'implementation_started')?.executor) throw new Error('the builder cannot dispute the oracle that judges it');
+  return append(runDir, 'oracle_disputed', { criterion, reason, role, executor });
 }
 
 function judgePrompt(runDir, role, criteria, gov) {
@@ -907,7 +1224,8 @@ function judge(runDir, options = {}) {
 
 function evaluateCriteria(contract, evidence, contractVersion) {
   return contract.acceptance.map((a) => {
-    const relevant = evidence.filter((e) => e.criterion === a.id && (e.phase === 'after' || e.kind === 'judgment') && e.contract_version === contractVersion);
+    // Practice (dev) results are in-sample: shown to builder and peer, never counted.
+    const relevant = evidence.filter((e) => e.criterion === a.id && e.set !== 'dev' && (e.phase === 'after' || e.kind === 'judgment') && e.contract_version === contractVersion);
     const qualifying = relevant.filter((e) => e.level <= a.required_level && !e.self_review && e.producer_role !== 'builder');
     const insufficient = relevant.filter((e) => !qualifying.includes(e));
     let status = 'missing';
@@ -940,6 +1258,12 @@ function decide(state) {
   if (state.gates_missing.length) inconclusive.push(`gates without a result: ${state.gates_missing.join(', ')}`);
   if (state.baseline_blocker) inconclusive.push(`baseline blocker accepted: ${state.baseline_blocker}`);
   if (state.rail_gate !== 'pass') inconclusive.push(`verifier rail gate is ${state.rail_gate}`);
+  if (state.holdout_exposed.length) inconclusive.push(`holdout exposed to ${state.holdout_exposed.join(', ')}; it can no longer decide`);
+  const disputed = state.disputes.filter((d) => state.criteria.some((c) => c.id === d.criterion && c.mandatory));
+  if (disputed.length) inconclusive.push(`oracle disputed for ${disputed.map((d) => d.criterion).join(', ')}; a human decides whether the label or threshold was wrong`);
+  // The peer can only withhold a KEEP, never rescue a failure (REVERT returned above).
+  if (!state.peer_recommendation) inconclusive.push('no valid Duo peer recommendation');
+  else if (state.peer_recommendation !== 'keep') inconclusive.push(`Duo peer recommends ${state.peer_recommendation} while the checks pass; a human decides`);
   if (inconclusive.length) return { decision: 'INCONCLUSIVE', reasons: inconclusive };
   return { decision: 'KEEP', reasons: ['all mandatory criteria satisfied by qualifying evidence; no gate regressed; scope and safety held'] };
 }
@@ -962,7 +1286,8 @@ function evaluate(runDir) {
     const pick = (phase) => evidence.filter((e) => e.criterion === `gate:${g.id}` && e.phase === phase).slice(-1)[0]?.result || 'missing';
     return { id: g.id, baseline: pick('baseline'), after: pick('after') };
   });
-  const findingsPath = runner.verificationPaths({ runDir: runPaths(runDir).phaseDir('after') }).findingsPath;
+  // Only holdout findings feed the rail gate; practice findings are in-sample.
+  const findingsPath = runner.verificationPaths({ runDir: path.join(runPaths(runDir).phaseDir('after'), 'holdout') }).findingsPath;
   const findings = fs.existsSync(findingsPath) ? runner.readLedger(findingsPath) : [];
   const finished = lastEvent(evs, 'implementation_finished');
   const state = {
@@ -976,6 +1301,10 @@ function evaluate(runDir) {
     gates_missing: gates.filter((g) => g.after === 'missing' || g.after === 'unavailable').map((g) => g.id),
     preexisting_gate_failures: gates.filter((g) => g.baseline === 'fail' && g.after === 'fail').map((g) => g.id),
     baseline_blocker: started.baseline_blocker_accepted || null,
+    holdout_exposed: [...new Set(evs.filter((e) => e.event === 'holdout_exposed').map((e) => e.role))],
+    disputes: evs.filter((e) => e.event === 'oracle_disputed').map((e) => ({ criterion: e.criterion, reason: e.reason, role: e.role })),
+    peer_recommendation: finished?.peer_recommendation || null,
+    peer_rounds: evs.filter((e) => e.event === 'peer_review').map((e) => ({ round: e.round, recommendation: e.recommendation, assessment: e.assessment, invalid: e.invalid, independence: e.provenance?.independence })),
     rail_gate: runner.verifierGateDecision(findings),
   };
   const { decision, reasons } = decide(state);
@@ -1045,13 +1374,15 @@ function status(runDir) {
   let next = 'record candidates (improve candidates RUN FILE)';
   if (has('decision_applied')) next = 'terminal: human reviews report.md';
   else if (has('decision_made')) next = 'apply the decision (improve finalize RUN)';
-  else if (has('verification_completed')) next = 'optional independent judgment (improve judge), then improve evaluate RUN';
-  else if (has('implementation_finished')) next = 'run frozen checks on the workspace (improve verify RUN)';
+  else if (has('verification_completed')) next = 'independent judgment for judgment criteria (improve judge), then improve evaluate RUN';
+  else if (has('implementation_finished')) next = 'run the hidden holdout once on the workspace (improve verify RUN)';
   else if (has('implementation_started')) next = 'interrupted during implementation: the workspace is recorded; evaluate as-is or finalize will not claim success';
   else if (has('baseline_recorded')) next = 'implement (improve build RUN --policy P)';
   else if (has('baseline_blocked')) next = 'baseline did not reproduce the problem: supersede the contract before implementation';
   else if (has('contract_frozen')) next = 'capture the baseline (improve baseline RUN)';
-  else if (has('candidates_recorded')) next = 'freeze the ImprovementContract (improve contract RUN FILE)';
+  else if (has('oracle_authored') && has('critique_recorded')) next = 'freeze the ImprovementContract (improve contract RUN FILE)';
+  else if (has('critique_recorded')) next = 'have an evaluator author the holdout checks (improve oracle RUN --policy P --prompt F)';
+  else if (has('candidates_recorded')) next = 'Duo peer critique of the selection (improve critique RUN)';
   return {
     run_dir: runDir,
     terminal: has('decision_applied'),
@@ -1077,10 +1408,13 @@ function writeReport(runDir) {
   const evidence = readEvidence(runDir);
   const roles = [
     ...evs.filter((e) => e.event === 'role_recorded').map((e) => ({ role: e.role, executor: e.executor, requested: e.requested_model || '-', observed: e.observed_model || 'unknown', cost: e.cost_usd ?? null })),
-    ...evs.filter((e) => e.event === 'implementation_finished' || e.event === 'judgment_run').map((e) => ({
-      role: e.role, executor: e.provenance.policy_id, requested: e.provenance.requested_model || '-', observed: e.provenance.observed_model, cost: e.provenance.cost_usd,
+    ...evs.filter((e) => ['critique_recorded', 'oracle_authored', 'builder_round', 'peer_review', 'judgment_run', 'implementation_finished'].includes(e.event) && e.provenance).map((e) => ({
+      role: e.event === 'critique_recorded' ? 'duo-peer (critique)' : e.event === 'peer_review' ? `duo-peer (round ${e.round}, ${e.provenance.independence})`
+        : e.event === 'builder_round' ? `builder (round ${e.round})` : e.event === 'oracle_authored' ? 'oracle author' : e.role,
+      executor: e.provenance.policy_id || e.provenance.executor || e.executor, requested: e.provenance.requested_model || '-', observed: e.provenance.observed_model || 'unknown', cost: e.provenance.cost_usd ?? null,
     })),
   ];
+  const peerRounds = evs.filter((e) => e.event === 'peer_review');
   const measured = roles.filter((r) => typeof r.cost === 'number').reduce((s, r) => s + r.cost, 0);
   const unknown = roles.filter((r) => typeof r.cost !== 'number').length;
   const pick = (criterion, phase) => evidence.filter((e) => e.criterion === criterion && e.phase === phase && e.kind !== 'judgment').slice(-1)[0];
@@ -1136,6 +1470,15 @@ function writeReport(runDir) {
     applied ? `- Applied: ${applied.branch_retained ? `retained on \`${applied.branch}\` @ \`${applied.commit}\`` : 'no product change retained'}; patch preserved (${applied.patch_sha256.slice(0, 16)}…)` : '',
     decision?.divergence ? `- Divergence: ${decision.divergence} (builder claimed \`${decision.builder_claim}\`)` : '',
     '',
+    '## Duo rounds (practice checks are in-sample; the peer advises, never decides)',
+    '',
+    '| Round | Practice checks | Peer | Direction |',
+    '|---|---|---|---|',
+    ...peerRounds.map((e) => `| ${e.round} | ${Object.entries(e.dev_summary || {}).map(([k, v]) => `${k} ${v}`).join(', ') || '-'} | ${e.invalid ? `invalid (${e.invalid})` : `${e.recommendation} / ${e.assessment}`} | ${(e.direction?.next_steps || []).map((st) => `${st.criterion}: ${st.action}`).join('; ').slice(0, 300) || e.reason || '-'} |`),
+    '',
+    `Holdout: ${evs.some((e) => e.event === 'holdout_consumed') ? 'consumed once for the decision' : 'not yet run'}${evs.some((e) => e.event === 'holdout_exposed') ? '; **EXPOSED** during building' : ''}. Oracle authored by ${evs.filter((e) => e.event === 'oracle_authored').map((e) => e.executor).join(', ') || 'nobody recorded'}.`,
+    ...evs.filter((e) => e.event === 'oracle_disputed').map((e) => `- Oracle dispute on ${e.criterion} by ${e.role}: ${e.reason}`),
+    '',
     '## Models and cost',
     '',
     '| Role | Executor | Requested | Observed | Cost |',
@@ -1172,9 +1515,12 @@ const USAGE = `Usage:
   specflow improve --once --target DIR --mission FILE [--base REF] [--run-id ID] [--state-dir DIR] [--worktree-root DIR]
   specflow improve status RUN_DIR
   specflow improve candidates RUN_DIR CANDIDATES.json
+  specflow improve critique RUN_DIR [--draft CONTRACT.json] [--include a.png,b.json] [--model opus]
+  specflow improve oracle RUN_DIR --policy EVALUATOR.yml --prompt ORACLE_BRIEF.md
   specflow improve contract RUN_DIR CONTRACT.json [--supersede "reason"]
   specflow improve baseline RUN_DIR
-  specflow improve build RUN_DIR --policy POLICY.yml [--prompt EXTRA.md] [--dry-run] [--accept-baseline-blocker "why"]
+  specflow improve build RUN_DIR --policy POLICY.yml [--prompt EXTRA.md] [--peer-model opus] [--dry-run] [--accept-baseline-blocker "why"]
+  specflow improve dispute RUN_DIR --criterion AC-n --reason "why the oracle is wrong" --role ROLE --executor ID
   specflow improve exec RUN_DIR --role ROLE -- COMMAND...
   specflow improve verify RUN_DIR
   specflow improve judge RUN_DIR --policy POLICY.yml [--role ux-evaluator] [--criteria A,B] [--dry-run]
@@ -1205,7 +1551,10 @@ async function cli(argv = process.argv.slice(2)) {
       case 'candidates': result = recordCandidates(runDir, fileArg); break;
       case 'contract': result = freezeContract(runDir, fileArg, { supersede: args.supersede }); break;
       case 'baseline': result = await verifyPhase(runDir, 'baseline'); break;
-      case 'build': result = build(runDir, { policy: args.policy, prompt: args.prompt, dryRun: Boolean(args.dryRun), acceptBaselineBlocker: args.acceptBaselineBlocker }); break;
+      case 'critique': result = critique(runDir, { draft: args.draft, include: args.include ? String(args.include).split(',') : [], model: args.model }); break;
+      case 'oracle': result = oracle(runDir, { policy: args.policy, prompt: args.prompt }); break;
+      case 'build': result = await build(runDir, { policy: args.policy, prompt: args.prompt, dryRun: Boolean(args.dryRun), acceptBaselineBlocker: args.acceptBaselineBlocker, peerModel: args.peerModel }); break;
+      case 'dispute': result = dispute(runDir, { criterion: args.criterion, reason: args.reason, role: args.role, executor: args.executor }); break;
       case 'exec': {
         const run = loadRun(runDir);
         const r = guardedSpawn(runDir, args.role || 'builder', tail, { cwd: workspaceFor(run, 'improve').worktreePath });
@@ -1247,6 +1596,13 @@ module.exports = {
   governingContract,
   prepareWorkspace,
   verifyPhase,
+  devRound,
+  critique,
+  oracle,
+  recordOracle,
+  dispute,
+  validatePeerRound,
+  peerArgs,
   submitJudgment,
   recordRole,
   build,
