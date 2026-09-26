@@ -1415,6 +1415,8 @@ function writeReport(runDir) {
     })),
   ];
   const peerRounds = evs.filter((e) => e.event === 'peer_review');
+  // The Duo peer names decisions only a human can make (owner: user); surface them.
+  const userSteps = (peerRounds.slice(-1)[0]?.direction?.next_steps || []).filter((st) => st.owner === 'user');
   const measured = roles.filter((r) => typeof r.cost === 'number').reduce((s, r) => s + r.cost, 0);
   const unknown = roles.filter((r) => typeof r.cost !== 'number').length;
   const pick = (criterion, phase) => evidence.filter((e) => e.criterion === criterion && e.phase === phase && e.kind !== 'judgment').slice(-1)[0];
@@ -1435,7 +1437,7 @@ function writeReport(runDir) {
     '',
     !decision ? `- ${status(runDir).next_action}`
       : decision.decision === 'KEEP' ? `- Review branch \`${applied?.branch}\` (commit \`${applied?.commit}\`) and decide whether to push/open a PR. Specflow never pushes or merges.`
-        : decision.decision === 'REVERT' ? '- Nothing to merge. Decide whether the opportunity deserves a differently scoped contract.'
+        : decision.decision === 'REVERT' ? (userSteps.length ? userSteps.map((st) => `- ${st.action} Done when: ${st.done_when}`).join('\n') : '- Nothing to merge. Decide whether the opportunity deserves a differently scoped contract.')
           : `- Decide whether to gather the missing evidence or discard. The attempted patch is preserved at \`workspace.patch\` (sha256 ${applied?.patch_sha256 || decision.workspace.patch_sha256}).`,
     '',
     '## Selected opportunity',

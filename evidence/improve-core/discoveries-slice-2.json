@@ -1,0 +1,108 @@
+{
+  "outcome": "success",
+  "discoveries": [
+    {
+      "id": "improve-S2-duo-same-vendor",
+      "kind": "observation",
+      "tickets": [
+        177,
+        178
+      ],
+      "observation": "duo-build hard-wires a cross-vendor peer; only Claude available, so the peer ran same-vendor via duo reviewer invocation",
+      "proposedEdit": "Install codex in agent environments or accept and record same-vendor peers",
+      "publicSummary": "Duo peer ran same-vendor; independence recorded in the ledger",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES-slice-2.md",
+          "sha256": "5b91967e9feaa3eea57b99386b6c2c86afe7eeae75a2c2c0ef85437151629f4a"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-002.md",
+          "sha256": "b4a45798121252cde2e164ec86ffdccd8e8475fb0ddd61f4bb5b7fce17b29c5a"
+        }
+      ]
+    },
+    {
+      "id": "improve-S2-per-set-baseline",
+      "kind": "observation",
+      "tickets": [
+        174
+      ],
+      "observation": "Improvement vs preservation depends on the check sample; baseline expectation per criterion is too coarse",
+      "proposedEdit": "Allow baseline_expectation per check set (dev/holdout)",
+      "publicSummary": "Baseline expectations need to be per check set",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES-slice-2.md",
+          "sha256": "5b91967e9feaa3eea57b99386b6c2c86afe7eeae75a2c2c0ef85437151629f4a"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-002.md",
+          "sha256": "b4a45798121252cde2e164ec86ffdccd8e8475fb0ddd61f4bb5b7fce17b29c5a"
+        }
+      ]
+    },
+    {
+      "id": "improve-S2-duo-loop-works",
+      "kind": "observation",
+      "tickets": [
+        178,
+        175
+      ],
+      "observation": "Peer redirected a false complete, then stopped with an infeasibility proof and a user-owned decision",
+      "proposedEdit": "Keep Duo rounds as the improve build loop; surface user-owned steps as the human decision",
+      "publicSummary": "Duo rounds caught a false claim and routed a real scope decision to the human",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES-slice-2.md",
+          "sha256": "5b91967e9feaa3eea57b99386b6c2c86afe7eeae75a2c2c0ef85437151629f4a"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-002.md",
+          "sha256": "b4a45798121252cde2e164ec86ffdccd8e8475fb0ddd61f4bb5b7fce17b29c5a"
+        }
+      ]
+    },
+    {
+      "id": "improve-S2-holdout-generalises",
+      "kind": "observation",
+      "tickets": [
+        174,
+        178
+      ],
+      "observation": "Holdout at 1280px caught footer harm the 1440px practice sample missed",
+      "proposedEdit": "Keep evaluator-authored holdout with different widths/data as the deciding set",
+      "publicSummary": "The held-out sample caught harm the practice sample missed",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES-slice-2.md",
+          "sha256": "5b91967e9feaa3eea57b99386b6c2c86afe7eeae75a2c2c0ef85437151629f4a"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-002.md",
+          "sha256": "b4a45798121252cde2e164ec86ffdccd8e8475fb0ddd61f4bb5b7fce17b29c5a"
+        }
+      ]
+    },
+    {
+      "id": "improve-S2-card-scope-decision",
+      "kind": "observation",
+      "tickets": [
+        180
+      ],
+      "observation": "Fixed card max-height plus fixed control set makes readable names and no body harm incompatible on narrow cards",
+      "proposedEdit": "Human chooses: card may grow, or Settings/Flip move into the card menu on narrow cards, or stop",
+      "publicSummary": "HeyStax card header needs a human scope decision before another run",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES-slice-2.md",
+          "sha256": "5b91967e9feaa3eea57b99386b6c2c86afe7eeae75a2c2c0ef85437151629f4a"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-002.md",
+          "sha256": "b4a45798121252cde2e164ec86ffdccd8e8475fb0ddd61f4bb5b7fce17b29c5a"
+        }
+      ]
+    }
+  ]
+}

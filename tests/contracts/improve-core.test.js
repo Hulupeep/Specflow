@@ -401,6 +401,16 @@ describe('IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)', ()
     expect(d.reasons.join(' ')).toMatch(/Duo peer recommends revert while the checks pass/);
   }));
 
+  test('a failed run surfaces the peer\'s user-owned decision as the human next decision', quiet(async () => {
+    const f = fixture();
+    const ask = { direction: direction('redirect', [{ criterion: 'AC-1', owner: 'user', action: 'Choose whether the card may grow.', done_when: 'option named' }]), recommendation: 'revert', reason: 'conflicting non-goals' };
+    const { runDir } = await runToImplementation(f, { edits: { 1: (ws) => setSteps(ws, 3) }, peer: [ask] });
+    await improve.verifyPhase(runDir, 'after');
+    expect(improve.evaluate(runDir).decision).toBe('REVERT');
+    const report = fs.readFileSync(improve.finalize(runDir).report, 'utf8');
+    expect(report).toMatch(/Choose whether the card may grow\. Done when: option named/);
+  }));
+
   test('an oracle dispute on a mandatory criterion is INCONCLUSIVE, and the builder cannot raise one', quiet(async () => {
     const f = fixture();
     const { runDir } = await runToImplementation(f, { edits: { 1: (ws) => setSteps(ws, 2) } });
