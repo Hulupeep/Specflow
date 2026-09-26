@@ -85,6 +85,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 |----------|----------|-------|
 | `feature_preflight` | Board-auditor compliance | ARCH-001 through ARCH-008 |
 | `feature_spec_density` | Shared tier applicability and evidence-based readiness | I-DENSITY-001 through I-DENSITY-009 |
+| `feature_improve_core` | `specflow improve --once` contract freeze, evidence strength, isolation and decision | I-IMPROVE-001 through I-IMPROVE-008 |
 | `feature_specflow_project` | Project structure & code quality | PROJ-001 through PROJ-004 |
 | `security_defaults` | OWASP baseline patterns | SEC-001 through SEC-005 |
 | `test_integrity_defaults` | Test quality and anti-mock rules | TEST-001 through TEST-005 |

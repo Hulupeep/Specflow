@@ -1726,8 +1726,10 @@ function buildAdapterCommand(policy, promptPath) {
     if (policy.session_id && !args.includes('--resume') && !args.includes('--session-id')) {
       args.push('--resume', String(policy.session_id));
     }
-    if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
-    else if (policy.prompt) args.push(String(policy.prompt));
+    // --allowedTools/--disallowedTools are variadic in the Claude CLI and would
+    // swallow a trailing prompt; end option parsing first (#171 discovery).
+    const prompt = promptPath ? readFileSync(promptPath, 'utf8') : policy.prompt ? String(policy.prompt) : null;
+    if (prompt !== null) args.push('--', prompt);
     return { command: policy.command || 'claude', args };
   }
 

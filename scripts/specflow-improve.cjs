@@ -1095,6 +1095,8 @@ function writeReport(runDir) {
     '',
     decision ? `**Why:** ${decision.reasons.join('; ')}` : '',
     '',
+    decision ? `**What the evidence established:** ${['satisfied', 'failed', 'missing'].map((st) => `${st}: ${decision.criteria.filter((c) => c.status === st).map((c) => c.id).join(', ') || 'none'}`).join('; ')}. Partial gains are not retained; they inform the next contract.` : '',
+    '',
     '## Human next decision',
     '',
     !decision ? `- ${status(runDir).next_action}`
