@@ -428,7 +428,7 @@ if [ -d ".claude/hooks" ]; then
     check_pass ".claude/hooks/ directory exists"
 
     # Check for expected hook scripts (file presence + executable bit)
-    HOOK_SCRIPTS=("post-build-check.sh" "run-journey-tests.sh" "post-push-ci.sh" "session-start.sh" "check-pipeline-compliance.sh")
+    HOOK_SCRIPTS=("post-build-check.sh" "run-journey-tests.sh" "post-push-ci.sh" "session-start.sh" "model-switch-hook.sh" "check-pipeline-compliance.sh")
     HOOKS_FOUND=0
 
     for hook in "${HOOK_SCRIPTS[@]}"; do
@@ -760,7 +760,8 @@ else
         "run-journey-tests.sh|$SPECFLOW_SRC/hooks/run-journey-tests.sh|CRITICAL|Issue-to-test mapping broken — no targeted Playwright runs, old version uses broken heuristic naming"
         "check-pipeline-compliance.sh|$SPECFLOW_SRC/hooks/check-pipeline-compliance.sh|HIGH|Contract violations not caught on Write/Edit — Claude can break contracts without warning"
         "post-push-ci.sh|$SPECFLOW_SRC/templates/hooks/post-push-ci.sh|MEDIUM|No CI feedback after push — you check GitHub Actions manually"
-        "session-start.sh|$SPECFLOW_SRC/hooks/session-start.sh|LOW|No session init — placeholder with no current function"
+        "session-start.sh|$SPECFLOW_SRC/hooks/session-start.sh|MEDIUM|No re-entry briefing on session start (durable run position not surfaced)"
+        "model-switch-hook.sh|$SPECFLOW_SRC/hooks/model-switch-hook.sh|MEDIUM|Model switches during a run are neither ledgered nor guarded"
     )
 
     echo ""
