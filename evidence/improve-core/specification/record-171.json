@@ -1,0 +1,31 @@
+{
+  "issue": {
+    "number": 171,
+    "title": "[SPECFLOW] IMPROVE-CORE: verified single-cycle product improvement",
+    "labels": [
+      {
+        "name": "enhancement"
+      },
+      {
+        "name": "P1: Ship Next"
+      }
+    ],
+    "comments": [],
+    "body": "## Outcome\n\nShip a first-class `specflow improve --once` mode that can select one bounded product improvement, define what \"better\" means before implementation, use existing Specflow model-routing/build/verifier machinery, make the smallest useful change in an isolated workspace, and finish with an auditable `KEEP | REVERT | INCONCLUSIVE` decision.\n\n(Full body: https://github.com/Hulupeep/Specflow/issues/171 — acceptance AC-CORE-1..8, snapshot 2026-09-26T12:37:01Z.)\n\n## Acceptance criteria\n\n- [ ] AC-CORE-1: `specflow improve --once` can start from an explicit product mission and current repository state, select one bounded candidate and record why it was selected.\n- [ ] AC-CORE-2: No implementation starts until a frozen ImprovementContract defines the problem, user impact, hypothesis, baseline, acceptance, non-goals and evaluation method.\n- [ ] AC-CORE-3: Product/UX candidates can remove friction or improve workflow without treating visual novelty or code churn as improvement.\n- [ ] AC-CORE-4: Work happens in an isolated reversible git workspace; prohibited external side effects are blocked by default.\n- [ ] AC-CORE-5: Existing Specflow routing/build/verifier/gate machinery is reused. A builder or provider self-review cannot establish success.\n- [ ] AC-CORE-6: Every cycle terminates as KEEP, REVERT or INCONCLUSIVE, with predeclared acceptance and evidence strength preserved.\n- [ ] AC-CORE-7: The ledger and report reconstruct candidate choice, contract, models, cost, implementation, evidence, decision and retained commit.\n- [ ] AC-CORE-8: A real HeyStax/TabStax web-app run demonstrates one bounded product or subtle UX improvement with before/after evidence, explicit UX evaluation and no production side effects.\n"
+  },
+  "source": {
+    "kind": "file",
+    "path": "evidence/improve-core/specification/issue-171.json",
+    "note": "replay snapshot fetched through GitHub MCP on 2026-09-26; gh CLI unavailable in this session"
+  },
+  "freshness": {
+    "status": "current"
+  },
+  "profile": {
+    "ui": false,
+    "materialSeams": [],
+    "artifacts": [],
+    "gates": []
+  },
+  "dependencies": []
+}

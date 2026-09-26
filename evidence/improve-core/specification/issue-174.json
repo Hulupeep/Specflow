@@ -1,0 +1,14 @@
+{
+  "number": 174,
+  "title": "[SPECFLOW] IMPROVE-02: ImprovementContract and evidence-strength model",
+  "labels": [
+    {
+      "name": "enhancement"
+    },
+    {
+      "name": "P1: Ship Next"
+    }
+  ],
+  "comments": [],
+  "body": "Epic: #171 · Story: IMPROVE-02 · Declared tier: `spec:thin`\n\n## Acceptance criteria\n\n- [ ] AC-02-1: Implementation cannot start without a persisted contract and baseline or an explicit blocker explaining why no baseline can be established.\n- [ ] AC-02-2: Acceptance and non-goals are frozen before builder execution; later edits create a new contract version and cannot retroactively make a failed change pass.\n- [ ] AC-02-3: Every evidence item records its level, source/reference and applicable acceptance criterion.\n- [ ] AC-02-4: Missing deterministic evidence remains missing; heuristic/model judgment cannot silently satisfy a deterministic requirement.\n- [ ] AC-02-5: The contract remains small and scoped to the selected candidate rather than becoming a full-product specification.\n"
+}
