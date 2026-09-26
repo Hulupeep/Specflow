@@ -1,0 +1,19 @@
+# Builder role for `specflow improve build` (#177). Runs inside the isolated
+# worktree with a scrubbed environment. It implements; it never decides.
+adapter_policy:
+  id: improve-builder-claude
+  provider: claude-print
+  command: claude
+  role: implementer
+  effort: medium
+  args: [-p, --output-format, stream-json, --verbose, --permission-mode, acceptEdits]
+  model: sonnet
+  requested_model: sonnet
+  max_budget_usd: 5
+  timeout_seconds: 1500
+  max_iterations: 1
+  allowed_tools: [Read, Grep, Glob, Edit, Write, "Bash(ls *)", "Bash(cat *)", "Bash(grep *)", "Bash(rg *)", "Bash(git diff*)", "Bash(git status*)", "Bash(pnpm exec eslint *)", "Bash(pnpm exec tsc *)", "Bash(npx tsc *)"]
+  denied_tools: ["Bash(git commit*)", "Bash(git push*)", "Bash(rm -rf *)"]
+  transcript_path: .specflow/runs/<slug>/adapters/builder.transcript.jsonl
+  output_path: .specflow/runs/<slug>/adapters/builder.final.md
+  never_without_human: [git push, open PR, merge, --no-verify, override contract, production deploy]

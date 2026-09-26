@@ -1,0 +1,174 @@
+{
+  "outcome": "success",
+  "discoveries": [
+    {
+      "id": "improve-D1-D3-adapter-cli",
+      "kind": "confirmed-cause",
+      "tickets": [
+        177
+      ],
+      "observation": "claude-print adapter: stream-json needs --verbose; total_cost_usd ignored; variadic tool flags swallowed the prompt",
+      "proposedEdit": "Fix runner/templates (D2,D3 fixed in this slice; D1 template pending) and add a live adapter smoke to CI",
+      "publicSummary": "Existing claude-print adapter path could not run with tool lists and never recorded cost; two of three causes fixed in the improve slice",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ],
+      "causeEvidence": [
+        {
+          "path": "scripts/specflow-runner.cjs",
+          "sha256": "af7845bc6d9e0e6c5fc3edc38b79e05461d12d0539400f82c39179d10d9752af"
+        }
+      ]
+    },
+    {
+      "id": "improve-D4-guard-not-sandbox",
+      "kind": "observation",
+      "tickets": [
+        176
+      ],
+      "observation": "Side-effect guard is argv classification + transcript scan + diff scope, not a sandbox",
+      "proposedEdit": "State the limitation in #176 AC and route through an approved experiment sandbox when present",
+      "publicSummary": "Guardrails block declared commands and detect attempts, but do not sandbox network egress",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    },
+    {
+      "id": "improve-D5-runnable-surface",
+      "kind": "observation",
+      "tickets": [
+        180,
+        173
+      ],
+      "observation": "No Supabase credentials: only the auth-bypass demo board is runnable; mission journeys (capture/resume/today) unevaluable",
+      "proposedEdit": "Add a seeded local Supabase or read-only fixture as a #180 prerequisite; record environment limits in candidate sources",
+      "publicSummary": "Real-data HeyStax journeys could not be exercised; candidates were limited to the demo board",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    },
+    {
+      "id": "improve-D6-D7-contract-quality",
+      "kind": "observation",
+      "tickets": [
+        174,
+        175
+      ],
+      "observation": "Pre-freeze check dry-run and the independent UX critic both changed the contract materially",
+      "proposedEdit": "Make a check dry-run and an improve critique stage mandatory before freezing",
+      "publicSummary": "The critic and a pre-freeze check dry-run caught wrong assumptions before implementation",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    },
+    {
+      "id": "improve-L1-builder-feedback",
+      "kind": "observation",
+      "tickets": [
+        178,
+        174
+      ],
+      "observation": "One-shot builder ignored the permitted fallback; it cannot see frozen check results",
+      "proposedEdit": "Allow read-only frozen-check runs by the builder and one bounded repair round under the same contract version; decision stays independent",
+      "publicSummary": "Builder had no executable feedback; add bounded repair under the frozen contract",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    },
+    {
+      "id": "improve-L2-single-intended-change",
+      "kind": "observation",
+      "tickets": [
+        174
+      ],
+      "observation": "Conditional hypotheses are ambiguous to builders",
+      "proposedEdit": "Contracts name one intended change; fallbacks are required or separate cycles",
+      "publicSummary": "Contracts should name one intended change",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    },
+    {
+      "id": "improve-D8-D9-L6-trace",
+      "kind": "observation",
+      "tickets": [
+        179
+      ],
+      "observation": "Host-role cost unknown; token counts wrong; no durable private home for run evidence",
+      "proposedEdit": "Adapters for scout/contract writer; aggregate usage from result event; choose a durable private evidence store (human decision)",
+      "publicSummary": "Cost and evidence durability gaps in the improvement trace",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    },
+    {
+      "id": "improve-D11-tier-route",
+      "kind": "observation",
+      "tickets": [
+        171
+      ],
+      "observation": "improve is not a runner loop or tier route; thin tickets block production build",
+      "proposedEdit": "Decide whether ImprovementContract governs target-product changes independently of Specflow issue tiers",
+      "publicSummary": "How improve relates to issue-tier readiness is undecided",
+      "evidence": [
+        {
+          "path": "evidence/improve-core/DISCOVERIES.md",
+          "sha256": "9cfa62a0cba3d9d400b90edb496bb7d1819d34c73de248e339d7cb341493b135"
+        },
+        {
+          "path": "evidence/improve-core/RUN-SUMMARY-improve-heystax-001.md",
+          "sha256": "94303681421664d5e83d60af53619fa55b84040dc870a72d784752365b1f68c8"
+        }
+      ]
+    }
+  ]
+}
