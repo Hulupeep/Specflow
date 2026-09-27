@@ -1,3 +1,4 @@
-display_name: Specflow Loop Selector
-short_description: Select the right Specflow loop and emit a run contract before work starts.
-default_prompt: Use the Specflow loop selector to choose the correct loop, write the mandatory run_contract, and execute only the next gate.
+interface:
+  display_name: "Specflow Loop Selector"
+  short_description: "Select a loop after full-loop work routing."
+  default_prompt: "Use $specflow-loop-selector for work routed to a full loop, emit its run contract, and advance all unblocked stages."

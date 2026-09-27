@@ -6,6 +6,53 @@ This doc helps you decide. It covers what Specflow gives you, what it costs, wha
 
 ---
 
+## Does This Ticket Need Specflow?
+
+Installing Specflow does not put every ticket through a build loop. Apply the
+work-routing policy in `AGENTS.md` before selecting a skill:
+
+| Route | Typical work | What to do |
+|---|---|---|
+| Direct | Clear bug fix, copy/style change, behaviour-preserving refactor | Implement and run relevant checks |
+| Targeted Specflow | Bounded behaviour change or existing contract update | Update affected artifacts, simulate/audit changed stories, implement and verify |
+| Full loop | Discovery, story slicing, dependency coordination, durable multi-stage execution, explicit loop request | Select spec-build or feature-build according to current artifacts |
+
+Targeted Specflow is an agent workflow, not a CLI runner mode. Existing
+contracts, required CI checks, and UI journey evidence still apply. A ready
+ticket does not need spec-build repeated. Risk determines verification depth;
+uncertainty and coordination determine workflow depth.
+
+### Apply the policy to an existing project
+
+From a Specflow checkout containing this change:
+
+```bash
+node bin/specflow.js update /absolute/path/to/project --runtime codex
+```
+
+This runs the normal kit update, including project-local skills and runtime
+routing. It installs or refreshes a marked work-routing section in `AGENTS.md`
+while preserving instructions outside that section. Older loop instructions
+remain, with the new policy explicitly taking precedence over automatic loop
+entry. Use `--runtime claude-code` for Claude Code projects. Start a new agent
+session after updating to load the refreshed instructions and skills.
+
+For an instructions-only update, without refreshing the rest of the kit:
+
+```bash
+node scripts/install-agent-instructions.cjs templates/AGENTS.md /absolute/path/to/project/AGENTS.md
+```
+
+The instructions-only command does not refresh an older installed loop selector;
+use the normal kit update to get both changes. Keep project-specific rules
+outside the `specflow:work-routing` markers, since that section is managed.
+
+Global agent instructions should also scope simulation/audit requirements to
+Specflow stories and explicit workflow requests. Ordinary tickets should first
+use the repository's routing policy.
+
+---
+
 ## What You Get
 
 ✅ **Specs become enforceable** — Requirements get IDs (AUTH-001). Contracts enforce them. Tests verify them. CI blocks violations automatically.

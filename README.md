@@ -24,6 +24,91 @@ Contract tests scan your source code for forbidden patterns. Break a rule → bu
 
 ---
 
+## Quick start: Duo build with optional TypeSafe
+
+Start one interactive agent and give it a target. **Duo** reuses `spec-build`
+preparation and `feature-build` implementation, then sends each meaningful batch
+to the other model for independent review. Claude Code builds → Codex reviews;
+Codex builds → Claude reviews. Both read the same goal and acceptance criteria.
+You do not need to copy messages between agents or run all three workflows yourself.
+
+### 1. Install Duo into your project
+
+Install and authenticate **both Claude Code and Codex**. For GitHub projects,
+also install and authenticate `gh`. Check their login status:
+
+```sh
+claude auth status
+codex login status
+gh auth status
+```
+
+Use the current GitHub source for this Duo setup. From a directory **outside your
+target project**, clone the kit and run its installer (replace the project path):
+
+```sh
+git clone https://github.com/Hulupeep/Specflow.git specflow-kit
+bash specflow-kit/install-hooks.sh /absolute/path/to/your-project --runtime claude-code
+```
+
+Use `--runtime codex` if you are starting in Codex. The installer supplies the
+native Duo skills and helper scripts; no separate Duo skill installation is needed.
+Open a **new agent session in your target project** after installation. If an
+unfinished Duo run exists, managed updates are staged until that run finishes;
+rerun the installer afterwards. Missing peer authentication or required permissions
+blocks peer review and is reported explicitly.
+
+### 2. Start or resume in your agent
+
+These are commands inside the agent conversation, not shell commands:
+
+| Agent | Existing issue | New feature | Resume |
+|---|---|---|---|
+| Claude Code | `/duo-build #905` | `/duo-build "Connect a Google account"` | `/duo-build resume <run-id>` |
+| Codex | `$duo-build #905` | `$duo-build "Connect a Google account"` | `$duo-build resume <run-id>` |
+
+The builder fixes actionable findings and requests another review. Required tests
+and release gates still apply. Keep the returned run ID; records live in
+`.specflow/duo/<run-id>/` in your project.
+
+### 3. Add TypeSafe evidence checks (optional)
+
+Duo works without TypeSafe. To enable it, put your API key in **`.env.local` at
+the root of the project using Duo**, not in the Specflow kit checkout:
+
+```dotenv
+TYPESAFE_API_KEY=your_key_here
+```
+
+Ensure `.env.local` is excluded by that project's `.gitignore` and remains
+untracked. Do not paste the key into an issue, prompt or run configuration.
+The installed adapter uses HTTP directly; no Python SDK is required.
+
+When starting your Duo run, tell the builder:
+
+> Configure TypeSafe for this run using `.env.local` in advisory mode before the
+> first batch review. Select the relevant acceptance criteria, assertions and
+> execution evidence. Report the run ID, active mode and whether TypeSafe calls
+> actually succeeded; make any missing evidence or unavailable service explicit.
+
+**The key alone does not enable TypeSafe.** The builder must explicitly configure
+the run with `envFile: ".env.local"`, a mode and selected evidence inputs.
+`shadow` is the default when configuring TypeSafe: it records judgments without
+sharing them with the peer. `advisory` shares the judgments with both agents and
+requires an evidence-backed response to each flag. `off` makes no calls.
+
+TypeSafe checks assertion coverage, execution and support for a claim separately.
+Its advice cannot approve completion, replace independent review or waive a test.
+Inspect actual results under `.specflow/duo/<run-id>/typesafe/round-NNN/`;
+configuration alone is not evidence that a check ran.
+
+See the [Duo guide](https://github.com/Hulupeep/Specflow/blob/main/docs/duo-build.md)
+for run configuration, review records and limitations, and
+[TypeSafe setup](https://github.com/Hulupeep/Specflow/blob/main/docs/duo-build.md#typesafe-advice-optional)
+for the helper commands and configuration format.
+
+---
+
 ## Core Workflow: `spec-build` → `feature-build`
 
 For serious product work, Specflow is two loops:

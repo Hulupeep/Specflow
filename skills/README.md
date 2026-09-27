@@ -5,27 +5,26 @@ phrasing instead of requiring you to manually invoke an agent prompt.
 
 ## specflow-loop-selector
 
-Routes an agent to the right Specflow loop and forces a concrete `run_contract`
-before work starts. Use this as the pre-build/pre-loop skill for Claude Code,
-Codex, K2.7, or any other agent that might otherwise spend time rediscovering
-`spec-build`, `feature-build`, Gate D, or `daily-use-teardown`.
-
-**Triggers on:** starting Specflow work, choosing between `spec-build` and
-`feature-build`, implementing a Specflow ticket, creating/refining a PRD,
-investigating an existing product, running Gate D, or "go find out about
-Specflow loops".
-
-The skill is intentionally a router, not a duplicate of the loop docs:
+Use only after `AGENTS.md` routes work to **Full loop**, or for an explicit
+request to select/run spec-build, feature-build, Gate D, or daily-use-teardown.
+Ordinary ticket implementation, PRD edits, and standalone audit/simulation do
+not automatically invoke this skill. Direct and Targeted Specflow work do not
+need a loop run contract.
 
 ```
-select loop → emit run_contract → load selected YAML → advance one gate
+route work → select loop if needed → emit run_contract → advance unblocked stages
 ```
 
-For story/ticket creation or refinement it also enforces the simulation path:
+Use `SPECIFICATION.md` and the shared tier helper to determine depth. Thin
+backlog work stays planning; for the selected build-ready slice, simulation
+and audit still apply:
 
 ```
-create/refine story → specflow-simulate → specflow-audit/uplift → pre-flight gate → feature-build
+create/refine story → specflow-simulate → specflow-audit/uplift → pre-flight gate → implementation
 ```
+
+Implementation can be direct for Targeted Specflow or use feature-build for
+Full loop. Targeted Specflow is an agent workflow, not a runner mode.
 
 Installers copy it to `.claude/skills/`, `.codex/skills/`, and
 `.agents/skills/` so Claude Code, Codex, K2.7, and generic agents can all read

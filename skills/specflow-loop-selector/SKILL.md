@@ -1,11 +1,20 @@
 ---
 name: specflow-loop-selector
-description: Selects the correct Specflow loop and forces a concrete run contract before work starts. Use when an agent is asked to start Specflow work, build a ticket, create/refine a PRD, investigate an existing product, run Gate D, choose between spec-build and feature-build, or "go find out about" Specflow loops. Compatible with Claude Code, Codex, K2.7, and other agents because it emits a plain YAML run_contract instead of relying on vendor-specific orchestration.
+description: Select a Specflow loop and emit a run contract after work is routed to a full loop, or when the user explicitly requests spec-build, feature-build, Gate D, daily-use-teardown, or loop selection. Ordinary ticket implementation, PRD edits, and standalone audit/simulation requests do not trigger this skill.
 ---
 
 # Specflow Loop Selector
 
-Use this before starting any Specflow loop work. Do not rediscover the process by grepping the repo unless a named file is missing.
+Use this only after work is routed to a full loop or the user explicitly requests
+loop selection/execution. Apply `AGENTS.md` work routing first. If routing has not
+happened, distinguish Direct (clear bounded work), Targeted Specflow (affected
+artifacts and prescribed checks without orchestration), and Full loop (discovery,
+slicing, dependencies, or durable multi-stage execution). State the route and
+reason. For Direct or Targeted Specflow, return to that workflow without a run
+contract or provider invocation. Standalone audit/simulation requests use their
+own skills and do not automatically start a build loop.
+
+For selected full-loop work: Do not rediscover the process by grepping the repo unless a named file is missing.
 
 Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Run
 `node scripts/specflow-tier.cjs inspect <record.json> specflow-loop-selector inspect`
@@ -32,7 +41,9 @@ slice. Thin selection ends at planning state; it does not generate a full spec.
   use `QA/loops/daily-use-teardown.yaml`.
   Output: evidence-grounded do-list for spec-build.
 
-If two loops look plausible, choose the earlier loop in the lifecycle and state why.
+If two loops look plausible, inspect current artifacts and evidence and choose
+the first unmet lifecycle need. Do not repeat spec-build for an already-ready
+ticket. State why the selected loop is needed.
 
 ## Select The Runtime Routing Profile
 

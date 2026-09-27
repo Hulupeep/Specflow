@@ -2,9 +2,58 @@
 
 Use this file for Codex, K2.7, and other agents that read repository-level agent instructions.
 
+<!-- specflow:work-routing:start -->
+## Specflow Work Routing
+
+Apply this decision before selecting Specflow skills or loops. This section
+supersedes older Specflow guidance that automatically sends every ticket into
+a loop; explicit project requirements and required checks still apply.
+
+Choose the lightest sufficient route and state it with a brief reason. Proceed
+without asking the user to choose routine workflow details. A ticket, feature
+request, or installed skill does not automatically require Specflow.
+
+- **Direct:** clear, bounded fixes, copy/style changes, maintenance, and
+  behaviour-preserving refactors that do not change a formal contract.
+  Implement and run relevant checks; reproduce bugs and add regression coverage
+  where appropriate. Do not manufacture a PRD, story, simulation, or run contract.
+- **Targeted Specflow:** bounded changes to durable product behaviour or existing
+  Specflow requirements that need no substantial discovery or orchestration.
+  Update only affected requirements, contracts, journeys, and tests. Reuse valid
+  artifacts and evidence. Apply `SPECIFICATION.md` and `scripts/specflow-tier.cjs`
+  to determine depth: thin stays planning; the selected build-ready slice needs
+  simulation -> audit/uplift -> pre-flight. Explicit project requirements still
+  apply. Then implement and verify directly;
+  neither spec-build nor feature-build is automatic. This is an agent workflow,
+  not a new runner mode.
+- **Full loop:** explicitly requested loops, or work requiring substantial
+  discovery, story slicing, dependency coordination, or durable multi-stage
+  execution. Only then load the loop selector. Use spec-build for unclear
+  requirements and feature-build for a ready ticket; do not repeat spec-build
+  for a ready ticket with current evidence.
+
+Risk determines verification depth; uncertainty and coordination determine
+workflow depth. A small permissions fix can need rigorous tests without a PRD.
+Escalate when new evidence makes the route insufficient, explaining why. Ask
+only for unresolved decisions that materially affect the work. File count,
+labels, and estimated lines changed are not sufficient routing criteria.
+
+Explicit audit/uplift and simulation requests invoke their prescribed workflows
+directly, without automatically starting a build loop. Existing contracts,
+required CI checks, and repository invariants apply on every route. Do not use
+Direct or Targeted Specflow to waive an applicable gate or required evidence.
+Never claim Specflow compliance with CRITICAL/P1 findings or missing evidence.
+For build-ready UI Specflow stories, the executed Playwright journey remains the DoD:
+ordered steps and success criteria, a spec mapped to its J-<NAME> id, and actual
+execution are required. A missing, skipped, or never-run journey is CRITICAL;
+deferral requires a linked tracking issue.
+
+Report what changed, verification actually run, and remaining gaps.
+<!-- specflow:work-routing:end -->
+
 ## Specflow Loop Routing
 
-Before starting any Specflow loop work, use the installed skill:
+Only after selecting Full loop above, use the installed skill:
 
 - Claude Code: `.claude/skills/specflow-loop-selector/SKILL.md`
 - Codex: `.codex/skills/specflow-loop-selector/SKILL.md`
@@ -33,7 +82,11 @@ refining, simulating, uplifting or auditing a ticket. Thin work stays thin;
 contracted UI flows receive a paper walkthrough. The following scoped path is
 required for the selected build-ready slice before production work:
 
-`create/refine story -> specflow-simulate -> specflow-audit/uplift -> pre-flight gate -> feature-build`
+`create/refine story -> specflow-simulate -> specflow-audit/uplift -> pre-flight gate -> implementation`
+
+Implementation uses the selected route: direct execution for Targeted Specflow,
+or `feature-build` for Full loop. Run-contract requirements apply only when a
+loop is active. Both routes must validate applicable readiness evidence.
 
 Do not mark a ticket ready for `feature-build` when required simulation is missing,
 stale, skipped or only mentioned in chat. Derive `run_contract.tier` and

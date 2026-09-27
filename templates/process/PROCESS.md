@@ -8,7 +8,11 @@ selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
 Required privacy, permission, executable journey and release gates still apply.
 
 
-The canonical reference for how we run work end to end. The spine in one line:
+This is the full-loop lifecycle. First apply the work routing in `AGENTS.md`:
+Direct and Targeted Specflow work do not automatically enter this pipeline.
+Existing contracts and required verification still apply on every route.
+
+The full-loop spine in one line:
 
 > **A single hostile critic gates the spec; CI gates the code; the swarm/agent is muscle *inside* a phase, never the thing that approves its own work.**
 
