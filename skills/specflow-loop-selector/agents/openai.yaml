@@ -1,3 +1,4 @@
-display_name: Specflow Loop Selector
-short_description: Select the right Specflow loop and emit a run contract before work starts.
-default_prompt: Use the Specflow loop selector to choose the correct loop, write the mandatory run_contract, and execute only the next gate.
+interface:
+  display_name: "Specflow Loop Selector"
+  short_description: "Scale Specflow work and verification to risk."
+  default_prompt: "Use $specflow-loop-selector to choose the lightest work weight that covers the risk, state required checks, and select a loop only if needed."

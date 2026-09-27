@@ -279,22 +279,17 @@ if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
   REFRESHED_KIT=true
 fi
 if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
-  if [ ! -f "$TARGET_DIR/AGENTS.md" ]; then
-    cp -a "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Installed AGENTS.md"
-  elif ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
-    {
-      echo ""
-      cat "$SCRIPT_DIR/templates/AGENTS.md"
-    } >> "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
-  else
-    echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
-    if ! grep -q 'Progressive specification policy' "$TARGET_DIR/AGENTS.md"; then
-      printf '\n## Progressive specification policy\n\nRead SPECIFICATION.md before creating, simulating, auditing or building tickets. The installed tier helper determines applicable depth. Reconcile legacy universal simulation instructions explicitly; a label alone never proves readiness.\n' >> "$TARGET_DIR/AGENTS.md"
-      echo -e "${YELLOW}⚠️${NC} Existing AGENTS.md retained. Reconcile legacy simulation instructions using SPECIFICATION.md and reload the agent session."
-    fi
+  NEEDS_LEGACY_SPEC_POLICY=false
+  if [ -f "$TARGET_DIR/AGENTS.md" ] && grep -q 'Specflow Loop Routing' "$TARGET_DIR/AGENTS.md" && ! grep -q 'Progressive specification policy' "$TARGET_DIR/AGENTS.md"; then
+    NEEDS_LEGACY_SPEC_POLICY=true
   fi
+  node "$SCRIPT_DIR/scripts/install-agent-instructions.cjs" \
+    "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md" || exit 1
+  if [ "$NEEDS_LEGACY_SPEC_POLICY" = true ]; then
+    printf '\n## Progressive specification policy\n\nRead SPECIFICATION.md before creating, simulating, auditing or building tickets. The installed tier helper determines applicable depth. Reconcile legacy universal simulation instructions explicitly; a label alone never proves readiness.\n' >> "$TARGET_DIR/AGENTS.md"
+    echo -e "${YELLOW}⚠️${NC} Existing AGENTS.md retained. Reconcile legacy simulation instructions using SPECIFICATION.md and reload the agent session."
+  fi
+  echo -e "${GREEN}✓${NC} Refreshed AGENTS.md work routing (project instructions preserved)"
   REFRESHED_KIT=true
 fi
 if [ -d "$SCRIPT_DIR/skills" ]; then
