@@ -23,10 +23,11 @@ CLI `--runtime` takes precedence over `SPECFLOW_RUNTIME`. A non-interactive run
 without either value fails before changing active routing. Interactive runs may
 prompt for `codex` or `claude-code`.
 
-Activate or refresh routing without reinstalling other files with:
+Activate or refresh routing and the installed loop skills with the canonical
+project update command:
 
 ```bash
-specflow run --setup-routing --runtime codex
+npx @colmbyrne/specflow update . --runtime codex
 ```
 
 All paths install both shipped templates, activate the selected profile, and
@@ -266,7 +267,7 @@ Edit:
 ```
 
 If the file does not exist yet, run
-`specflow run --setup-routing --runtime codex|claude-code` first.
+`npx @colmbyrne/specflow update . --runtime codex|claude-code` first.
 
 To use Opus as the primary reviewer instead of Fable, change the reviewer policy:
 

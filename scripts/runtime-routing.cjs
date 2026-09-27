@@ -67,6 +67,54 @@ function loadInstallState(statePath) {
   return state && typeof state === 'object' ? state : null;
 }
 
+function runtimeFromActiveRouting(activePath) {
+  if (!fs.existsSync(activePath)) return null;
+  try {
+    const active = readYaml(activePath);
+    const runtime = active?.routing_profile?.runtime;
+    return RUNTIMES[runtime] ? runtime : null;
+  } catch (_) {
+    return null;
+  }
+}
+
+function runtimeRecoveryCommand(runtime, options = {}) {
+  const selected = RUNTIMES[runtime] ? runtime : '<codex|claude-code>';
+  const replace = options.replaceRouting ? ' --replace-routing' : '';
+  return `npx @colmbyrne/specflow update . --runtime ${selected}${replace}`;
+}
+
+function routingRequired(status, runtime, detail, options = {}) {
+  const recovery_command = runtimeRecoveryCommand(runtime, options);
+  return {
+    ok: false,
+    status,
+    code: 'routing_required',
+    runtime: RUNTIMES[runtime] ? runtime : null,
+    recovery_command,
+    provider_invoked: false,
+    error: `${detail}; repair: ${recovery_command}`,
+  };
+}
+
+function verifyInstalledSelectorSkills(sourceRoot, targetRoot, runtime) {
+  const shipped = path.join(sourceRoot, 'skills', 'specflow-loop-selector', 'SKILL.md');
+  if (!fs.existsSync(shipped)) {
+    return routingRequired('missing_shipped_selector', runtime, 'shipped specflow-loop-selector skill is missing');
+  }
+  const shippedHash = sha256(fs.readFileSync(shipped));
+  for (const root of ['.claude/skills', '.codex/skills', '.agents/skills']) {
+    const installed = path.join(targetRoot, root, 'specflow-loop-selector', 'SKILL.md');
+    if (!fs.existsSync(installed)) {
+      return routingRequired('missing_selector_skill', runtime, `${path.relative(targetRoot, installed)} is missing`);
+    }
+    if (sha256(fs.readFileSync(installed)) !== shippedHash) {
+      return routingRequired('outdated_selector_skill', runtime, `${path.relative(targetRoot, installed)} differs from the shipped selector skill`);
+    }
+  }
+  return { ok: true, status: 'ok', selector_sha256: shippedHash };
+}
+
 function templatePaths(sourceRoot, targetRoot) {
   const sourceDir = path.join(sourceRoot, 'templates', 'adapter-policies');
   const installedDir = path.join(targetRoot, '.specflow', 'adapter-policies');
@@ -176,40 +224,58 @@ function installRuntimeRouting(options = {}) {
 }
 
 function verifyRuntimeRouting(options = {}) {
+  const sourceRoot = path.resolve(options.sourceRoot || path.join(__dirname, '..'));
   const targetRoot = path.resolve(options.targetRoot || '.');
   const statePath = path.join(targetRoot, '.specflow', 'install-state.yml');
   const activePath = path.join(targetRoot, '.specflow', 'adapter-routing.yml');
-  const repair = 'npx @colmbyrne/specflow update . --runtime <codex|claude-code> --replace-routing';
   const state = loadInstallState(statePath);
   if (!state || state.schema_version !== STATE_SCHEMA_VERSION || !state.routing) {
-    return { ok: false, status: 'missing_install_state', error: `routing install state is missing or invalid; repair: ${repair}` };
+    const inferredRuntime = options.runtime || runtimeFromActiveRouting(activePath);
+    return routingRequired('missing_install_state', inferredRuntime, 'routing install state is missing or invalid');
   }
   const routing = state.routing;
   if (!RUNTIMES[routing.runtime] || routing.template !== RUNTIMES[routing.runtime]) {
-    return { ok: false, status: 'runtime_mismatch', error: `routing runtime/template mismatch; repair: ${repair}` };
+    return routingRequired('runtime_mismatch', routing.runtime, 'routing runtime/template mismatch');
   }
   if (!fs.existsSync(activePath)) {
-    return { ok: false, status: 'missing_routing', error: `managed adapter routing is missing; repair: ${repair}` };
+    return routingRequired('missing_routing', routing.runtime, 'managed adapter routing is missing');
   }
   const actualHash = sha256(fs.readFileSync(activePath));
   if (routing.managed && actualHash !== routing.installed_sha256) {
-    return { ok: false, status: 'stale_routing', error: `managed adapter routing differs from install state; repair: ${repair}` };
+    return routingRequired('stale_routing', routing.runtime, 'managed adapter routing differs from install state', { replaceRouting: true });
   }
   if (routing.managed) {
     try {
       const active = readYaml(activePath);
       if (!active.routing_profile || active.routing_profile.runtime !== routing.runtime) {
-        return { ok: false, status: 'runtime_mismatch', error: `active routing runtime differs from install state; repair: ${repair}` };
+        return routingRequired('runtime_mismatch', routing.runtime, 'active routing runtime differs from install state');
       }
     } catch (_) {
-      return { ok: false, status: 'stale_routing', error: `managed adapter routing is invalid YAML; repair: ${repair}` };
+      return routingRequired('stale_routing', routing.runtime, 'managed adapter routing is invalid YAML', { replaceRouting: true });
     }
   }
   const installedTemplate = path.join(targetRoot, '.specflow', 'adapter-policies', routing.template);
   if (!fs.existsSync(installedTemplate) || sha256(fs.readFileSync(installedTemplate)) !== routing.template_sha256) {
-    return { ok: false, status: 'stale_template', error: `installed routing template differs from install state; repair: ${repair}` };
+    return routingRequired('stale_template', routing.runtime, 'installed routing template differs from install state');
   }
-  return { ok: true, status: routing.managed ? 'ok' : 'custom_routing_preserved', runtime: routing.runtime };
+  const shippedTemplate = path.join(sourceRoot, 'templates', 'adapter-policies', routing.template);
+  if (!fs.existsSync(shippedTemplate)
+    || sha256(fs.readFileSync(shippedTemplate)) !== routing.template_sha256
+    || state.specflow_version !== packageVersion(sourceRoot)) {
+    return routingRequired('outdated_install', routing.runtime, 'routing template or install state differs from the shipped Specflow version');
+  }
+  let selector = null;
+  if (options.verifySkills) {
+    selector = verifyInstalledSelectorSkills(sourceRoot, targetRoot, routing.runtime);
+    if (!selector.ok) return selector;
+  }
+  return {
+    ok: true,
+    status: routing.managed ? 'ok' : 'custom_routing_preserved',
+    runtime: routing.runtime,
+    selector_sha256: selector?.selector_sha256 || null,
+    provider_invoked: false,
+  };
 }
 
 function parseArgs(argv) {
@@ -229,7 +295,7 @@ function cli(argv = process.argv.slice(2)) {
   const command = argv.shift();
   try {
     const options = parseArgs(argv);
-    const result = command === 'verify' ? verifyRuntimeRouting(options) : installRuntimeRouting(options);
+    const result = command === 'verify' ? verifyRuntimeRouting({ ...options, verifySkills: true }) : installRuntimeRouting(options);
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return result.ok === false ? 1 : 0;
   } catch (error) {
@@ -245,6 +311,9 @@ module.exports = {
   resolveRuntime,
   installRuntimeRouting,
   verifyRuntimeRouting,
+  verifyInstalledSelectorSkills,
+  runtimeRecoveryCommand,
+  routingRequired,
   cli,
 };
 
