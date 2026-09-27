@@ -5,7 +5,16 @@ Specflow records three planning depths: `spec:thin`, `spec:contracted` and
 scope, behaviour acceptance, dependencies and unknowns. Choose the next useful
 decision or slice before adding detail; future work stays thin.
 
-All entry points use `scripts/specflow-tier.cjs`. Inspect the selected ticket's
+Work weight is selected first by `specflow-loop-selector`: it determines which
+parts and checks the ask needs and whether a loop is warranted. It is separate
+from these planning-depth labels. A display-only tweak or bounded bug does not
+need a tier record solely for triage. Formal specification and loop entry points
+use the shared policy below; weight never overrides their evidence requirements.
+In particular, build-ready loop work still requires scoped simulation. Required
+server-state journeys must execute against a real seeded backend; mocked success,
+a skipped test or owner testing alone does not establish completion.
+
+All specification entry points use `scripts/specflow-tier.cjs`. Inspect the selected ticket's
 record with `node scripts/specflow-tier.cjs inspect <record.json> <route> inspect`.
 Use the exact route name: `specflow-loop-selector`, `spec-build`,
 `specflow-simulate`, `specflow-audit`, `specflow-uplifter`, `specflow-writer`,

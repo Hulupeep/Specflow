@@ -1,4 +1,4 @@
 interface:
   display_name: "Specflow Loop Selector"
-  short_description: "Select a loop after full-loop work routing."
-  default_prompt: "Use $specflow-loop-selector for work routed to a full loop, emit its run contract, and advance all unblocked stages."
+  short_description: "Scale Specflow work and verification to risk."
+  default_prompt: "Use $specflow-loop-selector to choose the lightest work weight that covers the risk, state required checks, and select a loop only if needed."

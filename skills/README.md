@@ -5,26 +5,25 @@ phrasing instead of requiring you to manually invoke an agent prompt.
 
 ## specflow-loop-selector
 
-Use only after `AGENTS.md` routes work to **Full loop**, or for an explicit
-request to select/run spec-build, feature-build, Gate D, or daily-use-teardown.
-Ordinary ticket implementation, PRD edits, and standalone audit/simulation do
-not automatically invoke this skill. Direct and Targeted Specflow work do not
-need a loop run contract.
+Chooses work weight before loop type: Tweak, Bug, UI feature, Schema/RPC change,
+New concept/behaviour change, or Multi-slice epic. Use it for proportionate work
+triage or explicit loop selection; consulting the skill does not start a loop.
+The [decision table](specflow-loop-selector/SKILL.md#choose-the-work-weight)
+combines risk modifiers with the checks that remain mandatory.
 
 ```
-route work → select loop if needed → emit run_contract → advance unblocked stages
+weight + risk → required parts/checks → loop only if needed → execute and verify
 ```
 
-Use `SPECIFICATION.md` and the shared tier helper to determine depth. Thin
-backlog work stays planning; for the selected build-ready slice, simulation
-and audit still apply:
+A bounded task can use individual parts without a loop run contract. Bugs need
+a failing regression test; database changes retain replay/rollback/pgTAP and CI
+migration-replay; new concepts require simulation and a kill check. Every required
+server-state journey runs against a real seeded backend. Owner testing, flags and
+mocked journeys cannot substitute for that evidence.
 
-```
-create/refine story → specflow-simulate → specflow-audit/uplift → pre-flight gate → implementation
-```
-
-Implementation can be direct for Targeted Specflow or use feature-build for
-Full loop. Targeted Specflow is an agent workflow, not a runner mode.
+Weight does not replace `SPECIFICATION.md` or its shared depth policy. Formal
+Specflow stories and full-loop build-ready work retain required simulation,
+audit/pre-flight and readiness checks. Do not relabel work to evade a gate.
 
 Installers copy it to `.claude/skills/`, `.codex/skills/`, and
 `.agents/skills/` so Claude Code, Codex, K2.7, and generic agents can all read

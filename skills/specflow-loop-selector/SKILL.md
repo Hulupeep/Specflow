@@ -1,29 +1,105 @@
 ---
 name: specflow-loop-selector
-description: Select a Specflow loop and emit a run contract after work is routed to a full loop, or when the user explicitly requests spec-build, feature-build, Gate D, daily-use-teardown, or loop selection. Ordinary ticket implementation, PRD edits, and standalone audit/simulation requests do not trigger this skill.
+description: Choose the lightest Specflow workflow that covers an ask’s size, uncertainty and risk, then select a loop only when needed. Use for work triage, proportionate verification, loop selection, or explicit spec-build, feature-build and Gate D requests. A lightweight decision does not start a loop.
 ---
 
 # Specflow Loop Selector
 
-Use this only after work is routed to a full loop or the user explicitly requests
-loop selection/execution. Apply `AGENTS.md` work routing first. If routing has not
-happened, distinguish Direct (clear bounded work), Targeted Specflow (affected
-artifacts and prescribed checks without orchestration), and Full loop (discovery,
-slicing, dependencies, or durable multi-stage execution). State the route and
-reason. For Direct or Targeted Specflow, return to that workflow without a run
-contract or provider invocation. Standalone audit/simulation requests use their
-own skills and do not automatically start a build loop.
+## Choose The Work Weight
 
-For selected full-loop work: Do not rediscover the process by grepping the repo unless a named file is missing.
+Choose the lightest level that covers the actual risk before selecting a loop.
+Inspect the affected behaviour and interfaces; file count, issue labels and a
+small diff do not establish low risk. Reuse current tickets and evidence. State
+one short decision in the existing task/issue or response: **weight, reason,
+required checks, simulation needed or not, loop needed or not**. Do not create a
+triage document, ticket, run contract or provider call just to make this decision.
+
+| Weight | Typical ask | Parts to invoke |
+|---|---|---|
+| Tweak | Copy, CSS, a display-only component; deck hint or compact cards | No Specflow ceremony. Relevant unit tests, lint and an emulator screenshot for changed UI (browser equivalent for web). |
+| Bug | Stale flick-down, ghost-click tap | Capture a failing regression test before the fix, then pass it and applicable contract tests. A short issue is enough; add a journey when the failure crosses UI/backend boundaries. |
+| UI feature, no schema change | Reorder, quick add, full deck using established behaviour | Short ticket with Gherkin, failure cases and `data-testid` selectors; contract tests and an executed emulator/browser journey. Simulate only for a new or changed gesture/mental model, or an already-required gate. |
+| Schema or RPC change | Table, constraint, RLS, trigger or RPC contract change | Full ticket; Gate C with migration replay, rollback and pgTAP; CI migration-replay. These checks are mandatory for the applicable database change, even if the diff is tiny. |
+| New concept / behaviour change | Detours, pause reasons, changing what “hold” means | Simulate personas and edge routes before building; run a kill check, then implement with the applicable UI/database verification. |
+| Multi-slice epic | A Live Stax build spanning dependent slices | Coordinate waves and dependencies, run slice journey gates, then Gate D on the merged result. Keep each slice’s applicable checks. |
+
+These are work profiles, not six CLI modes or a ladder where every higher level
+includes every lower ceremony. Combine them when risks overlap: a billing bug
+needs its failing test and billing checks; a concept with an RPC needs simulation
+and database gates. A ready single slice need not repeat discovery or run waves.
+
+### Adjust For Risk
+
+Raise verification depth for database access, persistent writes, auth/security
+rules, changes to gestures or relied-on behaviour, hard-to-undo data, money or
+billing, and cross-repository seams. Name the extra check that addresses each
+risk. Verify permissions and ownership boundaries for auth/security work, failure
+and retry behaviour for money/data writes, and both sides of a cross-repo contract.
+Changing a familiar gesture requires simulation even when only one UI file moves.
+
+Display-only changes, easy reversal, a feature flag and an owner committed to
+hands-on testing within a day can reduce planning and coordination overhead.
+They do not cancel a raised risk or replace tests, database gates, security
+checks or a required journey. A persistent write through an unchanged API does
+not automatically require a schema ticket: keep the UI profile, but verify the
+real write, persistence and relevant failure/permission paths. A changed schema
+or RPC contract always invokes the database profile.
+
+For a new concept, the **kill check** asks whether the proposed behaviour solves
+the user’s problem, whether an existing interaction already does so, and which
+simulation finding would make us stop, simplify or reframe it. Record the result
+with the existing acceptance notes before building; do not invent another gate
+artifact. Re-triage if implementation reveals a new risk or a wider seam.
+
+### Journey Evidence Is A Floor
+
+For every required journey involving server state, run the emulator/browser
+against a real seeded backend (local or isolated test/staging is sufficient;
+production is not required). Exercise the actual API/RPC, auth and persistence
+paths in scope. Mocks, intercepted success responses, an in-memory substitute,
+a screenshot alone or a written-but-never-run test cannot satisfy that journey.
+For a truly display-only tweak, a screenshot does not create a backend requirement.
+
+Keep the journey ID, ordered steps and success criteria, executable spec path,
+command, tested revision, non-secret environment identity, and actual executed /
+failed / skipped results with the existing test evidence. Assert the observable
+state after the action, including persisted state when relevant. Missing backend
+access means **blocked verification**, not a pass. A missing, skipped or never-run
+required UI journey is CRITICAL for Specflow compliance; deferral needs a linked
+tracking issue and remains an explicit gap, not completion. Owner testing and
+feature flags never substitute for this evidence.
+
+### Decide Whether A Loop Is Needed
+
+Use individual parts directly when the selected work is bounded. Tweak and Bug
+do not acquire PRD/ticket ceremony just because this skill was consulted. A
+bounded UI feature can use its short ticket, contracts and real-backend journey
+without a full loop. Select a loop for explicit loop requests, substantial
+discovery, dependency coordination or durable multi-stage execution. Standalone
+audit/simulation requests use their prescribed workflows without automatically
+starting spec-build or feature-build.
+
+Work weight is separate from specification depth. Existing contracts, explicit
+project instructions and required CI/release checks still apply. When working
+on a formal Specflow story, use its prescribed simulation/audit path; weight
+cannot waive it. In particular, the current full-loop build-ready policy still
+requires simulation evidence. Do not set `simulation_required: false`, relabel a
+ticket or call a required artifact N/A to evade that gate. Report a conflict
+between a lightweight recommendation and an existing requirement explicitly.
+
+If no loop or formal specification work is needed, execute the selected checks
+and stop here; no tier record or run contract is needed. Otherwise use the depth
+policy below, and emit a run contract only if a loop is selected.
 
 Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Run
 `node scripts/specflow-tier.cjs inspect <record.json> specflow-loop-selector inspect`
 before selecting depth. Missing labels mean thin; conflicting labels block.
-Record the returned `tier` and `simulation_required` in the run contract.
+For a selected loop, record the returned `tier` and `simulation_required` in its
+run contract; using a specification component alone does not require one.
 The detailed lifecycle below applies only to evidence justified for the selected
 slice. Thin selection ends at planning state; it does not generate a full spec.
 
-## Select The Loop
+## Select The Loop (Only When Needed)
 
 - Rough idea, discovery, PRD, story slicing, ticket creation, or "turn this into ready tickets":
   use `QA/loops/spec-build.yaml`.
@@ -68,7 +144,7 @@ current-stage policy during model confirmation.
 
 ## Mandatory Run Contract
 
-After selecting a loop, emit a `run_contract` before doing work. Referencing the YAML is not enough.
+Only after selecting a loop, emit a `run_contract` before loop execution. Referencing the YAML is not enough.
 
 ```yaml
 run_contract:
