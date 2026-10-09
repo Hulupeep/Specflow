@@ -1,0 +1,40 @@
+{
+  "issue": 121,
+  "reviewedCommit": "4ab8507",
+  "integratedMain": "5013a19",
+  "scope": "Routing readiness, before any provider invocation",
+  "checks": [
+    {
+      "command": "npm test -- --runInBand tests/scripts/routing-readiness.test.js tests/contracts/runtime-routing-install.test.js tests/contracts/loop-run-contract.test.js",
+      "result": "56 passed; includes 4 actual CLI journeys"
+    },
+    {
+      "command": "npm test -- --runInBand",
+      "result": "1352 passed, 1 failed: generated loop README drift after integrating main"
+    },
+    {
+      "repair": "Updated canonical templates/loops/README.md and regenerated shipping mirror; no test or acceptance weakened"
+    },
+    {
+      "command": "npm test -- --runInBand tests/contracts/mandate-version.test.js",
+      "result": "3 passed; fixes sole full-suite failure"
+    },
+    {
+      "command": "node scripts/sync-loop-templates.cjs --check",
+      "result": "passed"
+    },
+    {
+      "command": "npm pack --dry-run --json",
+      "result": "passed; both routing templates and selector present; no files normalized"
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "limits": [
+    "No provider calls made by CLI journeys; sentinels remained absent.",
+    "Historical provenance-121-routing-readiness.json belongs to original July change.",
+    "This does not complete separate runtime-binding #56 or critic-rail #54."
+  ]
+}
