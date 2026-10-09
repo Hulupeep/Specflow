@@ -938,16 +938,31 @@ function assembleVerifierInput(options = {}) {
 const RUNTIME_CHECK_TYPES = ['playwright', 'api', 'db-reread', 'console', 'network', 'screenshot', 'custom-script'];
 const RUNTIME_REREAD_TYPES = ['api', 'db-reread', 'custom-script'];
 
+function runtimeCheckIdentity(check, index) {
+  return {
+    check_id: check.id || `runtime-check-${index + 1}`,
+    check_sha256: createHash('sha256').update(JSON.stringify(canonicalizeSemanticValue(check))).digest('hex'),
+  };
+}
+
 function validateRuntimeChecks(checks, options = {}) {
   const list = Array.isArray(checks) ? checks : [];
   const errors = [];
-  for (const c of list) {
+  if (!Array.isArray(checks)) errors.push('runtime checks must be an array');
+  const identities = new Set();
+  for (const [index, c] of list.entries()) {
     if (!c || !RUNTIME_CHECK_TYPES.includes(c.type)) errors.push(`unsupported runtime check type: ${c && c.type}`);
+    if (!c) continue;
+    if (c.required !== undefined && typeof c.required !== 'boolean') errors.push('runtime check required must be a boolean');
+    if (c.id !== undefined && (typeof c.id !== 'string' || !c.id.trim())) errors.push('runtime check id must be a non-empty string');
+    const { check_id } = runtimeCheckIdentity(c, index);
+    if (identities.has(check_id)) errors.push(`duplicate runtime check id: ${check_id}`);
+    identities.add(check_id);
   }
-  if (options.uiOrWorkflow && !list.some((c) => c && c.required)) {
+  if (options.uiOrWorkflow && !list.some((c) => c && c.required === true)) {
     errors.push('UI/workflow slice requires at least one required runtime check');
   }
-  if (options.valueBearing && !list.some((c) => c && RUNTIME_REREAD_TYPES.includes(c.type))) {
+  if (options.valueBearing && !list.some((c) => c && c.required === true && RUNTIME_REREAD_TYPES.includes(c.type))) {
     errors.push('value-bearing slice requires an api/db-reread/custom-script reread; screenshot-only evidence is insufficient');
   }
   return { ok: errors.length === 0, errors };
@@ -965,10 +980,17 @@ function runRuntimeChecks(options = {}) {
   const makerClaim = options.makerClaim || UNKNOWN;
   const runner = options.runner || defaultRuntimeRunner;
   const findings = [];
-  for (const check of checks) {
-    const outcome = runner(check) || {};
+  for (const [index, check] of checks.entries()) {
+    const identity = runtimeCheckIdentity(check, index);
+    let outcome;
+    try {
+      // A runner may inspect a check, but cannot change the accepted inventory.
+      outcome = runner(JSON.parse(JSON.stringify(check))) || {};
+    } catch (error) {
+      outcome = { executable: false, reason: `runtime runner threw: ${error.message}` };
+    }
     let finding;
-    if (outcome.executable === false || outcome.result === 'blocked') {
+    if (outcome.executable !== true || !['pass', 'fail'].includes(outcome.result)) {
       finding = {
         severity: 'blocked',
         check_type: check.type,
@@ -979,7 +1001,9 @@ function runRuntimeChecks(options = {}) {
         result: 'blocked',
         gate_result: 'pending',
         evidence_path: null,
-        reason: outcome.reason || `missing executable surface for ${check.type} check`,
+        reason: outcome.reason || (outcome.executable !== true
+          ? `missing executable surface for ${check.type} check`
+          : `invalid runtime result: ${String(outcome.result)}`),
       };
     } else {
       const failed = outcome.result === 'fail';
@@ -995,6 +1019,7 @@ function runRuntimeChecks(options = {}) {
         evidence_path: outcome.evidence_path || check.evidence_path || null,
       };
     }
+    Object.assign(finding, identity);
     findings.push(finding);
     appendLedger(paths.findingsPath, finding);
   }
@@ -1131,10 +1156,22 @@ function verifierRequiredForSlice(sliceTags = [], options = {}) {
   return tags.some((t) => requiredWhen.includes(t));
 }
 
-function verifierGateDecision(findings = []) {
-  const required = findings.filter((f) => f.required);
+function verifierGateDecision(findings = [], checks) {
+  if (!Array.isArray(findings) || findings.some((f) => !f || typeof f !== 'object'
+    || (f.required !== undefined && typeof f.required !== 'boolean'))) return 'blocked';
+  const required = findings.filter((f) => f.required === true);
   if (!required.length) return 'blocked'; // required runtime evidence missing
-  if (required.some((f) => f.verifier_result === 'blocked')) return 'blocked';
+  if (checks !== undefined) {
+    if (!validateRuntimeChecks(checks, { uiOrWorkflow: true }).ok) return 'blocked';
+    const expected = checks.map((c, index) => ({ ...runtimeCheckIdentity(c, index), required: c.required === true }))
+      .filter((c) => c.required);
+    if (required.length !== expected.length) return 'blocked';
+    for (const check of expected) {
+      const matches = findings.filter((f) => f.check_id === check.check_id);
+      if (matches.length !== 1 || matches[0].required !== true || matches[0].check_sha256 !== check.check_sha256) return 'blocked';
+    }
+  }
+  if (required.some((f) => !['pass', 'fail'].includes(f.verifier_result))) return 'blocked';
   if (required.some((f) => f.verifier_result === 'fail')) return 'fail';
   return 'pass';
 }
@@ -1173,10 +1210,14 @@ function runVerifierStage(options = {}) {
     return { status: 'blocked', required, gate: 'blocked', reason: contractGate.reason };
   }
 
-  const checks = options.checks || (contractGate.contract && contractGate.contract.runtime_checks) || [];
-  const valueBearing = options.valueBearing !== undefined
-    ? options.valueBearing
-    : sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t));
+  const checks = contractGate.contract.runtime_checks;
+  if (options.checks !== undefined
+    && JSON.stringify(canonicalizeSemanticValue(options.checks)) !== JSON.stringify(canonicalizeSemanticValue(checks))) {
+    const reason = 'runtime checks differ from the accepted verification contract; accept a revised contract before changing checks';
+    record('blocked', { reason });
+    return { status: 'blocked', required, gate: 'blocked', reason };
+  }
+  const valueBearing = options.valueBearing === true || sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t));
   const validation = validateRuntimeChecks(checks, { uiOrWorkflow: true, valueBearing });
   if (!validation.ok) {
     record('blocked', { reason: validation.errors.join('; ') });
@@ -1186,7 +1227,7 @@ function runVerifierStage(options = {}) {
   const { findings, summary } = runRuntimeChecks({
     runDir: options.runDir, contract: options.contract, ledger: options.ledger, checks, makerClaim, runner: options.runner,
   });
-  const gate = verifierGateDecision(findings);
+  const gate = verifierGateDecision(findings, checks);
   record(gate, {
     findings_count: findings.length,
     divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,

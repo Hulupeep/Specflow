@@ -1,0 +1,75 @@
+{
+  "observed_at": "2026-10-09T08:23:48.945Z",
+  "base_commit": "b9be065acce89d60e42b246554597239ca46e015",
+  "environment": {
+    "node": "v24.19.0",
+    "platform": "linux"
+  },
+  "scope": "Independent verifier mechanics using the repository Node behavior fixture; injected pending outcome is explicitly simulated.",
+  "limitations": [
+    "No real browser or product backend was exercised.",
+    "No provider invocation, deployment or customer acceptance is claimed.",
+    "Passing fixture checks do not prove end-to-end product behavior."
+  ],
+  "source_sha256": {
+    "scripts/specflow-runner.cjs": "e93237577080895d2c1ac44dd427ffe82e8816349cc340672932bc45dd85b2df",
+    "scripts/adversary-mandate.cjs": "233f335a999e01be4b66437567949adf728a86b250322a21a9b32f9990d3dba4",
+    "templates/loops/adversary-mandate.md": "dcf6a24d3262848017c74023e6545fc5756c47ea2c47056159b40c05f0156cb4"
+  },
+  "cases": [
+    {
+      "case": "actual Node behavior fixture succeeds",
+      "gate": "pass",
+      "status": "passed",
+      "summary": {
+        "total": 1,
+        "pass": 1,
+        "fail": 0,
+        "blocked": 0
+      },
+      "reason": null
+    },
+    {
+      "case": "same behavior fixture with a deliberate broken action fails",
+      "gate": "fail",
+      "status": "blocked",
+      "summary": {
+        "total": 1,
+        "pass": 0,
+        "fail": 1,
+        "blocked": 0
+      },
+      "reason": null
+    },
+    {
+      "case": "no accepted verification contract",
+      "gate": "blocked",
+      "status": "blocked",
+      "summary": null,
+      "reason": "no accepted verification contract; maker implementation is blocked"
+    },
+    {
+      "case": "runner reports pending despite maker completion",
+      "gate": "blocked",
+      "status": "blocked",
+      "summary": {
+        "total": 1,
+        "pass": 0,
+        "fail": 0,
+        "blocked": 1
+      },
+      "reason": null
+    },
+    {
+      "case": "caller removes the accepted required check",
+      "gate": "blocked",
+      "status": "blocked",
+      "summary": null,
+      "reason": "runtime checks differ from the accepted verification contract; accept a revised contract before changing checks"
+    },
+    {
+      "case": "missing or duplicated findings against the accepted inventory",
+      "gate": "blocked"
+    }
+  ]
+}

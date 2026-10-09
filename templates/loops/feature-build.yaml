@@ -1,6 +1,7 @@
 # feature-build.yaml — the reusable PATH for the feature-build loop (PROCESS.md Step 6→7).
-# The prompt only supplies: goal + issue + automation. Each tick: load this path,
-# LOCATE the current rail from the branch + CI state, advance ONE rail, persist, stop/escalate.
+# The prompt only supplies: goal + issue + automation. Each invocation: load this path,
+# LOCATE the current rail from branch + CI state, advance all unblocked rails, persist after
+# each rail, stop only on HITL/external CI wait/block/done.
 loop: feature-build
 specification_policy:
   command: node scripts/specflow-tier.cjs inspect <record.json> feature-build build
@@ -12,14 +13,25 @@ principle: you and any swarm are muscle; per-slice trust lives ONLY in GATE C (b
   CI vs real data); EPIC-level trust lives in GATE D (epic_gate below) — a slice's contract test
   is necessary but not sufficient; the gate of record is the persona walk on the merged tree.
 
+execution:
+  continue_until: >
+    Keep going through every currently unblocked rail in this invocation. Persist the diff
+    and evidence note after each rail. A soft rail is work to perform now, not a reason to stop.
+  stop_only_when:
+    - a never_without_human action would be required
+    - branch-protected CI requires a human push/PR/opening action before Gate C exists
+    - required ticket/contract/journey/provenance evidence is missing and cannot be derived
+    - repair is slow or externally blocked
+    - Gate C is green and the branch is ready for review.
+
 progress_display:             # EMIT this at the START of every tick so the human sees the rail
   rule: >
     Re-render the map below with marks: ✓ completed · ▶ current · · pending · ⛔ hard wall.
-    GATE_C stays ⛔ until CI is green vs the real seeded backend. Show "now / next / blocked-on" + CI status under it.
+    GATE_C stays ⛔ until CI is green vs the real seeded backend and provenance passes. Show "now / next / blocked-on" + CI status under it.
   template: |
     ┌──────────────────────── FEATURE-BUILD #{issue} ────────────────────────┐
-      ticket ─▶ contract ─▶ e2e ─▶ oracle ─▶ impl ═╣⛔C╠═▶ ready-for-review
-        {r1}      {r2}      {r3}     {r4}    {r5}     {c}
+      ticket ─▶ contract ─▶ e2e ─▶ oracle ─▶ impl ─▶ prov ─▶ HITL ═╣⛔C╠═▶ ready-for-review
+        {r1}      {r2}      {r3}     {r4}    {r5}    {r6}    {h}      {c}
                   ▲____________ ↺ repair ___________│
     └─────────────────────────────────────────────────────────────────────────┘
       now: {current_rail}   next: {next_rail}   CI: {ci_status}   blocked-on: {blocker_or_none}
@@ -38,7 +50,7 @@ preconditions:
   - issue has current verified readiness and applicable AC/check/contract mapping; UI stories also require journey/selectors/e2e mapping (Rule 1) else escalate
   - constraint: slice < 1000 lines (else propose a 4–8 slice split)
 
-rails:                        # advance one per tick, in order
+rails:                        # advance all unblocked rails in order
   - id: 1_ticket
     gate: ticket + ACs + journey id confirmed
   - id: 2_contract
@@ -49,6 +61,23 @@ rails:                        # advance one per tick, in order
     gate: every asserted number traced to the live calc / real source (never guessed)
   - id: 5_impl
     gate: smallest mergeable slice (<1000 lines) makes it pass
+  - id: 6_provenance
+    gate: >
+      every value-bearing output/assertion is source-proven after implementation:
+      no hard-coded business literals, no mock/fake/stub source in the production or e2e
+      path, and every asserted value has runtime provenance showing:
+      source -> transform -> API/input -> UI/API output -> assertion.
+    do: >
+      run data-provenance audit on the diff + e2e run:
+      scan changed code/tests for asserted literals copied into implementation/API payloads;
+      reject mock/fake/stub adapters on the tested path unless explicitly contract-allowed;
+      capture runtime evidence from the real seeded backend/API/query/log; compare the
+      rendered/API value to the source re-read, not to a test literal.
+    evidence: evidence/provenance-${issue}.json
+  - id: 7_ci_handoff
+    gate: >
+      human has pushed/opened the PR or otherwise triggered branch-protected CI.
+      The agent stops here when CI does not exist yet; once CI exists, the next tick reads Gate C.
 
 muscle:                       # do work, never approve it
   - /qa (coverage + regression) — run + SPOT-CHECK before trusting
@@ -60,7 +89,10 @@ muscle:                       # do work, never approve it
 
 GATE_C:                       # HARD, unfakeable — the only trust gate
   type: hard
-  gate: contract + journey tests green on branch-protected CI vs real seeded backend
+  gate: >
+    contract + journey tests green on branch-protected CI vs real seeded backend
+    AND provenance audit passes: value-bearing outputs are traced to allowed sources,
+    not literals, mocks, generated fixtures, or hand-written API inputs.
   read: green → ready-for-review; red → repair (inline if fast, next tick if slow)
 
 repair:
@@ -75,8 +107,9 @@ escalate_when: [precondition unmet, AC ambiguous (>1 reading), slice can't stay 
 never_without_human: [git push, open PR, merge, --no-verify, override contract]
 
 done_when:
-  - 5 rails complete, muscle run + spot-checked, GATE C green, evidence note complete
-  - STOP at "branch ready for review" — human opens the PR
+  - 7 rails complete, muscle run + spot-checked, provenance evidence complete, GATE C green, evidence note complete
+  - if CI has not been triggered, STOP at "ready for human CI handoff" — human pushes/opens the PR
+  - after human CI handoff and green Gate C, STOP at "branch ready for review"
   - NOTE (slice-done ≠ epic-done): the EPIC is not done until GATE D (epic_gate below) is green.
 
 merge_notes:                  # stacked branches
@@ -105,18 +138,23 @@ epic_gate:
     (PRDs/<slug>-hops.md, pinned at GATE A) + the seam-derived hops (GATE B; seams
     RECOMPUTED here from final ticket state). The gate-d prompt MATERIALIZES the hop
     artifact into teardown format (each hop a "- J:" entry; findings per hop; evidence
-    per finding) so teardown-gate.cjs check validates it unchanged.
+    per finding) so `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/`
+    validates it.
   evidence: >
     every hop has a findings entry referencing evidence files that exist; VALUE-BEARING
     hops must attach the oracle re-read output itself (.txt/.json or a screenshot showing
     the value) — a decorative screenshot does not satisfy a value hop.
   disposition: >               # closes the ungoverned-reconciliation loophole (PR #724 exhibit)
     a red hop MUST be dispositioned `bug` or `stale-oracle`. stale-oracle = an amendment to
-    PRDs/<slug>-hops.md requiring HUMAN COUNTERSIGN (teardown-gate.cjs sign) — the build
-    agent can never reconcile its own oracle. On `bug`: the LAST-MERGED writer of the seam
+    PRDs/<slug>-hops.md requiring the configured amendment/provenance trail. If
+    `signoff_policy.required` is true, the amendment also requires the configured human
+    countersign — the build agent can never reconcile its own oracle. On `bug`: the LAST-MERGED writer of the seam
     reopens (it changed already-walked state); the failure names the seam pair + tiebreak.
     Shared-module case: the disposition names the module commit, not page blame.
   proof: >
-    teardown-gate.cjs check passes on the gate-d dir AND the human signs map + result
-    (2 sign actions). The epic cannot close without this signed artifact.
-  never_without_human: [sign, stale-oracle amendment, closing the epic on a red GATE D]
+    `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/` passes. Human signatures
+    are required only when the Gate D signoff policy marks them required.
+  signoff_policy:
+    required: false
+    artifacts: []
+  never_without_human: [sign when signoff_policy.required, stale-oracle amendment, closing the epic on a red GATE D]

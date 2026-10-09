@@ -1,6 +1,6 @@
 # Falsification Pass — <slug>
 
-Required output of adversary-mandate@v2 (spec-build). Do not polish or summarize — **falsify**: ask not "is this clear?" but "how can it be false while still sounding clear?" Findings recorded only in chat do not count. Every table below must carry ≥1 data row (`verify-falsification.cjs` rejects a stub); GATE_A additionally requires a PASS/PASS WITH STIPULATIONS bound to the current PRD hash (`--require-pass --binds-prd`). Claim `Type` ∈ {definition, assumption, theorem, impl-choice, hypothesis, citation}. The Dependency Audit asserts no edge without a one-line reason.
+Required output of adversary-mandate@v3 (spec-build). Do not polish or summarize — **falsify**: ask not "is this clear?" but "how can it be false while still sounding clear?" Findings recorded only in chat do not count. Every table below must carry ≥1 data row (`verify-falsification.cjs` rejects a stub); GATE_A additionally requires a PASS/PASS WITH STIPULATIONS bound to the current PRD hash (`--require-pass --binds-prd`). Claim `Type` ∈ {definition, assumption, theorem, impl-choice, hypothesis, citation}. The Dependency Audit asserts no edge without a one-line reason.
 
 PRD SHA-256: <sha256 of PRDs/<slug>-prd.md at review time>
 

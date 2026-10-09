@@ -59,4 +59,8 @@ describe('prepareAdversarySpawn — gated end to end', () => {
   test('refuses a disallowed tool grant (gate catches it before launch)', () => {
     expect(() => prepareAdversarySpawn(['a'], { toolGrants: ['network'] })).toThrow(/rejected/);
   });
+
+  test('#130: a stale version override cannot launch', () => {
+    expect(() => prepareAdversarySpawn(['a'], { mandateRef: 'adversary-mandate@v1' })).toThrow(/does not resolve/);
+  });
 });

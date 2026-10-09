@@ -7,11 +7,12 @@
  */
 
 const { validateSeed } = require('../../scripts/verify-seed.cjs');
+const { currentMandate } = require('../../scripts/adversary-mandate.cjs');
 
 const VALID = {
   artifact_paths: ['PRDs/pipeline-v2-prd.md'],
   tool_grants: ['read', 'grep', 'bash'],
-  mandate_ref: 'adversary-mandate@v1',
+  mandate_ref: currentMandate().ref,
 };
 
 describe('validateSeed — accepts a clean seed', () => {
@@ -60,7 +61,9 @@ describe('validateSeed — structural rules', () => {
     expect(validateSeed('string').ok).toBe(false);
   });
 
-  test('accepts the versioned id pattern (v2 etc.)', () => {
-    expect(validateSeed({ ...VALID, mandate_ref: 'adversary-mandate@v2' }).ok).toBe(true);
+  test('#130: rejects shaped but unknown or stale mandate ids', () => {
+    for (const mandate_ref of ['adversary-mandate@v1', 'adversary-mandate@v2', 'adversary-mandate@v9999', 'other-mandate@v3']) {
+      expect(validateSeed({ ...VALID, mandate_ref }).ok).toBe(false);
+    }
   });
 });

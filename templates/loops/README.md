@@ -2,6 +2,27 @@
 
 > **Canonical source: Specflow.** This kit was scaffolded by `specflow init` and is refreshed by `specflow init`/`update`. Don't hand-edit it per-project — change it in Specflow (`templates/loops/`) so every project gets the fix.
 
+## Maintaining the kit
+
+`templates/loops/` is canonical. `templates/QA/loops/` is its generated shipping
+mirror. Run `npm run sync:loops` after editing the canonical kit; contract tests
+and packaging reject drift with `node scripts/sync-loop-templates.cjs --check`.
+The installer copies these identical assets into a project's `QA/loops/`.
+
+The first header of `adversary-mandate.md` is the single version authority.
+To bump the version, change that header and run `npm run sync:loops`; the loop
+and falsification-template references regenerate, and the spawner derives its
+default from the header. Each mandate is self-contained. Seeds naming an absent
+or stale version are rejected before launch; explicitly refresh those seeds
+after reviewing the installed mandate. Retain old run artifacts as historical
+evidence rather than relabelling them as having used the new version.
+
+Version history belongs here, outside the instructions read by the critic:
+v1 established the five structural-review clauses; v2 added falsification,
+typed claims, dependency/correction checks and hash binding; v3 added reuse and
+conditional ADR conformance. The consolidated v3 retains the twelve clauses and
+seven banned failure modes already shipped in `templates/QA/loops/`.
+
 ## The problem this solves
 
 **Your best thinking becomes invisible to future you.** You think in rich, parallel texture — but the moment you need to *act* on it (retrieve it, build on it, hand it to an agent), there's no schema. It evaporates.
@@ -53,12 +74,18 @@ prompts/               examples/               ← the PROMPTS (thin: goal + inp
 **A loop = path + thin prompt + automation (the tick) + durable state (committed artifacts).**
 The path lives in the YAML. The prompt only carries *goal + inputs + automation* and says "follow the path." It never restates the stages. The YAML is the source of truth — if a prose doc disagrees, the YAML wins.
 
+`specflow run` is the local contracted-loop runner. It writes
+`.specflow/runs/<slug>/run-contract.yaml` plus `.specflow/runs/<slug>/ledger.jsonl`
+so an agent cannot merely cite this folder and improvise. A prompt is one
+instruction; a Specflow loop is a persisted job contract with verifier gates,
+state, evidence, and stop rules.
+
 ## Run the whole pipeline, in order
 
 1. **Spec-build** — turn a rough idea / discovery into defensible tickets.
    Copy [`prompts/spec-build.prompt.md`](prompts/spec-build.prompt.md), fill `goal` / `slug` / `grounding_ref`, paste into your agent (or set it as a thread automation). It starts with discovery and thin backlog capture. Selected contracted decisions receive **Gate A** review; only the next build-ready slice receives applicable Gate B/B.5 checks. Output: a mixed-tier backlog with scoped evidence for the selected slice.
 2. **Feature-build** — turn each ready ticket into a tested slice.
-   For the selected ticket with current verified build-ready evidence; leave other backlog tickets thin, copy [`prompts/feature-build.prompt.md`](prompts/feature-build.prompt.md), fill `issue`, paste/automate. It builds on the 5 rails → **Gate C (CI on real data)**. Output: a branch ready for review.
+   For the selected ticket with current verified build-ready evidence; leave other backlog tickets thin, copy [`prompts/feature-build.prompt.md`](prompts/feature-build.prompt.md), fill `issue`, paste/automate. It builds on the rails through implementation, post-code provenance, human CI handoff, then **Gate C (CI on real data)**. Output: a branch ready for review.
 
 **Already-built product?** Start one loop earlier: **daily-use-teardown** ([`daily-use-teardown.yaml`](daily-use-teardown.yaml), prompt in [`prompts/`](prompts/)) — investigate the app's main journeys + their purpose, **you confirm the map (hard human gate)**, then top-thinker persona walks judge each journey WORKS / CONFUSING / BROKEN with screenshot evidence, ending in a prioritized do-list that becomes spec-build's `grounding_ref`. Filled example: [`examples/claim-alert.daily-use-teardown.md`](examples/claim-alert.daily-use-teardown.md).
 3. **Mistake-harvest** (meta, optional) — schedule `docs/routines/daily-mistake-harvest.md` (timebreez). It reads runs of both loops and improves the skills/contracts they depend on.
@@ -80,8 +107,59 @@ See [`examples/tt-rollback.spec-build.md`](examples/tt-rollback.spec-build.md) f
 
 ## Two rules that make it trustworthy
 
-- **One gate per tick.** Each run locates where it is from committed artifacts, advances exactly one gate, persists, then stops/escalates. State lives in files (PRD, verdict, tickets, evidence) — never only in chat.
+- **Continue until done or truly blocked.** Each run locates where it is from
+  durable artifacts, advances every currently unblocked stage/rail, persists
+  after each gate, then stops only on a true human gate, missing evidence,
+  exhausted budget, external CI wait, or handoff/done state. State lives in files
+  (run contract, ledger, PRD, verdict, tickets, evidence) — never only in chat.
 - **Muscle never approves its own work.** Agents and the swarm do the work; trust lives only in **Gate A** (one hostile critic) and **Gate C** (branch-protected CI vs a real backend).
+
+## Generative stage adapters
+
+Some loop stages require writing or judgment. By default `specflow run` stops
+there with `agent_action_required`. To execute one generative stage under tight
+controls, provide an adapter policy for a local CLI runtime:
+
+- Claude Code: `claude -p`
+- Codex: `codex exec`
+
+The provider CLI owns authentication and subscription use. Specflow stores no
+subscription secrets. The adapter policy must name command args, timeout,
+budget where supported, transcript path, output path, allowed/denied tools, and
+`never_without_human`. The runner records transcript evidence, blocks forbidden
+actions outside the provider prompt, and requires the owning Specflow gate to
+rerun before state advances.
+
+### Default model routing for larger initiatives
+
+For larger initiatives, enable the project routing default during `specflow init`
+or `specflow update` by answering `y` to the model-routing prompt. If you skipped
+the prompt, enable it later with:
+
+```bash
+specflow run --setup-routing
+```
+
+That default routes expensive requirements/planning/review work to the configured
+Claude/Fable policy and bounded coding/test work to Codex CLI with GPT-5.5. It
+requires confirmation before invoking a routed model:
+
+```bash
+specflow run spec-build --slug auth-system --goal "build auth" --input docs/auth-idea.md --adapter-routing .specflow/adapter-routing.yml
+```
+
+The first run prints the selected provider, role, model, effort, fallback, and
+budget cap/quota guard. For `codex-exec`, ChatGPT-authenticated Codex consumes
+Codex plan quota/credits rather than OpenAI API billing.
+If the choice is right, rerun with:
+
+```bash
+specflow run spec-build --slug auth-system --adapter-routing .specflow/adapter-routing.yml --confirm-models
+```
+
+The confirmation is intentional: Fable/frontier routes are expensive and should
+not be spent just because an automation resumed. Models do work; Specflow gates,
+CI, and humans still approve.
 
 ## Which repo do I run in?
 
