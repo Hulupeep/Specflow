@@ -1,0 +1,106 @@
+{
+  "at": "2026-10-09T17:54:23.686Z",
+  "outcome": "accepted",
+  "stage": "validated",
+  "sourceFingerprint": "a20ab41465a75bccd7100f7933e1fb230e4449ed2093e8e0c57e30c44771bcac",
+  "builder": "codex",
+  "peer": {
+    "peer": "claude",
+    "version": "2.1.285 (Claude Code)",
+    "authenticated": true,
+    "artifactAccess": "successful native tool results",
+    "enforcedMode": "Read/Glob/Grep and allowlisted gh reads, dontAsk"
+  },
+  "review": {
+    "outcome": "accepted",
+    "summary": "PREP-1 to PREP-4 are verified for the preparation scope only. The spike separates measured results (the in-process decision probe, exit 0, stable source hash) from historical summaries and unexecuted Q1/Q2 hypotheses. It never claims research completion, independent review or publication.",
+    "findings": [],
+    "unrelated": [
+      "spike.md still says Claude launch currently fails and the privacy scanner is absent. The batch notes this is historical status, but a dated update line in the spike would remove the apparent contradiction.",
+      "Q1/Q2 remain source-only concerns until an approved experiment adapter and a real isolation probe exist. The Q3 probe covers only the exported decide and evaluateCriteria functions."
+    ],
+    "index_complete": true,
+    "assessments": [
+      {
+        "id": "PREP-1",
+        "status": "verified",
+        "evidence": [
+          "docs/specs/improve-trust-spike/spike.md",
+          "evidence/improve-trust-spike/decision-probe.json"
+        ],
+        "reason": "spike.md Grounding names the scripts/specflow-improve.cjs functions, the I-IMPROVE-001/002/003/005/006/011 invariants (all present in feature_improve_core.yml), the improve-core test file and PRD sections 1 and 6. It labels HeyStax material as historical summaries and Q1/Q2 as source-level concerns. decision-probe.json records the measured Q3 observation with a pinned source_sha256."
+      },
+      {
+        "id": "PREP-2",
+        "status": "verified",
+        "evidence": [
+          "docs/specs/improve-trust-spike/spike.md",
+          "evidence/improve-trust-spike/decision-probe.json",
+          ".specflow/duo/1791224192444-3bbfc937/evidence/1791562875665-5b733cc8.json"
+        ],
+        "reason": "The Q1-Q3 matrix gives controls, expected behavior, evidence to retain and the rule that unavailable is not a pass. It also sets a 90-minute timebox and retry stop, and REQ-01 to REQ-05. The Q3 probe shows KEEP for preservation-only input, with REVERT controls for mandatory regression and empty diff, desired_behavior_met false and stated limitations. The Duo capture shows exitCode 0, stable true and sourceBefore equal to sourceAfter."
+      },
+      {
+        "id": "PREP-3",
+        "status": "verified",
+        "evidence": [
+          "docs/specs/improve-trust-spike/spike.md",
+          "docs/specs/improve-trust-spike/simulation.md"
+        ],
+        "reason": "spike.md 'Initial recommendation to challenge' recommends evidence binding (Q1/Q2) first and gain semantics (Q3) as a separate slice, with four ranked deferred follow-ups. It leaves receipt reuse versus a new receipt, legacy INCONCLUSIVE versus a new run, and gain thresholds as open research questions. AC-3 and the simulation's open questions keep these decisions explicit."
+      },
+      {
+        "id": "PREP-4",
+        "status": "verified",
+        "evidence": [
+          "docs/specs/improve-trust-spike/simulation.md",
+          "docs/specs/improve-trust-spike/audit.md",
+          "docs/specs/improve-trust-spike/spike.md"
+        ],
+        "reason": "simulation.md has four personas with happy and divergent routes, and proposals labelled as not applied. audit.md has the three phases (gap analysis, surgical uplift, pre-flight) and says it is the builder's audit, not independent acceptance. It states that research execution is incomplete and publication is pending. Nothing is reported as passed that did not run."
+      }
+    ],
+    "resolutions": [],
+    "diagnostics": [
+      {
+        "observation": "The Duo capture of the decision probe ran node evidence/improve-trust-spike/decision-probe.cjs on 2026-10-09, exiting 0 with empty stderr and identical sourceBefore and sourceAfter hashes. stdout shows decision KEEP for preservation-only evidence, REVERT for both controls, and desired_behavior_met false.",
+        "evidence": [
+          ".specflow/duo/1791224192444-3bbfc937/evidence/1791562875665-5b733cc8.json",
+          "evidence/improve-trust-spike/decision-probe.json"
+        ]
+      }
+    ],
+    "direction": {
+      "assessment": "complete",
+      "goal_connection": "The preparation packet advances the trust-layer mission by targeting unsupported KEEP decisions. Its function-level observation is honestly bounded, and no research completion or production claim is made.",
+      "next_steps": [],
+      "preserve": [
+        "Keep the labels separating observation from source-level concern from unavailable experiment.",
+        "Keep the controls and limitations in decision-probe.json.",
+        "Keep the rule against reusing holdouts and against substituting a fake peer."
+      ]
+    },
+    "instruction_assessments": [],
+    "inspected": [
+      "goal.md",
+      "request.json",
+      "tree/.specflow/duo/1791224192444-3bbfc937/evidence/1791562875665-5b733cc8.json",
+      "tree/.specflow/duo/improve-trust-preparation/record.json",
+      "tree/CLAUDE.md",
+      "tree/docs/PRD.md",
+      "tree/docs/contracts/feature_improve_core.yml",
+      "tree/docs/specs/improve-trust-spike/audit.md",
+      "tree/docs/specs/improve-trust-spike/review-task.md",
+      "tree/docs/specs/improve-trust-spike/simulation.md",
+      "tree/docs/specs/improve-trust-spike/spike.md",
+      "tree/evidence/improve-trust-spike/decision-probe.json",
+      "tree/templates/AGENTS.md"
+    ]
+  },
+  "progress": {
+    "newly_verified": 4,
+    "findings_closed": 0,
+    "new_diagnostics": 1,
+    "instructions_satisfied": 0
+  }
+}

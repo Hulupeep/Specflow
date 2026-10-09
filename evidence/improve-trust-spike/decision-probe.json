@@ -1,0 +1,109 @@
+{
+  "kind": "research-observation",
+  "observed_at": "2026-10-05T18:15:51.357Z",
+  "source": "scripts/specflow-improve.cjs",
+  "source_sha256": "0baa368cc0aa1afbb9859b1a83ccab4217adaac02408516857c53f36f6f9f9d8",
+  "scope": "exported evaluateCriteria and decide functions; constructed inputs",
+  "input": {
+    "contract": {
+      "acceptance": [
+        {
+          "id": "PRESERVE",
+          "statement": "Existing navigation works",
+          "mandatory": true,
+          "required_level": 1,
+          "baseline_expectation": "pass"
+        }
+      ]
+    },
+    "evidence": [
+      {
+        "id": "baseline",
+        "criterion": "PRESERVE",
+        "phase": "baseline",
+        "contract_version": 1,
+        "set": "holdout",
+        "kind": "executable-check",
+        "level": 1,
+        "result": "pass",
+        "producer_role": "verifier-mechanical"
+      },
+      {
+        "id": "after",
+        "criterion": "PRESERVE",
+        "phase": "after",
+        "contract_version": 1,
+        "set": "holdout",
+        "kind": "executable-check",
+        "level": 1,
+        "result": "pass",
+        "producer_role": "verifier-mechanical"
+      }
+    ],
+    "state": {
+      "integrity_failed": false,
+      "side_effects_attempted": 0,
+      "scope": {
+        "outside_scope": [],
+        "protected_touched": [],
+        "too_many_files": false
+      },
+      "base": {
+        "unchanged": true
+      },
+      "empty_diff": false,
+      "criteria": [
+        {
+          "id": "PRESERVE",
+          "statement": "Existing navigation works",
+          "mandatory": true,
+          "required_level": 1,
+          "status": "satisfied",
+          "qualifying": [
+            {
+              "id": "after",
+              "level": 1,
+              "result": "pass",
+              "producer": "verifier-mechanical"
+            }
+          ],
+          "not_counted": []
+        }
+      ],
+      "regressions": [],
+      "gates_missing": [],
+      "baseline_blocker": null,
+      "rail_gate": "pass",
+      "holdout_exposed": [],
+      "disputes": [],
+      "peer_recommendation": "keep"
+    }
+  },
+  "desired_decision": "not KEEP without a demonstrated gain",
+  "observed": {
+    "decision": "KEEP",
+    "reasons": [
+      "all mandatory criteria satisfied by qualifying evidence; no gate regressed; scope and safety held"
+    ]
+  },
+  "desired_behavior_met": false,
+  "controls": {
+    "mandatory_regression": {
+      "decision": "REVERT",
+      "reasons": [
+        "mandatory criteria failed: PRESERVE"
+      ]
+    },
+    "empty_diff": {
+      "decision": "REVERT",
+      "reasons": [
+        "builder produced no product change"
+      ]
+    }
+  },
+  "limitations": [
+    "Not a CLI/worktree reproduction",
+    "No environment or backend validation",
+    "Constructed valid-state assumptions do not prove reachability through every CLI gate"
+  ]
+}
