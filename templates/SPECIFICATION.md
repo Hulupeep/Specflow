@@ -92,7 +92,14 @@ user does not copy review messages or run three separate workflows.
    Codex model; its explicit CLI selection is recorded separately from served
    model telemetry. No automatic model selection is introduced.
 6. Fix evidenced findings and re-review within the initial-plus-one-repair
-   allowance. Then run `node scripts/specflow-specification.cjs promote RECORD
+   allowance. Invalid native peer responses are retained as `protocol_failed`
+   and do not consume this substantive allowance or establish acceptance. Three
+   consecutive protocol failures block the issue/tier across hosts and run names;
+   a validated scoped review clears that streak. Correcting a rejected response
+   may retry the same scope. A substantive re-review still needs changed evidence.
+   A fully verified preparation peer returns `complete` with no next steps:
+   `finish` and promotion are subsequent builder actions, not repair instructions.
+   Then run `node scripts/specflow-specification.cjs promote RECORD
    build-ready "why this slice is needed now"` (or `contracted`). Promotion
    checks the current source, dependencies, review and the same raw gates,
    records the transaction, and updates only this issue's depth label. It does
@@ -106,6 +113,11 @@ After verifying the process ended, record it with `review-failed RECORD TIER
 "observed interruption and evidence location"`; this retains previous findings,
 never resets the budget and never supplies acceptance. A lock whose process
 status cannot be established stays blocked for explicit recovery.
+Legacy failed reservations remain charged: absence of a validated result alone
+does not prove a protocol rejection. This change neither rewrites past allowances
+nor upgrades an active run's pinned runtime. Preserve exhausted runs and escalate
+their retained records; do not rename a run, edit its ledger or start a replacement
+to bypass a limit. A live independent pass is still required for promotion.
 
 ## Learn before deepening
 

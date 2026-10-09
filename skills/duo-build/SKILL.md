@@ -244,6 +244,15 @@ New invalid/interrupted peer responses have a separate cap of three consecutive
 failures. They retain raw records and the last validated continuation but cannot
 verify criteria or consume validated product repair rounds. A valid review clears
 only that failure streak. Existing recorded budgets are preserved on resume.
+For scoped preparation, helper-rejected native responses are also recorded as
+`protocol_failed` in the shared issue/tier journal. They do not consume the
+initial-plus-one-repair specification allowance, but three consecutive failures
+block that issue/tier even after changing run names or hosts. A validated scoped
+review clears the shared streak. Unknown historical failures remain charged;
+never edit old journals or pinned runtimes to manufacture another allowance.
+When preparation is fully verified, return complete with no next steps. The
+builder runs finish and then specification promotion; promotion is not another
+peer-directed repair task.
 
 Finally run `node scripts/duo-build.cjs finish <id> --session <token>`.
 It refuses completion until every required indexed row has fresh peer-verified

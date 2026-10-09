@@ -24,13 +24,24 @@ function change(root, number, action) {
     return result;
   } finally { fs.rmSync(lock, { recursive: true }); }
 }
+function budget(rounds = []) {
+  let protocolFailures = 0;
+  for (const round of rounds.slice().reverse()) {
+    if (round.status !== 'protocol_failed') break;
+    protocolFailures++;
+  }
+  return { attempts: rounds.filter(r => r.status !== 'protocol_failed').length, protocolFailures };
+}
+const previousReview = rounds => rounds.findLast(r => r.status !== 'protocol_failed');
 function begin(root, record, tier, builder) {
   if (!['contracted', 'build-ready'].includes(tier)) throw Error('Thin work has no automatic adversary or pre-flight round');
   if (!['codex', 'claude-code'].includes(builder)) throw Error('Unknown review builder');
   return change(root, record.issue.number, state => {
     const rounds = state.reviews[tier] ||= [];
-    if (rounds.length >= 2) throw Error(`${tier} review limit reached: initial review plus one repair/regrade. Escalate retained findings; renaming a run or switching hosts cannot reset it.`);
-    const previous = rounds.at(-1), scope = policy.inputHash(record);
+    const allowance = budget(rounds);
+    if (allowance.protocolFailures >= 3) throw Error(`${tier} protocol failure limit reached (3); inspect retained raw responses. Changing hosts, scope or run names cannot reset it.`);
+    if (allowance.attempts >= 2) throw Error(`${tier} review limit reached: initial review plus one repair/regrade. Escalate retained findings; renaming a run or switching hosts cannot reset it.`);
+    const previous = previousReview(rounds), scope = policy.inputHash(record);
     if (previous?.status === 'pending') throw Error('Prior scoped review is unfinished; retain it and record the failure before continuing');
     if (previous?.outcome === 'escalated') throw Error('Repair-induced findings require escalation, not another automatic review');
     if (previous?.scope === scope) throw Error('No new evidence or scope change since the last review; stop instead of repeating it');
@@ -90,12 +101,13 @@ function complete(root, reservation, report) {
     return structuredClone(round);
   });
 }
-function fail(root, reservation, reason) {
+function fail(root, reservation, reason, { kind = 'interrupted' } = {}) {
+  if (!['interrupted', 'protocol'].includes(kind)) throw Error('Unknown review failure kind');
   return change(root, reservation.number, state => {
     const round = state.reviews[reservation.tier]?.find(r => r.id === reservation.id);
     if (!round || round.status !== 'pending') throw Error('No matching unfinished review');
     const prior = state.reviews[reservation.tier][state.reviews[reservation.tier].indexOf(round)-1];
-    Object.assign(round, { status: 'complete', outcome: 'blocked', errors: [reason], findings: structuredClone(prior?.findings || []), identity: null });
+    Object.assign(round, { status: kind === 'protocol' ? 'protocol_failed' : 'complete', outcome: 'blocked', errors: [reason], findings: structuredClone(prior?.findings || []), identity: null, atEnd: new Date().toISOString() });
     return structuredClone(round);
   });
 }
@@ -110,16 +122,17 @@ function latest(root, record, tier) {
 }
 function status(root, record, tier) {
   const state = load(root, record.issue.number), round = state.reviews[tier]?.at(-1);
+  const allowance = budget(state.reviews[tier]);
   const exception = state.events.filter(e => e.kind === 'owner-exception' && e.scope === policy.inputHash(record)).at(-1);
-  if (exception) return { status: exception.status, passed: false, attempts: state.reviews[tier]?.length || 0 };
-  if (round && round.scope !== policy.inputHash(record)) return { status: 'fixed as specified, not re-graded', passed: false, attempts: state.reviews[tier].length };
-  try { const accepted = latest(root, record, tier); return { status: accepted.outcome, passed: accepted.identity?.mode === 'live', attempts: state.reviews[tier].length, identity: accepted.identity }; }
-  catch (error) { return { status: 'blocked', passed: false, attempts: state.reviews[tier]?.length || 0, reason: error.message }; }
+  if (exception) return { status: exception.status, passed: false, ...allowance };
+  if (round && round.scope !== policy.inputHash(record)) return { status: 'fixed as specified, not re-graded', passed: false, ...allowance };
+  try { const accepted = latest(root, record, tier); return { status: accepted.outcome, passed: accepted.identity?.mode === 'live', ...allowance, identity: accepted.identity }; }
+  catch (error) { return { status: 'blocked', passed: false, ...allowance, reason: error.message }; }
 }
 function stageGate(root, record, stage) {
   const tier = stage === 'adversary' ? 'contracted' : 'build-ready';
   if (!record?.issue?.number) return { status: 'blocked', passed: false, reason: 'Bind the selected issue before scoped review' };
   const result = status(root, record, tier);
-  return { ...result, tier, next_action: result.passed ? 'Advance using the accepted scoped review' : result.attempts >= 2 ? 'Review budget exhausted: escalate retained findings; do not launch another reviewer' : 'The builder must run scoped Duo preparation with specification.targetTier; its native peer call consumes the shared issue/tier reservation. Return here after the receipt is recorded.' };
+  return { ...result, tier, next_action: result.passed ? 'Advance using the accepted scoped review' : result.protocolFailures >= 3 ? 'Scoped protocol failure limit reached (3): inspect retained responses; do not launch another reviewer' : result.attempts >= 2 ? 'Review budget exhausted: escalate retained findings; do not launch another reviewer' : 'The builder must run scoped Duo preparation with specification.targetTier; its native peer call consumes the shared issue/tier reservation. Return here after the receipt is recorded.' };
 }
 module.exports = { statePath, load, change, begin, complete, fail, latest, classify, status, stageGate };
