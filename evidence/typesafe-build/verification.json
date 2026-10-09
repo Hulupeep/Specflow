@@ -1,0 +1,8 @@
+{
+  "kind": "Delivery proof verification; no provider predictions, quality metrics, latency or cost published",
+  "liveEvaluation": "private live report and zero-network replay structurally verified",
+  "corpus": "50 evidence cases and 20 repair cases; independently adjudicated before live held-out inference",
+  "liveWorkflow": "actual Codex rejection, corrected execution, actual Claude acceptance, provider-unavailable and recovery paths",
+  "boundaries": "synthetic project and host-selection harness; real peer CLIs and API; no human Claude interactive session claimed",
+  "release": "not yet committed, merged, published to npm, deployed or customer-validated"
+}

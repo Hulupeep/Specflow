@@ -1,0 +1,94 @@
+{
+  "method": "Independent Claude CLI, blind to expected labels and TypeSafe predictions. One ambiguous case retained outside scored corpus before provider evaluation. No provider answers or benchmark metrics in this record.",
+  "sourceHash": "50bc6584599d05aa3aabfdfd9ef9a3c7e2f83c9d0a2eb4814cc49c57f0784f91",
+  "cases": [
+    {
+      "id": "claude-complete-unrelated",
+      "support": "insufficient",
+      "coverage": "none",
+      "execution": "passed",
+      "rationale": "Claim asserts the displayed total is verified as 'Total: 42', but the only evidence is a passing component test of core.cjs's return value; nothing exercises the printed display output, so the claim is neither established nor refuted. Coverage: the supplied assertion checks core.cjs()===42, an internal value, not the scoped outcome of the display printing 'Total: 42' plus newline, so it checks zero required outcomes. Execution: the current capture identifies 'node component-test.cjs' with exit 0 and '1 passed; 0 skipped', so that specific check ran and passed.",
+      "ambiguous": false
+    },
+    {
+      "id": "claude-complete-incorrect",
+      "support": "contradicts",
+      "coverage": "none",
+      "execution": "insufficient",
+      "rationale": "Claim is a product-behavior claim ('The display printed Total: 42'); the current run of display.cjs exits 0 with stdout 'Total: 41\\n', an executed incompatible result for exactly this claim. Coverage: the supplied assertion is the component test on core.cjs's return value, which checks none of the scoped display-output outcomes. Execution: the only capture is 'node display.cjs', not the component-test check represented by the assertion, so there is no execution proof for the selected check.",
+      "ambiguous": false
+    },
+    {
+      "id": "claude-complete-verified",
+      "support": "supports",
+      "coverage": "full",
+      "execution": "passed",
+      "rationale": "Coverage: the assertion spawns display.cjs and asserts status 0, empty stderr, and stdout exactly 'Total: 42\\n', covering every scoped outcome including the prominent value and the trailing newline. Execution: the current capture 'node display-test.cjs' exits 0 with 'display: 1 passed; 0 skipped', identifying this check as executed and passing with no conflicting current result. Support: the claim is about test execution and content, and the current evidence establishes exactly that verification level.",
+      "ambiguous": false
+    },
+    {
+      "id": "codex-complete-unrelated",
+      "support": "insufficient",
+      "coverage": "none",
+      "execution": "passed",
+      "rationale": "Same structure as the claude variant: the passing component test only verifies core.cjs()===42, so the claim that the displayed total is verified as 'Total: 42' is unproven and unrefuted by this evidence. Coverage: the assertion targets an internal return value, not the display's printed text and newline, so no scoped outcome would be checked. Execution: the current capture identifies 'node component-test.cjs', exit 0, '1 passed; 0 skipped', so the selected check executed and passed.",
+      "ambiguous": false
+    },
+    {
+      "id": "codex-complete-incorrect",
+      "support": "contradicts",
+      "coverage": "none",
+      "execution": "insufficient",
+      "rationale": "The current capture of 'node display.cjs' prints 'Total: 41\\n', an executed result incompatible with the claim that the display printed 'Total: 42'. Coverage: the supplied assertion is the core-value component test, which checks none of the scoped display-output outcomes. Execution: no current capture identifies the component-test check running; the available run is a different command, so execution of the selected check cannot be established.",
+      "ambiguous": false
+    },
+    {
+      "id": "codex-complete-verified",
+      "support": "supports",
+      "coverage": "full",
+      "execution": "passed",
+      "rationale": "Coverage: the assertion spawns display.cjs and asserts no spawn error, status 0, empty stderr, and stdout exactly 'Total: 42\\n', covering all scoped outcomes including the exact value and newline. Execution: current capture 'node display-test.cjs' exits 0 with 'display: 1 passed; 0 skipped', identifying this check as executed and passing with no conflicting current result. Support: the claim is exactly that this display test executed and passed checking Total: 42, which the current evidence establishes.",
+      "ambiguous": false
+    },
+    {
+      "id": "reset-absent-edge",
+      "support": "insufficient",
+      "coverage": "insufficient",
+      "execution": "insufficient",
+      "rationale": "Coverage: the assertion field is an explicit statement that no reset journey assertion was supplied, which is missing assertion content rather than an unrelated assertion, so no judgement of what would be checked is possible. Execution: with no identified check and only unrelated unit tests reported, there is no execution proof. Support: unrelated results cannot establish or refute 'Reset journey passed'.",
+      "ambiguous": false
+    },
+    {
+      "id": "attachment-edge",
+      "support": "insufficient",
+      "coverage": "insufficient",
+      "execution": "insufficient",
+      "rationale": "Coverage: 'No byte assertion supplied' is absent assertion content, which belongs in insufficient rather than none. Execution: only upload was tested, so the download-bytes check is not identified as executed, skipped, or blocked. Support: an upload-only test is unrelated to the criterion that download returns the expected file bytes, so the claim is neither proven nor disproven.",
+      "ambiguous": false
+    },
+    {
+      "id": "signup-skipped-edge",
+      "support": "insufficient",
+      "coverage": "full",
+      "execution": "not_executed",
+      "rationale": "Coverage: judged on the assertion source alone, 'assert account exists after submit' would, if executed, check the scoped outcome that the signup journey creates an account; the skip does not change this. Execution: evidence explicitly reports the signup journey skipped with zero executed, which identifies this check as not run. Support: a skipped journey cannot establish 'Signup is verified', and per the rubric the skip must not be read as product failure either.",
+      "ambiguous": false
+    },
+    {
+      "id": "unrelated-search-edge",
+      "support": "insufficient",
+      "coverage": "full",
+      "execution": "insufficient",
+      "rationale": "Coverage: 'assert matching invoice visible' directly checks the criterion's scoped outcome that search returns the matching invoice, and run outcome is ignored for this question. Execution: the only reported result is a passing calendar rendering test, which does not identify the invoice-search check as having run; an unrelated green job is not execution evidence. Support: unrelated passing results cannot establish 'Invoice search works'.",
+      "ambiguous": false
+    },
+    {
+      "id": "fixture-auth-edge",
+      "support": "insufficient",
+      "coverage": "partial",
+      "execution": "not_executed",
+      "rationale": "Coverage: 'assert balance panel visible' checks that the balance panel is displayed, one required part, but omits that the panel shows the authenticated employee's own balance, so it is partial; a 'none' reading is defensible since presence-only checks are close to the existence-only case, but the criterion names no specific value, so partial fits better. Execution: login failed with an expired fixture token and the balance page was never reached, a prerequisite failure before the check ran. Support: the claim asserts the balance code is broken, but a blocked run proves only a fixture/auth problem, and product failure must not be inferred from a check that never executed.",
+      "ambiguous": true
+    }
+  ]
+}

@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 TARGET_DIR="$1"
 SPECFLOW_RUNTIME_ARG=""
 REPLACE_ROUTING=false
+DUO_PARENT_LOCK=false
 PREV_ARG=""
 for arg in "$@"; do
   if [ "$PREV_ARG" = "--runtime" ]; then
@@ -22,6 +23,8 @@ for arg in "$@"; do
     PREV_ARG=""
   elif [ "$arg" = "--runtime" ]; then
     PREV_ARG="--runtime"
+  elif [ "$arg" = "--duo-lock-held" ]; then
+    DUO_PARENT_LOCK=true
   elif [ "$arg" = "--replace-routing" ]; then
     REPLACE_ROUTING=true
   fi
@@ -55,6 +58,36 @@ prompt_model_routing() {
 
 # Determine source directory (where this script lives)
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# A downloaded hooks-only script cannot stage or verify managed duo bytes.
+# Existing run history requires the full kit installer, including for legacy runs.
+if [ ! -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ] && compgen -G "$TARGET_DIR/.specflow/duo/*/run.json" > /dev/null; then
+  echo "Full Specflow kit required: hooks-only installation cannot safely update an existing duo project. Run the installer from the complete package or checkout." >&2
+  exit 2
+fi
+
+# Duo updates are transactions; unfinished runs stage updates before any kit mutation.
+if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
+  mkdir -p "$TARGET_DIR/.specflow/duo"
+  DUO_INSTALL_LOCK="$TARGET_DIR/.specflow/duo/installer.lock"
+  if [ "$DUO_PARENT_LOCK" = true ]; then
+    # setup-project.sh owns the transaction; only its direct child may reuse it.
+    # Do not reacquire, reinstall runtime bytes, or remove the parent's lock.
+    [ -f "$DUO_INSTALL_LOCK/pid" ] && [ "$(cat "$DUO_INSTALL_LOCK/pid")" = "$PPID" ] || {
+      echo "Inherited Duo installer lock is not owned by the parent process" >&2
+      exit 2
+    }
+  else
+    mkdir "$DUO_INSTALL_LOCK" || { echo "Duo installation/start lock active; inspect its owner before recovery" >&2; exit 2; }
+    echo "$$" > "$DUO_INSTALL_LOCK/pid"
+    trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
+    duo_install_exit=0
+    node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+    [ "$duo_install_exit" -eq 10 ] && exit 0
+    [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
+  fi
+fi
+
 HOOKS_DIR="$SCRIPT_DIR/hooks"
 
 # Check if running from Specflow repo or via curl
@@ -70,7 +103,7 @@ else
   TEMPLATES_URL="https://raw.githubusercontent.com/Hulupeep/Specflow/main/templates/hooks"
 
   # NOTE: This list must be updated when new hooks are added to hooks/
-  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh check-pipeline-compliance.sh commit-msg pre-push README.md; do
+  for file in settings.json post-build-check.sh run-journey-tests.sh session-start.sh model-switch-hook.sh check-pipeline-compliance.sh duo-review-check.sh commit-msg pre-push README.md; do
     curl -fsSL "$BASE_URL/$file" -o "$HOOKS_DIR/$file" 2>/dev/null || {
       echo -e "${YELLOW}Warning: Could not download $file${NC}"
     }
@@ -129,6 +162,7 @@ echo -e "${BLUE}[3/6]${NC} Installing hook files..."
 for script in "$HOOKS_DIR"/*.sh; do
   [ -f "$script" ] || continue
   SCRIPT_NAME=$(basename "$script")
+  [ "$(basename "$script")" = "duo-review-check.sh" ] && [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ] && continue
   cp "$script" "$TARGET_DIR/.claude/hooks/"
   chmod +x "$TARGET_DIR/.claude/hooks/$SCRIPT_NAME"
   echo -e "${GREEN}✓${NC} Installed .claude/hooks/$SCRIPT_NAME"
@@ -188,8 +222,11 @@ if [ -f "$TARGET_DIR/.claude/settings.json" ]; then
     if jq -s '
       (.[0].hooks.PostToolUse // []) as $existing |
       (.[1].hooks.PostToolUse // []) as $new |
+      (.[0].hooks.Stop // []) as $existingStop |
+      (.[1].hooks.Stop // []) as $newStop |
       .[0] * .[1] |
-      .hooks.PostToolUse = ($existing + $new | unique_by([.matcher, (.hooks[0].command // "")]))
+      .hooks.PostToolUse = ($existing + $new | unique_by([.matcher, (.hooks[0].command // "")])) |
+      .hooks.Stop = ($existingStop + $newStop | unique)
     ' "$TARGET_DIR/.claude/settings.json" "$HOOKS_DIR/settings.json" > "$TEMP_SETTINGS"; then
       mv "$TEMP_SETTINGS" "$TARGET_DIR/.claude/settings.json"
       echo -e "${GREEN}✓${NC} Merged hooks into existing settings.json (preserved existing hooks)"
@@ -230,34 +267,36 @@ if [ -d "$SCRIPT_DIR/templates/QA" ]; then
     cp -a "$SCRIPT_DIR/templates/PROCESS.md" "$TARGET_DIR/PROCESS.md"
     echo -e "${GREEN}✓${NC} Refreshed PROCESS.md"
   fi
+  cp -a "$SCRIPT_DIR/templates/SPECIFICATION.md" "$TARGET_DIR/SPECIFICATION.md"
 fi
 if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
   mkdir -p "$TARGET_DIR/scripts"
   for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+    case "$(basename "$script")" in specflow-tier.cjs|specflow-specification.cjs|specflow-volume.cjs|specflow-publication.cjs|specflow-reviews.cjs|typesafe-effort-analysis.cjs|typesafe-effort-trial.cjs|typesafe-routing.cjs|typesafe-routing-bridge.cjs|duo-review-receipts.cjs|typesafe-evidence.cjs|typesafe-questions-v1.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
   done
   REFRESHED_KIT=true
 fi
 if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
-  if [ ! -f "$TARGET_DIR/AGENTS.md" ]; then
-    cp -a "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Installed AGENTS.md"
-  elif ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
-    {
-      echo ""
-      cat "$SCRIPT_DIR/templates/AGENTS.md"
-    } >> "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
-  else
-    echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
+  NEEDS_LEGACY_SPEC_POLICY=false
+  if [ -f "$TARGET_DIR/AGENTS.md" ] && grep -q 'Specflow Loop Routing' "$TARGET_DIR/AGENTS.md" && ! grep -q 'Progressive specification policy' "$TARGET_DIR/AGENTS.md"; then
+    NEEDS_LEGACY_SPEC_POLICY=true
   fi
+  node "$SCRIPT_DIR/scripts/install-agent-instructions.cjs" \
+    "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md" || exit 1
+  if [ "$NEEDS_LEGACY_SPEC_POLICY" = true ]; then
+    printf '\n## Progressive specification policy\n\nRead SPECIFICATION.md before creating, simulating, auditing or building tickets. The installed tier helper determines applicable depth. Reconcile legacy universal simulation instructions explicitly; a label alone never proves readiness.\n' >> "$TARGET_DIR/AGENTS.md"
+    echo -e "${YELLOW}⚠️${NC} Existing AGENTS.md retained. Reconcile legacy simulation instructions using SPECIFICATION.md and reload the agent session."
+  fi
+  echo -e "${GREEN}✓${NC} Refreshed AGENTS.md work routing (project instructions preserved)"
   REFRESHED_KIT=true
 fi
 if [ -d "$SCRIPT_DIR/skills" ]; then
   for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do
     mkdir -p "$TARGET_DIR/$skill_target"
     for skill_dir in "$SCRIPT_DIR/skills/"*; do
+      [ "$(basename "$skill_dir")" = "duo-build" ] && continue
       if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
         rm -rf "$TARGET_DIR/$skill_target/$(basename "$skill_dir")"
         cp -a "$skill_dir" "$TARGET_DIR/$skill_target/"
@@ -267,8 +306,23 @@ if [ -d "$SCRIPT_DIR/skills" ]; then
   done
   REFRESHED_KIT=true
 fi
+if [ -d "$SCRIPT_DIR/agents" ]; then
+  mkdir -p "$TARGET_DIR/scripts/agents"
+  cp -a "$SCRIPT_DIR/agents/." "$TARGET_DIR/scripts/agents/"
+fi
 if [ "$REFRESHED_KIT" = false ]; then
   echo -e "${YELLOW}⚠️${NC}  QA kit/scripts not in source (curl install?) — run 'specflow init' from the package to install them"
+fi
+
+# Tier labels are planning metadata, not readiness evidence. Never rewrite an
+# existing label, unrelated label or issue body. Offline installs stay usable
+# for local planning and explicitly report the unavailable GitHub setup.
+if [ -f "$TARGET_DIR/scripts/specflow-tier.cjs" ]; then
+  if ! (cd "$TARGET_DIR" && node scripts/specflow-tier.cjs install-labels); then
+    echo -e "${YELLOW}⚠️${NC} Tier labels unavailable: run 'node scripts/specflow-tier.cjs install-labels' after restoring GitHub access. Unlabelled tickets remain thin."
+  fi
+else
+  echo -e "${YELLOW}⚠️${NC} Tier policy unavailable or staged for unfinished Duo runs. Legacy runs retain their pinned rules and cannot claim the new tier gate; reload after applying the staged installation."
 fi
 
 ADAPTER_POLICY_DIR="$SCRIPT_DIR/templates/adapter-policies"

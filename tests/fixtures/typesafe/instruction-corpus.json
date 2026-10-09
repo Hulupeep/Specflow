@@ -1,0 +1,451 @@
+{
+  "version": "instruction-1",
+  "limitations": [
+    "Small synthetic evaluation; does not establish production calibration or a universal confidence threshold.",
+    "Broad/scoped variants share held-out families and have evidence-specific labels. Compare evidence utility separately from accuracy."
+  ],
+  "cases": [
+    {
+      "id": "total-proof-broad",
+      "family": "total-proof",
+      "split": "development",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "total-proof",
+          "criterion": "Customer total is42",
+          "doneWhen": "Customer total is42"
+        },
+        "claim": "The displayed total is42",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "total-proof-instruction",
+      "family": "total-proof",
+      "split": "development",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "total-proof",
+          "criterion": "Customer total is42",
+          "doneWhen": "Customer total is42"
+        },
+        "claim": "The displayed total is42",
+        "evidence": [
+          "Current command output is Total:42; exact assertion passed"
+        ]
+      },
+      "labels": {
+        "relevance": "relevant",
+        "support": "supports"
+      }
+    },
+    {
+      "id": "auth-green-broad",
+      "family": "auth-green",
+      "split": "development",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "auth-green",
+          "criterion": "Observe actual live consent",
+          "doneWhen": "Observe actual live consent"
+        },
+        "claim": "Live consent works",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "auth-green-instruction",
+      "family": "auth-green",
+      "split": "development",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "auth-green",
+          "criterion": "Observe actual live consent",
+          "doneWhen": "Observe actual live consent"
+        },
+        "claim": "Live consent works",
+        "evidence": [
+          "7 unit tests passed; no real account connected"
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "absent-broad",
+      "family": "absent",
+      "split": "development",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "absent",
+          "criterion": "Observe request diagnostic",
+          "doneWhen": "Observe request diagnostic"
+        },
+        "claim": "The cause is confirmed",
+        "evidence": []
+      },
+      "labels": {
+        "relevance": "insufficient",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "absent-instruction",
+      "family": "absent",
+      "split": "development",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "absent",
+          "criterion": "Observe request diagnostic",
+          "doneWhen": "Observe request diagnostic"
+        },
+        "claim": "The cause is confirmed",
+        "evidence": []
+      },
+      "labels": {
+        "relevance": "insufficient",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "sheet-proof-broad",
+      "family": "sheet-proof",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "sheet-proof",
+          "criterion": "Write and read the same test row in a personal Sheet",
+          "doneWhen": "Write and read the same test row in a personal Sheet"
+        },
+        "claim": "The actual round trip succeeded",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "sheet-proof-instruction",
+      "family": "sheet-proof",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "sheet-proof",
+          "criterion": "Write and read the same test row in a personal Sheet",
+          "doneWhen": "Write and read the same test row in a personal Sheet"
+        },
+        "claim": "The actual round trip succeeded",
+        "evidence": [
+          "Current integration capture: wrote row marker X and read identical marker X; assertion passed"
+        ]
+      },
+      "labels": {
+        "relevance": "relevant",
+        "support": "supports"
+      }
+    },
+    {
+      "id": "gmail-unrelated-broad",
+      "family": "gmail-unrelated",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "gmail-unrelated",
+          "criterion": "Observe live read-only Gmail consent",
+          "doneWhen": "Observe live read-only Gmail consent"
+        },
+        "claim": "Gmail consent works",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "gmail-unrelated-instruction",
+      "family": "gmail-unrelated",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "gmail-unrelated",
+          "criterion": "Observe live read-only Gmail consent",
+          "doneWhen": "Observe live read-only Gmail consent"
+        },
+        "claim": "Gmail consent works",
+        "evidence": [
+          "400 component tests passed in a synthetic test environment; no owner browser available"
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "request-failed-broad",
+      "family": "request-failed",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "request-failed",
+          "criterion": "Request permitted account data successfully",
+          "doneWhen": "Request permitted account data successfully"
+        },
+        "claim": "The request succeeded",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "request-failed-instruction",
+      "family": "request-failed",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "request-failed",
+          "criterion": "Request permitted account data successfully",
+          "doneWhen": "Request permitted account data successfully"
+        },
+        "claim": "The request succeeded",
+        "evidence": [
+          "Actual request returned HTTP401, invalid authentication; no data received"
+        ]
+      },
+      "labels": {
+        "relevance": "relevant",
+        "support": "contradicts"
+      }
+    },
+    {
+      "id": "stale-run-broad",
+      "family": "stale-run",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "stale-run",
+          "criterion": "Observe result on the current deployment",
+          "doneWhen": "Observe result on the current deployment"
+        },
+        "claim": "Current deployment works",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "stale-run-instruction",
+      "family": "stale-run",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "stale-run",
+          "criterion": "Observe result on the current deployment",
+          "doneWhen": "Observe result on the current deployment"
+        },
+        "claim": "Current deployment works",
+        "evidence": [
+          "Only evidence from a previous deployment; current deployment not tested"
+        ]
+      },
+      "labels": {
+        "relevance": "insufficient",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "replacement-broad",
+      "family": "replacement",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "replacement",
+          "criterion": "Verify actual customer command prints42",
+          "doneWhen": "Verify actual customer command prints42"
+        },
+        "claim": "Equivalent command test proves the goal",
+        "evidence": [
+          "Unrelated component tests: 90 passed; no requested operation executed."
+        ]
+      },
+      "labels": {
+        "relevance": "mismatched",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "replacement-instruction",
+      "family": "replacement",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "replacement",
+          "criterion": "Verify actual customer command prints42",
+          "doneWhen": "Verify actual customer command prints42"
+        },
+        "claim": "Equivalent command test proves the goal",
+        "evidence": [
+          "Current direct invocation of customer command prints42, asserted exact stdout; equivalent route replaces the old test wrapper"
+        ]
+      },
+      "labels": {
+        "relevance": "relevant",
+        "support": "supports"
+      }
+    },
+    {
+      "id": "missing-live-broad",
+      "family": "missing-live",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "broad",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "missing-live",
+          "criterion": "Observe owner-approved live access",
+          "doneWhen": "Observe owner-approved live access"
+        },
+        "claim": "Owner access verified",
+        "evidence": []
+      },
+      "labels": {
+        "relevance": "insufficient",
+        "support": "insufficient"
+      }
+    },
+    {
+      "id": "missing-live-instruction",
+      "family": "missing-live",
+      "split": "heldout",
+      "kind": "instruction",
+      "selection": "instruction",
+      "origin": "seeded",
+      "source": "Synthetic cases for #154; no customer or mailbox content",
+      "rationale": "Same instruction with separately labelled broad/scoped evidence; no assumption that selection improves model accuracy",
+      "state": {
+        "instruction": {
+          "id": "missing-live",
+          "criterion": "Observe owner-approved live access",
+          "doneWhen": "Observe owner-approved live access"
+        },
+        "claim": "Owner access verified",
+        "evidence": []
+      },
+      "labels": {
+        "relevance": "insufficient",
+        "support": "insufficient"
+      }
+    }
+  ]
+}

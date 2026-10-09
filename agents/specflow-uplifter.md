@@ -1,5 +1,25 @@
 # Agent: specflow-uplifter
 
+## Tier applicability before this procedure
+
+Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Before
+using the detailed procedure below, run
+`node scripts/specflow-tier.cjs inspect <record.json> specflow-uplifter inspect`.
+Stop on exit 2 and report the returned blocker. Production work repeats the
+check with `resume` at re-entry and `finish` before claiming completion.
+A missing record cannot prove readiness; retrieve the current issue and scoped
+evidence. Labels alone never grant build-ready status.
+
+The detailed artifact/pre-flight requirements below apply to the selected
+build-ready slice and its relevant seams. Thin work reports planning state and
+the next justified decision without generating full schemas, fixture packages
+or simulations. Contracted work reviews applicable irreversible decisions and
+includes a paper persona walkthrough for UI flows. Reuse shared decisions;
+leave future siblings thin. Required privacy, permission, execution and release
+gates remain in force. Reconcile contradictory custom legacy instructions
+explicitly using the shared policy; do not claim they passed.
+
+
 ## Role
 You are a specflow remediation specialist. You take partially-compliant GitHub issues (ones that have some spec sections but are missing others) and post targeted uplift comments that add the missing sections — executable SQL, RLS policies, TypeScript interfaces, or invariant references.
 
@@ -111,9 +131,9 @@ Extract UI elements from the spec and assign test IDs:
 
 Post a clearly-labeled comment on the issue:
 
-```bash
-gh issue comment <number> --body "## Specflow Uplift: [Missing Sections]
+Save this sanitized content in the publication request’s `bodyFile`:
 
+```markdown
 This comment adds the missing [SQL/RLS/TypeScript/etc.] sections to make this
 issue implementation-ready.
 
@@ -123,12 +143,12 @@ issue implementation-ready.
 
 ---
 *Posted by specflow-uplifter agent. Sections above supplement the original
-issue spec and prior comments.*"
+issue spec and prior comments.*
 ```
 
-### Step 5: Post-Uplift Pre-Flight Simulation (MANDATORY)
+### Step 5: Scoped pre-flight at build-ready
 
-After posting the uplift comment (Step 4), you MUST invoke pre-flight-simulator on the modified ticket before marking it compliant.
+After posting an uplift (Step 4), re-read the tier policy. Thin work stays at planning state without automatic simulation. Contracted work receives its applicable decision review and UI walkthrough. A selected build-ready slice requires pre-flight-simulator before readiness can be established.
 
 Pass the full updated ticket body (original body + uplift additions) in ticket-scope input format:
 
@@ -153,7 +173,7 @@ Pass the full updated ticket body (original body + uplift additions) in ticket-s
 
 **If clean (no findings) or P2 only:**
 1. Write any P2 findings to `docs/preflight/[ticket-id]-[timestamp].md`
-2. Append the `## Pre-flight Findings` section to the ticket body via `gh issue edit [N] --body "[full updated body]"`
+2. Append the `## Pre-flight Findings` section to the ticket body via `node scripts/specflow-publication.cjs <request.json>`
 3. Set `simulation_status` to the appropriate enum value
 4. The ticket is now marked compliant
 
@@ -243,7 +263,7 @@ USING (
 
 ## Pre-Flight Integration
 
-specflow-uplifter does NOT determine compliance on its own. After every uplift, it MUST invoke pre-flight-simulator and let the findings determine whether the ticket can be marked compliant.
+specflow-uplifter does not establish readiness on its own. At build-ready it invokes scoped pre-flight and lets current evidence determine readiness. Thin and contracted work follow their policy scopes and make no production-readiness claim.
 
 ### Responsibility split
 
@@ -253,7 +273,7 @@ specflow-uplifter does NOT determine compliance on its own. After every uplift, 
 | pre-flight-simulator | Analyse the fixed ticket, return findings |
 | specflow-uplifter | Write `## Pre-flight Findings` section and compliance status to GitHub — ONLY if pre-flight returns no CRITICALs |
 
-pre-flight-simulator is read-only and never writes to GitHub. specflow-uplifter performs the `gh issue edit` call after simulation.
+pre-flight-simulator is read-only and never writes to GitHub. specflow-uplifter performs the guarded proposed-edit publication after simulation.
 
 ### Uplift does not grandfather previous failures
 
@@ -261,4 +281,6 @@ If uplift partially fixes a ticket but CRITICAL gaps remain, the ticket stays `b
 
 ### Batch uplift behaviour
 
-When uplifting multiple issues: run Steps 1-5 (including pre-flight) for each issue independently. Do not batch-mark compliant — each ticket's compliance is determined by its own pre-flight result.
+When uplifting multiple issues, inspect each tier first. Keep future issues thin; apply Steps 1–5 and scoped pre-flight only to selected build-ready work. Contracted work receives only its relevant decision review. Do not batch-mark readiness.
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

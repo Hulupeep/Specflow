@@ -1,0 +1,60 @@
+{
+  "simulation": "peer transport only; snapshot/git/helper real",
+  "request": {
+    "omittedPaths": [
+      "credentials.json"
+    ],
+    "acceptance": {
+      "AC-1": {
+        "id": "AC-1",
+        "source": "task.md",
+        "anchor": "AC-1: output equals 18",
+        "kind": "acceptance",
+        "status": "unverified",
+        "evidence": []
+      }
+    },
+    "open_findings": [],
+    "progress": null,
+    "target": "#138",
+    "snapshot": "7fdc2a87c12b656104498be84cd675d834f814e521e8b64f87f0cdc144f2caae",
+    "batch": {
+      "id": "fixture",
+      "scope": "Omission disclosure",
+      "criteria": [
+        "AC-1"
+      ],
+      "claims": [
+        "output 18"
+      ],
+      "assumptions": [],
+      "evidence": [
+        "raw.txt"
+      ],
+      "resolutions": []
+    },
+    "instructions": [],
+    "requiredReads": [
+      "goal.md",
+      "tree/task.md",
+      "tree/raw.txt",
+      "tree/goal.md",
+      "tree/task.md"
+    ],
+    "prior": [],
+    "context": {
+      "goal": "goal.md",
+      "task": "task.md",
+      "objective": "Verify output",
+      "finish": "Exact value",
+      "criteria": [
+        {
+          "id": "AC-1",
+          "source": "task.md",
+          "anchor": "AC-1: output equals 18",
+          "kind": "acceptance"
+        }
+      ]
+    }
+  }
+}

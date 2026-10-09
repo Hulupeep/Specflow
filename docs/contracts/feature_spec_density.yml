@@ -1,0 +1,38 @@
+contract_meta:
+  id: feature_spec_density
+  version: 2
+  created_from_spec: "GitHub #162–167"
+  covers_reqs: [AC-163-1, AC-163-2, AC-163-3, AC-163-4, AC-163-5, AC-163-6, AC-163-7, AC-165-2, AC-164-1, AC-164-5, AC-164-7, AC-166-1, AC-166-3, AC-167-1, AC-167-5]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_spec_density"
+invariants:
+  - id: I-DENSITY-001
+    rule: "Planning depth defaults to thin; conflicting labels block. A label alone never proves build readiness."
+  - id: I-DENSITY-002
+    rule: "Deepen only applicable evidence. Current reused artifacts count; required absent, stale, skipped or failing evidence cannot pass."
+  - id: I-DENSITY-003
+    rule: "Production eligibility is distinct from implementation, test, merge, deployment and customer validation status."
+  - id: I-DENSITY-004
+    rule: "Scoped specification review allows an initial review and one repair/regrade; issue/tier state survives host and run names. Unknown impact, required skips, missing evidence and incomplete scoped acceptance cannot pass."
+  - id: I-DENSITY-005
+    rule: "Promotion binds current scope, dependency capability, live scoped review and the same raw required gates; no recursive dependency promotion."
+  - id: I-DENSITY-006
+    rule: "Bounded experiments preserve all outcomes and limits without granting production readiness; unchanged repetition stops."
+  - id: I-DENSITY-007
+    rule: "Meaningful work reserves discovery collection before execution; missing collection or affected unresolved discoveries block subsequent production boundaries, even if remote publication fails."
+  - id: I-DENSITY-008
+    rule: "Specification volume includes linked maintained content and historical evidence separately. Size cannot establish readiness; existing identifiers cannot silently disappear or change meaning."
+  - id: I-DENSITY-009
+    rule: "Publication requires the project mechanical privacy gate and applicable real baseline canary; model-written overrides cannot supply owner authority."
+test_hooks:
+  tests:
+    - file: tests/contracts/spec-density-policy.test.js
+    - file: tests/contracts/spec-density-reviews.test.js
+    - file: tests/contracts/spec-density-alignment.test.js
+    - file: tests/hooks/spec-density-install.test.js
+    - file: tests/contracts/spec-density-workflow.test.js
+    - file: tests/contracts/spec-density-volume.test.js
+    - file: tests/contracts/spec-density-publication.test.js

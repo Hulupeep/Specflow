@@ -6,6 +6,19 @@ All notable changes to `@colmbyrne/specflow`.
 
 ---
 
+## Unreleased
+
+**`specflow improve --once` — first learning slice (#171, #174, #176; minimum #173/#175/#178).**
+
+- **Frozen ImprovementContract** with evidence strength (1 deterministic, 2 behavioural journey, 3 heuristic, 4 judgment). Level 1–2 evidence only comes from checks frozen with the contract. Judgment can never satisfy a deterministic criterion. The version frozen before implementation governs the decision.
+- **Isolated workspace and guardrails**: base and improvement worktrees are built on the runner's `prepareWorktree`. Prohibited side effects are classified and blocked before execution. Secrets are scrubbed from command environments. Diff scope and protected paths are enforced. Base ref is never moved.
+- **KEEP / REVERT / INCONCLUSIVE** is a pure function of recorded evidence. The builder claim is recorded as divergence and never decides. REVERT and INCONCLUSIVE keep a patch and their evidence, but no product change.
+- **Hash-chained improvement ledger** and a human report that leads with the product result, then models, measured versus unknown cost, and the next human decision.
+- Runner: `runAdapter` accepts `cwd`/`env`; claude-print reads `total_cost_usd`; the prompt follows `--` so variadic tool flags no longer swallow it.
+- First real run against HeyStax (TabStax web app): truthful **REVERT**. See `evidence/improve-core/`.
+
+---
+
 ## 0.11.0 (2026-07-02)
 
 **Enforced runtime verifier + long-run trust primitives.** The trust layer that decides what ships is now enforced end-to-end, not just described. Fable can carry the work; Specflow carries the trust.

@@ -1,6 +1,6 @@
 # Example — feature-build for a TT-ROLLBACK ticket (running as a goal)
 
-A real, filled invocation of [`../prompts/feature-build.prompt.md`](../prompts/feature-build.prompt.md). This **continues the tt-rollback story**: spec-build ([`tt-rollback.spec-build.md`](tt-rollback.spec-build.md)) shipped audited, journey-contracted tickets — this builds **one** of them. **Run with the agent pointed at the code repo** (timebreez, where `QA/loops/feature-build.yaml`, the branch, and CI live), *not* gmh-docs. Issue numbers below are illustrative — use the ones the spec-build run actually created.
+A real, filled invocation of [`../prompts/feature-build.prompt.md`](../prompts/feature-build.prompt.md). This **continues the tt-rollback story**: spec-build ([`tt-rollback.spec-build.md`](tt-rollback.spec-build.md)) prepared the selected slice with audited journey evidence — this builds **that slice**. **Run with the agent pointed at the code repo** (timebreez, where `QA/loops/feature-build.yaml`, the branch, and CI live), *not* gmh-docs. Issue numbers below are illustrative — use the ones the spec-build run actually created.
 
 ```
 Goal:   branch for #571 green on branch-protected CI vs the real seeded backend, ready for review

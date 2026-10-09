@@ -1,5 +1,11 @@
 # Journeys — the how-to
 
+This procedure applies to the selected build-ready UI slice and its relevant
+seams under `SPECIFICATION.md`. Reuse existing journeys. Future thin tickets
+record intended behaviour without generating the full artifact chain below;
+contracted UI decisions receive a bounded paper walkthrough. Production UI
+acceptance still requires its executable journey and actual results.
+
 **The journey is the parent spine; the stories are the verbs.** A journey like *"Owner files a Notice of Loss after a named storm"* is delivered by a dozen small stories (render the alert, build the snapshot, wire the drafter, persist it, surface it in the pipeline…). The journey exists so that, at any point, a story can look **up** at its parent and ask:
 
 > ### "Does what I'm building still let the human finish the whole thing?"

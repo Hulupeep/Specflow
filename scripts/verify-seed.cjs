@@ -10,7 +10,7 @@
  *   seed = {
  *     artifact_paths: ["PRDs/foo-prd.md", ...],   // non-empty array of strings
  *     tool_grants:    ["read","grep","bash"],      // subset of the allow-list below
- *     mandate_ref:    "adversary-mandate@v1"        // id of a versioned static mandate, NOT prose
+ *     mandate_ref:    "adversary-mandate@vN"        // installed versioned static mandate id, NOT prose
  *   }
  *
  * No other keys are permitted — `rationale`, `context`, `notes`, `why`, etc. are exactly the
@@ -20,13 +20,14 @@
  */
 
 const { readFileSync } = require('fs');
+const { resolveMandate } = require('./adversary-mandate.cjs');
 
 const ALLOWED_KEYS = ['artifact_paths', 'tool_grants', 'mandate_ref'];
 const TOOL_ALLOWLIST = ['read', 'grep', 'glob', 'bash'];
-const MANDATE_REF = /^[a-z][a-z0-9-]*@v\d+$/; // e.g. adversary-mandate@v1 — an id, never free text
+const MANDATE_REF = /^[a-z][a-z0-9-]*@v\d+$/; // a versioned id, never free text
 
 /**
- * Pure validator. No IO.
+ * Validate the fixed template and resolve its id to the installed static mandate.
  * @returns {{ok:boolean, violations:string[]}}
  */
 function validateSeed(seed) {
@@ -63,7 +64,9 @@ function validateSeed(seed) {
   if ('mandate_ref' in seed) {
     const m = seed.mandate_ref;
     if (typeof m !== 'string' || !MANDATE_REF.test(m)) {
-      v.push('mandate_ref must be a versioned id like "adversary-mandate@v1" (an id, not prose)');
+      v.push('mandate_ref must be an installed versioned id (name@v<number>, not prose)');
+    } else {
+      try { resolveMandate(m); } catch (error) { v.push(error.message); }
     }
   }
 

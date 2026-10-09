@@ -1,0 +1,39 @@
+{
+  "body": "Epic: #162 \u00b7 Story: SPEC-DENSITY-02 \u00b7 Declared tier: `spec:thin`\n\nThe revised epic/body governs implementation. The [original brief](https://github.com/Hulupeep/Specflow/issues/162#issuecomment-5792444374) supplies the rationale, not conflicting earlier rules.\n\n## Outcome\n\nThe builder prepares the explicitly selected next slice and resolves its real unknowns without specifying the entire dependency chain. A useful experiment can run before production readiness.\n\n## Scope\n\nUse an existing selector/runner route or a small promotion command; do not add an orchestration service. Depends on #163's tier policy and #165's gate outcomes. #166 later consumes the durable observations/transitions delivered here and adds discovery-driven invalidation; #167 checks scope and volume.\n\nThe frontier is the explicitly selected next implementation slice or independent slices whose required dependency capabilities have evidence at the stage needed. A closed issue, merged PR or build-ready label alone is insufficient. Immediate seams may be prepared to contracted depth when necessary; that does not recursively promote successors. Early shared irreversible decisions are permitted without promoting the whole feature.\n\nA **bounded experiment** records the question, allowed input and code scope, existing permission/privacy constraints, resource/time stop condition, expected observation and raw evidence location. It produces learning, not production acceptance. Reusing experimental code in the product requires normal promotion and all applicable tests/release gates.\n\n## Acceptance criteria\n\n- [ ] AC-164-1: Promotion records the selected slice, dependency reasons/evidence and why additional depth is needed now. Missing, circular or unverifiable required dependencies produce a specific blocker, not an inferred ready state.\n- [ ] AC-164-2: For a chain A \u2192 B \u2192 C, preparing A does not make B and C build-ready. A build-ready label on A cannot establish an unbuilt capability; B may have only the directly necessary seam discussion until its own readiness is justified.\n- [ ] AC-164-3: spec-build deepens the selected ticket, its directly relevant seams and necessary shared decisions only. The frontier report shows tiers, evidence gaps, stale work and unjustified far-future detail; it distinguishes planned interfaces from implemented capabilities.\n- [ ] AC-164-4: A deliberate owner-authorized exception to preparation scope records who, why, scope and unresolved risks. A command-line reason or model-written approval cannot impersonate the owner. Such an exception never supplies missing dependency evidence or waives privacy, production acceptance or release gates, and is never labelled passed.\n- [ ] AC-164-5: From a thin parser story, the builder can run a bounded experiment on approved representative input before production contracts exist. Success, failure, unavailable input and budget exhaustion each retain raw evidence and an honest outcome; no route marks the product accepted or silently ships experimental code.\n- [ ] AC-164-6: Experiment results are durable inputs for #166's later discovery integration and already inform this slice's next promotion decision. Unrelated downstream tickets stay thin. A repeat with no new evidence does not trigger another specification/review cycle automatically.\n- [ ] AC-164-7: Promotion validates current scope, dependency and gate evidence before persisting readiness. Concurrent edits or changed acceptance invalidate the attempted transition; resume cannot rely solely on a prior label or historical successful check.\n\n## Verification and dependencies\n\nSequencing: AC-164-6 delivers durable experiment observations; #166 owns verification that they reach affected tickets. AC-164-7 verifies current scope/dependency/gate evidence here without requiring #166; #166 later adds discovery-triggered invalidation. The complete producer-to-consumer route remains an epic integration gate, not a prerequisite that makes these tickets depend on each other.\n\nExercise the installed workflow on a dependency chain, independent slices, a closed-but-unimplemented dependency, an owner-scope exception, a stale promotion and successful/failed/unavailable experiments. These are CLI/workflow journeys, not a new browser UI or DB schema. At promotion, attach executable mappings using existing runner tests; done requires executed negative and positive routes. The full private Pastor-input replay belongs to #162, with unavailable inputs explicit.\n",
+  "comments": [
+    {
+      "id": "IC_kwDOQhZHiM8AAAABWUG2nQ",
+      "author": {
+        "login": "Hulupeep"
+      },
+      "authorAssociation": "OWNER",
+      "body": "Before implementing, read the implementation brief on the epic: https://github.com/Hulupeep/Specflow/issues/162#issuecomment-5792444374. It records what worked and what was theatre in the first real spec-build run, and gives the rules this ticket must implement.",
+      "createdAt": "2026-09-23T09:34:18Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/Hulupeep/Specflow/issues/164#issuecomment-5792446109",
+      "viewerDidAuthor": true
+    }
+  ],
+  "labels": [
+    {
+      "id": "LA_kwDOQhZHiM8AAAACRayJXg",
+      "name": "enhancement",
+      "description": "New feature or request",
+      "color": "a2eeef"
+    },
+    {
+      "id": "LA_kwDOQhZHiM8AAAACXgA1Jg",
+      "name": "P1: Ship Next",
+      "description": "High priority - ship after P0s",
+      "color": "D93F0B"
+    }
+  ],
+  "number": 164,
+  "state": "OPEN",
+  "title": "[SPECFLOW] SPEC-DENSITY-02: bounded build frontier and learning experiments",
+  "updatedAt": "2026-09-23T12:40:58Z",
+  "url": "https://github.com/Hulupeep/Specflow/issues/164"
+}

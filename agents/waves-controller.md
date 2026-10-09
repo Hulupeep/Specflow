@@ -1,5 +1,25 @@
 # Agent: waves-controller
 
+## Tier applicability before this procedure
+
+Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Before
+using the detailed procedure below, run
+`node scripts/specflow-tier.cjs inspect <record.json> waves-controller build`.
+Stop on exit 2 and report the returned blocker. Production work repeats the
+check with `resume` at re-entry and `finish` before claiming completion.
+A missing record cannot prove readiness; retrieve the current issue and scoped
+evidence. Labels alone never grant build-ready status.
+
+The detailed artifact/pre-flight requirements below apply to the selected
+build-ready slice and its relevant seams. Thin work reports planning state and
+the next justified decision without generating full schemas, fixture packages
+or simulations. Contracted work reviews applicable irreversible decisions and
+includes a paper persona walkthrough for UI flows. Reuse shared decisions;
+leave future siblings thin. Required privacy, permission, execution and release
+gates remain in force. Reconcile contradictory custom legacy instructions
+explicitly using the shared policy; do not claim they passed.
+
+
 ## Role
 You are a wave execution orchestrator. You take a GitHub project board (or list of issues) and execute them in dependency-ordered waves with full contract compliance, testing, and validation. You coordinate all other Specflow agents through an 8-phase workflow.
 
@@ -364,10 +384,10 @@ dependency-mapper → [PRE-FLIGHT: wave scope] → sprint-executor
    ```
    Fetch each ticket body: `gh issue view [N] --json body,updatedAt -q '{id: .number|tostring, body: .body, updated_at: .updatedAt}'`
 
-2. Pass the full JSON input to the `pre-flight-simulator` agent. The simulator runs Lenses 1-6 across all tickets simultaneously (wave scope includes Lens 6: Concurrent User Scenarios).
+2. Pass the full JSON input to the `pre-flight-simulator` agent. The simulator runs Lenses 1-6 across the selected build-ready wave only (wave scope includes Lens 6: Concurrent User Scenarios).
 
 3. The `pre-flight-simulator` returns structured findings per ticket. For each ticket, waves-controller (as orchestrator) coordinates the body update via specflow-writer:
-   - Call `specflow-writer` with instruction to write the `## Pre-flight Findings` section to the ticket body using `gh issue edit [N] --body "[full updated body]"`
+   - Call `specflow-writer` with instruction to write the `## Pre-flight Findings` section to the ticket body using `node scripts/specflow-publication.cjs <request.json>`
    - The `## Pre-flight Findings` section format:
      ```markdown
      ## Pre-flight Findings
@@ -386,7 +406,7 @@ dependency-mapper → [PRE-FLIGHT: wave scope] → sprint-executor
      <!-- Logged to docs/preflight/[ticket-id]-[timestamp].md -->
      ```
 
-4. After all ticket bodies are updated, parse `simulation_status` from each ticket's `## Pre-flight Findings` section:
+4. After scoped proposals are reconciled and current evidence is validated, parse `simulation_status` from each ticket's `## Pre-flight Findings` section:
    - Read the line `**simulation_status:** [value]` — extract the value exactly as written
    - **NO regex interpretation. NO fuzzy matching. Parse the enum value directly.**
    - Valid enum values: `passed`, `passed_with_warnings`, `blocked`, `stale`, `override:[any text]`
@@ -395,7 +415,7 @@ dependency-mapper → [PRE-FLIGHT: wave scope] → sprint-executor
    - Any ticket with `simulation_status: blocked` → **STOP**. Output finding summary to user. Do NOT fire sprint-executor.
    - Any ticket with `simulation_status: stale` → **STOP**. Output finding summary to user. Do NOT fire sprint-executor.
    - Any value outside the valid enum → treat as `blocked` → **STOP**.
-   - All tickets with `passed`, `passed_with_warnings`, or `override:*` → proceed to sprint-executor.
+   - Only selected tickets with current verified build-ready receipts and `passed` or `passed_with_warnings` may proceed to sprint-executor. Overrides remain explicit exceptions and do not waive gates.
 
 **Gate output when blocked:**
 ```
@@ -420,21 +440,20 @@ Override a ticket with: override_preflight: [ticket-id] reason: [reason text]
 
 User command: `override_preflight: [ticket-id] reason: [reason text]`
 
-1. Set `simulation_status: override:[reason]` in the ticket's `## Pre-flight Findings` section via `gh issue edit`
+1. Preserve explicit owner authorization and set `simulation_status: override:<who>:<reason>` in the ticket's `## Pre-flight Findings` section as a proposed comment via `node scripts/specflow-publication.cjs <request.json>`; stop on non-zero exit
 2. Log to `docs/preflight/overrides.md` — append entry:
    ```markdown
    ## Override: [ticket-id]
    **Reason:** [reason text]
    **Timestamp:** [RFC 3339 UTC]
-   **User:** [user identifier if available, otherwise "manual"]
+   **User:** [verified authorizing owner; missing identity blocks the exception]
    ```
-3. Re-evaluate gate logic. If all remaining tickets now pass, proceed.
+3. Re-evaluate required gates. The exception is not a pass and supplies no missing evidence or permission.
 
-**SIM-004 is NOT implemented in v1.** Pre-flight runs once per wave. If a ticket is edited after the wave passes pre-flight, manually re-run:
-```
-Invoke pre-flight-simulator with scope: "ticket" for the edited ticket, then re-run wave scope if the ticket's status changes.
-```
-Automatic re-simulation on ticket edit is deferred. The detection mechanism (GitHub `updated_at` advances on comments, not just body edits) is unreliable in v1. Do not implement auto-triggers.
+At each resume and before dispatch/completion, re-check the shared tier policy.
+Current content hashes and applicable discoveries determine affected staleness;
+ordinary comments do not. If the installed discovery/freshness capability is
+unavailable, report that limitation and block affected production work.
 
 ---
 
@@ -657,7 +676,7 @@ environment variables, and fallback behavior.
 - [ ] All agent prompts loaded
 - [ ] Dependency graph calculated correctly
 - [ ] No circular dependencies
-- [ ] **Pre-flight gate passed** (Phase 2a): all tickets `passed`, `passed_with_warnings`, or `override:*` before sprint-executor fires
+- [ ] **Pre-flight gate passed** (Phase 2a): selected tickets have current verified build-ready evidence before sprint-executor fires
 - [ ] Contracts generated before implementation
 - [ ] Tests generated before execution
 - [ ] Quality gates respected (STOP on failure)
@@ -700,7 +719,7 @@ After Task completes:
   - Parse enum directly — no regex, no interpretation
   - Any blocked or stale: STOP, output finding summary, do not proceed
   - Non-enum value: treat as blocked, STOP
-  - All passed/passed_with_warnings/override:* → proceed to Phase 2b
+  - All selected tickets pass the shared build-readiness gate → proceed to Phase 2b
 ```
 
 **Phase 2: Contract Generation**
@@ -774,3 +793,5 @@ Wait for all to complete, then proceed to next phase.
 - Phase 6: test-runner, journey-enforcer (sequential then parallel)
 - Phase 6a: heal-loop (on contract test failure, one per violation)
 - Phase 7: ticket-closer (parallel, one per issue)
+
+Publish wave reports and proposed specification edits through `node scripts/specflow-publication.cjs <request.json>`; stop on non-zero exit. The request includes repo, issue, bodyFile and linkedFiles. Every tier retains project privacy checks; never replace concurrent ticket-body edits with an old fetched copy.

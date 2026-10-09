@@ -2,12 +2,12 @@
 # Existing contracts in templates/contracts/ enforce regex patterns against source files.
 # This file is a BOARD-AUDITOR RULE SET. board-auditor reads it as a compliance
 # checklist for GitHub issue bodies. It defines required fields that must appear in
-# the "## Pre-flight Findings" section of every specflow-compliant ticket body.
+# the "## Pre-flight Findings" section of a selected build-ready ticket body.
 # The enforcement mechanism is board-auditor — not the pattern-scanning test runner.
 
 contract_meta:
   id: feature_preflight
-  version: 1
+  version: 2
   created_from_spec: "docs/preflightprd.md"
   covers_reqs:
     - ARCH-001
@@ -33,13 +33,19 @@ llm_policy:
 # Each rule corresponds to a required field or validation constraint in the
 # "## Pre-flight Findings" section of a specflow-compliant ticket.
 board_auditor_rules:
+  applicability:
+    policy: scripts/specflow-tier.cjs
+    tier: build-ready
+    thin: planning only; no automatic full simulation or artifacts
+    contracted: applicable irreversible decisions and UI paper walkthrough
+    production: require current verified build-ready evidence before any wave dispatch
   required_section:
     heading: "## Pre-flight Findings"
     description: >
-      Every specflow-compliant ticket MUST contain a "## Pre-flight Findings"
-      section. A ticket without this section has no pre-flight and is treated
-      as blocked by waves-controller. board-auditor flags absent sections as
-      non-compliant. Covers ARCH-004.
+      A selected build-ready ticket MUST contain a "## Pre-flight Findings"
+      section. Without current scoped pre-flight evidence, production wave
+      dispatch is blocked. Thin tickets remain valid planning work without
+      this section and cannot be dispatched as production work. Covers ARCH-004.
 
   required_fields:
     - field: simulation_status
@@ -64,8 +70,8 @@ board_auditor_rules:
       description: >
         MUST be present on the line: "**simulated_at:** <timestamp>"
         Value MUST be RFC 3339 UTC format only. Example: 2026-02-19T14:32:00Z
-        No other ISO 8601 variant is accepted. GitHub's updatedAt field is also RFC 3339 UTC;
-        the staleness comparison only works when formats match (ARCH-007).
+        No other ISO 8601 variant is accepted. This is the historical review time;
+        current scope and artifact hashes establish freshness (ARCH-007).
         If this line is absent, the ticket has no pre-flight and is treated as blocked.
       format: "RFC 3339 UTC"
       example: "2026-02-19T14:32:00Z"
@@ -86,9 +92,11 @@ board_auditor_rules:
   staleness_rules:
     ticket_staleness:
       description: >
-        If ticket.updated_at > simulated_at, board-auditor MUST set simulation_status to stale.
-        stale is treated as blocked by waves-controller. No wave fires on a stale pre-flight.
-        Covers ARCH-007.
+        A changed scope/acceptance hash or an unresolved applicable discovery
+        invalidates readiness. Ordinary comments and label changes do not by
+        themselves invalidate evidence. Missing freshness sources block affected
+        production work; legacy timestamp-only evidence requires migration.
+        No wave fires on stale evidence. Covers ARCH-007.
       data_sources:
         simulated_at:
           source: "## Pre-flight Findings section of ticket body"
@@ -99,24 +107,24 @@ board_auditor_rules:
           command: "gh issue view [N] --json updatedAt -q '.updatedAt'"
           authoritative: true
           note: "Do NOT use file system timestamps or git log for this value."
-      rule: "if ticket_updated_at > simulated_at → simulation_status = stale"
+      rule: "changed scope/acceptance hash or unresolved applicable discovery → stale; inaccessible freshness source → blocked"
 
     contract_staleness:
       description: >
-        If any docs/contracts/*.yml file referenced by contract IDs found in the ticket body
-        has mtime > simulated_at, board-auditor MUST flag the ticket pre-flight as stale.
-        A contract update can invalidate a previously passing simulation. Covers ARCH-008.
+        Changed content hashes of referenced contracts invalidate affected
+        readiness, including all consumers of a changed shared decision. Unrelated
+        contract files and unchanged mtimes do not establish an impact. Covers ARCH-008.
       data_sources:
         contract_mtime:
           source: "filesystem"
           command_linux: "stat -c %Y docs/contracts/[file].yml"
           command_macos: "stat -f %m docs/contracts/[file].yml"
           note: "Convert to ISO timestamp for comparison against simulated_at."
-      rule: "if contract_file.mtime > simulated_at → simulation_status = stale"
+      rule: "if a referenced contract content hash changed → simulation_status = stale"
 
   override_rules:
     trigger: "override_preflight: [ticket-id] reason: [reason text]"
-    effect: "simulation_status is set to override:[reason]"
+    effect: "simulation_status is set to override:<who>:<reason>; this is not passed and supplies no missing evidence or release permission"
     audit_log: "docs/preflight/overrides.md"
     audit_fields:
       - ticket-id
@@ -163,16 +171,16 @@ schema_validation:
 
 compliance_checklist:
   before_firing_sprint_executor:
-    - question: "Does every ticket in the wave have a '## Pre-flight Findings' section?"
-      if_no: "Block the wave. Tickets without pre-flight are treated as blocked."
+    - question: "Does each selected production ticket have current verified build-ready evidence and its applicable pre-flight section?"
+      if_no: "Block dispatch for affected tickets. Keep thin future work in planning."
     - question: "Is simulation_status a valid enum value for every ticket?"
       if_no: "Block the wave. Non-enum values are treated as blocked."
     - question: "Is any ticket's simulation_status 'blocked' or 'stale'?"
       if_yes: "Block the wave. Human must resolve or provide explicit override."
-    - question: "Is ticket.updated_at newer than simulated_at for any ticket?"
-      if_yes: "Set simulation_status to 'stale' and block the wave."
-    - question: "Is any referenced docs/contracts/*.yml mtime newer than simulated_at?"
-      if_yes: "Set simulation_status to 'stale' and block the wave."
+    - question: "Has selected scope/acceptance changed or does an applicable unresolved discovery exist?"
+      if_yes: "Set simulation_status to 'stale' and block affected dispatch."
+    - question: "Has a referenced contract content hash changed?"
+      if_yes: "Set simulation_status to 'stale' and block affected dispatch."
     - question: "Are there any override:* statuses in the wave?"
       if_yes: "Display overrides distinctly in audit output. Check if override is older than last contract update."
 

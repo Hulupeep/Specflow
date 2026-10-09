@@ -1,0 +1,9 @@
+{
+  "actual": "{\"issues_with_private_values\": 0, \"fetch_failures\": 0, \"issues_flagged\": [], \"files_scanned\": 3, \"secret_forms_checked\": 8, \"canary_detected\": true}",
+  "exitCode": 0,
+  "expected": "{\"issues_with_private_values\": 0, \"fetch_failures\": 0}",
+  "failed": 0,
+  "passed": 1,
+  "status": "no_private_data_in_issues",
+  "success": true
+}

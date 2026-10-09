@@ -1,5 +1,13 @@
 # Pre-flight Gate
 
+Specification depth is governed by `SPECIFICATION.md` (source kit:
+`templates/SPECIFICATION.md`) and `scripts/specflow-tier.cjs`. Thin work stays
+at planning depth; contracted reviews cover applicable decisions and UI paper
+walkthroughs. The detailed build-ready procedures below apply only to the
+selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
+Required privacy, permission, executable journey and release gates still apply.
+
+
 Condensed from Specflow's `pre-flight-simulator.md`. Pre-flight is a **read-only**
 simulation of the uplifted ticket. It does not write code and does not write to
 GitHub — it returns findings. The auditor skill writes the result to the ticket
@@ -55,7 +63,7 @@ CRITICAL/P1 remains, the ticket stays non-compliant.
 
 ## `## Pre-flight Findings` section format
 
-Append this to the ticket body (via `gh issue edit <n>`) ONLY when the gate passes:
+Publish this as a proposed update via `node scripts/specflow-publication.cjs <request.json>` ONLY when the gate passes. Stop on non-zero exit; preserve intervening body edits:
 
 ```markdown
 ## Pre-flight Findings

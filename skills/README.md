@@ -5,27 +5,25 @@ phrasing instead of requiring you to manually invoke an agent prompt.
 
 ## specflow-loop-selector
 
-Routes an agent to the right Specflow loop and forces a concrete `run_contract`
-before work starts. Use this as the pre-build/pre-loop skill for Claude Code,
-Codex, K2.7, or any other agent that might otherwise spend time rediscovering
-`spec-build`, `feature-build`, Gate D, or `daily-use-teardown`.
-
-**Triggers on:** starting Specflow work, choosing between `spec-build` and
-`feature-build`, implementing a Specflow ticket, creating/refining a PRD,
-investigating an existing product, running Gate D, or "go find out about
-Specflow loops".
-
-The skill is intentionally a router, not a duplicate of the loop docs:
+Chooses work weight before loop type: Tweak, Bug, UI feature, Schema/RPC change,
+New concept/behaviour change, or Multi-slice epic. Use it for proportionate work
+triage or explicit loop selection; consulting the skill does not start a loop.
+The [decision table](specflow-loop-selector/SKILL.md#choose-the-work-weight)
+combines risk modifiers with the checks that remain mandatory.
 
 ```
-select loop → emit run_contract → load selected YAML → advance one gate
+weight + risk → required parts/checks → loop only if needed → execute and verify
 ```
 
-For story/ticket creation or refinement it also enforces the simulation path:
+A bounded task can use individual parts without a loop run contract. Bugs need
+a failing regression test; database changes retain replay/rollback/pgTAP and CI
+migration-replay; new concepts require simulation and a kill check. Every required
+server-state journey runs against a real seeded backend. Owner testing, flags and
+mocked journeys cannot substitute for that evidence.
 
-```
-create/refine story → specflow-simulate → specflow-audit/uplift → pre-flight gate → feature-build
-```
+Weight does not replace `SPECIFICATION.md` or its shared depth policy. Formal
+Specflow stories and full-loop build-ready work retain required simulation,
+audit/pre-flight and readiness checks. Do not relabel work to evade a gate.
 
 Installers copy it to `.claude/skills/`, `.codex/skills/`, and
 `.agents/skills/` so Claude Code, Codex, K2.7, and generic agents can all read

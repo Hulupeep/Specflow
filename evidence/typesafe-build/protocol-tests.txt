@@ -1,0 +1,9 @@
+PASS tests/contracts/typesafe-duo.test.js
+PASS tests/contracts/typesafe-evaluation.test.js
+PASS tests/contracts/typesafe-repair.test.js
+
+Test Suites: 3 passed, 3 total
+Tests:       18 passed, 18 total
+Snapshots:   0 total
+Time:        4.569 s, estimated 5 s
+Ran all test suites matching /tests\/contracts\/typesafe-duo.test.js|tests\/contracts\/typesafe-evaluation.test.js|tests\/contracts\/typesafe-repair.test.js/i.

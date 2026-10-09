@@ -1,0 +1,31 @@
+{
+  "issue": {
+    "number": 176,
+    "title": "[SPECFLOW] IMPROVE-04: isolated workspace and external side-effect guardrails",
+    "labels": [
+      {
+        "name": "enhancement"
+      },
+      {
+        "name": "P1: Ship Next"
+      }
+    ],
+    "comments": [],
+    "body": "Epic: #171 · Story: IMPROVE-04 · Declared tier: `spec:thin`\n\n## Acceptance criteria\n\n- [ ] AC-04-1: A run records starting ref/workspace and cannot modify the protected base branch directly.\n- [ ] AC-04-2: Prohibited external side effects are blocked before execution and recorded as blockers, not merely discouraged in prompts.\n- [ ] AC-04-3: A retained improvement has an independently identifiable commit/change set; a reverted experiment leaves no product diff while preserving its evidence.\n- [ ] AC-04-4: Crash/interruption cannot leave a successful status for an unknown workspace or unrecorded mutation.\n- [ ] AC-04-5: Existing human-only release/merge/override rules remain authoritative.\n"
+  },
+  "source": {
+    "kind": "file",
+    "path": "evidence/improve-core/specification/issue-176.json",
+    "note": "replay snapshot fetched through GitHub MCP on 2026-09-26; gh CLI unavailable in this session"
+  },
+  "freshness": {
+    "status": "current"
+  },
+  "profile": {
+    "ui": false,
+    "materialSeams": [],
+    "artifacts": [],
+    "gates": []
+  },
+  "dependencies": []
+}

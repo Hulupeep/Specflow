@@ -5,6 +5,26 @@ description: Audits a Specflow story/ticket for spec-compliance and surgically u
 
 # Specflow Audit & Uplift
 
+## Tier applicability before this procedure
+
+Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Before
+using the detailed procedure below, run
+`node scripts/specflow-tier.cjs inspect <record.json> specflow-audit inspect`.
+Stop on exit 2 and report the returned blocker. Production work repeats the
+check with `resume` at re-entry and `finish` before claiming completion.
+A missing record cannot prove readiness; retrieve the current issue and scoped
+evidence. Labels alone never grant build-ready status.
+
+The detailed artifact/pre-flight requirements below apply to the selected
+build-ready slice and its relevant seams. Thin work reports planning state and
+the next justified decision without generating full schemas, fixture packages
+or simulations. Contracted work reviews applicable irreversible decisions and
+includes a paper persona walkthrough for UI flows. Reuse shared decisions;
+leave future siblings thin. Required privacy, permission, execution and release
+gates remain in force. Reconcile contradictory custom legacy instructions
+explicitly using the shared policy; do not claim they passed.
+
+
 Take a partially-compliant Specflow story (some sections present, others missing) and bring it to compliance through a fixed three-phase process. The quality comes from the *process*, not improvisation — never freelance the uplift inline.
 
 ## When to run
@@ -62,8 +82,12 @@ This is the single most common real-world failure ("journeys missing or not exec
 1. Read the target (issue via `gh issue view <n> --json title,body,comments`, or the file).
 2. Ground against the canonical Specflow docs when present in the repo — full versions live at `<specflow-repo>/agents/{board-auditor,specflow-uplifter,pre-flight-simulator,specflow-writer}.md` and `CONTRACT-SCHEMA.md`, `SPEC-FORMAT.md`, `USER-JOURNEY-CONTRACTS.md`. Find the repo: it is the dir containing `CONTRACT-SCHEMA.md` (commonly `tooling/Specflow/` or a `Specflow/` subdir). If absent, the condensed `references/` files here are sufficient.
 3. Run Phase 1 → 2 → 3. For large stories, delegate Phase 1+2 to a subagent prompted with `references/uplift-process.md`, but always perform Phase 3 yourself.
-4. Cross-link material verdicts to the durable record (a `gh issue comment`), not just chat.
+4. Cross-link material verdicts to the durable record (a `node scripts/specflow-publication.cjs <request.json>`), not just chat.
 
 ## Reference files
 - `references/uplift-process.md` — template sections, the surgical-additions templates (SQL/RLS/TS/invariants/Gherkin/AC/DoD/testid), and the RLS join-through + invariant-domain patterns.
 - `references/preflight-gate.md` — CRITICAL/P1/P2 severity model, the compliance gate rule, and the `## Pre-flight Findings` section format.
+
+Scoped grading uses the shared `specflow-reviews.cjs` issue/tier ledger through Duo preparation (`specification.targetTier`). The contracted adversary and build-ready pre-flight each allow an initial review plus one repair/re-grade. Never bypass it with a fresh adapter, different host, run name, or direct simulation. Return `fixed as specified, not re-graded` after changing an already graded scope until a permitted re-grade passes. Exhaustion escalates retained findings.
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

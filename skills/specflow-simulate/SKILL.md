@@ -5,6 +5,26 @@ description: Simulates end-to-end usage of a Specflow story across multiple pers
 
 # Specflow Simulate
 
+## Tier applicability before this procedure
+
+Read `SPECIFICATION.md` (source kit: `templates/SPECIFICATION.md`). Before
+using the detailed procedure below, run
+`node scripts/specflow-tier.cjs inspect <record.json> specflow-simulate inspect`.
+Stop on exit 2 and report the returned blocker. Production work repeats the
+check with `resume` at re-entry and `finish` before claiming completion.
+A missing record cannot prove readiness; retrieve the current issue and scoped
+evidence. Labels alone never grant build-ready status.
+
+The detailed artifact/pre-flight requirements below apply to the selected
+build-ready slice and its relevant seams. Thin work reports planning state and
+the next justified decision without generating full schemas, fixture packages
+or simulations. Contracted work reviews applicable irreversible decisions and
+includes a paper persona walkthrough for UI flows. Reuse shared decisions;
+leave future siblings thin. Required privacy, permission, execution and release
+gates remain in force. Reconcile contradictory custom legacy instructions
+explicitly using the shared policy; do not claim they passed.
+
+
 Run a story through realistic usage — multiple personas, multiple routes — to find the gaps and edges a single happy-path reading misses. The output is not commentary; it is a set of concrete, proposed additions that make the story sharper before any code is written.
 
 ## When to run
@@ -26,7 +46,7 @@ Full method (persona archetypes, route taxonomy, gap→edit mapping, output form
 3. **Walk each persona through the story end-to-end** — the happy path AND at least one divergent route per persona: where do they get confused, blocked, take an unanticipated branch, hit an empty/error/permission state, or make a decision the story didn't plan for?
 4. **Collect gaps** — each gap is a concrete moment where the story is silent, ambiguous, or wrong for that persona/route.
 5. **Map every gap to a story edit** — a new `REQ-NN`, a negative-path `AC`, a new Gherkin scenario/branch, a new journey step + `data-testid`, or a flagged open question. A gap with no proposed edit is incomplete.
-6. **Propose, don't silently rewrite** — post the findings as ONE labelled block: a GitHub comment (`gh issue comment`) or an appended `## Simulation Findings (proposed)` section. The user (or the subsequent specflow-audit uplift) folds accepted items into the story body. Only edit the body directly if the user explicitly says to apply.
+6. **Propose, don't silently rewrite** — post the findings as ONE labelled block: a GitHub comment (`node scripts/specflow-publication.cjs <request.json>`) or an appended `## Simulation Findings (proposed)` section. The user (or the subsequent specflow-audit uplift) folds accepted items into the story body. Only edit the body directly if the user explicitly says to apply.
 
 ## Parallel personas (optional, for thorough runs)
 For a deep simulation, fan out one agent per persona so each route is explored independently and blind to the others — this surfaces more than one sequential reading. The `ux-critique` skill already runs parallel persona agents against a live screen; reuse that pattern here, scoped to the *story text* rather than a running UI. Then dedupe and synthesize into the single findings block.
@@ -40,3 +60,7 @@ Report, and post as the findings block:
 
 ## Reference
 - `references/simulation-method.md` — persona archetypes, route taxonomy, gap→edit mapping table, and the `## Simulation Findings (proposed)` format.
+
+Scoped grading uses the shared `specflow-reviews.cjs` issue/tier ledger through Duo preparation (`specification.targetTier`). The contracted adversary and build-ready pre-flight each allow an initial review plus one repair/re-grade. Never bypass it with a fresh adapter, different host, run name, or direct simulation. Return `fixed as specified, not re-graded` after changing an already graded scope until a permitted re-grade passes. Exhaustion escalates retained findings.
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

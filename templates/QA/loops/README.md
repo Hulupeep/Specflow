@@ -1,6 +1,27 @@
 # Loops — run the whole pipeline
 
-> **Canonical source: Specflow.** This kit was scaffolded by `specflow init` and is refreshed by `specflow init`/`update`. Don't hand-edit it per-project — change it in Specflow (`templates/QA/loops/`) so every project gets the fix.
+> **Canonical source: Specflow.** This kit was scaffolded by `specflow init` and is refreshed by `specflow init`/`update`. Don't hand-edit it per-project — change it in Specflow (`templates/loops/`) so every project gets the fix.
+
+## Maintaining the kit
+
+`templates/loops/` is canonical. `templates/QA/loops/` is its generated shipping
+mirror. Run `npm run sync:loops` after editing the canonical kit; contract tests
+and packaging reject drift with `node scripts/sync-loop-templates.cjs --check`.
+The installer copies these identical assets into a project's `QA/loops/`.
+
+The first header of `adversary-mandate.md` is the single version authority.
+To bump the version, change that header and run `npm run sync:loops`; the loop
+and falsification-template references regenerate, and the spawner derives its
+default from the header. Each mandate is self-contained. Seeds naming an absent
+or stale version are rejected before launch; explicitly refresh those seeds
+after reviewing the installed mandate. Retain old run artifacts as historical
+evidence rather than relabelling them as having used the new version.
+
+Version history belongs here, outside the instructions read by the critic:
+v1 established the five structural-review clauses; v2 added falsification,
+typed claims, dependency/correction checks and hash binding; v3 added reuse and
+conditional ADR conformance. The consolidated v3 retains the twelve clauses and
+seven banned failure modes already shipped in `templates/QA/loops/`.
 
 ## The problem this solves
 
@@ -22,8 +43,8 @@ Think of it as a **type system for the whole lifecycle**. Each phase emits a *ty
 | Artifact | Its "type" is enforced by |
 |---|---|
 | discovery | a **real artifact** — no grounding, no PRD |
-| PRD | a **hostile critic** (Gate A) — no SHIP verdict, no tickets |
-| tickets | the **specflow auditor** (Gate B) — every requirement→journey→test→issue, no orphans, no dup IDs |
+| selected decisions | the **independent critic** (Gate A) — accepted scoped review before promotion; local thin backlog capture may precede it; GitHub issue creation requires SHIP and human approval |
+| selected build-ready slice | the **specflow auditor** (Gate B) — applicable requirement→journey→test→issue links, no orphans or duplicate IDs; future backlog stays thin |
 | an asserted number | the **oracle** — checked against the real calc/source, never guessed |
 | the merge | **CI vs a real backend** (Gate C) — green-but-broken can't typecheck |
 
@@ -62,9 +83,9 @@ state, evidence, and stop rules.
 ## Run the whole pipeline, in order
 
 1. **Spec-build** — turn a rough idea / discovery into defensible tickets.
-   Copy [`prompts/spec-build.prompt.md`](prompts/spec-build.prompt.md), fill `goal` / `slug` / `grounding_ref`, paste into your agent (or set it as a thread automation). It runs discover → PRD → adversary → **Gate A (SHIP)** → tickets → Gate B/B.5. Output: audited, journey-contracted tickets.
+   Copy [`prompts/spec-build.prompt.md`](prompts/spec-build.prompt.md), fill `goal` / `slug` / `grounding_ref`, paste into your agent (or set it as a thread automation). It starts with discovery and thin backlog capture. Selected contracted decisions receive **Gate A** review; only the next build-ready slice receives applicable Gate B/B.5 checks. Output: a mixed-tier backlog with scoped evidence for the selected slice.
 2. **Feature-build** — turn each ready ticket into a tested slice.
-   For every ticket the spec-build loop produced, copy [`prompts/feature-build.prompt.md`](prompts/feature-build.prompt.md), fill `issue`, paste/automate. It builds on the rails through implementation, post-code provenance, human CI handoff, then **Gate C (CI on real data)**. Output: a branch ready for review.
+   For the selected ticket with current verified build-ready evidence; leave other backlog tickets thin, copy [`prompts/feature-build.prompt.md`](prompts/feature-build.prompt.md), fill `issue`, paste/automate. It builds on the rails through implementation, post-code provenance, human CI handoff, then **Gate C (CI on real data)**. Output: a branch ready for review.
 
 **Already-built product?** Start one loop earlier: **daily-use-teardown** ([`daily-use-teardown.yaml`](daily-use-teardown.yaml), prompt in [`prompts/`](prompts/)) — investigate the app's main journeys + their purpose, **you confirm the map (hard human gate)**, then top-thinker persona walks judge each journey WORKS / CONFUSING / BROKEN with screenshot evidence, ending in a prioritized do-list that becomes spec-build's `grounding_ref`. Filled example: [`examples/claim-alert.daily-use-teardown.md`](examples/claim-alert.daily-use-teardown.md).
 3. **Mistake-harvest** (meta, optional) — schedule `docs/routines/daily-mistake-harvest.md` (timebreez). It reads runs of both loops and improves the skills/contracts they depend on.

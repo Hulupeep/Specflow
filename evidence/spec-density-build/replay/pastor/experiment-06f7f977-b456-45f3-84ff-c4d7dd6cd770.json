@@ -1,0 +1,22 @@
+{
+  "kind": "experiment",
+  "question": "Can the available parser open one approved representative PST and read bounded folder/message structure inside the existing sandbox?",
+  "expectedObservation": "A successful archive open, root-folder read, bounded structural counts and explicit limitations; no message content",
+  "scope": "d122bd50aeded57087048d2eab3c3cf08ebe4d8a8b44b198cdf932c518b86767",
+  "planHash": "31119ad027cd10f6164ecbf57c9268a9b5edf2b5516a05da89af47328c8c32d6",
+  "exitCode": 2,
+  "error": null,
+  "stdout": "{\"status\": \"parser_or_sandbox_failed\", \"exitCode\": 1, \"private_content_emitted\": false, \"sandbox_network\": \"denied\", \"source_write\": \"denied\", \"memory_limit_gib\": 2, \"worker_time_limit_seconds\": 20, \"scope\": \"One representative PST, bounded structural read; not extraction or all-format qualification\"}\n",
+  "stderr": "",
+  "outcome": "failed",
+  "limitations": [
+    "One PST only; not all formats, full extraction, downstream schema or ingestion acceptance",
+    "Existing source remains read-only; sandbox denies network and bounds memory"
+  ],
+  "sandboxProbe": {
+    "exitCode": 0,
+    "stdout": "{\"success\": true, \"sandboxReady\": true, \"restrictions\": \"Existing Pastor runtime and synthetic sandbox probes passed\"}\n",
+    "passed": true
+  },
+  "productionAccepted": false
+}

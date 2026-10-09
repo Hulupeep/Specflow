@@ -1,0 +1,30 @@
+PASS tests/scripts/duo-build.test.js
+  ✓ J-DUO-REPAIR/J-DUO-RESUME: codex builder repairs and retains evidence (127 ms)
+  ✓ J-DUO-REPAIR/J-DUO-RESUME: claude-code builder repairs and retains evidence (119 ms)
+  ✓ both commands retain native permission controls and no write tools for Claude (22 ms)
+  ✓ J-DUO-BLOCKED: missing evidence never invokes peer (21 ms)
+  ✓ missing peer is durable and never accepted (34 ms)
+  ✓ recursive reviewer is rejected before a peer is launched (33 ms)
+  ✓ changed pinned acceptance blocks review (21 ms)
+  ✓ concurrent source modification rejects stale peer acceptance (67 ms)
+  ✓ peer snapshot modification is blocked (68 ms)
+  ✓ uncommitted binary and untracked files are copied exactly (70 ms)
+  ✓ no progress stops and maximum three repair rounds is enforced (238 ms)
+  ✓ acceptance without independent evidence read is rejected (67 ms)
+  ✓ paths cannot escape repository or follow symlinks (22 ms)
+  ✓ unauthenticated Codex is blocked without invoking a review (36 ms)
+  ✓ an interrupted attempt is persisted before invoking the peer (67 ms)
+  ✓ resume invalidates acceptance when reviewed evidence changed (85 ms)
+  ✓ installer delivers native skill and helper for codex (217 ms)
+  ✓ installer delivers native skill and helper for claude-code (227 ms)
+  ✓ snapshot preserves executable permissions and detects mode drift (70 ms)
+  ✓ readable blocked status leads with the actionable finding (66 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       20 passed, 20 total
+Snapshots:   0 total
+Time:        1.892 s, estimated 2 s
+Ran all test suites matching /tests\/scripts\/duo-build.test.js/i.
+
+command: npx jest tests/scripts/duo-build.test.js --runInBand --no-coverage
+exit: 0

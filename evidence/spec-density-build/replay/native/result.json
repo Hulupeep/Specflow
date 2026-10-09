@@ -1,0 +1,315 @@
+{
+  "kind": "native-replay-aggregate",
+  "runId": "1790178810790-262542ea",
+  "goalStatus": "complete",
+  "history": [
+    {
+      "outcome": "blocked",
+      "stage": "peer_review",
+      "summary": "Peer judgment cites evidence without a successful content-access receipt"
+    },
+    {
+      "outcome": "accepted",
+      "stage": "validated",
+      "summary": "All five seeded bad decisions in decisions.json are now corrected, and each new value fits the unchanged task.md acceptance. Both raw captures show node check.cjs exiting 0 with 5 executed, 0 skipped and 0 failed. This accepts only the decision-level scope; it does not show that a parser works, is deployed or is production-ready."
+    }
+  ],
+  "scopedJournal": {
+    "version": 1,
+    "issue": 162,
+    "reviews": {
+      "contracted": [
+        {
+          "id": "cfc70ca7-9365-4bb3-91bb-c8332b26a344",
+          "tier": "contracted",
+          "number": 162,
+          "scope": "325a4d345c26ff56aa91a2dc96d533ce1480e140192579cf598b2402ad32329f",
+          "builder": "codex",
+          "at": "2026-09-23T15:54:07.363Z",
+          "status": "complete",
+          "outcome": "blocked",
+          "errors": [
+            "Peer judgment cites evidence without a successful content-access receipt"
+          ],
+          "findings": [],
+          "identity": null
+        },
+        {
+          "id": "be26aed7-ee12-4f19-843e-2044812ea1d1",
+          "tier": "contracted",
+          "number": 162,
+          "scope": "6e51e5c3a60800241337afb52d4ed1b543ce088e1270af1db046fafa0188384e",
+          "builder": "codex",
+          "at": "2026-09-23T15:57:14.972Z",
+          "status": "complete",
+          "outcome": "passed",
+          "errors": [],
+          "findings": [],
+          "counts": {
+            "newMaterial": 0,
+            "repairInduced": 0,
+            "unknownOrigin": 0
+          },
+          "identity": {
+            "provider": "claude",
+            "model": "claude-opus-5-5",
+            "family": "claude",
+            "modelEvidence": "native-metadata",
+            "mode": "live"
+          },
+          "gates": [
+            {
+              "id": "checks",
+              "scope": "6e51e5c3a60800241337afb52d4ed1b543ce088e1270af1db046fafa0188384e",
+              "status": "passed",
+              "executed": true,
+              "skipped": false,
+              "evidence": [
+                {
+                  "path": ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json",
+                  "sha256": "f830c862ed9fcf6c0e5291503f64c730d0c8bd8314e264a1c83199ee39e5279f"
+                }
+              ]
+            }
+          ],
+          "evidence": [
+            {
+              "path": ".specflow/duo/1790178810790-262542ea/round-002/stdout.txt",
+              "sha256": "a22a16f2adddedea5b0e2172d123387e7b73340c1eaec29fef6a6a455ee829aa"
+            }
+          ],
+          "atEnd": "2026-09-23T15:57:58.720Z"
+        }
+      ]
+    },
+    "discoveries": [],
+    "experiments": [],
+    "batches": {},
+    "events": [],
+    "record": "record.json",
+    "volumeBaseline": {
+      "status": "reported",
+      "counts": {
+        "bodyCharacters": 876,
+        "linkedMaintainedCharacters": 311,
+        "historicalCharacters": 0,
+        "uniqueMaintainedCharacters": 1187,
+        "shared": 0,
+        "reused": 0,
+        "new": 5,
+        "deferred": 0,
+        "inapplicable": 0,
+        "requirements": 0
+      },
+      "artifacts": [
+        {
+          "id": "decision-offline",
+          "path": "decisions.json",
+          "characters": 311,
+          "historical": false,
+          "shared": false,
+          "reused": false
+        },
+        {
+          "id": "decision-corrections",
+          "path": "decisions.json",
+          "characters": 311,
+          "historical": false,
+          "shared": false,
+          "reused": false
+        },
+        {
+          "id": "decision-identity",
+          "path": "decisions.json",
+          "characters": 311,
+          "historical": false,
+          "shared": false,
+          "reused": false
+        },
+        {
+          "id": "decision-network",
+          "path": "decisions.json",
+          "characters": 311,
+          "historical": false,
+          "shared": false,
+          "reused": false
+        },
+        {
+          "id": "decision-reuse",
+          "path": "decisions.json",
+          "characters": 311,
+          "historical": false,
+          "shared": false,
+          "reused": false
+        }
+      ],
+      "identifiers": {
+        "AC-OFFLINE": [
+          {
+            "path": "issue",
+            "definition": "AC-OFFLINE: The selected bounded parser operation works offline; no required cloud service."
+          }
+        ],
+        "AC-CORRECTIONS": [
+          {
+            "path": "issue",
+            "definition": "AC-CORRECTIONS: Owner corrections survive repeat parsing; generated cache cannot own the only correction copy."
+          }
+        ],
+        "AC-IDENTITY": [
+          {
+            "path": "issue",
+            "definition": "AC-IDENTITY: Stable source identity distinguishes archives and survives sorting or rescanning."
+          }
+        ],
+        "AC-NETWORK": [
+          {
+            "path": "issue",
+            "definition": "AC-NETWORK: Private source content stays inside the approved local sandbox; it is never sent to a provider."
+          }
+        ],
+        "AC-REUSE": [
+          {
+            "path": "issue",
+            "definition": "AC-REUSE: Reuse the established sandbox and canonical decisions; no duplicate unreviewed parser sandbox."
+          }
+        ]
+      },
+      "errors": [],
+      "warnings": [],
+      "judgments": "Counts are mechanical signals. Applicability, scope and meaning require scoped review; length does not prove readiness."
+    },
+    "gates": {
+      "checks": {
+        "id": "checks",
+        "scope": "6e51e5c3a60800241337afb52d4ed1b543ce088e1270af1db046fafa0188384e",
+        "status": "passed",
+        "executed": true,
+        "skipped": false,
+        "evidence": {
+          "path": ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json",
+          "sha256": "f830c862ed9fcf6c0e5291503f64c730d0c8bd8314e264a1c83199ee39e5279f"
+        }
+      }
+    },
+    "transitions": [
+      {
+        "id": "2816592d-825a-4ffe-9955-0750eb820f93",
+        "producer": "specflow-specification/v1",
+        "tier": "contracted",
+        "inputHash": "6e51e5c3a60800241337afb52d4ed1b543ce088e1270af1db046fafa0188384e",
+        "dependenciesHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "discoveryHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "discoverySources": [
+          162
+        ],
+        "why": "Review the selected material parser decisions before future implementation detail",
+        "selected": 162,
+        "gates": [
+          {
+            "id": "checks",
+            "scope": "6e51e5c3a60800241337afb52d4ed1b543ce088e1270af1db046fafa0188384e",
+            "status": "passed",
+            "executed": true,
+            "skipped": false,
+            "evidence": {
+              "path": ".specflow/specification/evidence/gate-162-3e3ddfad-f291-43f3-8d56-99a194223be3.json",
+              "sha256": "f830c862ed9fcf6c0e5291503f64c730d0c8bd8314e264a1c83199ee39e5279f"
+            }
+          }
+        ],
+        "review": {
+          "outcome": "passed",
+          "evidence": {
+            "path": ".specflow/duo/1790178810790-262542ea/round-002/stdout.txt",
+            "sha256": "a22a16f2adddedea5b0e2172d123387e7b73340c1eaec29fef6a6a455ee829aa"
+          },
+          "identity": {
+            "provider": "claude",
+            "model": "claude-opus-5-5",
+            "family": "claude",
+            "modelEvidence": "native-metadata",
+            "mode": "live"
+          }
+        },
+        "at": "2026-09-23T15:59:13.297Z"
+      }
+    ]
+  },
+  "capturesFromSeparateReplayRepository": [
+    {
+      "duo_capture": 1,
+      "command": [
+        "node",
+        "check.cjs"
+      ],
+      "startedAt": "2026-09-23T15:53:40.970Z",
+      "finishedAt": "2026-09-23T15:53:41.048Z",
+      "exitCode": 1,
+      "error": null,
+      "stdout": "{\"executed\":5,\"skipped\":0,\"failed\":5,\"checks\":[[\"AC-OFFLINE\",false],[\"AC-CORRECTIONS\",false],[\"AC-IDENTITY\",false],[\"AC-NETWORK\",false],[\"AC-REUSE\",false]],\"scope\":\"Seeded decision constraints only; not product runtime verification\"}\n",
+      "stderr": "",
+      "sourceBefore": "a50f976c41b81983a1a05b381def2a1eec49a7dc1cd9ce897aa259e51655d207",
+      "sourceAfter": "a50f976c41b81983a1a05b381def2a1eec49a7dc1cd9ce897aa259e51655d207",
+      "stable": true
+    },
+    {
+      "duo_capture": 1,
+      "command": [
+        "node",
+        "check.cjs"
+      ],
+      "startedAt": "2026-09-23T15:56:51.186Z",
+      "finishedAt": "2026-09-23T15:56:51.252Z",
+      "exitCode": 0,
+      "error": null,
+      "stdout": "{\"executed\":5,\"skipped\":0,\"failed\":0,\"checks\":[[\"AC-OFFLINE\",true],[\"AC-CORRECTIONS\",true],[\"AC-IDENTITY\",true],[\"AC-NETWORK\",true],[\"AC-REUSE\",true]],\"scope\":\"Seeded decision constraints only; not product runtime verification\"}\n",
+      "stderr": "",
+      "sourceBefore": "e9abdf9aeb9a68ec0324ab3e2e298880530b9a2481f6d7636103676265506d69",
+      "sourceAfter": "e9abdf9aeb9a68ec0324ab3e2e298880530b9a2481f6d7636103676265506d69",
+      "stable": true
+    }
+  ],
+  "gateExecutions": [
+    {
+      "kind": "specification-gate",
+      "id": "checks",
+      "scope": "6e51e5c3a60800241337afb52d4ed1b543ce088e1270af1db046fafa0188384e",
+      "command": [
+        "/home/xanacan/.nvm/versions/node/v22.19.0/bin/node",
+        "check.cjs"
+      ],
+      "startedAt": "2026-09-23T15:56:51.019Z",
+      "exitCode": 0,
+      "error": null,
+      "stdout": "{\"executed\":5,\"skipped\":0,\"failed\":0,\"checks\":[[\"AC-OFFLINE\",true],[\"AC-CORRECTIONS\",true],[\"AC-IDENTITY\",true],[\"AC-NETWORK\",true],[\"AC-REUSE\",true]],\"scope\":\"Seeded decision constraints only; not product runtime verification\"}\n",
+      "stderr": "",
+      "executed": 5,
+      "skipped": 0,
+      "failed": 0
+    },
+    {
+      "kind": "specification-gate",
+      "id": "checks",
+      "scope": "325a4d345c26ff56aa91a2dc96d533ce1480e140192579cf598b2402ad32329f",
+      "command": [
+        "/home/xanacan/.nvm/versions/node/v22.19.0/bin/node",
+        "check.cjs"
+      ],
+      "startedAt": "2026-09-23T15:53:30.658Z",
+      "exitCode": 1,
+      "error": null,
+      "stdout": "{\"executed\":5,\"skipped\":0,\"failed\":5,\"checks\":[[\"AC-OFFLINE\",false],[\"AC-CORRECTIONS\",false],[\"AC-IDENTITY\",false],[\"AC-NETWORK\",false],[\"AC-REUSE\",false]],\"scope\":\"Seeded decision constraints only; not product runtime verification\"}\n",
+      "stderr": "",
+      "executed": 5,
+      "skipped": 0,
+      "failed": 5
+    }
+  ],
+  "limitations": [
+    "First native response was protocol-invalid because it cited empty diff.patch; its findings were not a validated ledger.",
+    "Second and final allowed contracted attempt accepted the corrected decisions.",
+    "Seeded decision checks exercise policy choices, not functioning parser runtime.",
+    "Native replay pinned the recorded intermediate runtime; later retry-availability, assumption-hash and mandatory-artifact-read fixes are covered by final workflow tests. No old runtime was overwritten."
+  ]
+}

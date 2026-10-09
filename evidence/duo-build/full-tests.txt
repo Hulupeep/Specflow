@@ -1,0 +1,82 @@
+
+> @colmbyrne/specflow@0.11.1 test
+> jest --no-coverage --runInBand
+
+PASS tests/hooks/post-push-ci.test.js
+PASS tests/hooks/installer-fixes.test.js
+PASS tests/scripts/duo-build.test.js
+PASS tests/scripts/routing-readiness.test.js
+PASS tests/contracts/teardown-gate.test.js
+PASS tests/hooks/run-journey-tests.test.js
+PASS tests/contracts/loop-run-contract.test.js
+  ● Console
+
+    console.log
+      {
+        "status": "gate_passed",
+        "contractPath": "/tmp/specflow-run-ipLlid/run-contract.yaml",
+        "ledgerPath": "/tmp/specflow-run-ipLlid/ledger.jsonl",
+        "model_routing": {
+          "active": true,
+          "status": "active",
+          "routing_path": ".specflow/adapter-routing.yml",
+          "loop": "feature-build",
+          "stage": "3_e2e",
+          "policy_id": "codex-sol-implementer",
+          "provider": "codex-exec",
+          "role": "implementer",
+          "effort": "medium",
+          "requested_model": "gpt-5.6-sol",
+          "fallback_model": null,
+          "max_budget_usd": null,
+          "budget_note": "max_budget_usd is a policy cap/quota guard. If Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing.",
+          "confirmation_required": true,
+          "message": "Model routing active: gpt-5.6-sol for feature-build.3_e2e (implementer)."
+        }
+      }
+
+      at cli (scripts/specflow-runner.cjs:2458:13)
+
+PASS tests/hooks/post-build-check.test.js
+PASS tests/scripts/gate-scripts.test.js
+PASS tests/contracts/verifier-rail.test.js
+PASS tests/contracts/verifier-runtime-evidence.test.js
+PASS tests/schema/contract-schema.test.js
+PASS tests/contracts/routing-confirmation.test.js
+PASS tests/contracts/specflow_self_compliance.test.js
+PASS tests/contracts/runtime-routing-install.test.js
+PASS tests/contracts/test_integrity_defaults.test.js
+PASS tests/contracts/production_readiness_defaults.test.js
+PASS tests/contracts/security_defaults.test.js
+PASS tests/schema/feature_preflight.test.js
+PASS tests/contracts/state-reentry.test.js
+PASS tests/scripts/loop-contracts.test.js
+PASS tests/compile/yaml-output.test.js
+PASS tests/contracts/verifier-policy-isolation.test.js
+PASS tests/contracts/fable-subordinate-controls.test.js
+PASS tests/contracts/worktree-isolation.test.js
+PASS tests/contracts/accessibility_defaults.test.js
+PASS tests/compile/validation.test.js
+PASS tests/compile/csv-parse.test.js
+PASS tests/contracts/verify-seams.test.js
+PASS tests/contracts/provider-confirmation-order.test.js
+PASS tests/contracts/verifier-contract-lifecycle.test.js
+PASS tests/contracts/verifier-trace-divergence.test.js
+PASS tests/contracts/verifier-impl-rail.test.js
+PASS tests/contracts/adversary-spawn.test.js
+PASS tests/contracts/verify-seed.test.js
+PASS tests/scripts/install-agent-instructions.test.js
+PASS tests/contracts/verify-adr.test.js
+PASS tests/contracts/provenance-gate.test.js
+PASS tests/contracts/ticket-journey.test.js
+PASS tests/contracts/verify-falsification.test.js
+PASS tests/compile/playwright-output.test.js
+
+Test Suites: 41 passed, 41 total
+Tests:       922 passed, 922 total
+Snapshots:   0 total
+Time:        13.481 s, estimated 15 s
+Ran all test suites.
+
+command: npm test -- --runInBand
+exit: 0

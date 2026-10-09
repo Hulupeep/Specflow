@@ -1,4 +1,5 @@
 ---
+
 name: specflow
 description: Spec-driven development with executable contracts
 version: 1.0.0
@@ -6,6 +7,13 @@ author: Hulupeep
 ---
 
 # Specflow Skill
+
+Specification depth is governed by `SPECIFICATION.md` (source kit:
+`templates/SPECIFICATION.md`) and `scripts/specflow-tier.cjs`. Thin work stays
+at planning depth; contracted reviews cover applicable decisions and UI paper
+walkthroughs. The detailed build-ready procedures below apply only to the
+selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
+Required privacy, permission, executable journey and release gates still apply.
 
 Specs that enforce themselves. Turn requirements into contracts that break the build when violated.
 
@@ -31,7 +39,7 @@ When this skill is active, Claude Code MUST:
 3. **When creating new features**: Generate the spec (with REQ IDs), contract YAML, and test files BEFORE implementing code.
 4. **When a contract violation is reported**: Read the contract rule, understand why it exists, fix the code to comply. Never work around the test.
 5. **Never modify `non_negotiable` rules** unless the user explicitly says `override_contract: <contract_id>`.
-6. **Before accepting a ticket as specflow-compliant**: Pre-flight must have run and returned `passed`, `passed_with_warnings`, or a human-acknowledged `override:*` status. A ticket with `blocked`, `stale`, or missing pre-flight section is NOT compliant.
+6. **Before accepting a selected slice as build-ready**: Require current scoped pre-flight and all applicable acceptance/gate evidence through `scripts/specflow-tier.cjs`. Relevant CRITICAL/P1 findings, missing execution or stale evidence block readiness. Thin planning needs no full pre-flight. An owner exception is recorded distinctly and cannot grant readiness or turn a failed gate into a pass.
 7. **Before starting spec-build or feature-build work**: Confirm model routing in plain language. If `.specflow/adapter-routing.yml` exists, say `Model routing active:` and list the selected model/policy for the current stage before invoking it. Call `max_budget_usd` a budget cap / quota guard, not a guaranteed cost. For `codex-exec`, say that ChatGPT-authenticated Codex consumes Codex plan quota/credits rather than OpenAI API billing. If the routing file does not exist, stop and give the setup command:
    `specflow run --setup-routing`.
    Expensive/default routed adapters must not run until the user has confirmed the displayed model choices.
@@ -46,28 +54,28 @@ A read-only simulation that catches broken specs before any code is written. Pre
 
 | Scope | Trigger | Lenses |
 |-------|---------|--------|
-| **Ticket** | When any ticket is created or edited as a specflow ticket | Lenses 1-5 |
-| **Wave** | Between dependency-mapper and sprint-executor, for all wave tickets simultaneously | Lenses 1-6 (includes Lens 6: Concurrent User Scenarios) |
+| **Selected slice** | Promotion to build-ready, or a material change invalidating its scoped evidence | Applicable lenses 1-5 |
+| **Wave** | Before executing selected build-ready work with interacting seams; future tickets stay thin | Applicable lenses 1-6, including concurrent-user seams |
 
 ### Trigger Phrases (Ticket Scope)
 
-All of the following invoke format-then-simulate, in that order, every time:
+The following first load the shared tier policy. Thin work remains planning; contracted work reviews only applicable decisions. Format and simulate only the selected build-ready slice:
 - "write this as a specflow ticket"
 - "update this ticket as a specflow ticket"
 - "edit this ticket as a specflow ticket"
 - "make this ticket specflow-compliant"
 - Any instruction resulting in specflow-writer creating or modifying a ticket body
 
-A ticket is NOT specflow-compliant until both format AND simulate have completed cleanly.
+A selected build-ready slice needs current applicable artifact and simulation evidence. Planning completion does not imply build readiness; reuse existing evidence rather than generating a package for future tickets.
 
 ### simulation_status Enum
 
 ```
 passed              — no CRITICAL findings
-passed_with_warnings — P1 findings present but acknowledged
+passed_with_warnings — nonblocking findings documented; no relevant CRITICAL/P1
 blocked             — CRITICAL findings unresolved; ticket cannot enter a wave
-stale               — ticket or referenced contract updated after last simulation
-override:[reason]   — human override applied; wave can proceed
+stale               — scope, assumptions or relevant evidence no longer match
+override:[reason]   — recorded owner exception; never a passing readiness result
 ```
 
 Any value outside this enum is treated as `blocked` by waves-controller. The field is parsed directly — no regex, no interpretation.
@@ -77,15 +85,15 @@ Any value outside this enum is treated as `blocked` by waves-controller. The fie
 After dependency-mapper completes and before sprint-executor fires:
 - Any ticket with `blocked` or `stale` → wave pauses, finding summary output to user, STOP
 - Any non-enum value → treated as `blocked`, STOP
-- All tickets with `passed`, `passed_with_warnings`, or `override:*` → sprint-executor proceeds
+- Selected slices require current `passed` or `passed_with_warnings` evidence and the shared build-ready check before sprint-executor proceeds
+- `override:*` remains an explicit exception; it cannot authorize production implementation
 
-### Override
+### Owner exceptions
 
-```
-override_preflight: [ticket-id] reason: [reason text]
-```
-
-Sets `simulation_status: override:[reason]` on the ticket. Logged to `docs/preflight/overrides.md` with ticket-id, reason, RFC 3339 UTC timestamp, and user. board-auditor displays overrides distinctly (⚠️OVERRIDE prefix) and flags overrides older than the last contract update.
+Follow the authenticated owner-exception procedure in `SPECIFICATION.md`.
+A model-written reason, label or CLI token is not authorization. Preserve the
+owner decision and raw failed evidence; an exception stays `override:*`, never
+`passed`, and cannot grant build-ready status or bypass privacy or release gates.
 
 ### What Pre-Flight Does NOT Do
 
@@ -255,13 +263,13 @@ Forbidden: /tabIndex\s*=\s*\{?\s*[1-9]/
 
 ### Pre-Flight Simulator
 
-**When**: Before any ticket is accepted as specflow-compliant; before each wave fires (between dependency-mapper and sprint-executor).
+**When**: Before the selected slice receives build-ready promotion or enters a production wave. Thin inspection does not trigger full pre-flight; contracted UI decisions use a bounded paper walkthrough.
 
 **Recommended model**: `sonnet`
 
 **Process**:
 1. Receive JSON input with scope (`ticket` or `wave`) plus ticket bodies and `contracts_dir`
-2. Load all files in `docs/contracts/` before running any lens (proof-of-work: list every file loaded)
+2. Load applicable canonical contracts and directly relevant shared decisions before running a lens; record every reference actually inspected.
 3. Run lenses in sequence — Lenses 1-5 for ticket scope, Lenses 1-6 for wave scope:
    - **Lens 1: Dependency Order** — are all upstream dependencies present in the wave or schema?
    - **Lens 2: Shared State** — concurrent writes, global state that should be per-user scoped?
@@ -269,7 +277,7 @@ Forbidden: /tabIndex\s*=\s*\{?\s*[1-9]/
    - **Lens 4: Timing and Interval Assumptions** — polling intervals, timeouts, SLA thresholds match contracts?
    - **Lens 5: Partial Failure States** — missing rollback, cleanup, or idempotency on step N+1 failure?
    - **Lens 6: Concurrent User Scenarios** (wave scope only) — race conditions, missing locks, shared state not isolated per-session?
-4. Write findings to `## Pre-flight Findings` section in each ticket body (via specflow-writer for writes)
+4. Propose the smallest relevant finding update for affected tickets; specflow-writer publishes only after the project privacy gate, preserving concurrent edits.
 5. Return structured report with Lens attribution on every finding
 6. P2 findings written to `docs/preflight/[ticket-id]-[timestamp].md` without blocking
 

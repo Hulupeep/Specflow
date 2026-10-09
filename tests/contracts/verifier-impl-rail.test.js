@@ -21,6 +21,7 @@ function setup(overrides = {}) {
   fs.writeFileSync(contractPath, yaml.dump({
     run_contract: {
       loop: 'feature-build',
+      ...require('../helpers/spec-density').fixture(dir),
       goal: 'implement slice',
       input_artifact: 'docs/x.md',
       path: 'templates/QA/loops/feature-build.yaml',

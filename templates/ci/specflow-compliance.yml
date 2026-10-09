@@ -1,3 +1,6 @@
+# Specification depth: scripts/specflow-tier.cjs owns thin/contracted/build-ready
+# applicability. These execution/release checks remain required for product changes;
+# passing CI alone does not grant promotion or replace current scoped evidence.
 # Specflow PR Compliance Reporter
 #
 # Runs contract tests on pull requests and posts a compliance report

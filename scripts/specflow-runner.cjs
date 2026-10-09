@@ -8,6 +8,8 @@
  */
 
 const { spawnSync } = require('child_process');
+const routingShadow = require('./typesafe-routing-bridge.cjs');
+const tierPolicy = require('./specflow-tier.cjs');
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve } = require('path');
@@ -102,7 +104,7 @@ function defaultStatePaths(contractPath, options = {}) {
   };
 }
 
-function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }) {
+function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath, tierRecord, repoRoot }) {
   if (!LOOP_PATHS[loop]) throw new Error(`unknown loop "${loop}"`);
   return {
     run_contract: {
@@ -116,7 +118,10 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath }
         ? 'ticket + ACs + journey id confirmed'
         : 'grounding written with problem + oracle',
       durable_evidence: [contractPath, ledgerPath],
-      simulation_required: loop === 'spec-build',
+      tier: 'thin',
+      tier_record: tierRecord || null,
+      repository_root: repoRoot || process.cwd(),
+      simulation_required: false,
       stop_condition: 'continue until handoff, human gate, missing evidence, or failure',
       never_without_human: ['git push', 'open PR', 'merge', '--no-verify', 'override contract'],
       budgets: {},
@@ -724,6 +729,8 @@ function fallbackLoopSequence(contract) {
 }
 
 function loopSequence(contract, options = {}) {
+  if (contract.loop === 'spec-build' && contract.tier === 'thin') return ['discover', 'draft', 'tickets', 'handoff'];
+  if (contract.loop === 'spec-build' && contract.tier === 'contracted') return ['discover', 'draft', 'adversary', 'tickets', 'handoff'];
   const fromDefinition = loopSequenceFromDefinition(loadLoopDefinition(contract, options));
   return fromDefinition.length ? fromDefinition : fallbackLoopSequence(contract);
 }
@@ -940,16 +947,31 @@ function assembleVerifierInput(options = {}) {
 const RUNTIME_CHECK_TYPES = ['playwright', 'api', 'db-reread', 'console', 'network', 'screenshot', 'custom-script'];
 const RUNTIME_REREAD_TYPES = ['api', 'db-reread', 'custom-script'];
 
+function runtimeCheckIdentity(check, index) {
+  return {
+    check_id: check.id || `runtime-check-${index + 1}`,
+    check_sha256: createHash('sha256').update(JSON.stringify(canonicalizeSemanticValue(check))).digest('hex'),
+  };
+}
+
 function validateRuntimeChecks(checks, options = {}) {
   const list = Array.isArray(checks) ? checks : [];
   const errors = [];
-  for (const c of list) {
+  if (!Array.isArray(checks)) errors.push('runtime checks must be an array');
+  const identities = new Set();
+  for (const [index, c] of list.entries()) {
     if (!c || !RUNTIME_CHECK_TYPES.includes(c.type)) errors.push(`unsupported runtime check type: ${c && c.type}`);
+    if (!c) continue;
+    if (c.required !== undefined && typeof c.required !== 'boolean') errors.push('runtime check required must be a boolean');
+    if (c.id !== undefined && (typeof c.id !== 'string' || !c.id.trim())) errors.push('runtime check id must be a non-empty string');
+    const { check_id } = runtimeCheckIdentity(c, index);
+    if (identities.has(check_id)) errors.push(`duplicate runtime check id: ${check_id}`);
+    identities.add(check_id);
   }
-  if (options.uiOrWorkflow && !list.some((c) => c && c.required)) {
+  if (options.uiOrWorkflow && !list.some((c) => c && c.required === true)) {
     errors.push('UI/workflow slice requires at least one required runtime check');
   }
-  if (options.valueBearing && !list.some((c) => c && RUNTIME_REREAD_TYPES.includes(c.type))) {
+  if (options.valueBearing && !list.some((c) => c && c.required === true && RUNTIME_REREAD_TYPES.includes(c.type))) {
     errors.push('value-bearing slice requires an api/db-reread/custom-script reread; screenshot-only evidence is insufficient');
   }
   return { ok: errors.length === 0, errors };
@@ -967,10 +989,17 @@ function runRuntimeChecks(options = {}) {
   const makerClaim = options.makerClaim || UNKNOWN;
   const runner = options.runner || defaultRuntimeRunner;
   const findings = [];
-  for (const check of checks) {
-    const outcome = runner(check) || {};
+  for (const [index, check] of checks.entries()) {
+    const identity = runtimeCheckIdentity(check, index);
+    let outcome;
+    try {
+      // A runner may inspect a check, but cannot change the accepted inventory.
+      outcome = runner(JSON.parse(JSON.stringify(check))) || {};
+    } catch (error) {
+      outcome = { executable: false, reason: `runtime runner threw: ${error.message}` };
+    }
     let finding;
-    if (outcome.executable === false || outcome.result === 'blocked') {
+    if (outcome.executable !== true || !['pass', 'fail'].includes(outcome.result)) {
       finding = {
         severity: 'blocked',
         check_type: check.type,
@@ -981,7 +1010,9 @@ function runRuntimeChecks(options = {}) {
         result: 'blocked',
         gate_result: 'pending',
         evidence_path: null,
-        reason: outcome.reason || `missing executable surface for ${check.type} check`,
+        reason: outcome.reason || (outcome.executable !== true
+          ? `missing executable surface for ${check.type} check`
+          : `invalid runtime result: ${String(outcome.result)}`),
       };
     } else {
       const failed = outcome.result === 'fail';
@@ -997,6 +1028,7 @@ function runRuntimeChecks(options = {}) {
         evidence_path: outcome.evidence_path || check.evidence_path || null,
       };
     }
+    Object.assign(finding, identity);
     findings.push(finding);
     appendLedger(paths.findingsPath, finding);
   }
@@ -1133,10 +1165,22 @@ function verifierRequiredForSlice(sliceTags = [], options = {}) {
   return tags.some((t) => requiredWhen.includes(t));
 }
 
-function verifierGateDecision(findings = []) {
-  const required = findings.filter((f) => f.required);
+function verifierGateDecision(findings = [], checks) {
+  if (!Array.isArray(findings) || findings.some((f) => !f || typeof f !== 'object'
+    || (f.required !== undefined && typeof f.required !== 'boolean'))) return 'blocked';
+  const required = findings.filter((f) => f.required === true);
   if (!required.length) return 'blocked'; // required runtime evidence missing
-  if (required.some((f) => f.verifier_result === 'blocked')) return 'blocked';
+  if (checks !== undefined) {
+    if (!validateRuntimeChecks(checks, { uiOrWorkflow: true }).ok) return 'blocked';
+    const expected = checks.map((c, index) => ({ ...runtimeCheckIdentity(c, index), required: c.required === true }))
+      .filter((c) => c.required);
+    if (required.length !== expected.length) return 'blocked';
+    for (const check of expected) {
+      const matches = findings.filter((f) => f.check_id === check.check_id);
+      if (matches.length !== 1 || matches[0].required !== true || matches[0].check_sha256 !== check.check_sha256) return 'blocked';
+    }
+  }
+  if (required.some((f) => !['pass', 'fail'].includes(f.verifier_result))) return 'blocked';
   if (required.some((f) => f.verifier_result === 'fail')) return 'fail';
   return 'pass';
 }
@@ -1175,10 +1219,14 @@ function runVerifierStage(options = {}) {
     return { status: 'blocked', required, gate: 'blocked', reason: contractGate.reason };
   }
 
-  const checks = options.checks || (contractGate.contract && contractGate.contract.runtime_checks) || [];
-  const valueBearing = options.valueBearing !== undefined
-    ? options.valueBearing
-    : sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t));
+  const checks = contractGate.contract.runtime_checks;
+  if (options.checks !== undefined
+    && JSON.stringify(canonicalizeSemanticValue(options.checks)) !== JSON.stringify(canonicalizeSemanticValue(checks))) {
+    const reason = 'runtime checks differ from the accepted verification contract; accept a revised contract before changing checks';
+    record('blocked', { reason });
+    return { status: 'blocked', required, gate: 'blocked', reason };
+  }
+  const valueBearing = options.valueBearing === true || sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t));
   const validation = validateRuntimeChecks(checks, { uiOrWorkflow: true, valueBearing });
   if (!validation.ok) {
     record('blocked', { reason: validation.errors.join('; ') });
@@ -1188,7 +1236,7 @@ function runVerifierStage(options = {}) {
   const { findings, summary } = runRuntimeChecks({
     runDir: options.runDir, contract: options.contract, ledger: options.ledger, checks, makerClaim, runner: options.runner,
   });
-  const gate = verifierGateDecision(findings);
+  const gate = verifierGateDecision(findings, checks);
   record(gate, {
     findings_count: findings.length,
     divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,
@@ -1709,6 +1757,11 @@ function buildAdapterCommand(policy, promptPath) {
   const deniedTools = policy.denied_tools || [];
   if (policy.provider === 'claude-print') {
     const args = policy.args.length ? [...policy.args] : ['-p', '--output-format', 'stream-json'];
+    if (policy.effort) {
+      const existing = args.flatMap((arg, i) => arg === '--effort' ? [args[i + 1]] : arg.startsWith('--effort=') ? [arg.slice(9)] : []);
+      if (existing.length > 1 || existing.some(e => e !== policy.effort)) throw Error('Conflicting Claude effort flags');
+      if (!existing.length) args.push('--effort', policy.effort);
+    }
     if (!args.includes('-p') && !args.includes('--print')) args.unshift('-p');
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
@@ -1725,8 +1778,10 @@ function buildAdapterCommand(policy, promptPath) {
     if (policy.session_id && !args.includes('--resume') && !args.includes('--session-id')) {
       args.push('--resume', String(policy.session_id));
     }
-    if (promptPath) args.push(readFileSync(promptPath, 'utf8'));
-    else if (policy.prompt) args.push(String(policy.prompt));
+    // --allowedTools/--disallowedTools are variadic in the Claude CLI and would
+    // swallow a trailing prompt; end option parsing first (#171 discovery).
+    const prompt = promptPath ? readFileSync(promptPath, 'utf8') : policy.prompt ? String(policy.prompt) : null;
+    if (prompt !== null) args.push('--', prompt);
     return { command: policy.command || 'claude', args };
   }
 
@@ -1734,6 +1789,11 @@ function buildAdapterCommand(policy, promptPath) {
     const args = policy.session_id
       ? ['exec', 'resume', String(policy.session_id), ...(policy.args || [])]
       : ['exec', ...(policy.args || [])];
+    if (policy.effort) {
+      const settings = args.filter(a => a.includes('model_reasoning_effort='));
+      if (settings.length > 1 || settings.some(a => !new RegExp('^model_reasoning_effort=["\']?' + policy.effort + '["\']?$').test(a))) throw Error('Conflicting Codex effort flags');
+      if (!settings.length) args.push('-c', `model_reasoning_effort="${policy.effort}"`);
+    }
     if (!args.includes('--json')) args.push('--json');
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
@@ -1784,7 +1844,8 @@ function mergeUsage(current, event) {
     event.total_tokens,
     inputTokens !== null || outputTokens !== null ? Number(inputTokens || 0) + Number(outputTokens || 0) : null,
   );
-  const costUsd = pickFirstNumber(usage.cost_usd, usage.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd);
+  // claude -p reports the run total as total_cost_usd on its result event.
+  const costUsd = pickFirstNumber(usage.cost_usd, usage.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd, event.total_cost_usd);
   return {
     input_tokens: current.input_tokens ?? inputTokens,
     output_tokens: current.output_tokens ?? outputTokens,
@@ -1916,6 +1977,10 @@ function runAdapter(policy, options = {}) {
       encoding: 'utf8',
       timeout: Number(policy.timeout_seconds) * 1000,
       maxBuffer: 10 * 1024 * 1024,
+      // Optional isolation for callers such as `specflow improve` (#176):
+      // run inside a delegated worktree with a scrubbed environment.
+      ...(options.cwd ? { cwd: options.cwd } : {}),
+      ...(options.env ? { env: options.env } : {}),
     });
   }
 
@@ -1978,6 +2043,18 @@ function runAdapter(policy, options = {}) {
 }
 
 function runLoop(options) {
+  const result = runLoopBody(options);
+  if (result.contractPath && existsSync(result.contractPath)) {
+    const contract = loadRunContract(result.contractPath);
+    if (contract.routing_shadow && ['handoff', 'failed', 'blocked'].includes(contract.terminal_status)) {
+      result.routing_shadow_terminal = routingShadow.terminal(contract.routing_shadow, contract.run_id, contract.terminal_status === 'handoff' ? 'completed' : contract.terminal_status, [result.ledgerPath]);
+    }
+    if (contract.routing_shadow) result.routing_shadow = routingShadow.reportStatus(contract.routing_shadow);
+    if (contract.routing_shadow_error) result.routing_shadow_error = contract.routing_shadow_error;
+  }
+  return result;
+}
+function runLoopBody(options) {
   const slug = options.slug || 'specflow-run';
   const { contractPath, ledgerPath } = defaultRunPaths(slug, options);
   let wrapper;
@@ -1993,7 +2070,11 @@ function runLoop(options) {
       input: options.input || 'unspecified',
       contractPath,
       ledgerPath,
+      tierRecord: options.tierRecord,
+      repoRoot: options.repoRoot,
     });
+    try { wrapper.run_contract.routing_shadow = routingShadow.enrollment(process.cwd()); }
+    catch (e) { wrapper.run_contract.routing_shadow_error = e.message; }
     writeYaml(contractPath, wrapper);
   }
 
@@ -2023,6 +2104,32 @@ function runLoop(options) {
     return { status: 'invalid_contract', errors: validation.errors, contractPath, ledgerPath };
   }
 
+  if (['spec-build', 'feature-build'].includes(contract.loop)) {
+    let record;
+    try {
+      record = contract.tier_record ? loadDataFile(contract.tier_record) : { issue: { labels: [] } };
+    } catch (error) {
+      record = null;
+    }
+    const decision = require('./specflow-specification.cjs').boundary(contract.repository_root || process.cwd(), record, {
+      route: contract.loop,
+      operation: contract.loop === 'feature-build' ? (resuming ? 'resume' : 'build') : 'inspect',
+    });
+    contract.tier = decision.tier;
+    contract.simulation_required = decision.simulation_required;
+    contract.tier_warnings = decision.warnings;
+    contract.tier_decision = decision;
+    writeYaml(contractPath, { run_contract: contract });
+    if (decision.status === 'blocked') {
+      const entry = { stage: contract.current_stage_or_rail, event: 'tier_gate', result: 'blocked', stop_reason: 'blocked_specification', errors: decision.errors, next_action: decision.next_action };
+      appendLedger(ledgerPath, entry);
+      return { status: 'blocked_specification', decision, entry, contractPath, ledgerPath };
+    }
+    if (contract.loop === 'spec-build' && contract.tier !== 'build-ready' && !loopSequence(contract, options).includes(contract.current_stage_or_rail)) {
+      return { status: 'planning_complete', decision, contractPath, ledgerPath, next_action: 'The backlog remains at its recorded tier. Promote only the next justified slice.' };
+    }
+  }
+
   if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '7_ci_handoff') {
     const entry = {
       stage: '7_ci_handoff',
@@ -2035,6 +2142,20 @@ function runLoop(options) {
     contract.terminal_status = 'handoff';
     writeYaml(contractPath, { run_contract: contract });
     return { status: 'human_ci_handoff_required', entry, contractPath, ledgerPath };
+  }
+
+  // Specification review has one native boundary: Duo reserves the durable
+  // issue/tier budget before invoking the opposite CLI. Generic stage adapters
+  // and supplied stage-evidence cannot bypass that boundary.
+  if (contract.loop === 'spec-build' && ['adversary', 'GATE_B5'].includes(contract.current_stage_or_rail)) {
+    const record = contract.tier_record ? loadDataFile(contract.tier_record) : null;
+    const scoped = require('./specflow-reviews.cjs').stageGate(contract.repository_root || process.cwd(), record, contract.current_stage_or_rail);
+    const entry = { stage: contract.current_stage_or_rail, event: 'scoped_review', result: scoped.passed ? 'pass' : 'blocked', ...scoped };
+    appendLedger(ledgerPath, entry);
+    if (scoped.passed) contract.current_stage_or_rail = nextStage(contract, options);
+    contract.terminal_status = scoped.passed ? 'in_progress' : 'blocked';
+    writeYaml(contractPath, { run_contract: contract });
+    return { status: scoped.passed ? 'scoped_review_accepted' : 'scoped_review_required', entry, contractPath, ledgerPath };
   }
 
   const runId = contract.run_id || modelConfirmationRunId(slug, contractPath);
@@ -2130,12 +2251,35 @@ function runLoop(options) {
     }
 
     const prompt = options.prompt ? { promptPath: options.prompt } : materializeStagePrompt(contract, { ...options, contractPath, slug });
+    const shadowTask = contract.routing_shadow ? {
+      taskFamilyId: contract.routing_task_family || contract.input_artifact,
+      runId, stage: contract.current_stage_or_rail, loop: contract.loop,
+      attempt: readLedger(ledgerPath).filter(e => e.event === 'routing_shadow_begin' && e.stage === contract.current_stage_or_rail).length,
+      goal: contract.goal, acceptance: readFileSync(prompt.promptPath, 'utf8'),
+      context: contract.input_artifact, evidenceRefs: [prompt.promptPath],
+      recentEvidence: readLedgerTail(ledgerPath, 3),
+      configured: { model: policy.model || policy.requested_model || UNKNOWN, effort: policy.effort || null },
+      requested: { model: policy.requested_model || policy.model || UNKNOWN, effort: policy.effort || null },
+    } : null;
+    const shadowReceipt = policy.dry_run || options.adapterDryRun ? null : routingShadow.begin(process.cwd(), contract.routing_shadow, shadowTask);
+    if (shadowReceipt) appendLedger(ledgerPath, { event: 'routing_shadow_begin', stage: contract.current_stage_or_rail, ...shadowReceipt });
+    const discoveryBatch = contract.loop === 'feature-build' && contract.current_stage_or_rail === '5_impl' && !policy.dry_run && !options.adapterDryRun ? `runner-${runId}-${Date.now()}` : null;
+    if(discoveryBatch) require('./specflow-specification.cjs').beginBatch(contract.repository_root || process.cwd(),loadDataFile(contract.tier_record),discoveryBatch);
     const adapterResult = runAdapter(policy, {
       dryRun: options.adapterDryRun,
       promptPath: prompt.promptPath,
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
     });
+    if(discoveryBatch) {
+      require('./specflow-reviews.cjs').change(contract.repository_root || process.cwd(),loadDataFile(contract.tier_record).issue.number,journal=>{journal.batches[discoveryBatch].outcome=adapterResult.status==='gate_rerun_required'?'success':'blocked';journal.batches[discoveryBatch].evidence=policy.transcript_path;});
+      adapterResult.discoveryBatch=discoveryBatch;
+      adapterResult.discoveryNextAction=`Collect discoveries or explicit none for ${discoveryBatch} before advancing`;
+    }
+    if (shadowReceipt) {
+      const result = routingShadow.end(contract.routing_shadow, shadowReceipt, { status: adapterResult.status === 'gate_rerun_required' ? 'completed' : 'blocked', terminal: false, observed: { model: adapterResult.entry.effective_model || UNKNOWN, effort: null }, evidenceRefs: [policy.transcript_path], note: 'Provider completion is not gate acceptance; effective effort is unknown without native metadata.' });
+      appendLedger(ledgerPath, { event: 'routing_shadow_outcome', stage: contract.current_stage_or_rail, ...result });
+    }
     appendLedger(ledgerPath, {
       ...adapterResult.entry,
       prompt_path: prompt.promptPath,
@@ -2312,6 +2456,7 @@ function runStatus(options = {}) {
     cost: costAccounting(readLedger(ledgerPath)),
     model_routing: routing,
     model_confirmation: confirmation,
+    routing_shadow: routingShadow.reportStatus(contract.routing_shadow),
   };
 }
 
@@ -2327,6 +2472,8 @@ function isTerminalStatus(status) {
     'blocked_verification_required',
     'blocked_verifier_stage',
     'dry_run',
+    'blocked_specification',
+    'planning_complete', 'scoped_review_required',
   ].includes(status);
 }
 
@@ -2456,7 +2603,7 @@ function cli(argv = process.argv.slice(2)) {
       return 2;
     }
     console.log(JSON.stringify(result, null, 2));
-    return 0;
+    return result.status === 'blocked_specification' ? 2 : 0;
   } catch (e) {
     console.error(`specflow run failed: ${e.message}`);
     return 1;
@@ -2494,6 +2641,7 @@ module.exports = {
   buildAdapterCommand,
   commandExists,
   containsForbiddenAction,
+  forbiddenStageCheck,
   parseProviderEvents,
   forbiddenFromProviderEvents,
   isSimulationFresh,

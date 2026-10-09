@@ -16,9 +16,10 @@ Follow the epic_gate spec — do not restate it. The run:
    a decorative screenshot does not satisfy a value hop.
 3. Every red hop gets a DISPOSITION: `bug` (the last-merged writer of the seam reopens;
    name the seam pair + tiebreak; shared-module case names the module commit) or
-   `stale-oracle` (an amendment to the hops artifact — REQUIRES HUMAN COUNTERSIGN;
-   you may never reconcile your own oracle).
-4. PROOF: `node scripts/teardown-gate.cjs check gate-d/<epic>/` must pass, and the human
-   signs map + result. STOP and present for signing — never sign yourself, never close
-   the epic on a red or unsigned GATE D.
+   `stale-oracle` (an amendment to the hops artifact through the configured
+   amendment/provenance path; you may never reconcile your own oracle).
+4. PROOF: `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/` must pass.
+   Human signatures are required only when the Gate D signoff policy marks them required.
+   STOP and present for signing only in that configured mode — never sign yourself, never
+   close the epic on a red Gate D.
 ```

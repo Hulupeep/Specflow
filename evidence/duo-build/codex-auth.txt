@@ -1,0 +1,27 @@
+Live authentication verification using the current helper.
+
+command: codex --version
+exit: 0
+stdout:
+codex-cli 0.154.0
+stderr:
+
+command: codex login status
+exit: 0
+stdout:
+stderr:
+Logged in using ChatGPT
+
+Current authentication regex matches actual combined output: true
+
+command: node scripts/duo-build.cjs check --builder claude-code
+exit: 0
+stdout:
+{"peer":"codex","version":"codex-cli 0.154.0","authenticated":true,"artifactAccess":"not yet verified","enforcedMode":"read-only sandbox, approval never"}
+stderr:
+
+command: node scripts/duo-build.cjs check --builder codex
+exit: 0
+stdout:
+{"peer":"claude","version":"2.1.258 (Claude Code)","authenticated":true,"artifactAccess":"not yet verified","enforcedMode":"Read/Glob/Grep only, dontAsk"}
+stderr:

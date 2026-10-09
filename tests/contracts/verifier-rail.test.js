@@ -5,6 +5,7 @@ const yaml = require('js-yaml');
 
 const {
   runVerifierStage,
+  runRuntimeChecks,
   verifierRequiredForSlice,
   verifierGateDecision,
   runLoop,
@@ -47,6 +48,70 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
     expect(verifierGateDecision([{ required: true, verifier_result: 'blocked' }])).toBe('blocked');
     expect(verifierGateDecision([{ required: true, verifier_result: 'fail' }])).toBe('fail');
     expect(verifierGateDecision([{ required: true, verifier_result: 'pass' }])).toBe('pass');
+  });
+
+  test.each([undefined, null, 'unknown', 'pending', 'PASS', false])('#190: incomplete or unknown required results never pass (%s)', result => {
+    expect(verifierGateDecision([{ required: true, verifier_result: result }])).toBe('blocked');
+  });
+
+  test.each([null, {}, [null], [{ required: 'false', verifier_result: 'pass' }]])('#190: malformed findings block rather than throwing (%j)', findings => {
+    expect(verifierGateDecision(findings)).toBe('blocked');
+  });
+
+  test('#190: accepted inventory detects dropped, duplicated, substituted and downgraded findings', () => {
+    const checks = [
+      { id: 'AC-create', type: 'api', assertion: 'create', required: true },
+      { id: 'AC-reread', type: 'db-reread', assertion: 'reread', required: true },
+    ];
+    const { findings } = runRuntimeChecks({ runDir: tempRun(), checks, runner: () => ({ executable: true, result: 'pass' }) });
+    expect(verifierGateDecision(findings, checks)).toBe('pass');
+    expect(verifierGateDecision(findings.slice(0, 1), checks)).toBe('blocked');
+    expect(verifierGateDecision([findings[0], findings[0]], checks)).toBe('blocked');
+    expect(verifierGateDecision([...findings, findings[1]], checks)).toBe('blocked');
+    expect(verifierGateDecision([findings[0], { ...findings[1], check_id: 'other' }], checks)).toBe('blocked');
+    expect(verifierGateDecision([findings[0], { ...findings[1], check_sha256: 'other' }], checks)).toBe('blocked');
+    expect(verifierGateDecision([findings[0], { ...findings[1], required: false }], checks)).toBe('blocked');
+  });
+
+  test.each([{}, { executable: true, result: 'pending' }, { result: 'pass' }, { executable: false, result: 'pass' }])('#190: real stage records malformed runner evidence as blocked (%j)', outcome => {
+    const runDir = tempRun();
+    acceptContract(runDir, [{ type: 'api', assertion: 'reread', required: true }]);
+    const result = runVerifierStage({ runDir, sliceTags: ['api_behavior'], makerClaim: 'complete', runner: () => outcome });
+    expect(result).toMatchObject({ status: 'blocked', gate: 'blocked', summary: { pass: 0, blocked: 1 } });
+    const findings = fs.readFileSync(verificationPaths({ runDir }).findingsPath, 'utf8').trim().split('\n').map(JSON.parse);
+    expect(findings[0]).toMatchObject({ verifier_result: 'blocked', required: true });
+    expect(fs.readFileSync(verificationPaths({ runDir }).ledgerPath, 'utf8')).toContain('maker_claimed_complete_but_gate_blocked');
+  });
+
+  test('#190: runner exceptions are auditable blockers and runner mutation cannot downgrade checks', () => {
+    const runDir = tempRun();
+    acceptContract(runDir, [{ type: 'api', assertion: 'reread', required: true }]);
+    const result = runVerifierStage({ runDir, sliceTags: ['api_behavior'], runner: check => { check.required = false; throw Error('backend unavailable'); } });
+    expect(result).toMatchObject({ gate: 'blocked', findings: [{ required: true, reason: 'runtime runner threw: backend unavailable' }] });
+  });
+
+  test('#190: caller cannot omit, replace or reclassify accepted checks before execution', () => {
+    const runDir = tempRun();
+    const checks = [
+      { type: 'api', command: PASS, assertion: 'create', required: true },
+      { type: 'db-reread', command: FAIL, assertion: 'reread', required: true },
+    ];
+    acceptContract(runDir, checks);
+    const runner = jest.fn(() => ({ executable: true, result: 'pass' }));
+    for (const replacement of [[], checks.slice(0, 1), [checks[0], { ...checks[1], command: PASS }], [checks[0], { ...checks[1], required: false }]]) {
+      expect(runVerifierStage({ runDir, sliceTags: ['api_behavior'], checks: replacement, runner })).toMatchObject({ gate: 'blocked', reason: expect.stringContaining('accepted verification contract') });
+    }
+    expect(runner).not.toHaveBeenCalled();
+    expect(runVerifierStage({ runDir, sliceTags: ['api_behavior'], checks }).gate).toBe('fail');
+  });
+
+  test('#190: value-bearing tag cannot be downgraded and an optional reread cannot decide completion', () => {
+    const runDir = tempRun();
+    acceptContract(runDir, [
+      { type: 'screenshot', command: PASS, required: true },
+      { type: 'api', command: FAIL, required: false },
+    ]);
+    expect(runVerifierStage({ runDir, sliceTags: ['data_mutation'], valueBearing: false }).gate).toBe('blocked');
   });
 
   test('AC10: doc-only slice is not required', () => {
@@ -110,6 +175,7 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
     fs.writeFileSync(contractPath, yaml.dump({
       run_contract: {
         loop: 'feature-build', goal: 'g', input_artifact: 'x', path: 'templates/QA/loops/feature-build.yaml',
+        ...require('../helpers/spec-density').fixture(dir),
         current_stage_or_rail: '6_provenance', next_gate: 'provenance', durable_evidence: [contractPath],
         stop_condition: 'handoff', never_without_human: ['git push'],
         slice_tags: ['ui'], maker_claim: 'complete',

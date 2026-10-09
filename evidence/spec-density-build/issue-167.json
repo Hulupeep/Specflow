@@ -1,0 +1,24 @@
+{
+  "body": "Epic: #162 \u00b7 Story: SPEC-DENSITY-05 \u00b7 Declared tier: `spec:thin`\n\nThe revised epic/body governs implementation. The [original brief](https://github.com/Hulupeep/Specflow/issues/162#issuecomment-5792444374) supplies the rationale, not conflicting earlier rules.\n\n## Outcome\n\nTickets remain readable and executable, and unnecessary specification is visible even when moved into linked documents. Reuse and removal of premature detail are preferred to generating a new document package for every ticket.\n\n## Scope\n\nExtend the existing backlog/verification path using #163's tier and artifact-applicability policy. Keep issue bodies below 20,000 characters as a target and enforce a 30,000-character maximum. More than roughly 40 requirements is a scope/split review trigger, not a reason to produce equally speculative child tickets. Counts are warning signals, not quotas or evidence of quality.\n\nThe issue's outcome and behaviour ACs remain the acceptance authority. Supporting details reference existing canonical contracts, decisions, fixtures and evidence where possible. Create a spec/contract document only when the scoped work needs one; do not require links to all of `docs/specs/`, `docs/reviews/` and `docs/contracts/` for every contracted ticket. Executable Specflow contracts remain YAML under the existing contract conventions.\n\n## Acceptance criteria\n\n- [ ] AC-167-1: The verifier reports body character count and fails above 30,000, warns above the 20,000 target, and identifies roughly 40-plus requirements as needing scope review. A passing length check is not a build-readiness verdict.\n- [ ] AC-167-2: Before promotion, applicable new or reused artifacts have valid references; missing applicable evidence blocks. Thin and contracted tickets are not forced to create inapplicable spec/contract/review files merely to satisfy a link check. Inapplicability has a recorded reason.\n- [ ] AC-167-3: Reports show linked specification volume and which artifacts are shared, reused, newly generated or deferred, distinguishing historical evidence from maintained specifications. Moving text out of a body or duplicating it across child tickets is reported honestly rather than counted as less specification.\n- [ ] AC-167-4: A proposed oversized story can be narrowed, stripped of premature implementation detail or split into independently useful outcomes, leaving future children thin. Shared contracts are referenced once rather than copied, and unrelated acceptance is not silently removed to meet a size limit.\n- [ ] AC-167-5: Moving necessary details preserves every existing requirement/acceptance identifier and its resolvable canonical reference. Removal, renaming or changing meaning requires an explicit recorded decision; an ID-preservation check rejects accidental loss or conflicting definitions.\n- [ ] AC-167-6: Verification identifies broken references and unjustified artifact expansion using the common policy, and distinguishes observed counts from semantic review judgments. All publication and privacy requirements still apply to linked files and comments as well as issue bodies.\n\n## Verification and dependencies\n\nExercise an inline thin ticket, a ready slice reusing a contract, valid N/A artifacts, a missing required reference, length boundaries, shared versus duplicated files and an ID-preserving move with a negative missing-ID case. This is CLI/document verification with no new DB or browser UI surface. Bind and execute focused checks at promotion; the complete Pastor volume comparison belongs to #162. This ticket does not claim that shorter text alone proves a better specification.\n",
+  "comments": [
+    {
+      "id": "IC_kwDOQhZHiM8AAAABWUG50g",
+      "author": {
+        "login": "Hulupeep"
+      },
+      "authorAssociation": "OWNER",
+      "body": "Before implementing, read the implementation brief on the epic: https://github.com/Hulupeep/Specflow/issues/162#issuecomment-5792444374. It records what worked and what was theatre in the first real spec-build run, and gives the rules this ticket must implement.",
+      "createdAt": "2026-09-23T09:34:22Z",
+      "includesCreatedEdit": false,
+      "isMinimized": false,
+      "minimizedReason": "",
+      "reactionGroups": [],
+      "url": "https://github.com/Hulupeep/Specflow/issues/167#issuecomment-5792446930",
+      "viewerDidAuthor": true
+    }
+  ],
+  "number": 167,
+  "title": "[SPECFLOW] SPEC-DENSITY-05: ticket size, reuse and total specification visibility",
+  "updatedAt": "2026-09-23T11:56:52Z",
+  "url": "https://github.com/Hulupeep/Specflow/issues/167"
+}

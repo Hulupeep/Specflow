@@ -1,0 +1,26 @@
+contract_meta:
+  id: feature_duo_actions
+  version: 1
+  created_from_spec: "GitHub #149–#155"
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_duo_actions"
+invariants:
+  - id: I-DUOACT-001
+    rule: Every outstanding instruction survives history truncation and requires an independently evidenced, snapshot-bound peer disposition; builder text cannot satisfy it.
+  - id: I-DUOACT-002
+    rule: Invalid instruction/protocol output applies no partial acceptance and cannot consume or refund validated product repair history.
+  - id: I-DUOACT-003
+    rule: Active runs retain exact helper/skill bytes; installation cannot overwrite an unfinished run's managed runtime or weaken product freshness.
+  - id: I-DUOACT-004
+    rule: Instruction advice uses explicit bounded relevant evidence and cannot grant acceptance, permission or budget; missing and wrong outcomes remain visible.
+test_hooks:
+  tests:
+    - file: tests/scripts/duo-actions.test.js
+    - file: tests/scripts/duo-action-assessment.test.js
+    - file: tests/scripts/duo-action-accounting.test.js
+    - file: tests/scripts/duo-runtime-pinning.test.js
+    - file: tests/contracts/typesafe-action-evidence.test.js
+    - file: tests/scripts/duo-action-workflow.test.js

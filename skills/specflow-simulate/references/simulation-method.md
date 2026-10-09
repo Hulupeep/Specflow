@@ -1,5 +1,13 @@
 # Simulation Method — personas × routes → proposed story edits
 
+Specification depth is governed by `SPECIFICATION.md` (source kit:
+`templates/SPECIFICATION.md`) and `scripts/specflow-tier.cjs`. Thin work stays
+at planning depth; contracted reviews cover applicable decisions and UI paper
+walkthroughs. The detailed build-ready procedures below apply only to the
+selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
+Required privacy, permission, executable journey and release gates still apply.
+
+
 The goal: surface what a single happy-path reading of the story misses, by
 running realistic actors through it on realistic (and adversarial) routes, then
 turning every gap into a concrete proposed addition. Pairs with the
@@ -46,7 +54,7 @@ A gap with no proposed edit is incomplete. Map every gap to one of:
 
 ## Step 4 — output as a proposed block (do not silently rewrite)
 
-Post ONE labelled block — `gh issue comment` or an appended section. Default is
+Post ONE labelled block — `node scripts/specflow-publication.cjs <request.json>` or an appended section. Default is
 *propose*; only apply into the story body if the user says so.
 
 ```markdown
@@ -81,3 +89,5 @@ collapse to one consolidated findings block; never post N overlapping comments.
 - Every finding cites the persona+route that motivated it (traceability).
 - Don't answer product questions; surface them.
 - The output improves the artifact (proposed edits), it is not a critique essay.
+
+Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.

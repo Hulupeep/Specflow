@@ -1,0 +1,28 @@
+{
+  "kind": "actual final npm pack/install and target-project installer; no npm publication",
+  "node": "v22.19.0",
+  "hosts": [
+    {
+      "runtime": "codex",
+      "installedHelpers": "byte-identical to final source and packed tarball",
+      "peerCheck": {
+        "peer": "claude",
+        "version": "2.1.258 (Claude Code)",
+        "authenticated": true,
+        "artifactAccess": "not yet verified",
+        "enforcedMode": "Read/Glob/Grep only, dontAsk"
+      }
+    },
+    {
+      "runtime": "claude-code",
+      "installedHelpers": "byte-identical to final source and packed tarball",
+      "peerCheck": {
+        "peer": "codex",
+        "version": "codex-cli 0.154.0",
+        "authenticated": true,
+        "artifactAccess": "not yet verified",
+        "enforcedMode": "read-only sandbox, approval never"
+      }
+    }
+  ]
+}

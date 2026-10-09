@@ -1,0 +1,19 @@
+# Independent UX/product evaluator for `specflow improve judge` (#178).
+# Read-only; a different policy id from the builder (#100 isolation rule).
+adapter_policy:
+  id: improve-ux-evaluator-claude
+  provider: claude-print
+  command: claude
+  role: verifier
+  effort: high
+  args: [-p, --output-format, stream-json, --verbose, --permission-mode, default]
+  model: opus
+  requested_model: opus
+  max_budget_usd: 3
+  timeout_seconds: 900
+  max_iterations: 1
+  allowed_tools: [Read, Grep, Glob]
+  denied_tools: [Edit, Write, Bash]
+  transcript_path: .specflow/runs/<slug>/adapters/ux-evaluator.transcript.jsonl
+  output_path: .specflow/runs/<slug>/adapters/ux-evaluator.final.md
+  never_without_human: [git push, open PR, merge, --no-verify, override contract, production deploy]

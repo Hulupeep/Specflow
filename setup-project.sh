@@ -56,6 +56,20 @@ mkdir -p "$TARGET_DIR"
 TARGET_DIR="$(cd "$TARGET_DIR" && pwd)"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Duo updates are transactions; unfinished runs stage updates before any kit mutation.
+if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
+  mkdir -p "$TARGET_DIR/.specflow/duo"
+  DUO_INSTALL_LOCK="$TARGET_DIR/.specflow/duo/installer.lock"
+  mkdir "$DUO_INSTALL_LOCK" || { echo "Duo installation/start lock active; inspect its owner before recovery" >&2; exit 2; }
+  echo "$$" > "$DUO_INSTALL_LOCK/pid"
+  trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
+  duo_install_exit=0
+  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+  [ "$duo_install_exit" -eq 10 ] && exit 0
+  [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
+fi
+
+
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║           Specflow Full Project Setup                    ║${NC}"
 echo -e "${BLUE}╚═══════════════════════════════════════════════════════════╝${NC}"
@@ -148,6 +162,7 @@ echo -e "${BLUE}[4/10]${NC} Copying scripts, examples, and QA loops kit..."
 # teardown-gate, verify-seed, adversary-spawn, verify-ticket-journey, verify-falsification,
 # verify-seams, verify-adr, verify-graph, specflow-compile).
 for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+    case "$(basename "$script")" in duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
   if [ -f "$script" ]; then
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"
@@ -195,23 +210,15 @@ if [ -f "$SCRIPT_DIR/templates/PROCESS.md" ]; then
   echo -e "${GREEN}✓${NC} Installed PROCESS.md"
 fi
 if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
-  if [ ! -f "$TARGET_DIR/AGENTS.md" ]; then
-    cp -a "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Installed AGENTS.md"
-  elif ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
-    {
-      echo ""
-      cat "$SCRIPT_DIR/templates/AGENTS.md"
-    } >> "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
-  else
-    echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
-  fi
+  node "$SCRIPT_DIR/scripts/install-agent-instructions.cjs" \
+    "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md" || exit 1
+  echo -e "${GREEN}✓${NC} Refreshed AGENTS.md work routing (project instructions preserved)"
 fi
 if [ -d "$SCRIPT_DIR/skills" ]; then
   for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do
     mkdir -p "$TARGET_DIR/$skill_target"
     for skill_dir in "$SCRIPT_DIR/skills/"*; do
+      [ "$(basename "$skill_dir")" = "duo-build" ] && continue
       if [ -d "$skill_dir" ] && [ -f "$skill_dir/SKILL.md" ]; then
         rm -rf "$TARGET_DIR/$skill_target/$(basename "$skill_dir")"
         cp -a "$skill_dir" "$TARGET_DIR/$skill_target/"
@@ -235,7 +242,7 @@ echo -e "${BLUE}[4b/10]${NC} Copying loop kit + process docs..."
 if [ -d "$SCRIPT_DIR/templates/loops" ]; then
   mkdir -p "$TARGET_DIR/QA/loops/prompts" "$TARGET_DIR/QA/loops/examples"
   cp "$SCRIPT_DIR/templates/loops/"*.yaml "$TARGET_DIR/QA/loops/" 2>/dev/null || true
-  cp "$SCRIPT_DIR/templates/loops/"*.md "$TARGET_DIR/QA/loops/" 2>/dev/null || true   # README + adversary-mandate@v1
+  cp "$SCRIPT_DIR/templates/loops/"*.md "$TARGET_DIR/QA/loops/" 2>/dev/null || true   # canonical README + current mandate
   cp "$SCRIPT_DIR/templates/loops/prompts/"*.md "$TARGET_DIR/QA/loops/prompts/" 2>/dev/null || true
   cp "$SCRIPT_DIR/templates/loops/examples/"*.md "$TARGET_DIR/QA/loops/examples/" 2>/dev/null || true
   echo -e "${GREEN}✓${NC} Copied QA/loops/ (paths + prompts + example)"
@@ -724,7 +731,14 @@ echo ""
 
 echo -e "${BLUE}[9/10]${NC} Installing Claude Code hooks..."
 
-bash "$SCRIPT_DIR/install-hooks.sh" "$TARGET_DIR" 2>&1 | grep -E '(✓|⚠️|✗|Installed|Created)' || true
+# The full setup already owns the Duo installation transaction. Pass that
+# ownership to the direct child instead of reacquiring the same lock. Propagate
+# hook-install failure: a partial install must not report success.
+HOOK_INSTALL_ARGS=("$TARGET_DIR")
+[ -n "${DUO_INSTALL_LOCK:-}" ] && HOOK_INSTALL_ARGS+=(--duo-lock-held)
+[ -n "$SPECFLOW_RUNTIME_ARG" ] && HOOK_INSTALL_ARGS+=(--runtime "$SPECFLOW_RUNTIME_ARG")
+[ "$REPLACE_ROUTING" = true ] && HOOK_INSTALL_ARGS+=(--replace-routing)
+bash "$SCRIPT_DIR/install-hooks.sh" "${HOOK_INSTALL_ARGS[@]}"
 
 echo ""
 

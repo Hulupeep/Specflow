@@ -1,0 +1,20 @@
+# Oracle author for `specflow improve oracle` (#174/#178 slice 2). An evaluator
+# role that writes the hidden holdout checks before the contract is frozen.
+# It may write only inside its scratch directory; it never builds the product.
+adapter_policy:
+  id: improve-oracle-author-claude
+  provider: claude-print
+  command: claude
+  role: verifier
+  effort: high
+  args: [-p, --output-format, stream-json, --verbose, --permission-mode, acceptEdits]
+  model: opus
+  requested_model: opus
+  max_budget_usd: 4
+  timeout_seconds: 1200
+  max_iterations: 1
+  allowed_tools: [Read, Glob, Grep, Write, Edit, "Bash(node --check *)"]
+  denied_tools: [WebFetch, WebSearch]
+  transcript_path: .specflow/runs/<slug>/adapters/oracle-author.transcript.jsonl
+  output_path: .specflow/runs/<slug>/adapters/oracle-author.final.md
+  never_without_human: [git push, open PR, merge, --no-verify, override contract, production deploy]
