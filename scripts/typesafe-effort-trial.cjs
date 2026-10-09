@@ -42,13 +42,19 @@ function apply(work, c, patch) {
     fs.writeFileSync(noLinks(path.join(work, f.path)), f.content);
   }
 }
+function validOracleChecks(checks, required) {
+  return Array.isArray(checks) && checks.length === required.length
+    && checks.every(r => r && typeof r.id === 'string' && ['passed', 'failed', 'skipped'].includes(r.status))
+    && new Set(checks.map(r => r.id)).size === checks.length
+    && required.every(id => checks.some(r => r.id === id));
+}
 function oracle(work, c, study, options) {
   // Read-only host, ephemeral /tmp, only this isolated copied snapshot writable.
   const args = ['--ro-bind', '/', '/', '--unshare-net', '--tmpfs', '/tmp', '--bind', work, '/tmp/work', '--chdir', '/tmp/work', '--clearenv', '--setenv', 'PATH', path.dirname(process.execPath) + ':/usr/bin:/bin', '--', process.execPath, c.oracle.path];
   const result = (options.oracleExecute || spawnSync)('bwrap', args, { encoding: 'utf8', timeout: study.manifest.nativeTimeoutMs, maxBuffer: study.manifest.maxOutputBytes });
   let checks; try { checks = JSON.parse(result.stdout).checks; } catch { /* absent means unexecuted */ }
-  const valid = Array.isArray(checks) && checks.length === c.oracle.requiredChecks.length && new Set(checks.map(r => r.id)).size === checks.length && c.oracle.requiredChecks.every(id => checks.some(r => r.id === id && ['passed', 'failed', 'skipped'].includes(r.status)));
-  return { command: 'bwrap', args, exitCode: result.status, error: result.error?.code || null, stdout: String(result.stdout || ''), stderr: String(result.stderr || ''), requiredChecks: c.oracle.requiredChecks.length, executedChecks: valid ? checks.filter(r => r.status !== 'skipped').length : 0, skipped: valid ? checks.filter(r => r.status === 'skipped').length : null, passed: result.status === 0 && valid && checks.every(r => r.status === 'passed'), checks: valid ? checks : null, transport: options.oracleExecute ? 'simulated' : 'live' };
+  const valid = validOracleChecks(checks, c.oracle.requiredChecks);
+  return { command: 'bwrap', args, exitCode: result.status, error: result.error?.code || null, stdout: String(result.stdout || ''), stderr: String(result.stderr || ''), requiredChecks: c.oracle.requiredChecks.length, executedChecks: valid ? checks.filter(r => r.status !== 'skipped').length : 0, skipped: valid ? checks.filter(r => r.status === 'skipped').length : null, passed: !result.error && result.status === 0 && valid && checks.every(r => r.status === 'passed'), checks: valid ? checks : null, transport: options.oracleExecute ? 'simulated' : 'live' };
 }
 function review(study, id, c, after, oracleResult, options) {
   const blind = fs.mkdtempSync(path.join(os.tmpdir(), 'specflow-assess-'));
@@ -127,8 +133,32 @@ function verifyEvidence(study, pair) {
     for (const effort of ['medium','high']) {
       const a = result.arms[effort]; if (!a || a.status !== 'completed') continue;
       const raw = routing.read(a.invocationRef), meta = metadata(raw), peer = routing.read(a.reviewRef), check = routing.read(a.oracleRef), peerRaw = routing.read(peer.rawRef);
-      const validChecks = Array.isArray(check.checks) && check.checks.length === c.oracle.requiredChecks.length && new Set(check.checks.map(r=>r.id)).size === check.checks.length && c.oracle.requiredChecks.every(id=>check.checks.some(r=>r.id===id && ['passed','failed','skipped'].includes(r.status)));
-      if (hash(raw) !== a.receiptHash || hash(peerRaw) !== peer.receiptHash || raw.status !== 'completed' || peerRaw.status !== 'completed' || raw.transport !== pair.transport || peerRaw.transport !== pair.transport || !meta.providerSuccess || !validChecks || hash(peer.input) !== peer.inputHash || hash(peer.input.before) !== hash(c.files) || hash(peer.input.after) !== hash(a.after) || peer.input.goal !== c.goal || peer.input.acceptance !== c.acceptance || peer.input.oracle.stdout !== check.stdout || peer.input.oracle.exitCode !== check.exitCode || peer.status !== 'completed' || !peer.access.receipts.some(r=>r.path==='input.json' && r.extent==='full')) throw Error('raw_provenance');
+      if (check.error || !Number.isInteger(check.exitCode)) throw Error('oracle_execution_unavailable');
+      if (!validOracleChecks(check.checks, c.oracle.requiredChecks)) throw Error('oracle_checks_missing_or_invalid');
+      let outputChecks;
+      try { outputChecks = JSON.parse(check.stdout).checks; } catch { throw Error('oracle_output_invalid_json'); }
+      if (!validOracleChecks(outputChecks, c.oracle.requiredChecks) || hash(outputChecks) !== hash(check.checks)) throw Error('oracle_checks_output_mismatch');
+      const conditions = [
+        ['builder_receipt_hash', hash(raw) === a.receiptHash],
+        ['peer_receipt_hash', hash(peerRaw) === peer.receiptHash],
+        ['builder_execution_unavailable', raw.status === 'completed'],
+        ['peer_execution_unavailable', peerRaw.status === 'completed'],
+        ['builder_transport_mismatch', raw.transport === pair.transport],
+        ['peer_transport_mismatch', peerRaw.transport === pair.transport],
+        ['builder_result_unsuccessful', meta.providerSuccess],
+        ['peer_input_hash', !!peer.input && hash(peer.input) === peer.inputHash],
+        ['peer_before_mismatch', !!peer.input?.before && hash(peer.input.before) === hash(c.files)],
+        ['peer_after_mismatch', !!peer.input?.after && hash(peer.input.after) === hash(a.after)],
+        ['peer_goal_mismatch', peer.input?.goal === c.goal],
+        ['peer_acceptance_mismatch', peer.input?.acceptance === c.acceptance],
+        ['peer_oracle_stdout_mismatch', peer.input?.oracle?.stdout === check.stdout],
+        ['peer_oracle_exit_mismatch', peer.input?.oracle?.exitCode === check.exitCode],
+        ['peer_oracle_checks_mismatch', !!peer.input?.oracle?.checks && hash(peer.input.oracle.checks) === hash(check.checks)],
+        ['peer_review_unavailable', peer.status === 'completed'],
+        ['peer_content_receipt_missing', peer.access?.receipts?.some(r => r.path === 'input.json' && r.extent === 'full')],
+      ];
+      const failed = conditions.find(([, valid]) => !valid);
+      if (failed) throw Error(failed[0]);
       const args = raw.invocation.args, applied = args[args.indexOf('--effort')+1];
       if (applied !== effort || args[args.indexOf('--model')+1] !== study.manifest.model || args.filter(x=>x==='--effort').length!==1) throw Error('invocation_mismatch');
       a.observedModel = meta.observedModel; a.observedEffort = meta.observedEffort;
