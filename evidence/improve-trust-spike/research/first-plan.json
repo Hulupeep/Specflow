@@ -1,0 +1,50 @@
+{
+  "id": "trust-lifecycle-controls",
+  "question": "Do current lifecycle gates bind tested code and contract baseline, and reject preservation-only KEEP?",
+  "expectedObservation": "Unchanged gain accepted; stale tested code and stale baseline blocked; preservation alone cannot establish gain. Record contrary outcomes without changing assertions.",
+  "adapter": "bwrap-194",
+  "command": [
+    "node",
+    "evidence/improve-trust-spike/sandbox.cjs"
+  ],
+  "permissionEvidence": [
+    {
+      "path": ".specflow/research-194/permission.md",
+      "sha256": "a00e9640c12f1b5836e9b8331ad23ea6ce8a12249b02a6b26e0feec73c20d79c"
+    }
+  ],
+  "inputs": [
+    {
+      "path": ".specflow/research-194/issue.json",
+      "sha256": "faf70deac2bbe53fbaa9014bc395a18ca91d6a62eb1150a3a886441ac87bd304"
+    }
+  ],
+  "code": [
+    {
+      "path": "scripts/specflow-improve.cjs",
+      "sha256": "0baa368cc0aa1afbb9859b1a83ccab4217adaac02408516857c53f36f6f9f9d8"
+    },
+    {
+      "path": "scripts/specflow-runner.cjs",
+      "sha256": "45bc7e274137e3449f07b35fe052eedfa7a4c59f029bfdb60074e28556ce094d"
+    },
+    {
+      "path": "tests/contracts/improve-core.test.js",
+      "sha256": "54f807a75d6cb7903b7ee86ad97ef9802d9c10d60ffa65ef37ddf87625b2319a"
+    },
+    {
+      "path": "evidence/improve-trust-spike/sandbox.cjs",
+      "sha256": "0f1e8b39aa3ce4aa57d211a00315a2ce77da8da700c7f94caa4189c7dd93e86b"
+    },
+    {
+      "path": "evidence/improve-trust-spike/lifecycle-probe.cjs",
+      "sha256": "87ea25d9cb23f7cd7068fc36bf7a4bdaf194b9928bdd95066d1d9002c92069dd"
+    }
+  ],
+  "timeoutMs": 240000,
+  "maxOutputBytes": 4194304,
+  "limitations": [
+    "Fixture model transports, no live backend or live-provider acceptance",
+    "Actual OS isolation, Git and verifier subprocesses; no production source mutation"
+  ]
+}

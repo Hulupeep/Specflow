@@ -1,0 +1,97 @@
+{
+  "sourceCommit": "9af73701c4b74597bc8d53a714042bd088460ea9",
+  "kind": "research-not-production-acceptance",
+  "files": [
+    {
+      "path": "evidence/improve-trust-spike/research/first.json",
+      "sha256": "a39439dcb596f8de4e6855a58fc65eb7800c6400a6658a5d8a1e03c326f7319b"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/first-plan.json",
+      "sha256": "efcfca03c9a445d4ce385a6d0ba84a2b9e67aa82ec490799400fbb3aabb4b9a9"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/first-probe.cjs",
+      "sha256": "87ea25d9cb23f7cd7068fc36bf7a4bdaf194b9928bdd95066d1d9002c92069dd"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/first-execution.json",
+      "sha256": "045907d5bd25686dccf91d286cb758a2bb4ef67f1963695cfbf291f700c5bdf9"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/preservation-retry.json",
+      "sha256": "ac44de497eb99be135d5b3226833542262f142c2e05c239b2c42dfcd9c2611a9"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/preservation-retry-plan.json",
+      "sha256": "3d278067b0305b3d950f1f03e7abad872e4ea1f877448e7caebe9a8a6783f677"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/preservation-retry-probe.cjs",
+      "sha256": "d5628a207ce084e657fcb48419a0816e2d33b3ae1554a652aef046c4891c675a"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/preservation-retry-execution.json",
+      "sha256": "782ee8ace5b6e5961da30dd9b93a9078719e6a3e45a20eccf058f4566c884399"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/gate-control.json",
+      "sha256": "8cc4970e21458368350d2bb46abc2efefeae35064095024b54c889334430d9f3"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/gate-control-plan.json",
+      "sha256": "0feff6da65d54b8f1361925d019996962bb51b1db957b8f0098ff1a4187b9cae"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/gate-control-probe.cjs",
+      "sha256": "2ed64f8223fb12737bc53be73faa4a51b7b32dad1ee19ccd47a7aa78179de6ed"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/gate-control-execution.json",
+      "sha256": "aac1436887e795f1efbcd1523e97e4de5b7590739c78cc7e6f66d2a7778b330b"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/permission.md",
+      "sha256": "a00e9640c12f1b5836e9b8331ad23ea6ce8a12249b02a6b26e0feec73c20d79c"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/issue.json",
+      "sha256": "faf70deac2bbe53fbaa9014bc395a18ca91d6a62eb1150a3a886441ac87bd304"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/first-sandbox.cjs",
+      "sha256": "0f1e8b39aa3ce4aa57d211a00315a2ce77da8da700c7f94caa4189c7dd93e86b"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/preservation-retry-sandbox.cjs",
+      "sha256": "44542933090027bd50d84777f06f0b6f809cffa0f9ac2f3bf87efb049d82503c"
+    },
+    {
+      "path": "evidence/improve-trust-spike/research/gate-control-sandbox.cjs",
+      "sha256": "44542933090027bd50d84777f06f0b6f809cffa0f9ac2f3bf87efb049d82503c"
+    }
+  ],
+  "experiments": [
+    {
+      "label": "first",
+      "receipt": "evidence/improve-trust-spike/research/first.json",
+      "plan": "evidence/improve-trust-spike/research/first-plan.json",
+      "probe": "evidence/improve-trust-spike/research/first-probe.cjs",
+      "execution": "evidence/improve-trust-spike/research/first-execution.json"
+    },
+    {
+      "label": "preservation-retry",
+      "receipt": "evidence/improve-trust-spike/research/preservation-retry.json",
+      "plan": "evidence/improve-trust-spike/research/preservation-retry-plan.json",
+      "probe": "evidence/improve-trust-spike/research/preservation-retry-probe.cjs",
+      "execution": "evidence/improve-trust-spike/research/preservation-retry-execution.json"
+    },
+    {
+      "label": "gate-control",
+      "receipt": "evidence/improve-trust-spike/research/gate-control.json",
+      "plan": "evidence/improve-trust-spike/research/gate-control-plan.json",
+      "probe": "evidence/improve-trust-spike/research/gate-control-probe.cjs",
+      "execution": "evidence/improve-trust-spike/research/gate-control-execution.json"
+    }
+  ]
+}
