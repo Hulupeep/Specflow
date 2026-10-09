@@ -1,6 +1,7 @@
 # spec-build.yaml — the reusable PATH for the spec-build loop (PROCESS.md Steps 0–5).
 # The prompt does NOT restate this. The prompt only supplies: goal + inputs + automation.
-# Each tick: load this path, LOCATE the current stage from committed artifacts, advance ONE gate, persist, stop/escalate.
+# Each invocation: load this path, LOCATE the current stage from committed artifacts,
+# advance through all unblocked gates, persist after each gate, stop only on HITL/block/done.
 loop: spec-build
 specification_policy:
   command: node scripts/specflow-tier.cjs inspect <record.json> spec-build inspect
@@ -11,6 +12,18 @@ specification_policy:
   detailed_stages_below: apply only to evidence justified by the effective tier, never to all future tickets
 process_ref: PROCESS.md#steps-0-5
 principle: writers are muscle; trust lives in GATE A (one hostile critic), never self-consensus.
+
+execution:
+  continue_until: >
+    Keep going through every currently unblocked stage in this invocation. Persist evidence
+    and update the run contract after each stage/gate. A soft gate is work to perform now,
+    not a reason to stop.
+  stop_only_when:
+    - a never_without_human action would be required
+    - GATE_A verdict is not SHIP/SHIP_WITH_STIPULATIONS, or human approval is required before creating issues
+    - required inputs/evidence are missing and cannot be derived from durable artifacts
+    - repair budget is exhausted or an escalation condition is hit
+    - done_when is met and handoff evidence is persisted.
 
 progress_display:             # EMIT this at the START of every tick so the human sees the phase
   rule: >
@@ -42,8 +55,9 @@ stages:
   - id: draft
     do: writer → ${prd}
     gate: JTBD, scope boundary, acceptance, success metrics, deps all present
-  - id: adversary            # one hostile critic (adversary-mandate@v2), informed by parallel lenses
-    do: adversarial-prd-reviewer @v2 — 7-pass rubric + Special Mandate
+  - id: adversary            # one hostile critic (adversary-mandate@v3), informed by parallel lenses
+    mandate_ref: adversary-mandate@v3
+    do: adversarial-prd-reviewer @v3 — 7-pass rubric + Special Mandate
         (reality-grounding ledger over every repo/schema claim; loophole hunt)
     falsify_subrun: |         # @v2 added output — runs like the persona lens: PARALLEL, fresh-context
       A fresh-context falsification sub-run (NOT bundled into the structural pass's depth budget)
@@ -68,15 +82,17 @@ stages:
       From → URL → required control → EXPECTED VALUE (re-read) → oracle/source.
       A pre-committed integration oracle, pinned BEFORE code exists (post-hoc tests get
       unconsciously shaped to pass). Assertion bar = a re-read value, never element presence.
-      AND PRDs/${slug}-falsification.md exists, passes `verify-falsification.cjs` (every
-      section filled, recognized verdict), and its PASS is HASH-BOUND to the current PRD —
-      `teardown-gate.cjs check-sign ${prd}` must be green (a PRD edited after PASS fails
-      until re-falsified; a typo-only edit needs a human re-sign, not full re-falsification).
+      AND PRDs/${slug}-falsification.md exists, passes
+      `node scripts/verify-falsification.cjs PRDs/${slug}-falsification.md --require-pass --binds-prd ${prd}`
+      (every section filled, verdict is PASS/PASS WITH STIPULATIONS, and the artifact's
+      recorded PRD SHA-256 matches the current PRD). A PRD edited after PASS fails until
+      re-falsified. Human signing is optional and policy-driven, not a universal Gate A rule.
     rule: >
       selected-slice decision promotion requires accepted scoped review; local thin backlog capture may precede it. GitHub issue creation still requires a human-approved SHIP verdict.
-      The hops artifact is HUMAN-SIGNED at pin time (teardown-gate.cjs sign); post-SHIP
-      changes only via countersigned amendment — never unilaterally by the build agent
-      (it is the party the oracle constrains). Consumed by GATE D (feature-build epic_gate).
+      The hops artifact is hash/provenance-bound at pin time. If the project/contract declares
+      signoff_policy.required, post-SHIP changes also require the configured human countersign;
+      otherwise changes require a durable amendment trail. The build agent may not silently
+      reconcile the oracle it is constrained by. Consumed by GATE D (feature-build epic_gate).
   - id: tickets
     do: specflow-writer → mixed-tier backlog; selected work gets applicable or reused acceptance, contract and journey references
     gate: the selected build-ready UI slice references its applicable journey contract; future tickets remain thin and Gherkin stays canonical
@@ -90,11 +106,11 @@ stages:
     type: soft
     do: >
       board-auditor + specflow-uplifter — wire the selected build-ready slice to applicable journey + test + contract references; keep future tickets thin.
-      PLUS seam-lite: `verify-seams.cjs <tickets.json> --repo-root .` computes the seam graph
+      PLUS seam-lite: `node scripts/verify-seams.cjs <tickets.json> --repo-root .` computes the seam graph
       (writer×writer AND writer×reader pairs on shared surfaces) and ERRORS on any declared
       surface not found in the repo (no silent zero-seam runs). Derived hops are appended to
       ${hops_artifact} — the integration walk is DERIVED from seams, not remembered.
-      PLUS conditional ADR/reuse (#68): `verify-adr.cjs <tickets.json> --repo-root .` — if the
+      PLUS conditional ADR/reuse (#68): `node scripts/verify-adr.cjs <tickets.json> --repo-root .` — if the
       repo has an ADR folder, each selected slice cites a RESOLVING ADR (or `adrNone`) and declares
       `reuses` (or a justified new component); if there's no ADR folder it exits 0 silently.
     gate: >

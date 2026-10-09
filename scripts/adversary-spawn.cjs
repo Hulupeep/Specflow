@@ -15,9 +15,10 @@
  */
 
 const { validateSeed } = require('./verify-seed.cjs');
+const { currentMandate } = require('./adversary-mandate.cjs');
 
 const DEFAULT_TOOL_GRANTS = ['read', 'grep', 'glob', 'bash']; // the adversary must re-ground claims
-const DEFAULT_MANDATE_REF = 'adversary-mandate@v1';
+const DEFAULT_MANDATE_REF = currentMandate().ref;
 
 /**
  * Build a template-conforming seed from ONLY the three allowed inputs.

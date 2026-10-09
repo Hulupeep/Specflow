@@ -1,6 +1,27 @@
 # Loops — run the whole pipeline
 
-> **Canonical source: Specflow.** This kit was scaffolded by `specflow init` and is refreshed by `specflow init`/`update`. Don't hand-edit it per-project — change it in Specflow (`templates/QA/loops/`) so every project gets the fix.
+> **Canonical source: Specflow.** This kit was scaffolded by `specflow init` and is refreshed by `specflow init`/`update`. Don't hand-edit it per-project — change it in Specflow (`templates/loops/`) so every project gets the fix.
+
+## Maintaining the kit
+
+`templates/loops/` is canonical. `templates/QA/loops/` is its generated shipping
+mirror. Run `npm run sync:loops` after editing the canonical kit; contract tests
+and packaging reject drift with `node scripts/sync-loop-templates.cjs --check`.
+The installer copies these identical assets into a project's `QA/loops/`.
+
+The first header of `adversary-mandate.md` is the single version authority.
+To bump the version, change that header and run `npm run sync:loops`; the loop
+and falsification-template references regenerate, and the spawner derives its
+default from the header. Each mandate is self-contained. Seeds naming an absent
+or stale version are rejected before launch; explicitly refresh those seeds
+after reviewing the installed mandate. Retain old run artifacts as historical
+evidence rather than relabelling them as having used the new version.
+
+Version history belongs here, outside the instructions read by the critic:
+v1 established the five structural-review clauses; v2 added falsification,
+typed claims, dependency/correction checks and hash binding; v3 added reuse and
+conditional ADR conformance. The consolidated v3 retains the twelve clauses and
+seven banned failure modes already shipped in `templates/QA/loops/`.
 
 ## The problem this solves
 

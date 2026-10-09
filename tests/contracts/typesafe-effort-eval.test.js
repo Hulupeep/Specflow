@@ -1,19 +1,29 @@
 const fs = require('fs'), path = require('path');
 const routing = require('../../scripts/typesafe-routing.cjs'), trial = require('../../scripts/typesafe-effort-trial.cjs'), analysis = require('../../scripts/typesafe-effort-analysis.cjs');
 const { setup, manifest, fetchImpl, caseInput, nativeDouble } = require('../helpers/routing-study.cjs');
+const { spawnSync } = require('child_process');
+// Trusted deterministic fixture only. Execute its real oracle in the copied
+// snapshot, with simulated sandbox transport; this is not OS isolation proof.
+function fixtureOracle(command, args, options) {
+  if (command !== 'bwrap' || !args.includes('--unshare-net')) throw Error('Expected sandbox invocation');
+  const work = args[args.indexOf('--bind') + 1];
+  return spawnSync(process.execPath, [args.at(-1)], {
+    ...options, cwd: work, env: { PATH: process.env.PATH },
+  });
+}
 let f, key;
 beforeEach(() => { key = process.env.TYPESAFE_API_KEY; process.env.TYPESAFE_API_KEY = 'fixture-key'; const c = caseInput(), m = manifest(); m.heldoutFamilies = [routing.familyKey(c.repository, c.taskFamilyId)]; f = setup(m); });
 afterEach(() => { f.close(); if (key === undefined) delete process.env.TYPESAFE_API_KEY; else process.env.TYPESAFE_API_KEY = key; });
-test('J-TSAFE-EFFORT-EVAL: actual isolated oracle; native transport doubles clearly labelled, blinded read receipts, replay without more calls', async () => {
+test('J-TSAFE-EFFORT-EVAL: actual fixture oracle; simulated transports labelled, blinded read receipts, replay without more calls', async () => {
   const calls = []; const execute = (cmd, args, opts) => { calls.push({ cmd, args, input: opts.input }); return nativeDouble(cmd, args, opts); };
-  const receipt = await trial.trial(f.dir, caseInput(), { fetchImpl, execute });
+  const receipt = await trial.trial(f.dir, caseInput(), { fetchImpl, execute, oracleExecute: fixtureOracle });
   const result = routing.read(receipt.resultRef);
   expect(result.transport).toBe('simulated'); expect(calls).toHaveLength(4);
   for (const effort of ['medium', 'high']) {
     const arm = result.arms[effort]; expect(arm).toMatchObject({ requestedEffort: effort, observedEffort: effort, accepted: true, requiredChecks: 1, executedChecks: 1, skipped: 0, repairRounds: 0, reviewRounds: 1 });
     const peer = routing.read(arm.reviewRef); expect(peer.access.receipts[0].extent).toBe('full');
     expect(peer.input).not.toHaveProperty('effort'); expect(peer.input).not.toHaveProperty('proposed');
-    expect(routing.read(arm.oracleRef).transport).toBe('live');
+    expect(routing.read(arm.oracleRef).transport).toBe('simulated');
   }
   const before = calls.length; expect(await trial.trial(f.dir, caseInput(), { fetchImpl, execute })).toMatchObject({ status: 'replay' }); expect(calls.length).toBe(before);
   expect(analysis.analyze(f.study.manifest, [result], routing.events(f.study).filter(e => e.type === 'observation'))).toMatchObject({ attemptedFamilies: 1, comparableFamilies: 0, recommendation: 'insufficient_evidence' });
@@ -69,10 +79,21 @@ test.each(['same arm', 'regression', 'material', 'missing', 'clamped', 'correlat
   if (kind === 'same arm') expect(r.benefit.estimate).toBeLessThan(0);
 });
 test('production replay rejects missing raw evidence and stale snapshot identities', async () => {
-  const r = await trial.trial(f.dir, caseInput(), { fetchImpl, execute: nativeDouble }); const pair = routing.read(r.resultRef);
+  const r = await trial.trial(f.dir, caseInput(), { fetchImpl, execute: nativeDouble, oracleExecute: fixtureOracle }); const pair = routing.read(r.resultRef);
   expect(trial.verifyEvidence(f.study, pair).evidenceError).toBeUndefined();
   const changed = structuredClone(pair); changed.snapshotHash = 'changed'; expect(trial.verifyEvidence(f.study, changed).evidenceError).toBeTruthy();
   fs.unlinkSync(pair.arms.high.oracleRef); expect(trial.verifyEvidence(f.study, pair).evidenceError).toBeTruthy();
+});
+test.each(['ENOENT', 'namespace denied'])('#191: unavailable sandbox never accepts or fabricates executed checks (%s)', async reason => {
+  const oracleExecute = jest.fn(() => ({ status: reason === 'ENOENT' ? null : 1, error: reason === 'ENOENT' ? { code: reason } : undefined, stdout: '', stderr: reason }));
+  const r = await trial.trial(f.dir, caseInput(), { fetchImpl, execute: nativeDouble, oracleExecute });
+  const pair = routing.read(r.resultRef);
+  expect(oracleExecute).toHaveBeenCalledTimes(2);
+  for (const arm of Object.values(pair.arms)) {
+    expect(arm).toMatchObject({ accepted: false, executedChecks: 0 });
+    expect(routing.read(arm.oracleRef)).toMatchObject({ passed: false, checks: null, transport: 'simulated' });
+  }
+  expect(trial.verifyEvidence(f.study, pair).evidenceError).toBeTruthy();
 });
 test('paired checkpoints retain attempted denominators even when all raw pair evidence is absent', () => {
   for (let i=0;i<100;i++) routing.put(f.study, 'pair-start', 'p'+i, { value: { repository: 'https://github.com/test/one', taskFamilyId:'attempt'+i, loop:i%2?'spec-build':'feature-build', stage:'implementation', caseHash:'missing', independentUnit:true, startedAt:'2026-09-22' } });

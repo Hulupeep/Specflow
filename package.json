@@ -30,8 +30,9 @@
     "LLM-MASTER-PROMPT.md"
   ],
   "scripts": {
-    "prepack": "node scripts/normalize-eol.cjs",
-    "prepublishOnly": "node scripts/normalize-eol.cjs",
+    "prepack": "node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
+    "prepublishOnly": "node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
+    "sync:loops": "node scripts/sync-loop-templates.cjs",
     "normalize": "node scripts/normalize-eol.cjs",
     "postinstall": "echo '' && echo '╔═══════════════════════════════════════════════════════╗' && echo '║  @colmbyrne/specflow installed                       ║' && echo '╠═══════════════════════════════════════════════════════╣' && echo '║                                                       ║' && echo '║  Run in EACH project you want to enforce:             ║' && echo '║                                                       ║' && echo '║    npx @colmbyrne/specflow init .                     ║' && echo '║                                                       ║' && echo '║  This creates hooks, contracts, agents, tests, and    ║' && echo '║  CLAUDE.md (or appends rules to your existing one).   ║' && echo '║  Then fill in the Project Context in CLAUDE.md.       ║' && echo '║                                                       ║' && echo '╚═══════════════════════════════════════════════════════╝' && echo ''",
     "test": "jest --no-coverage",

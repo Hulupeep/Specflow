@@ -7,11 +7,11 @@ Goal:   a human-confirmed journey map + evidence-grounded do-list for <app>, fee
 Path:   QA/loops/daily-use-teardown.yaml
 Inputs: { slug: <name>-teardown, app: <live URL/env>, personas: <list, OR "propose in stage 1 — I'll confirm at the gate"> }
 
-Load the path and follow it — do not restate it. Each tick:
+Load the path and follow it — do not restate it. In this invocation:
 1. Render the path's progress_display.
 2. Locate the current stage from the committed artifacts (journey-map.md + its .signoff.json,
    findings.md, do-list.md + its .signoff.json).
-3. Advance exactly ONE gate; persist to those artifacts (never only to chat).
+3. Advance through every unblocked gate; persist after each gate to those artifacts (never only to chat).
 4. STOP at GATE_HITL — present the one-page journey map and tell me to run
    `node scripts/teardown-gate.cjs sign <map> --by "<me>"`. You NEVER run `sign` yourself,
    and you do not proceed until `node scripts/teardown-gate.cjs check <dir>` passes.

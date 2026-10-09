@@ -55,8 +55,9 @@ stages:
   - id: draft
     do: writer → ${prd}
     gate: JTBD, scope boundary, acceptance, success metrics, deps all present
-  - id: adversary            # one hostile critic (adversary-mandate@v2), informed by parallel lenses
-    do: adversarial-prd-reviewer @v2 — 7-pass rubric + Special Mandate
+  - id: adversary            # one hostile critic (adversary-mandate@v3), informed by parallel lenses
+    mandate_ref: adversary-mandate@v3
+    do: adversarial-prd-reviewer @v3 — 7-pass rubric + Special Mandate
         (reality-grounding ledger over every repo/schema claim; loophole hunt)
     falsify_subrun: |         # @v2 added output — runs like the persona lens: PARALLEL, fresh-context
       A fresh-context falsification sub-run (NOT bundled into the structural pass's depth budget)
