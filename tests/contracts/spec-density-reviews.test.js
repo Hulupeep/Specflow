@@ -30,6 +30,40 @@ test('a pending or interrupted review is durable and cannot disappear', () => {
   reviews.fail(root, first, 'peer unavailable');
   expect(() => reviews.latest(root, r, 'build-ready')).toThrow('blocked');
 });
+test('protocol failures retain evidence but do not spend specification repair rounds', () => {
+  const r = record();
+  for (const builder of ['codex', 'claude-code']) {
+    const reservation = reviews.begin(root, r, 'build-ready', builder);
+    reviews.fail(root, reservation, 'Invalid native response', { kind: 'protocol' });
+  }
+  expect(reviews.status(root, r, 'build-ready')).toMatchObject({ passed: false, attempts: 0, protocolFailures: 2 });
+  const reservation = reviews.begin(root, r, 'build-ready', 'codex');
+  reviews.complete(root, reservation, report());
+  expect(reviews.status(root, r, 'build-ready')).toMatchObject({ attempts: 1, protocolFailures: 0 });
+  expect(reviews.load(root, r.issue.number).reviews['build-ready']).toHaveLength(3);
+});
+test('three consecutive protocol failures block across hosts and changed scopes', () => {
+  const r = record();
+  for (let i = 0; i < 3; i++) {
+    r.profile.attempt = i;
+    const reservation = reviews.begin(root, r, 'build-ready', i % 2 ? 'claude-code' : 'codex');
+    reviews.fail(root, reservation, 'Invalid native response', { kind: 'protocol' });
+  }
+  r.profile.attempt++;
+  expect(() => reviews.begin(root, r, 'build-ready', 'codex')).toThrow('protocol failure limit');
+  expect(reviews.stageGate(root, r, 'GATE_B5').next_action).toContain('protocol failure limit');
+});
+test('a protocol retry retains prior findings and cannot erase substantive review accounting', () => {
+  const r = record();
+  reviews.complete(root, reviews.begin(root, r, 'build-ready', 'codex'), report({ nativeOutcome: 'changes_required', findings: [finding()] }));
+  r.profile.repairEvidence = evidence('repair');
+  reviews.fail(root, reviews.begin(root, r, 'build-ready', 'codex'), 'Invalid response', { kind: 'protocol' });
+  reviews.complete(root, reviews.begin(root, r, 'build-ready', 'codex'), report());
+  expect(reviews.load(root, r.issue.number).reviews['build-ready'].at(-1).findings).toHaveLength(1);
+  expect(reviews.status(root, r, 'build-ready')).toMatchObject({ attempts: 2, passed: false });
+  r.profile.changed = true;
+  expect(() => reviews.begin(root, r, 'build-ready', 'codex')).toThrow('initial review plus one repair');
+});
 test.each(['current', 'unknown'])('an unbuilt dependency with %s impact is not automatically deferred', impact => {
   const result = reviews.classify(root, null, [finding({ status: 'deferred', impact, targets_unbuilt_dependency: true, deferral: { nonimpact: 'future only', ownerIssue: 'https://github.com/example/project/issues/2', trigger: 'dependency implementation', evidence: [evidence('nonimpact')] } })], [], report().identity);
   expect(result.outcome).toBe('blocked');

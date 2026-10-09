@@ -65,6 +65,23 @@ test('native Duo review path consumes the shared tier budget before invoking a p
   const rounds = require('../../scripts/specflow-reviews.cjs').load(root, 165).reviews.contracted;
   expect(rounds).toHaveLength(2); expect(rounds.every(r => r.identity.mode === 'simulated')).toBe(true);
 });
+test('preparation can correct two rejected peer protocols and then obtain a scoped review', () => {
+  const record = { issue: { number: 189, body: 'AC-1: returns 42', labels: ['spec:contracted'] }, profile: { ui: false, materialSeams: [] } };
+  put('tier.json', JSON.stringify(record));
+  const run = duo.start(root, '#189', 'codex', { ...context, specification: { record: 'tier.json', targetTier: 'contracted' } });
+  const badEvidence = fakePeer('accepted', (opts, result) => { result.assessments[0].evidence = ['code.js']; });
+  const badPromotion = fakePeer('accepted', (opts, result) => {
+    result.direction = { assessment: 'on_track', goal_connection: 'Preparation accepted', preserve: [], next_steps: [{ criterion: 'AC-1', owner: 'builder', action: 'Run specification promote', done_when: 'Tier promoted' }] };
+  });
+  expect(reviewOwned(root, run.id, batch(), badEvidence).outcome).toBe('blocked');
+  expect(reviewOwned(root, run.id, batch(), badPromotion).outcome).toBe('blocked');
+  const accepted = reviewOwned(root, run.id, batch(), fakePeer());
+  expect(accepted.outcome).toBe('accepted');
+  expect(accepted.history.map(r => r.stage)).toEqual(['peer_review', 'peer_review', 'validated']);
+  const reviews = require('../../scripts/specflow-reviews.cjs');
+  expect(reviews.status(root, record, 'contracted')).toMatchObject({ attempts: 1, protocolFailures: 0, passed: false });
+  expect(fs.readFileSync(path.join(root, '.specflow/duo', run.id, 'round-003/prompt.txt'), 'utf8')).toContain('Promotion is a subsequent builder action');
+});
 test.each(['codex', 'claude-code'])('J-DUO-REPAIR/J-DUO-RESUME: %s builder repairs and retains evidence', builder => {
   const run = duo.start(root, '#1', builder, context);
   const first = reviewOwned(root, run.id, batch(), fakePeer('changes_required'));
