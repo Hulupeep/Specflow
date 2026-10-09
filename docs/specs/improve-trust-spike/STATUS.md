@@ -25,3 +25,13 @@ reviewed checkout, not this subsequent publication commit.
 Next: investigate tested-code/contract binding, then gain semantics. Keep repeat
 loops, instruction learning and resumable orchestration deferred until trust
 semantics and their execution evidence are established.
+
+## Research update — 2026-10-09, 19:03 UTC
+
+[RESULTS.md](RESULTS.md) now supersedes the preceding research availability notes.
+All Q1–Q3 defects reproduced through isolated lifecycle fixtures, with ten distinct
+scenarios and one retained setup failure/retry. Regression and unchanged controls
+ran. Raw receipts and historical harness versions are in
+`evidence/improve-trust-spike/research/`; production code remains unchanged.
+The new result review is separate from the completed preparation run. Its outcome
+will be recorded in the GitHub completion comment; this status does not preclaim it.

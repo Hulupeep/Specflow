@@ -1,0 +1,51 @@
+{
+  "id": "gate-regression-control",
+  "question": "Does an actual pass-to-fail preservation gate defeat KEEP despite a fail-to-pass gain? Distinct control; prior regression-control was failed acceptance, not baseline regression.",
+  "expectedObservation": "nav gate pass to fail returns REVERT; no completed scenario repeated",
+  "adapter": "bwrap-194-gate",
+  "command": [
+    "node",
+    "evidence/improve-trust-spike/sandbox.cjs",
+    "gate-regression-control"
+  ],
+  "permissionEvidence": [
+    {
+      "path": ".specflow/research-194/permission.md",
+      "sha256": "a00e9640c12f1b5836e9b8331ad23ea6ce8a12249b02a6b26e0feec73c20d79c"
+    }
+  ],
+  "inputs": [
+    {
+      "path": ".specflow/research-194/issue.json",
+      "sha256": "faf70deac2bbe53fbaa9014bc395a18ca91d6a62eb1150a3a886441ac87bd304"
+    }
+  ],
+  "code": [
+    {
+      "path": "scripts/specflow-improve.cjs",
+      "sha256": "0baa368cc0aa1afbb9859b1a83ccab4217adaac02408516857c53f36f6f9f9d8"
+    },
+    {
+      "path": "scripts/specflow-runner.cjs",
+      "sha256": "45bc7e274137e3449f07b35fe052eedfa7a4c59f029bfdb60074e28556ce094d"
+    },
+    {
+      "path": "tests/contracts/improve-core.test.js",
+      "sha256": "54f807a75d6cb7903b7ee86ad97ef9802d9c10d60ffa65ef37ddf87625b2319a"
+    },
+    {
+      "path": "evidence/improve-trust-spike/sandbox.cjs",
+      "sha256": "44542933090027bd50d84777f06f0b6f809cffa0f9ac2f3bf87efb049d82503c"
+    },
+    {
+      "path": "evidence/improve-trust-spike/lifecycle-probe.cjs",
+      "sha256": "2ed64f8223fb12737bc53be73faa4a51b7b32dad1ee19ccd47a7aa78179de6ed"
+    }
+  ],
+  "timeoutMs": 240000,
+  "maxOutputBytes": 4194304,
+  "limitations": [
+    "Fixture model transports, no live backend or live-provider acceptance",
+    "Actual OS isolation, Git and verifier subprocesses; no production source mutation"
+  ]
+}
