@@ -210,18 +210,9 @@ if [ -f "$SCRIPT_DIR/templates/PROCESS.md" ]; then
   echo -e "${GREEN}✓${NC} Installed PROCESS.md"
 fi
 if [ -f "$SCRIPT_DIR/templates/AGENTS.md" ]; then
-  if [ ! -f "$TARGET_DIR/AGENTS.md" ]; then
-    cp -a "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Installed AGENTS.md"
-  elif ! grep -q "Specflow Loop Routing" "$TARGET_DIR/AGENTS.md" 2>/dev/null; then
-    {
-      echo ""
-      cat "$SCRIPT_DIR/templates/AGENTS.md"
-    } >> "$TARGET_DIR/AGENTS.md"
-    echo -e "${GREEN}✓${NC} Appended Specflow loop routing to AGENTS.md"
-  else
-    echo -e "${GREEN}✓${NC} AGENTS.md already has Specflow loop routing"
-  fi
+  node "$SCRIPT_DIR/scripts/install-agent-instructions.cjs" \
+    "$SCRIPT_DIR/templates/AGENTS.md" "$TARGET_DIR/AGENTS.md" || exit 1
+  echo -e "${GREEN}✓${NC} Refreshed AGENTS.md work routing (project instructions preserved)"
 fi
 if [ -d "$SCRIPT_DIR/skills" ]; then
   for skill_target in ".claude/skills" ".codex/skills" ".agents/skills"; do

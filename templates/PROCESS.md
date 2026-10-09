@@ -8,7 +8,12 @@ selected slice and relevant seams. Reuse existing artifacts; N/A needs a reason.
 Required privacy, permission, executable journey and release gates still apply.
 
 
-The canonical reference for how we run work end to end. The spine in one line:
+This is the full-loop lifecycle. First use `specflow-loop-selector` to choose
+work weight and required checks, as directed by `AGENTS.md`. Bounded work uses
+only the applicable parts; consulting the selector does not start this pipeline.
+Required verification, including real-backend journeys, still applies.
+
+The full-loop spine in one line:
 
 > **A single hostile critic gates the spec; CI gates the code; the swarm/agent is muscle *inside* a phase, never the thing that approves its own work.**
 
