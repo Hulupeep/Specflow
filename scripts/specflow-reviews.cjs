@@ -1,5 +1,5 @@
 'use strict';
-const fs = require('fs'), path = require('path'), crypto = require('crypto');
+const fs = require('fs'), path = require('path'), crypto = require('crypto'), { spawnSync } = require('child_process');
 const policy = require('./specflow-tier.cjs');
 
 function statePath(root, number) {
@@ -40,7 +40,7 @@ function begin(root, record, tier, builder) {
     const rounds = state.reviews[tier] ||= [];
     const allowance = budget(rounds);
     if (allowance.protocolFailures >= 3) throw Error(`${tier} protocol failure limit reached (3); inspect retained raw responses. Changing hosts, scope or run names cannot reset it.`);
-    if (allowance.attempts >= 2) throw Error(`${tier} review limit reached: initial review plus one repair/regrade. Escalate retained findings; renaming a run or switching hosts cannot reset it.`);
+    if (allowance.attempts >= 2) throw Error(`${tier} review limit reached: initial review plus one repair/regrade. Escalate retained findings to the human owner, who alone may run: node scripts/specflow-specification.cjs reset-review RECORD ${tier} "reason"; renaming a run or switching hosts cannot reset it.`);
     const previous = previousReview(rounds), scope = policy.inputHash(record);
     if (previous?.status === 'pending') throw Error('Prior scoped review is unfinished; retain it and record the failure before continuing');
     if (previous?.outcome === 'escalated') throw Error('Repair-induced findings require escalation, not another automatic review');
@@ -120,9 +120,29 @@ function latest(root, record, tier) {
   if (errors.length) throw Error(errors.join('; '));
   return review;
 }
+const resetCount = (state, tier) => (state.events || []).filter(e => e.kind === 'owner-review-allowance-reset' && e.tier === tier).length;
+function identity(root) {
+  const git = key => { const r = spawnSync('git', ['config', key], { cwd: root, encoding: 'utf8' }); return r.status === 0 ? r.stdout.trim() : ''; };
+  const name = git('user.name'), email = git('user.email');
+  return name || email ? [name, email && `<${email}>`].filter(Boolean).join(' ') : process.env.USER || process.env.USERNAME || 'unknown';
+}
+// Owner-only escalation: agents and peer reviewers must never run this themselves.
+function resetReview(root, record, tier, reason, options = {}) {
+  if (process.env.SPECFLOW_DUO_REVIEWER) throw Error('reset-review is owner-only and cannot run inside a peer reviewer');
+  if (!['contracted', 'build-ready'].includes(tier)) throw Error('reset-review tier must be contracted or build-ready');
+  if (!nonempty(reason)) throw Error('reset-review requires a non-empty owner reason');
+  const by = options.by || identity(root);
+  return change(root, record.issue.number, state => {
+    const rounds = state.reviews[tier] || [];
+    if (rounds.at(-1)?.status === 'pending') throw Error('Prior scoped review is unfinished; record it with review-failed before resetting the allowance');
+    (state.events ||= []).push({ kind: 'owner-review-allowance-reset', tier, at: new Date().toISOString(), by, reason: reason.trim(), archivedRounds: rounds });
+    state.reviews[tier] = [];
+    return { status: 'reset', tier, archivedRounds: rounds.length, resets: resetCount(state, tier), next_action: 'Allowance restored to initial review plus one repair; readiness, gates and promotion are unchanged' };
+  });
+}
 function status(root, record, tier) {
   const state = load(root, record.issue.number), round = state.reviews[tier]?.at(-1);
-  const allowance = budget(state.reviews[tier]);
+  const allowance = { ...budget(state.reviews[tier]), resets: resetCount(state, tier) };
   const exception = state.events.filter(e => e.kind === 'owner-exception' && e.scope === policy.inputHash(record)).at(-1);
   if (exception) return { status: exception.status, passed: false, ...allowance };
   if (round && round.scope !== policy.inputHash(record)) return { status: 'fixed as specified, not re-graded', passed: false, ...allowance };
@@ -133,6 +153,6 @@ function stageGate(root, record, stage) {
   const tier = stage === 'adversary' ? 'contracted' : 'build-ready';
   if (!record?.issue?.number) return { status: 'blocked', passed: false, reason: 'Bind the selected issue before scoped review' };
   const result = status(root, record, tier);
-  return { ...result, tier, next_action: result.passed ? 'Advance using the accepted scoped review' : result.protocolFailures >= 3 ? 'Scoped protocol failure limit reached (3): inspect retained responses; do not launch another reviewer' : result.attempts >= 2 ? 'Review budget exhausted: escalate retained findings; do not launch another reviewer' : 'The builder must run scoped Duo preparation with specification.targetTier; its native peer call consumes the shared issue/tier reservation. Return here after the receipt is recorded.' };
+  return { ...result, tier, next_action: result.passed ? 'Advance using the accepted scoped review' : result.protocolFailures >= 3 ? 'Scoped protocol failure limit reached (3): inspect retained responses; do not launch another reviewer' : result.attempts >= 2 ? `Review budget exhausted: escalate retained findings to the human owner (owner-only: node scripts/specflow-specification.cjs reset-review RECORD ${tier} "reason"); do not launch another reviewer or run it yourself` : 'The builder must run scoped Duo preparation with specification.targetTier; its native peer call consumes the shared issue/tier reservation. Return here after the receipt is recorded.' };
 }
-module.exports = { statePath, load, change, begin, complete, fail, latest, classify, status, stageGate };
+module.exports = { statePath, load, change, begin, complete, fail, latest, classify, status, stageGate, resetReview };
