@@ -250,6 +250,10 @@ initial-plus-one-repair specification allowance, but three consecutive failures
 block that issue/tier even after changing run names or hosts. A validated scoped
 review clears the shared streak. Unknown historical failures remain charged;
 never edit old journals or pinned runtimes to manufacture another allowance.
+An exhausted issue/tier allowance is a stop: report retained findings to the human
+owner. Only the owner may run `node scripts/specflow-specification.cjs reset-review
+RECORD TIER "reason"` (audited, archives rounds, grants no readiness); never run
+it yourself or suggest a workaround.
 When preparation is fully verified, return complete with no next steps. The
 builder runs finish and then specification promotion; promotion is not another
 peer-directed repair task.

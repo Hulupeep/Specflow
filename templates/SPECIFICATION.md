@@ -118,6 +118,12 @@ does not prove a protocol rejection. This change neither rewrites past allowance
 nor upgrades an active run's pinned runtime. Preserve exhausted runs and escalate
 their retained records; do not rename a run, edit its ledger or start a replacement
 to bypass a limit. A live independent pass is still required for promotion.
+The escalation path for an exhausted issue/tier allowance is owner-only: the human
+owner runs `node scripts/specflow-specification.cjs reset-review RECORD TIER
+"reason"`. Agents and models must never run it themselves; it refuses inside a
+peer reviewer, without a reason, while a review is pending or the journal lock is
+held. It archives the rounds into an audited `owner-review-allowance-reset` event
+(status reports the per-tier reset count) and grants no readiness or promotion.
 
 ## Learn before deepening
 
