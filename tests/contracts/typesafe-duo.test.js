@@ -40,7 +40,8 @@ test('off makes zero calls; shadow excludes advice from request/tree',()=>{
 test('provider failures suppress calls; owner recovery and host takeover preserve used budget',()=>{
  const w=worker('unavailable');installWorker(w);const r=run();
  review(r,batch(),peer('changes_required'));put('raw.txt','New diagnostic failure A');review(r,batch(),peer('changes_required'));put('raw.txt','New diagnostic failure B');
- const result=review(r,batch(),peer('changes_required'));expect(result.history.at(-1).typesafe.reason).toBe('circuit_open');expect(w).toHaveBeenCalledTimes(2);
+ duo.recoverReview(root,r.id,r.owner.session,{kind:'stagnation',cause:'balance still wrong',action:'correct balance and inspect raw result',evidence:[{path:'raw.txt',sha256:require('crypto').createHash('sha256').update(fs.readFileSync(path.join(root,'raw.txt'))).digest('hex')}]});
+ const result=review(r,{...batch(),resolutions:[{id:'F1',change:'corrected balance (fixture)',evidence:['raw.txt']}]},peer('accepted'));expect(result.history.at(-1).typesafe.reason).toBe('circuit_open');expect(w).toHaveBeenCalledTimes(2);
  expect(()=>duo.configureTypesafe(root,r.id,'stale',{recover:true},'recover')).toThrow(/own/);
  duo.release(root,r.id,r.owner.session);const transferred=duo.resume(root,r.id,'claude-code');
  const recovered=duo.configureTypesafe(root,r.id,transferred.owner.session,{recover:true,maxCalls:2},'provider restored');expect(recovered.typesafe.calls).toBe(2);expect(recovered.typesafe.consecutiveFailures).toBe(0);

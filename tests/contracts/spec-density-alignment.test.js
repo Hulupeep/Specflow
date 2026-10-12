@@ -31,7 +31,7 @@ test('all installed spec-build templates replace legacy retry loops with bounded
  for(const file of ['templates/QA/loops/spec-build.yaml','templates/loops/spec-build.yaml','templates/QA/spec-build-loop.md','templates/QA/spec-build.md']){
   const text=fs.readFileSync(path.join(__dirname,'../..',file),'utf8');
   expect(text).not.toMatch(/cycles ≤ 4|adversary ≤ 4|uplift ≤ 3|re-audits ≤ 3|do_until:|re-review until a verdict|Repeats until/);
-  expect(text).toContain('initial + one repair');expect(text).toContain('no-new-evidence');
+  expect(text).toContain('continue on verified progress');expect(text).toContain('no-new-evidence');
  }
 });
 

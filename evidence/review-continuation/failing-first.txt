@@ -1,0 +1,47 @@
+
+> @colmbyrne/specflow@0.11.1 test
+> jest --no-coverage --runInBand --roots tests --runTestsByPath tests/contracts/review-continuation.test.js
+
+FAIL tests/contracts/review-continuation.test.js
+  ✕ optional finding paraphrase keeps original identity without blocking acceptance (13 ms)
+  ✕ scoped gate reports the real failure rather than generic blocked or exhausted (4 ms)
+
+  ● optional finding paraphrase keeps original identity without blocking acceptance
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "passed_with_warnings"
+    Received: "blocked"
+
+      13 |  r.profile.change='new required source';
+      14 |  const next=reviews.complete(root,reviews.begin(root,r,'build-ready','codex'),report([optional('Category diagnostics suffice; per-path is optional')]));
+    > 15 |  expect(next.outcome).toBe('passed_with_warnings');
+         |                       ^
+      16 |  expect(next.findings[0].basis).toBe('Optional per-path diagnostics');
+      17 |  expect(next.findings[0].latestBasis).toBe('Category diagnostics suffice; per-path is optional');
+      18 | });
+
+      at Object.toBe (tests/contracts/review-continuation.test.js:15:23)
+
+  ● scoped gate reports the real failure rather than generic blocked or exhausted
+
+    expect(received).toContain(expected) // indexOf
+
+    Expected substring: "tree/task.md"
+    Received string:    "Scoped review is blocked"
+
+      21 |  reviews.fail(root,reservation,'Peer did not inspect required artifact: tree/task.md',{kind:'protocol'});
+      22 |  const status=reviews.stageGate(root,r,'preflight');
+    > 23 |  expect(status.reason).toContain('tree/task.md');
+         |                        ^
+      24 |  expect(status.next_action).toContain('tree/task.md');
+      25 | });
+      26 |
+
+      at Object.toContain (tests/contracts/review-continuation.test.js:23:24)
+
+Test Suites: 1 failed, 1 total
+Tests:       2 failed, 2 total
+Snapshots:   0 total
+Time:        0.56 s
+Ran all test suites within paths "tests/contracts/review-continuation.test.js".

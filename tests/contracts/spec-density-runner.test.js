@@ -38,16 +38,16 @@ test('thin preparation skips automatic full adversary and pre-flight stages', ()
   expect(loopSequence({ loop: 'spec-build', tier: 'thin' })).toEqual(['discover', 'draft', 'tickets', 'handoff']);
   expect(loopSequence({ loop: 'spec-build', tier: 'contracted' })).toEqual(['discover', 'draft', 'adversary', 'tickets', 'handoff']);
 });
-test.each(['codex','claude-code'])('%s spec-build cannot dispatch a third adversary or preflight review through an adapter',host=>{
+test.each(['codex','claude-code'])('%s spec-build cannot dispatch another review after three interrupted peer attempts through an adapter',host=>{
  const reviews=require('../../scripts/specflow-reviews.cjs');
  for(const [stage,tier]of [['adversary','contracted'],['GATE_B5','build-ready']]){
   const {tier_record:file}=fixture(root);const r=JSON.parse(fs.readFileSync(file));
-  for(let i=0;i<2;i++){r.profile.repair=i;const reservation=reviews.begin(root,r,tier,host);reviews.fail(root,reservation,'Simulated unavailable peer; attempt is retained');}
+  for(let i=0;i<3;i++){r.profile.repair=i;const reservation=reviews.begin(root,r,tier,host);reviews.fail(root,reservation,'Simulated unavailable peer; attempt is retained');}
   fs.writeFileSync(file,JSON.stringify(r));
   const opts=options('spec-build',{runtime:host,tierRecord:file,contract:path.join(root,`${stage}.yml`),ledger:path.join(root,`${stage}.jsonl`)});
   runLoop(opts);const saved=yaml.load(fs.readFileSync(opts.contract,'utf8'));saved.run_contract.current_stage_or_rail=stage;fs.writeFileSync(opts.contract,yaml.dump(saved));
   const result=runLoop({...opts,adapterPolicy:'should-never-be-opened.json'});
-  expect(result.status).toBe('scoped_review_required');expect(result.entry.attempts).toBe(2);expect(result.entry.next_action).toContain('budget exhausted');
-  expect(reviews.load(root,r.issue.number).reviews[tier]).toHaveLength(2);
+  expect(result.status).toBe('scoped_review_required');expect(result.entry.attempts).toBe(0);expect(result.entry.next_action).toContain('protocol failures');
+  expect(reviews.load(root,r.issue.number).reviews[tier]).toHaveLength(3);
  }
 });

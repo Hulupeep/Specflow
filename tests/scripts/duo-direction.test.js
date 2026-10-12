@@ -82,7 +82,7 @@ test('J-DUO-PROTOCOL: invalid responses have a separate bounded budget, preserve
   for(let i=0;i<3;i++) {put('.specflow/duo/raw.txt',`new capture ${i}`);review(batch({direction_response:response()}),peer(r=>{delete r.direction;}));}
   const state=load();expect(state.peerFailures).toBe(3);expect(state.repairCycle.attempts).toBe(attempts);expect(state.continuation).toEqual(before);expect(state.findings.DISPLAY.status).toBe('open');
   expect(direction.render(state)).toContain('Historical direction');
-  const invoke=jest.fn(peer());expect(review(batch({direction_response:response()}),invoke).blocker).toContain('failure limit');expect(invoke).not.toHaveBeenCalled();
+  const invoke=jest.fn(peer());expect(review(batch({direction_response:response()}),invoke).history.at(-1).summary).toContain('protocol failures');expect(invoke).not.toHaveBeenCalled();
   run=duo.resume(root,run.id,'codex',{takeover:true,reason:'Host transfer cannot reset limits'});expect(run.peerFailures).toBe(3);
 });
 test('AC-FRESHNESS: excluded continuation/audit do not invalidate source; root log and product changes do',()=>{
