@@ -61,7 +61,7 @@ stages:
                  check: no CRITICAL design gap ("won't work for a real user") survives, before code
 repair:                      # replaces YOU re-prompting between steps
   on_gate_fail: route back to the owning stage with a targeted prompt
-  budget: contracted initial + one repair; build-ready initial + one re-grade; no-new-evidence stops
+  budget: continue on verified progress with bounded diagnosis; no-new-evidence requires diagnosis
   on_budget_exhausted: ESCALATE with the open FATAL/SERIOUS list
 human_gate:                  # the ONE escape hatch
   escalate_when:

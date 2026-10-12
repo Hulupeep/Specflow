@@ -60,7 +60,7 @@ test('native Duo review path consumes the shared tier budget before invoking a p
   // Changing both run and batch names does not replenish the issue/tier budget.
   const renamed = duo.start(root, '#165 renamed run', 'codex', scoped), invoke = jest.fn(fakePeer());
   const result = reviewOwned(root, renamed.id, { ...batch(), id: 'another-name' }, invoke);
-  expect(result.outcome).toBe('blocked'); expect(result.blocker).toContain('initial review plus one repair');
+  expect(result.outcome).toBe('blocked'); expect(result.blocker).toContain('No new evidence-backed progress');
   expect(invoke.mock.calls.some(([, , opts]) => opts?.input)).toBe(false);
   const rounds = require('../../scripts/specflow-reviews.cjs').load(root, 165).reviews.contracted;
   expect(rounds).toHaveLength(2); expect(rounds.every(r => r.identity.mode === 'simulated')).toBe(true);
@@ -141,13 +141,16 @@ test('uncommitted binary and untracked files are copied exactly', () => {
   expect(reviewOwned(root, run.id, batch(), fakePeer()).outcome).toBe('accepted');
   expect(fs.readFileSync(path.join(root, '.specflow/duo', run.id, 'round-001/tree/untracked.bin'))).toEqual(bytes);
 });
-test('no progress stops and maximum three repair rounds is enforced', () => {
-  const run = duo.start(root, '#1', 'codex', context);
-  reviewOwned(root, run.id, batch(), fakePeer('changes_required'));
-  expect(reviewOwned(root, run.id, batch(), fakePeer()).blocker).toMatch(/No new evidence/);
-  for (let i = 0; i < 3; i++) { put('raw.txt', `new observed failure ${i}`); expect(reviewOwned(root, run.id, batch(), fakePeer('changes_required')).outcome).toBe('changes_required'); }
-  put('raw.txt', 'another attempt');
-  expect(reviewOwned(root, run.id, batch(), fakePeer()).blocker).toMatch(/three repair rounds/);
+test('no progress guard preserves the actionable product failure', () => {
+  const run=duo.start(root,'#1','codex',context);
+  reviewOwned(root,run.id,batch(),fakePeer('changes_required'));
+  const repeated=reviewOwned(root,run.id,batch(),fakePeer());
+  expect(repeated.history.at(-1).summary).toMatch(/No new evidence/);
+  expect(duo.status(repeated)).toContain('Correct result');
+  put('raw.txt','new observed failure');
+  reviewOwned(root,run.id,batch(),fakePeer('changes_required'));
+  expect(duo.eligibility(root,run.id).blockers).toEqual(expect.arrayContaining([expect.objectContaining({kind:'stagnation'})]));
+  expect(duo.status(duo.load(root,run.id).state)).toContain('Current blocker: F1: AC-1; Correct result');
 });
 test('acceptance without independent evidence read is rejected', () => {
   const run = duo.start(root, '#1', 'codex', context);
@@ -225,7 +228,7 @@ test('readable blocked status leads with the actionable finding', () => {
   const run = duo.start(root, '#1', 'codex', context);
   reviewOwned(root, run.id, batch(), fakePeer('changes_required', (_, result) => { result.summary = 'Observed facts: '.repeat(50); }));
   const log = jest.spyOn(console, 'log').mockImplementation(() => {});
-  try { expect(duo.cli(['resume', run.id], root)).toBe(1); expect(log.mock.calls[0][0]).toContain('Current blocker: F1: Correct result'); }
+  try { expect(duo.cli(['resume', run.id], root)).toBe(1); expect(log.mock.calls[0][0]).toContain('Current blocker: F1: AC-1; Correct result'); }
   finally { log.mockRestore(); }
 });
 test('production capture reserves discovery collection and blocks review until an explicit report',()=>{
@@ -245,4 +248,64 @@ test('scoped review cannot silently omit an ignored applicable artifact from the
  const policy=require('../../scripts/specflow-tier.cjs'),r={issue:{number:165,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[{id:'ownership'}],artifacts:[{id:'ownership',role:'decision:ownership',path:'private-planning/decision.md',sha256:policy.sha('An applicable ownership decision')}]}};
  put('tier.json',JSON.stringify(r));const run=duo.start(root,'#165','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}}),invoke=jest.fn(fakePeer());
  expect(reviewOwned(root,run.id,batch(),invoke).blocker).toContain('not in the frozen snapshot');expect(invoke.mock.calls.some(([, , opts])=>opts?.input)).toBe(false);
+});
+test('stale Duo recovery evidence cannot consume a scoped reservation or either recovery attempt',()=>{
+ const record={issue:{number:189,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};
+ put('tier.json',JSON.stringify(record));const run=duo.start(root,'#189','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+ for(let i=0;i<2;i++){record.profile.revision=i;put('tier.json',JSON.stringify(record));put('raw.txt',`failure ${i}`);reviewOwned(root,run.id,batch(),fakePeer('changes_required'));}
+ const input={kind:'stagnation',cause:'value not corrected',action:'correct exported value',evidence:[{path:'raw.txt',sha256:require('crypto').createHash('sha256').update(fs.readFileSync(path.join(root,'raw.txt'))).digest('hex')}]};
+ expect(()=>duo.recoverReview(root,run.id,'wrong',{...input,scope:'specification'})).toThrow('does not own');
+ duo.recoverReview(root,run.id,run.owner.session,{...input,scope:'specification'});
+ duo.recoverReview(root,run.id,run.owner.session,input);
+ const reviews=require('../../scripts/specflow-reviews.cjs'),before=reviews.load(root,189);
+ put('raw.txt','tampered diagnosis evidence');const invoke=jest.fn(fakePeer());
+ const result=reviewOwned(root,run.id,batch(),invoke);
+ expect(result.blocker).toContain('Recovery evidence changed');
+ expect(invoke.mock.calls.some(([, , opts])=>opts?.input)).toBe(false);
+ expect(reviews.load(root,189)).toEqual(before);
+ expect(result.reviewControl.calls).toBe(2);expect(result.reviewControl.recoveries[0].consumed).toBe(false);
+});
+test('new recovery command explains a pinned old runtime boundary without changing its journal',()=>{
+ const run=duo.start(root,'#legacy','codex',context),file=path.join(root,'.specflow/duo',run.id,'run.json');
+ const state=JSON.parse(fs.readFileSync(file));delete state.runtime.helperHashes['scripts/review-continuation.cjs'];
+ fs.unlinkSync(path.join(root,'.specflow/duo',run.id,'runtime/scripts/review-continuation.cjs'));
+ fs.writeFileSync(file,JSON.stringify(state));const before=fs.readFileSync(file,'utf8');
+ const log=jest.spyOn(console,'error').mockImplementation(()=>{});
+ try{expect(duo.cli(['recover-review',run.id,'--session',run.owner.session,'--input','not-read.json'],root)).toBe(2);expect(log.mock.calls[0][0]).toContain('Pinned run uses the prior review policy');}finally{log.mockRestore();}
+ expect(fs.readFileSync(file,'utf8')).toBe(before);
+});
+test('rejected scoped deferral persists and is supplied to the next native peer without phantom progress',()=>{
+ const record={issue:{number:189,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};
+ put('tier.json',JSON.stringify(record));const run=duo.start(root,'#189','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+ const first=reviewOwned(root,run.id,batch(),fakePeer('accepted',(_,result)=>{
+  result.specification_nonblocking=[{id:'RISK',kind:'deferred',impact:'current',basis:'Current data loss',action:'Preserve the value',evidence:['raw.txt'],nonimpact:'claimed future',owner_issue:'https://github.com/example/repo/issues/1',trigger:'future adapter'}];
+ }));
+ expect(first.history.at(-1).stage).toBe('scoped_blocked');expect(first.peerFailures).toBe(0);expect(first.reviewControl.achievements).toEqual([]);
+ const reviews=require('../../scripts/specflow-reviews.cjs');expect(reviews.load(root,189).reviewControl.contracted.achievements).toEqual([]);
+ record.profile.revision=2;put('tier.json',JSON.stringify(record));put('raw.txt','new output');
+ const second=reviewOwned(root,run.id,batch(),fakePeer('accepted',(opts)=>{const req=JSON.parse(fs.readFileSync(path.join(opts.cwd,'request.json')));expect(req.specification_review.prior_findings[0]).toMatchObject({id:'RISK',status:'open'});}));
+ expect(second.outcome).toBe('blocked');expect(reviews.load(root,189).reviews.contracted.at(-1).findings[0].status).toBe('open');
+});
+test('interruption bookkeeping is owner-fenced and refuses a live run operation',()=>{
+ const record={issue:{number:189,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};
+ put('tier.json',JSON.stringify(record));const run=duo.start(root,'#189','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+ const reviews=require('../../scripts/specflow-reviews.cjs'),reservation=reviews.begin(root,record,'contracted','codex',{ownerRun:run.id});
+ expect(()=>duo.recordScopedInterruption(root,run.id,'wrong',reservation,'exited')).toThrow('does not own');
+ const lock=path.join(root,'.specflow/duo',run.id,'review.lock');fs.writeFileSync(lock,String(process.pid));
+ expect(()=>duo.recordScopedInterruption(root,run.id,run.owner.session,reservation,'exited')).toThrow('active');fs.unlinkSync(lock);
+ const result=duo.recordScopedInterruption(root,run.id,run.owner.session,reservation,'Peer exited without response');expect(result.status).toBe('protocol_failed');
+});
+test('scoped partial batches progress on new actual evidence without changing the specification',()=>{
+ const criteria=Array.from({length:4},(_,i)=>({id:`AC-${i+1}`,source:'task.md',anchor:`AC-${i+1}: requirement ${i+1}`,kind:'acceptance'}));
+ const body=criteria.map(c=>c.anchor).join('\n');put('task.md',body);
+ const record={issue:{number:189,body,labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};put('tier.json',JSON.stringify(record));
+ const run=duo.start(root,'#189','codex',{...context,criteria,specification:{record:'tier.json',targetTier:'contracted'}});
+ for(let i=0;i<4;i++){
+  put('raw.txt',`Requirement ${i+1} observed`);
+  const result=reviewOwned(root,run.id,{...batch(),id:`part${i}`,criteria:[`AC-${i+1}`]},fakePeer());
+  expect(result.outcome).toBe('accepted');expect(duo.eligibility(root,run.id).eligible).toBe(true);
+ }
+ const result=reviewOwned(root,run.id,{...batch(),id:'final',criteria:criteria.map(c=>c.id)},fakePeer());
+ expect(result.outcome).toBe('accepted');expect(duo.finish(root,run.id,run.owner.session).goalStatus).toBe('complete');
+ const journal=require('../../scripts/specflow-reviews.cjs').load(root,189);expect(journal.reviewControl.contracted.achievements).toHaveLength(4);expect(journal.reviews.contracted).toHaveLength(5);
 });

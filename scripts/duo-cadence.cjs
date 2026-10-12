@@ -14,8 +14,11 @@ function assess(root, id) {
   if (fs.existsSync(path.join(dir, 'review.lock'))) return { status: 'blocked', reason: 'A run operation is active. Wait for its result; do not start another review or edit its snapshot.' };
   const state = duo.inspect(root, id), last = state.history.at(-1);
   if (state.goalStatus === 'complete') return { status: 'reviewed', reason: 'Scoped goal finished on current evidence.' };
-  if (state.stagnantRounds >= 2 || state.repairCycle?.attempts >= 4) return { status: 'blocked', reason: 'Repair/no-progress limit reached. Report the specific unresolved findings; do not restart to evade the limit.' };
-  if (state.peerFailures >= 3) return { status: 'blocked', reason: 'Peer response failure limit reached. Inspect raw records; do not reset the run or claim verification.' };
+  const guards=duo.eligibility(root,id).blockers;
+  if (guards.length) {
+    const recoverable=guards.every(g=>g.recoverable === true);
+    return {status:recoverable?'continue_required':'blocked',reason:`Cause: ${state.lastFailure || state.blocker || 'Review unavailable'}. ${guards.map(g=>g.reason).join('; ')}. Inspect retained round evidence and use recover-review for an evidenced different action; do not reset history.`};
+  }
   if (!last) return { status: 'review_required', reason: 'No peer feedback yet. Review the completed implementation, diagnosis or verification batch, even if other goal gates remain blocked.' };
   const batch = readJson(path.join(dir, `round-${String(state.history.length).padStart(3, '0')}`, 'batch.json'));
   const fresh = last.snapshot === duo.fingerprint(root, [...Object.keys(state.pinned), ...(batch.evidence || [])]);

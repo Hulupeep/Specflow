@@ -50,10 +50,10 @@ the uplifter adds only missing artifacts. The simulator checks relevant routes
 and gaps. Reuse existing evidence and explain N/A decisions. Do not copy this
 whole procedure into every future ticket.
 
-Specification review permits **initial + one repair**, shared across sessions
-and hosts for the issue/tier. A **no-new-evidence** result stops automatic review.
+Specification review permits **continue on verified progress with bounded diagnosis**, shared across sessions
+and hosts for the issue/tier. A **no-new-evidence** result requires bounded diagnosis before review.
 Keep failed attempts, unresolved findings and the actual stop reason. An ungraded
-fix is not an accepted spec; an exhausted allowance needs owner resolution.
+fix is not an accepted spec; repeated failure after diagnosis needs a concrete blocker report.
 
 ## Build, review, learn
 

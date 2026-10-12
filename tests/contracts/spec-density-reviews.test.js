@@ -12,7 +12,7 @@ function report(overrides = {}) {
 function finding(overrides = {}) {
   return { id: 'F1', basis: 'AC-1: correction durability', action: 'Persist corrections before replacing a parse', severity: 'SERIOUS', status: 'open', impact: 'current', origin: 'original', evidence: [evidence('finding')], ...overrides };
 }
-test('review budget belongs to the issue/tier, survives hosts and cannot reset through run renaming', () => {
+test('progress survives hosts and permits regrade beyond the old issue/tier allowance', () => {
   const r = record();
   const first = reviews.begin(root, r, 'contracted', 'codex');
   reviews.complete(root, first, report({ nativeOutcome: 'changes_required', findings: [finding()] }));
@@ -21,8 +21,8 @@ test('review budget belongs to the issue/tier, survives hosts and cannot reset t
   const second = reviews.begin(root, r, 'contracted', 'claude-code');
   reviews.complete(root, second, report({ identity: { provider: 'codex', family: 'gpt', model: 'fixture-only', mode: 'simulated' }, findings: [finding({ status: 'resolved' })] }));
   r.profile.newName = 'try another run';
-  expect(() => reviews.begin(root, r, 'contracted', 'codex')).toThrow('initial review plus one repair');
-  expect(reviews.load(root, 3).reviews.contracted).toHaveLength(2);
+  expect(reviews.begin(root, r, 'contracted', 'codex').status).toBe('pending');
+  expect(reviews.load(root, 3).reviews.contracted).toHaveLength(3);
 });
 test('a pending or interrupted review is durable and cannot disappear', () => {
   const r = record(), first = reviews.begin(root, r, 'build-ready', 'codex');
@@ -50,8 +50,8 @@ test('three consecutive protocol failures block across hosts and changed scopes'
     reviews.fail(root, reservation, 'Invalid native response', { kind: 'protocol' });
   }
   r.profile.attempt++;
-  expect(() => reviews.begin(root, r, 'build-ready', 'codex')).toThrow('protocol failure limit');
-  expect(reviews.stageGate(root, r, 'GATE_B5').next_action).toContain('protocol failure limit');
+  expect(() => reviews.begin(root, r, 'build-ready', 'codex')).toThrow('protocol failures');
+  expect(reviews.stageGate(root, r, 'GATE_B5').next_action).toContain('protocol failures');
 });
 test('a protocol retry retains prior findings and cannot erase substantive review accounting', () => {
   const r = record();
@@ -62,7 +62,7 @@ test('a protocol retry retains prior findings and cannot erase substantive revie
   expect(reviews.load(root, r.issue.number).reviews['build-ready'].at(-1).findings).toHaveLength(1);
   expect(reviews.status(root, r, 'build-ready')).toMatchObject({ attempts: 2, passed: false });
   r.profile.changed = true;
-  expect(() => reviews.begin(root, r, 'build-ready', 'codex')).toThrow('initial review plus one repair');
+  expect(() => reviews.begin(root, r, 'build-ready', 'codex')).toThrow('No new evidence-backed progress');
 });
 test.each(['current', 'unknown'])('an unbuilt dependency with %s impact is not automatically deferred', impact => {
   const result = reviews.classify(root, null, [finding({ status: 'deferred', impact, targets_unbuilt_dependency: true, deferral: { nonimpact: 'future only', ownerIssue: 'https://github.com/example/project/issues/2', trigger: 'dependency implementation', evidence: [evidence('nonimpact')] } })], [], report().identity);

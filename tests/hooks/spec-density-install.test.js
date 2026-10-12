@@ -176,7 +176,7 @@ const r=spawnSync(process.execPath,[path.join(process.env.TIER_SOURCE,'node_modu
     const text = fs.readFileSync(path.join(target, name), 'utf8');
     const template = fs.readFileSync(path.join(source, name === 'PROCESS.md' ? 'templates/PROCESS.md' : 'templates/process/' + name), 'utf8');
     expect(text).toBe(template);
-    expect(text).toContain('initial + one repair');
+    expect(text).toContain('continue on verified progress');
     expect(text).toContain('no-new-evidence');
     expect(text).toContain('never_without_human');
     expect(text.replace(/\s+/g, ' ')).toMatch(/thin backlog capture (?:can|may) precede (?:that )?review/i);

@@ -106,7 +106,7 @@ The bugs that *would* have shown up in production mostly got found in steps 3–
 - **Worth it for:** anything non-trivial — real data, money/leave/balances, auth, things you'll maintain, anything where a production bug hurts. The hour up front saves far more in avoided rework.
 - **Overkill for:** a one-line copy change, a throwaway spike, or pure exploration where you're not shipping. Don't loop a typo fix.
 - **Where it's efficient:** independent tickets can be built in parallel after the spec is ready; discovery + adversary often run while you draft the next thing.
-- **Depth follows the decision:** a small story reuses existing contracts and supplies only applicable missing evidence. Thin capture triggers no full simulation. Selected contracted decisions get initial + one repair; no-new-evidence or an exhausted allowance stops automatic review.
+- **Depth follows the decision:** a small story reuses existing contracts and supplies only applicable missing evidence. Thin capture triggers no full simulation. Selected contracted decisions get continue on verified progress with bounded diagnosis; no-new-evidence requires diagnosis before another review.
 
 **Rule of thumb:** if a bug in this would embarrass you in front of a customer, run spec-build. If not, just write the ticket.
 
@@ -123,12 +123,12 @@ You point the prompt at one file — [`QA/loops/spec-build.yaml`](./loops/spec-b
 | **`stages`** | The steps, in order ↓ |
 | &nbsp;&nbsp;`discover` | Ground against the **real artifact**; write the problem + the real data it must satisfy. |
 | &nbsp;&nbsp;`draft` | Write the PRD (JTBD, scope, acceptance, metrics, deps). |
-| &nbsp;&nbsp;`adversary` | The hostile critic: 7-pass rubric + reality-grounding + loophole hunt. Contracted scope gets an initial review + one repair through scoped Duo; unchanged evidence stops. |
+| &nbsp;&nbsp;`adversary` | The hostile critic: 7-pass rubric + reality-grounding + loophole hunt. Contracted scope gets an continue on verified progress with bounded diagnosis through scoped Duo; unchanged evidence stops. |
 | &nbsp;&nbsp;**`GATE_A` (hard)** | Verdict must be `SHIP` / `SHIP WITH STIPULATIONS`, written to the committed verdict file. This gates selected-decision promotion and human-approved GitHub issue creation; local thin backlog capture may precede review. |
 | &nbsp;&nbsp;`tickets` | Specflow-writer keeps future outcomes thin and deepens only selected work and its applicable seams. |
 | &nbsp;&nbsp;`GATE_B` (soft) | board-auditor + uplifter: selected build-ready requirement→journey→test→issue, no orphans, no duplicate IDs. |
 | &nbsp;&nbsp;`GATE_B.5` (soft) | pre-flight-simulator walks real personas through the selected build-ready slice; a CRITICAL design gap blocks. |
-| **`repair`** | On a failed gate: retry with a targeted fix (budget: contracted initial + one repair; build-ready initial + one re-grade; no-new-evidence stops), else escalate. |
+| **`repair`** | On a failed gate: retry with a targeted fix (budget: continue on verified progress with bounded diagnosis), else escalate. |
 | **`escalate_when`** | It stops and asks **you** if: the verdict is DO-NOT-SHIP, the idea turns out wrong, or an open gap has no owner. |
 | **`never_without_human`** | It will **never**: create tickets from a rejected PRD, or fake a green verdict. |
 | **`done_when`** | Mixed-tier backlog exists; only the selected verified build-ready slice is handed to `feature-build.yaml`. |

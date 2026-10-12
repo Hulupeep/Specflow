@@ -91,12 +91,14 @@ user does not copy review messages or run three separate workflows.
    builders also bind `specification.reviewerModel` to their already approved
    Codex model; its explicit CLI selection is recorded separately from served
    model telemetry. No automatic model selection is introduced.
-6. Fix evidenced findings and re-review within the initial-plus-one-repair
-   allowance. Invalid native peer responses are retained as `protocol_failed`
-   and do not consume this substantive allowance or establish acceptance. Three
-   consecutive protocol failures block the issue/tier across hosts and run names;
-   a validated scoped review clears that streak. Correcting a rejected response
-   may retry the same scope. A substantive re-review still needs changed evidence.
+6. Fix evidenced findings and re-review while first-time criteria/gates or finding
+   closures advance. There is no fixed two-review allowance. Two consecutive
+   no-progress reviews require diagnosis; three protocol failures require
+   protocol diagnosis. One evidenced different recovery attempt per failure
+   episode is allowed; a repeated failure reports its actual cause and stops.
+   Invalid native responses remain `protocol_failed`, grant no acceptance and
+   do not consume product repair history. Changed wording and repeated closures
+   are not progress. Issue/tier history survives host and run names.
    A fully verified preparation peer returns `complete` with no next steps:
    `finish` and promotion are subsequent builder actions, not repair instructions.
    Then run `node scripts/specflow-specification.cjs promote RECORD
@@ -108,7 +110,8 @@ user does not copy review messages or run three separate workflows.
 
 Records under `.specflow/specification/` survive host/run changes. Keep that local
 journal when moving worktrees; missing required journals block affected work.
-An interrupted reserved peer call remains unfinished and consumes its allowance.
+An interrupted reserved peer call remains unfinished until recorded. New interrupted
+responses then count as protocol failures, not product reviews.
 After verifying the process ended, record it with `review-failed RECORD TIER
 "observed interruption and evidence location"`; this retains previous findings,
 never resets the budget and never supplies acceptance. A lock whose process
@@ -193,3 +196,5 @@ key stays outside the agent workspace; agents must not generate approval for
 themselves. Identifier decisions name the exact ID and the signed decision.
 Exceptions remain `override:<who>:<reason>`, never passed, and cannot grant
 missing capability, privacy or production acceptance.
+
+New Duo-owned reservations require `review-failed RECORD TIER "reason" --session TOKEN` from that owning session. A live Duo operation lock prevents interruption bookkeeping. Historical unbound reservations retain the legacy local recovery path; neither path grants acceptance.

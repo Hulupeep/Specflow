@@ -38,7 +38,7 @@ For the selected contracted decisions, the builder drafts or reuses the relevant
 
 ## Step 2 — GATE A (HARD) — the adversary verdict
 
-The scoped independent verdict and raw evidence govern promotion of the selected decisions. Local thin backlog capture can precede that review. GitHub issue creation still requires the scoped SHIP verdict and human approval; preserve the path's `never_without_human` actions. Contracted promotion requires its live scoped receipt; an ungraded fix or exhausted allowance stays blocked. Use initial + one repair and a no-new-evidence stop, retained across sessions and run names. Durable local evidence supports uncommitted work, so a per-review commit is not required.
+The scoped independent verdict and raw evidence govern promotion of the selected decisions. Local thin backlog capture can precede that review. GitHub issue creation still requires the scoped SHIP verdict and human approval; preserve the path's `never_without_human` actions. Contracted promotion requires its live scoped receipt; an ungraded fix stays blocked. Use continue on verified progress with bounded diagnosis and a no-new-evidence stop, retained across sessions and run names. Durable local evidence supports uncommitted work, so a per-review commit is not required.
 
 ## Step 3 — Tickets (Specflow)
 
