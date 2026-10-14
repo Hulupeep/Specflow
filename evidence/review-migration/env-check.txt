@@ -1,0 +1,22 @@
+
+> @colmbyrne/specflow@0.11.1 test
+> jest --no-coverage --runInBand --roots tests --runTestsByPath tests/scripts/duo-review-migration.test.js
+
+PASS tests/scripts/duo-review-migration.test.js
+  ✓ MIG-1/3/4: same-run migration archives exact old state/runtime and requires fresh review (351 ms)
+  ✓ MIG-2: wrong owner, missing authorization/reason, stale evidence leave original state intact (159 ms)
+  ✓ MIG-3: historical calls and validated achievements survive without granting acceptance (426 ms)
+  ✓ MIG-2: installer and active operation locks refuse migration (54 ms)
+  ✓ MIG-2: failed staging leaves old run authoritative and retry keeps abandoned archive (195 ms)
+  ✓ MIG-1/2: unknown runtime, ceased and completed state refuse (58 ms)
+  ✓ MIG-2/3: scoped journal lock and pending round refuse; migration preserves exact shared bytes (86 ms)
+  ✓ MIG-3: invalid historical responses retain protocol guard and earn no progress (70 ms)
+  ✓ MIG-2: changed acceptance or tampered pinned runtime refuses (55 ms)
+  ✓ MIG-4: printed migrated entrypoint works while installed legacy dispatcher stays unchanged (540 ms)
+  ✓ MIG-3: retained counters absent from detailed history cannot be refunded (60 ms)
+
+Test Suites: 1 passed, 1 total
+Tests:       11 passed, 11 total
+Snapshots:   0 total
+Time:        2.601 s, estimated 3 s
+Ran all test suites within paths "tests/scripts/duo-review-migration.test.js".

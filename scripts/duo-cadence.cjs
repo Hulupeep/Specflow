@@ -54,7 +54,11 @@ function stop(root, input) {
   });
   const required = pending.filter(row => ['review_required', 'continue_required'].includes(row.status));
   if (required.length) {
-    const reason = required.map(row => `Duo ${row.id}: ${row.reason}`).join('\n') + '\nRead the saved continuation.md and act on the authorized builder step now. Record your direction_response, capture the result, then use your existing owner token with node scripts/duo-build.cjs review <id> --session <token> --batch <batch.json>. Do not wait for user permission to review, unrelated live gates, or a ten-minute timer. Do not change pinned acceptance.';
+    const reason = required.map(row => {
+      const state=duo.load(root,row.id).state;
+      const entry=state.runtime.directory ? path.join('.specflow/duo',row.id,state.runtime.directory,'scripts/duo-build.cjs') : 'scripts/duo-build.cjs';
+      return `Duo ${row.id}: ${row.reason}\nUse your existing owner token with node ${entry} review ${row.id} --session <token> --batch <batch.json>.`;
+    }).join('\n') + '\nRead the saved continuation.md and act on the authorized builder step now. Record your direction_response and capture the result. Do not wait for user permission to review, unrelated live gates, or a ten-minute timer. Do not change pinned acceptance.';
     // One corrective continuation; never an unbounded Stop-hook loop.
     return input.stop_hook_active ? { continue: false, stopReason: `Duo remains unreviewed; automatic continuation exhausted. ${reason}` } : { decision: 'block', reason };
   }
