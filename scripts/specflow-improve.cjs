@@ -388,6 +388,9 @@ function validateContract(runDir, contract, selected) {
     if (![1, 2, 3, 4].includes(a?.required_level)) errors.push(`${where}: required_level must be 1-4`);
     if (typeof a?.mandatory !== 'boolean') errors.push(`${where}: mandatory must be true or false`);
     if (!['fail', 'pass', 'n/a'].includes(a?.baseline_expectation)) errors.push(`${where}: baseline_expectation must be fail|pass|n/a`);
+    if (a?.check && !['gain', 'preservation'].includes(a.intent)) errors.push(`${where}: executable acceptance needs intent gain|preservation`);
+    if (a?.intent === 'gain' && (a.required_level > 2 || !a.check || a.baseline_expectation !== 'fail')) errors.push(`${where}: a gain needs level 1-2 holdout evidence with baseline_expectation fail`);
+    if (a?.intent === 'preservation' && a.check && a.baseline_expectation !== 'pass') errors.push(`${where}: preservation needs baseline_expectation pass`);
     if (a?.required_level <= 2) {
       if (!a.check) errors.push(`${where}: level ${a.required_level} needs an executable check frozen with the contract`);
       else {
@@ -399,6 +402,7 @@ function validateContract(runDir, contract, selected) {
       }
     }
     if (a?.dev_check) {
+      if (!['fail', 'pass', 'n/a'].includes(a.dev_baseline_expectation)) errors.push(`${where}: dev_check needs its own dev_baseline_expectation fail|pass|n/a`);
       // Builder-visible practice check: in-sample, never decides.
       if (!Array.isArray(a.dev_check.command) || !a.dev_check.command.length) errors.push(`${where}: dev_check.command argv is required`);
       if (!nonempty(a.dev_check.artifact) || !a.dev_check.artifact.startsWith(DEV_DIR)) errors.push(`${where}: dev_check artifact must live under ${DEV_DIR}`);
@@ -408,6 +412,9 @@ function validateContract(runDir, contract, selected) {
   }
   if (!acceptance.some((a) => a.mandatory && a.required_level <= 2)) {
     errors.push('at least one mandatory criterion must require level 1 or 2 evidence; otherwise the change is unevaluable');
+  }
+  if (!acceptance.some((a) => a.mandatory && a.intent === 'gain' && a.required_level <= 2 && a.check && a.baseline_expectation === 'fail')) {
+    errors.push('at least one mandatory executable gain must be declared before freezing');
   }
   if (!list(contract?.scope?.allowed_paths).length) errors.push('scope.allowed_paths must bound the change');
   if (selected && ['ux-refinement', 'workflow'].includes(selected.kind) && !list(contract?.ux_profile?.preserve).length) {
@@ -464,7 +471,7 @@ function freezeContract(runDir, file, options = {}) {
   const oracle = evs.filter((e) => e.event === 'oracle_authored').map((e) => ({ role: e.role, executor: e.executor, observed_model: e.provenance?.observed_model || null }));
   const implementationStarted = Boolean(lastEvent(evs, 'implementation_started'));
   const frozen = {
-    schema: 'specflow.improvement-contract/v1',
+    schema: 'specflow.improvement-contract/v2',
     run_id: run.run_id,
     version,
     supersedes: previous.length ? previous[previous.length - 1].contract_sha256 : null,
@@ -747,16 +754,16 @@ async function verifyPhase(runDir, phase) {
   if (!['baseline', 'after'].includes(phase)) throw new Error('phase must be baseline or after');
   const run = loadRun(runDir);
   const gov = governingContract(runDir);
+  const evs = events(runDir);
+  if (phase === 'baseline' && lastEvent(evs, 'implementation_started')) throw new Error('Baseline must be captured before implementation starts');
   const attempt = require('crypto').randomUUID();
   if(phase==='baseline')append(runDir,'baseline_attempted',{attempt,contract_version:gov?.entry.version,contract_sha256:gov?.entry.contract_sha256,base_commit:run.base_commit});
   const blocked = integrityBlock(runDir, gov, phase);
   if (blocked) return blocked;
-  const evs = events(runDir);
   if (phase === 'after' && !lastEvent(evs, 'implementation_finished')) throw new Error('No recorded implementation to verify');
   // The holdout decides once. Re-running it after seeing its result would make it in-sample.
   if (phase === 'after' && lastEvent(evs, 'holdout_consumed')) throw new Error('The holdout was already consumed for this run; evaluate on that result');
   if(phase==='after'&&evs.some(e=>(e.event==='verification_started'&&e.phase==='after'&&e.binding_version!==1)||(e.event==='verification_completed'&&e.phase==='after'&&!e.attempt)||(e.event==='evidence_added'&&e.phase==='after'&&!e.record_sha256)))throw Error('Legacy after-verification may have consumed the holdout; preserve evidence and evaluate without retry');
-  if (phase === 'baseline' && lastEvent(evs, 'implementation_started')) throw new Error('Baseline must be captured before implementation starts');
   const kind = phase === 'baseline' ? 'baseline' : 'improve';
   const ws = workspaceFor(run, kind);
   if (!fs.existsSync(ws.worktreePath)) prepareWorkspace(runDir, kind);
@@ -781,9 +788,11 @@ async function verifyPhase(runDir, phase) {
   if (outcome.status === 'blocked') {append(runDir,'verification_blocked',{phase,attempt,contract_version:gov.entry.version,reason:outcome.reason});return outcome;}
   const summary = Object.fromEntries(outcome.items.map((i) => [i.set === 'dev' ? `dev:${i.criterion}` : i.criterion, i.result]));
   if (phase === 'baseline') {
-    const mismatches = gov.contract.acceptance
-      .filter((a) => a.check && a.baseline_expectation !== 'n/a' && summary[a.id] !== a.baseline_expectation)
-      .map((a) => ({ criterion: a.id, expected: a.baseline_expectation, observed: summary[a.id] }));
+    const mismatches = gov.contract.acceptance.flatMap(a => [
+      { set: 'holdout', check: a.check, expected: a.baseline_expectation, observed: summary[a.id] },
+      { set: 'dev', check: a.dev_check, expected: a.dev_baseline_expectation ?? 'n/a', observed: summary[`dev:${a.id}`] },
+    ].filter(x => x.check && x.expected !== 'n/a' && x.observed !== x.expected)
+      .map(({ set, expected, observed }) => ({ set, criterion: a.id, expected, observed })));
     append(runDir, mismatches.length ? 'baseline_blocked' : 'baseline_recorded', { attempt, contract_version: gov.entry.version, contract_sha256:gov.entry.contract_sha256, receipt_sha256:outcome.receiptHash, summary, mismatches });
     return { status: mismatches.length ? 'baseline_blocked' : 'baseline_recorded', summary, mismatches };
   }
@@ -975,7 +984,7 @@ function publicContract(gov) {
     version: gov.entry.version, observation: c.observation, user_problem: c.user_problem, hypothesis: c.hypothesis,
     affected_journey: c.affected_journey, non_goals: c.non_goals, scope: c.scope, ux_profile: c.ux_profile || null,
     implementation_notes: c.implementation_notes || null,
-    acceptance: c.acceptance.map((a) => ({ id: a.id, statement: a.statement, required_level: a.required_level, mandatory: a.mandatory, practice_check: a.dev_check ? a.dev_check.artifact : null })),
+    acceptance: c.acceptance.map((a) => ({ id: a.id, statement: a.statement, required_level: a.required_level, mandatory: a.mandatory, intent: a.intent || null, practice_check: a.dev_check ? a.dev_check.artifact : null })),
   };
 }
 
@@ -1295,9 +1304,12 @@ function decide(state) {
   const failed = state.criteria.filter((c) => c.mandatory && c.status === 'failed');
   if (failed.length) reasons.push(`mandatory criteria failed: ${failed.map((c) => c.id).join(', ')}`);
   if (state.regressions.length) reasons.push(`gates regressed from baseline: ${state.regressions.join(', ')}`);
+  if (state.gates_failed?.length) reasons.push(`required gates failed: ${state.gates_failed.join(', ')}`);
   if (reasons.length) return { decision: 'REVERT', reasons };
   const missing = state.criteria.filter((c) => c.mandatory && c.status !== 'satisfied');
   const inconclusive = [...(state.binding_errors || [])];
+  if (!state.gains?.length) inconclusive.push('no mandatory executable gain declared in the governing contract');
+  for (const gain of state.gains || []) if (!gain.established) inconclusive.push(`gain ${gain.criterion} not established: ${gain.reason}`);
   if (missing.length) inconclusive.push(`mandatory criteria without qualifying evidence: ${missing.map((c) => c.id).join(', ')}`);
   if (state.gates_missing.length) inconclusive.push(`gates without a result: ${state.gates_missing.join(', ')}`);
   if (state.baseline_blocker) inconclusive.push(`baseline blocker accepted: ${state.baseline_blocker}`);
@@ -1309,7 +1321,7 @@ function decide(state) {
   if (!state.peer_recommendation) inconclusive.push('no valid Duo peer recommendation');
   else if (state.peer_recommendation !== 'keep') inconclusive.push(`Duo peer recommends ${state.peer_recommendation} while the checks pass; a human decides`);
   if (inconclusive.length) return { decision: 'INCONCLUSIVE', reasons: inconclusive };
-  return { decision: 'KEEP', reasons: ['all mandatory criteria satisfied by qualifying evidence; no gate regressed; scope and safety held'] };
+  return { decision: 'KEEP', reasons: ['all declared mandatory gains established by matched holdout evidence; all mandatory criteria and required gates passed; scope and safety held'] };
 }
 
 function evaluate(runDir) {
@@ -1320,8 +1332,40 @@ function evaluate(runDir) {
   if (!started) throw new Error('Nothing to evaluate: no implementation attempt was recorded');
   const gov = governingContract(runDir);
   const evidence = readEvidence(runDir);
-  const afterBinding=boundReceipt(runDir,'after'),baselineBinding=boundReceipt(runDir,'baseline',{current:false});
+  const afterBinding = boundReceipt(runDir, 'after');
+  let baselineBinding = boundReceipt(runDir, 'baseline', { current: false });
+  if (baselineBinding.receipt && baselineBinding.receipt.attempt !== lastEvent(evs, 'baseline_attempted')?.attempt) {
+    baselineBinding = { error: 'Evidence binding: baseline receipt was superseded by a newer attempt' };
+  }
   const bindingErrors=[afterBinding.error,baselineBinding.error].filter(Boolean);
+  const sameVerifier = Boolean(baselineBinding.receipt && afterBinding.receipt && baselineBinding.receipt.identity.verifier === afterBinding.receipt.identity.verifier);
+  if (baselineBinding.receipt && afterBinding.receipt && !sameVerifier) bindingErrors.push('Verifier identity differs between baseline and after; gain comparison is unavailable');
+  // Only the exact selected receipts can supply before/after results. Earlier
+  // attempts and independently appended observations cannot replace this pair.
+  const boundIds = new Set([...(baselineBinding.receipt?.evidence || []), ...(afterBinding.receipt?.evidence || [])].map(e => e.id));
+  const boundEvidence = evidence.filter(e => boundIds.has(e.id));
+  // Binding is required for positive authority. A recorded mechanical failure
+  // remains a veto even if subsequent drift invalidates its receipt (or the
+  // verification was interrupted after the failing check). Never turn a known
+  // failure into missing evidence or allow a used holdout to be retried.
+  const failures = evidence.filter(e => e.phase === 'after' && e.contract_version === gov.entry.version && e.result === 'fail'
+    && e.producer_role === MECHANICAL_PRODUCER && !e.self_review
+    && ((e.kind === 'executable-check' && e.set === 'holdout') || (e.kind === 'gate' && e.set === 'gate')));
+  const decisionEvidence = [...boundEvidence, ...failures.filter(e => !boundIds.has(e.id))];
+  const gains = gov.contract.acceptance.filter(a => a.mandatory && a.intent === 'gain').map(a => {
+    const qualifying = boundEvidence.filter(e => e.criterion === a.id && e.contract_version === gov.entry.version && e.set === 'holdout'
+      && e.kind === 'executable-check' && e.producer_role === MECHANICAL_PRODUCER && !e.self_review
+      && [1, 2].includes(e.level) && e.level <= a.required_level
+      && e.source?.artifact === a.check?.artifact && e.source?.artifact_sha256 === gov.entry.artifact_sha256?.[a.check?.artifact]
+      && binding.digest(e.source?.command) === binding.digest(a.check?.command));
+    const before = qualifying.filter(e => e.phase === 'baseline'), after = qualifying.filter(e => e.phase === 'after');
+    const paired = before.length === 1 && after.length === 1;
+    const established = paired && sameVerifier && a.baseline_expectation === 'fail' && before[0].result === 'fail' && after[0].result === 'pass';
+    return { criterion: a.id, established, baseline_evidence: before.length === 1 ? before[0].id : null, after_evidence: after.length === 1 ? after[0].id : null,
+      baseline: before.length === 1 ? before[0].result : 'missing', after: after.length === 1 ? after[0].result : 'missing',
+      reason: !paired ? 'missing or ambiguous bound holdout pair' : !sameVerifier ? 'verifier differs from baseline'
+        : established ? 'declared binary gain changed from fail to pass' : 'declared binary gain requires baseline fail and after pass' };
+  });
   const recordedEvidence=evs.filter(e=>e.event==='evidence_added');
   const evidenceTampered = new Set(evidence.map(e=>e.id)).size!==evidence.length || recordedEvidence.length!==evidence.length || evidence.some(item=>{
     const record=recordedEvidence.find(e=>e.evidence_id===item.id);
@@ -1330,7 +1374,10 @@ function evaluate(runDir) {
   const diff = workspaceDiff(run) || { files: [], patch: '', sha256: sha256('') };
   fs.writeFileSync(path.join(runDir, 'workspace.patch'), diff.patch);
   const gates = list(gov.contract.gates).map((g) => {
-    const pick = (phase) => evidence.filter((e) => e.criterion === `gate:${g.id}` && e.phase === phase).slice(-1)[0]?.result || 'missing';
+    const pick = (phase) => {
+      const items = decisionEvidence.filter(e => e.criterion === `gate:${g.id}` && e.phase === phase && e.set === 'gate');
+      return items.some(e => e.result === 'fail') ? 'fail' : items.at(-1)?.result || 'missing';
+    };
     return { id: g.id, baseline: pick('baseline'), after: pick('after') };
   });
   // Only holdout findings feed the rail gate; practice findings are in-sample.
@@ -1343,8 +1390,11 @@ function evaluate(runDir) {
     scope: scopeCheck(gov.contract, diff.files),
     base: baseUnchanged(run),
     empty_diff: diff.files.length === 0,
-    criteria: evaluateCriteria(gov.contract, evidence, gov.entry.version),
+    criteria: evaluateCriteria(gov.contract, [...decisionEvidence, ...evidence.filter(e => e.kind === 'judgment')], gov.entry.version),
+    gains,
+    evidence_ids: decisionEvidence.map(e => e.id),
     regressions: gates.filter((g) => g.baseline === 'pass' && g.after === 'fail').map((g) => g.id),
+    gates_failed: gates.filter((g) => g.after === 'fail').map((g) => g.id),
     gates_missing: gates.filter((g) => g.after === 'missing' || g.after === 'unavailable').map((g) => g.id),
     preexisting_gate_failures: gates.filter((g) => g.baseline === 'fail' && g.after === 'fail').map((g) => g.id),
     baseline_blocker: started.baseline_blocker_accepted || null,
@@ -1468,7 +1518,12 @@ function writeReport(runDir) {
   const userSteps = (peerRounds.slice(-1)[0]?.direction?.next_steps || []).filter((st) => st.owner === 'user');
   const measured = roles.filter((r) => typeof r.cost === 'number').reduce((s, r) => s + r.cost, 0);
   const unknown = roles.filter((r) => typeof r.cost !== 'number').length;
-  const pick = (criterion, phase) => evidence.filter((e) => e.criterion === criterion && e.phase === phase && e.kind !== 'judgment').slice(-1)[0];
+  const pick = (criterion, phase) => {
+    const items = evidence.filter(e => e.criterion === criterion && e.phase === phase && e.set === 'holdout'
+      && e.kind === 'executable-check' && e.contract_version === gov.entry.version
+      && (!decision?.evidence_ids || decision.evidence_ids.includes(e.id)));
+    return items.find(e => e.result === 'fail') || items.at(-1);
+  };
   const headline = !decision ? 'No decision yet.'
     : decision.decision === 'KEEP' ? `Improvement established: ${gov.contract.hypothesis}`
       : decision.decision === 'REVERT' ? 'Change reverted: it failed, regressed or broke the run boundary. Product unchanged.'
@@ -1481,6 +1536,13 @@ function writeReport(runDir) {
     decision ? `**Why:** ${decision.reasons.join('; ')}` : '',
     '',
     decision ? `**What the evidence established:** ${['satisfied', 'failed', 'missing'].map((st) => `${st}: ${decision.criteria.filter((c) => c.status === st).map((c) => c.id).join(', ') || 'none'}`).join('; ')}. Partial gains are not retained; they inform the next contract.` : '',
+    '',
+    '## Declared gains',
+    '',
+    'Only matched bound holdout pairs establish gains. A recorded failure can still veto the decision when its pairing is unavailable.',
+    '',
+    ...(decision?.gains?.length ? decision.gains.map(g => `- ${g.criterion}: ${g.baseline} → ${g.after}; ${g.established ? 'established' : 'not established'} — ${g.reason}. Evidence: ${g.baseline_evidence || 'missing'} → ${g.after_evidence || 'missing'}.`)
+      : ['No declared mandatory gain evidence recorded.']),
     '',
     '## Human next decision',
     '',

@@ -377,6 +377,7 @@ invokes; Specflow is a CLI + CI the swarm calls.
 | [Agent Library](https://github.com/Hulupeep/Specflow/blob/main/agents/README.md) | 30+ agents for wave execution |
 | [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Review relevant irreversible decisions before promotion (Gate A) |
 | [Contract Schema](https://github.com/Hulupeep/Specflow/blob/main/CONTRACT-SCHEMA.md) | YAML format for contracts |
+| [Improvement contracts](https://github.com/Hulupeep/Specflow/blob/main/templates/improve/GAIN_CONTRACT.md) | Declare a binary gain, preserve existing behaviour, and interpret KEEP evidence |
 | [CI Integration](https://github.com/Hulupeep/Specflow/blob/main/CI-INTEGRATION.md) | GitHub Actions setup |
 | [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
 | [Issues](https://github.com/Hulupeep/Specflow/issues) | Bugs and ideas |

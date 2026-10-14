@@ -84,7 +84,7 @@ function contract(overrides = {}) {
     baseline: 'journey.json steps = 4',
     acceptance: [
       {
-        id: 'AC-1', statement: 'Resume journey takes at most 2 steps', required_level: 1, mandatory: true, baseline_expectation: 'fail',
+        id: 'AC-1', statement: 'Resume journey takes at most 2 steps', required_level: 1, mandatory: true, intent: 'gain', baseline_expectation: 'fail', dev_baseline_expectation: 'fail',
         check: { type: 'custom-script', level: 1, artifact: 'holdout/steps.cjs', command: ['node', '{artifact}'] },
         dev_check: { type: 'custom-script', level: 1, artifact: 'dev/steps.cjs', command: ['node', '{artifact}'] },
       },
@@ -430,6 +430,169 @@ describe('IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)', ()
   }));
 });
 
+describe('IMPROVE-GAIN (#174/#178)', () => {
+  test.each(['preservation', 'optional-gain', 'undeclared'])('GAIN-1: %s cannot authorize a new improvement contract', quiet(async (kind) => {
+    const f = fixture();
+    try {
+      const doc = contract();
+      if (kind === 'preservation') Object.assign(doc.acceptance[0], { intent: 'preservation', baseline_expectation: 'pass' });
+      if (kind === 'optional-gain') doc.acceptance[0].mandatory = false;
+      if (kind === 'undeclared') delete doc.acceptance[0].intent;
+      const { frozen } = await prepare(f, { contractDoc: doc });
+      expect(frozen.status).toBe('rejected');
+      expect(frozen.errors.join(' ')).toMatch(/mandatory.*gain/);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test('GAIN-2: a practice baseline mismatch names its set and blocks build', quiet(async () => {
+    const f = fixture();
+    try {
+      const doc = contract(); doc.acceptance[0].dev_baseline_expectation = 'pass';
+      const { runDir } = await prepare(f, { contractDoc: doc });
+      const result = await improve.verifyPhase(runDir, 'baseline');
+      expect(result).toMatchObject({ status: 'baseline_blocked', mismatches: [{ set: 'dev', criterion: 'AC-1', expected: 'pass', observed: 'fail' }] });
+      await expect(improve.build(runDir, { policy: writeTmp(f, 'b.json', FAKE_BUILDER()), invokePeer: fakePeer([KEEP]) })).rejects.toThrow(/baseline/i);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test('GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain', quiet(async () => {
+    const f = fixture();
+    try {
+      const doc = contract();
+      doc.acceptance.push({ ...doc.acceptance[0], id: 'PRESERVE', intent: 'preservation', baseline_expectation: 'pass',
+        check: { ...doc.acceptance[0].check, command: ['node', '-e', 'process.exit(0)'] } });
+      const { runDir } = await runToImplementation(f, { contractDoc: doc, edits: { 1: w => setSteps(w, 2) } });
+      await improve.verifyPhase(runDir, 'after');
+      const d = improve.evaluate(runDir);
+      expect(d.decision).toBe('KEEP');
+      expect(d.gains.map(g => g.criterion)).toEqual(['AC-1']);
+      expect(d.gains[0]).toMatchObject({ established: true, baseline: 'fail', after: 'pass' });
+      const report = fs.readFileSync(improve.finalize(runDir).report, 'utf8');
+      expect(report).toMatch(/Declared gains/);
+      expect(report).toContain(d.gains[0].baseline_evidence);
+      expect(report).toMatch(/PRESERVE.*\| pass \| pass \|/);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test('GAIN-3: a different verifier environment cannot establish a matched gain', quiet(async () => {
+    const f = fixture(), old = process.env.IMPROVE_GAIN_TEST_SETTING;
+    try {
+      const { runDir } = await runToImplementation(f, { edits: { 1: w => setSteps(w, 2) } });
+      process.env.IMPROVE_GAIN_TEST_SETTING = 'different-after-baseline';
+      await improve.verifyPhase(runDir, 'after');
+      const d = improve.evaluate(runDir);
+      expect(d.decision).toBe('INCONCLUSIVE');
+      expect(d.reasons.join(' ')).toMatch(/verifier.*baseline/i);
+      expect(improve.finalize(runDir).branch_retained).toBe(false);
+    } finally {
+      if (old === undefined) delete process.env.IMPROVE_GAIN_TEST_SETTING; else process.env.IMPROVE_GAIN_TEST_SETTING = old;
+      fs.rmSync(f.root, { recursive: true, force: true });
+    }
+  }));
+
+  test('GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain', quiet(async () => {
+    const f = fixture();
+    try {
+      const doc = contract({ gates: [{ id: 'broken', command: ['node', '-e', 'process.exit(1)'] }] });
+      const { runDir } = await runToImplementation(f, { contractDoc: doc, edits: { 1: w => setSteps(w, 2) } });
+      await improve.verifyPhase(runDir, 'after');
+      const d = improve.evaluate(runDir);
+      expect(d.decision).toBe('REVERT');
+      expect(d.reasons.join(' ')).toMatch(/required gates failed: broken/);
+      expect(improve.finalize(runDir).branch_retained).toBe(false);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test.each(['pass', 'unavailable'])('GAIN-3: every mandatory gain needs matched evidence (second gain %s)', quiet(async (outcome) => {
+    const f = fixture();
+    try {
+      const doc = contract();
+      doc.acceptance.push({ ...doc.acceptance[0], id: 'GAIN-SECOND',
+        check: { ...doc.acceptance[0].check, command: ['node', '-e', `process.exit(process.env.IMPROVE_PHASE==='baseline'?1:${outcome === 'pass' ? 0 : 2})`] } });
+      const { runDir } = await runToImplementation(f, { contractDoc: doc, edits: { 1: w => setSteps(w, 2) } });
+      await improve.verifyPhase(runDir, 'after');
+      const d = improve.evaluate(runDir);
+      expect(d.gains[0].established).toBe(true);
+      expect(d.gains[1].established).toBe(outcome === 'pass');
+      expect(d.decision).toBe(outcome === 'pass' ? 'KEEP' : 'INCONCLUSIVE');
+      if (outcome !== 'pass') expect(d.reasons.join(' ')).toMatch(/gain GAIN-SECOND not established/);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test.each(['acceptance', 'gate'])('GAIN-4: input drift cannot erase a demonstrated %s failure', quiet(async (failure) => {
+    const f = fixture();
+    try {
+      const doc = contract({ scope: { allowed_paths: ['src/**'] } });
+      const { runDir, ws } = await runToImplementation(f, { contractDoc: doc, edits: { 1: w => {
+        setSteps(w, failure === 'acceptance' ? 3 : 2);
+        if (failure === 'gate') fs.writeFileSync(path.join(w, 'src/nav.json'), JSON.stringify({ items: ['home'] }));
+      } } });
+      await improve.verifyPhase(runDir, 'after');
+      fs.writeFileSync(path.join(ws, 'src/unrelated.txt'), 'new input after verification');
+      const d = improve.evaluate(runDir);
+      expect(d.decision).toBe('REVERT');
+      expect(d.reasons.join(' ')).toMatch(failure === 'gate' ? /required gates failed: nav/ : /mandatory criteria failed: AC-1/);
+      expect(improve.finalize(runDir).branch_retained).toBe(false);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test('GAIN-5: a rejected late baseline command does not invalidate an admitted run', quiet(async () => {
+    const f = fixture();
+    try {
+      const { runDir } = await runToImplementation(f, { edits: { 1: w => setSteps(w, 2) } });
+      const attempts = improve.events(runDir).filter(e => e.event === 'baseline_attempted').length;
+      await expect(improve.verifyPhase(runDir, 'baseline')).rejects.toThrow(/before implementation/);
+      expect(improve.events(runDir).filter(e => e.event === 'baseline_attempted')).toHaveLength(attempts);
+      await improve.verifyPhase(runDir, 'after');
+      expect(improve.evaluate(runDir).decision).toBe('KEEP');
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+
+  test.each(['gain', 'preservation'])('GAIN-5: legacy %s evidence cannot gain KEEP authority and is never rewritten', quiet(async (kind) => {
+    const f = fixture();
+    try {
+      const { runDir } = await prepare(f);
+      // Construct a historical v1 fixture BEFORE any baseline/build/checks.
+      // This is test fixture synthesis, never a supported run-migration path.
+      const crypto = require('crypto'), runner = require('../../scripts/specflow-runner.cjs');
+      const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
+      const file = improve.governingContract(runDir).entry.path;
+      const frozen = JSON.parse(fs.readFileSync(file, 'utf8'));
+      frozen.schema = 'specflow.improvement-contract/v1';
+      for (const a of frozen.contract.acceptance) { delete a.intent; delete a.dev_baseline_expectation; }
+      if (kind === 'preservation') {
+        frozen.contract.acceptance[0].baseline_expectation = 'pass';
+        frozen.contract.acceptance[0].check.command = ['node', '-e', 'process.exit(0)'];
+      }
+      fs.writeFileSync(file, JSON.stringify(frozen, null, 2) + '\n');
+      const original = fs.readFileSync(file, 'utf8');
+      const ledger = runner.verificationPaths({ runDir }).ledgerPath;
+      const rows = fs.readFileSync(ledger, 'utf8').trim().split('\n').map(JSON.parse), lines = [];
+      for (const [i, e] of rows.entries()) {
+        if (e.event === 'contract_frozen') e.contract_sha256 = hash(original);
+        if (e.stage === 'improve') { e.seq = i; e.prev_sha256 = i ? hash(lines[i - 1]) : null; }
+        lines.push(JSON.stringify(e));
+      }
+      fs.writeFileSync(ledger, lines.join('\n') + '\n');
+      expect(improve.verifyLedger(runDir).ok).toBe(true);
+      expect((await improve.verifyPhase(runDir, 'baseline')).status).toBe('baseline_recorded');
+      await improve.build(runDir, { policy: writeTmp(f, 'b.json', FAKE_BUILDER()), invokePeer: fakePeer([KEEP]), afterBuilderRound: w => {
+        if (kind === 'gain') setSteps(w, 2);
+        else fs.writeFileSync(path.join(w, 'src/journey.json'), JSON.stringify({ steps: 4, note: 'unrelated metadata' }));
+      } });
+      await improve.verifyPhase(runDir, 'after');
+      const evidenceBefore = fs.readFileSync(path.join(runDir, 'evidence.jsonl'), 'utf8');
+      const d = improve.evaluate(runDir);
+      expect(d.decision).toBe('INCONCLUSIVE');
+      expect(d.reasons.join(' ')).toMatch(/no mandatory executable gain declared/);
+      expect(fs.readFileSync(file, 'utf8')).toBe(original);
+      expect(fs.readFileSync(path.join(runDir, 'evidence.jsonl'), 'utf8')).toBe(evidenceBefore);
+      await expect(improve.verifyPhase(runDir, 'after')).rejects.toThrow(/already consumed/);
+      expect(improve.finalize(runDir).branch_retained).toBe(false);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+});
+
 describe('IMPROVE-06 decision (#178) and reversibility (#176)', () => {
   test('true improvement: KEEP retains an identifiable commit on an isolated branch; base untouched', quiet(async () => {
     const f = fixture();
@@ -549,14 +712,16 @@ describe('IMPROVE-BIND #201 negative routes and retention',()=>{
       const result=improve.evaluate(runDir);expect(result.decision).not.toBe('KEEP');expect(result.binding_errors.length).toBeGreaterThan(0);
     }finally{if(saved===undefined)delete process.env.SPECFLOW_BIND_FIXTURE;else process.env.SPECFLOW_BIND_FIXTURE=saved;fs.rmSync(f.root,{recursive:true,force:true});}
   }));
-  test('edit-and-restore during a holdout invalidates evidence and cannot consume it again',quiet(async()=>{
+  test.each([2,3])('edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps %s)',quiet(async steps=>{
     const f=fixture();try{
       const prefix="if(process.env.IMPROVE_PHASE==='after'){const fs=require('fs'),p=process.env.IMPROVE_WORKSPACE+'/src/journey.json',b=fs.readFileSync(p);fs.writeFileSync(p,'changed');fs.writeFileSync(p,b);}";
-      const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)},holdoutPrefix:prefix});
+      const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,steps)},holdoutPrefix:prefix});
       expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');
       expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);
       await expect(improve.verifyPhase(runDir,'after')).rejects.toThrow(/already consumed/);
-      expect(improve.evaluate(runDir).decision).not.toBe('KEEP');
+      expect(improve.evaluate(runDir).decision).toBe(steps===2?'INCONCLUSIVE':'REVERT');
+      const report=fs.readFileSync(improve.writeReport(runDir),'utf8');
+      expect(report).toContain(steps===2?'| fail | - | **missing**':'| fail | fail | **failed**');
     }finally{fs.rmSync(f.root,{recursive:true,force:true});}
   }));
   test.each(['external','dangling'])('%s symlinks fail before consuming the holdout',quiet(async kind=>{
@@ -604,7 +769,7 @@ describe('IMPROVE-BIND #201 negative routes and retention',()=>{
 
 test('IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE',quiet(async()=>{
   const f=fixture();try{
-    const doc=contract();doc.acceptance[0].baseline_expectation='pass';
+    const doc=contract();doc.acceptance[0].dev_baseline_expectation='pass';
     const {runDir}=await prepare(f,{contractDoc:doc});expect((await improve.verifyPhase(runDir,'baseline')).status).toBe('baseline_blocked');
     await improve.build(runDir,{policy:writeTmp(f,'builder.json',FAKE_BUILDER()),invokePeer:fakePeer([KEEP]),acceptBaselineBlocker:'Owner accepts current baseline limitation',afterBuilderRound:w=>setSteps(w,2)});
     await improve.verifyPhase(runDir,'after');expect(improve.evaluate(runDir).decision).toBe('INCONCLUSIVE');

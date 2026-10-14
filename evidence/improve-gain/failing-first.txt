@@ -1,0 +1,148 @@
+
+> @colmbyrne/specflow@0.11.1 test
+> jest --no-coverage --runInBand tests/contracts/improve-core.test.js -t GAIN-
+
+FAIL tests/contracts/improve-core.test.js
+  ● IMPROVE-GAIN (#174/#178) › GAIN-1: preservation cannot authorize a new improvement contract
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "rejected"
+    Received: "frozen"
+
+      440 |       if (kind === 'undeclared') delete doc.acceptance[0].intent;
+      441 |       const { frozen } = await prepare(f, { contractDoc: doc });
+    > 442 |       expect(frozen.status).toBe('rejected');
+          |                             ^
+      443 |       expect(frozen.errors.join(' ')).toMatch(/mandatory.*gain/);
+      444 |     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+      445 |   }));
+
+      at toBe (tests/contracts/improve-core.test.js:442:29)
+      at tests/contracts/improve-core.test.js:19:16
+
+  ● IMPROVE-GAIN (#174/#178) › GAIN-1: optional-gain cannot authorize a new improvement contract
+
+    expect(received).toMatch(expected)
+
+    Expected pattern: /mandatory.*gain/
+    Received string:  "at least one mandatory criterion must require level 1 or 2 evidence; otherwise the change is unevaluable"
+
+      441 |       const { frozen } = await prepare(f, { contractDoc: doc });
+      442 |       expect(frozen.status).toBe('rejected');
+    > 443 |       expect(frozen.errors.join(' ')).toMatch(/mandatory.*gain/);
+          |                                       ^
+      444 |     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+      445 |   }));
+      446 |
+
+      at toMatch (tests/contracts/improve-core.test.js:443:39)
+      at tests/contracts/improve-core.test.js:19:16
+
+  ● IMPROVE-GAIN (#174/#178) › GAIN-1: undeclared cannot authorize a new improvement contract
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "rejected"
+    Received: "frozen"
+
+      440 |       if (kind === 'undeclared') delete doc.acceptance[0].intent;
+      441 |       const { frozen } = await prepare(f, { contractDoc: doc });
+    > 442 |       expect(frozen.status).toBe('rejected');
+          |                             ^
+      443 |       expect(frozen.errors.join(' ')).toMatch(/mandatory.*gain/);
+      444 |     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+      445 |   }));
+
+      at toBe (tests/contracts/improve-core.test.js:442:29)
+      at tests/contracts/improve-core.test.js:19:16
+
+  ● IMPROVE-GAIN (#174/#178) › GAIN-2: a practice baseline mismatch names its set and blocks build
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 9
+    + Received  + 2
+
+      Object {
+    -   "mismatches": Array [
+    -     Object {
+    -       "criterion": "AC-1",
+    -       "expected": "pass",
+    -       "observed": "fail",
+    -       "set": "dev",
+    -     },
+    -   ],
+    -   "status": "baseline_blocked",
+    +   "mismatches": Array [],
+    +   "status": "baseline_recorded",
+      }
+
+      451 |       const { runDir } = await prepare(f, { contractDoc: doc });
+      452 |       const result = await improve.verifyPhase(runDir, 'baseline');
+    > 453 |       expect(result).toMatchObject({ status: 'baseline_blocked', mismatches: [{ set: 'dev', criterion: 'AC-1', expected: 'pass', observed: 'fail' }] });
+          |                      ^
+      454 |       await expect(improve.build(runDir, { policy: writeTmp(f, 'b.json', FAKE_BUILDER()), invokePeer: fakePeer([KEEP]) })).rejects.toThrow(/baseline/i);
+      455 |     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+      456 |   }));
+
+      at toMatchObject (tests/contracts/improve-core.test.js:453:22)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+  ● IMPROVE-GAIN (#174/#178) › GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain
+
+    TypeError: Cannot read properties of undefined (reading 'map')
+
+      466 |       const d = improve.evaluate(runDir);
+      467 |       expect(d.decision).toBe('KEEP');
+    > 468 |       expect(d.gains.map(g => g.criterion)).toEqual(['AC-1']);
+          |                      ^
+      469 |       expect(d.gains[0]).toMatchObject({ established: true, baseline: 'fail', after: 'pass' });
+      470 |       const report = fs.readFileSync(improve.finalize(runDir).report, 'utf8');
+      471 |       expect(report).toMatch(/Declared gains/);
+
+      at map (tests/contracts/improve-core.test.js:468:22)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+  ● IMPROVE-GAIN (#174/#178) › GAIN-3: a different verifier environment cannot establish a matched gain
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "INCONCLUSIVE"
+    Received: "KEEP"
+
+      482 |       await improve.verifyPhase(runDir, 'after');
+      483 |       const d = improve.evaluate(runDir);
+    > 484 |       expect(d.decision).toBe('INCONCLUSIVE');
+          |                          ^
+      485 |       expect(d.reasons.join(' ')).toMatch(/verifier.*baseline/i);
+      486 |       expect(improve.finalize(runDir).branch_retained).toBe(false);
+      487 |     } finally {
+
+      at toBe (tests/contracts/improve-core.test.js:484:26)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+  ● IMPROVE-GAIN (#174/#178) › GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "REVERT"
+    Received: "KEEP"
+
+      498 |       await improve.verifyPhase(runDir, 'after');
+      499 |       const d = improve.evaluate(runDir);
+    > 500 |       expect(d.decision).toBe('REVERT');
+          |                          ^
+      501 |       expect(d.reasons.join(' ')).toMatch(/required gates failed: broken/);
+      502 |       expect(improve.finalize(runDir).branch_retained).toBe(false);
+      503 |     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+
+      at toBe (tests/contracts/improve-core.test.js:500:26)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+
+Test Suites: 1 failed, 9 skipped, 1 of 10 total
+Tests:       7 failed, 439 skipped, 446 total
+Snapshots:   0 total
+Time:        4.218 s, estimated 53 s
+Ran all test suites matching /tests\/contracts\/improve-core.test.js/i with tests matching "GAIN-".

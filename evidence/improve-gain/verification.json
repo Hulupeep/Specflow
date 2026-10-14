@@ -1,0 +1,46 @@
+{
+  "verified_at": "2026-10-14T10:25:50.948642+00:00",
+  "base_commit": "fb0b3721e1b685efc0b33c3776895c15d46e68f3",
+  "scope": "bounded #174/#178 gain repair; not parent-ticket closure or backend proof",
+  "full_suite": {
+    "command": "npm test -- --runInBand --roots tests --json --outputFile=.specflow/gain/jest-final.json",
+    "suites_passed": 76,
+    "tests_passed": 1458,
+    "failed": 0,
+    "skipped": 0,
+    "todo": 0
+  },
+  "focused": {
+    "tests_passed": 76,
+    "failed": 0,
+    "skipped": 0
+  },
+  "failing_first": {
+    "initial_defect_cases": 7,
+    "review_failure_preservation_cases": 2,
+    "late_baseline_case": 1,
+    "later_robustness_cases_claimed_failing_first": false
+  },
+  "independent_review": {
+    "final_code_blockers": 0,
+    "native_duo_acceptance": false,
+    "final_full_suite_was_pending_at_review": "Completed subsequently; counts recorded above, source unchanged."
+  },
+  "source_sha256": {
+    "scripts/specflow-improve.cjs": "a6fa47a48ca36d23725dcc6df088525234c65f2b405e467fab053c906192ad95",
+    "scripts/improve-binding.cjs": "5f04d071206c40bae7a2fc291eb1f23bf6c9402d910ea343a415be77ba56feb5",
+    "scripts/duo-build.cjs": "b1d9b28dde68b9d02090604a93cebf1eed6228a642669bed12461373ddd15d1b",
+    "scripts/duo-snapshot.cjs": "64bb7ca3a0d72a728551eb8b478af37f403c91d86bb6a7fe02e99e093295c8ba",
+    "tests/contracts/improve-core.test.js": "33d4e78226731d0151fd5f200af6ad07a1a91c4724aabe9e10ecd305511a5f2f",
+    "docs/contracts/feature_improve_core.yml": "7b17369d5e4d269c9fc3d112f01ecc71e6dbd8fa31b00b154c0a3b321bcc0bf9",
+    "templates/improve/GAIN_CONTRACT.md": "8b0fcb98b2ab58379bccb81306ef927bd13aae8dc83bc78b242c093234a17f2a",
+    "docs/specs/improve-gain/story.md": "dd015d58552d748525bfce1a76a9e3ce3121ad2886186b5688d12eb083f05e00",
+    "docs/specs/improve-gain/preparation.md": "09232577c814f9539ddbe83063d44c9927909628ad4da184106eb6d727bf7297"
+  },
+  "limitations": [
+    "Model transports in lifecycle tests are fixture doubles; Git and check subprocesses are real.",
+    "Binary gain only; numeric/statistical thresholds not added.",
+    "No browser journey or database call in backend preflight.",
+    "Workspace size and verifier environment/toolchain identity remain prerequisites for #176/#180."
+  ]
+}
