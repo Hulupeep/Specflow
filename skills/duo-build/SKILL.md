@@ -219,6 +219,13 @@ execution/CI captures too: live remote observations cannot prove local edits wer
 tested. The reviewer must identify repository and SHA differences and cannot
 mutate GitHub. Access failure is a specific blocker.
 
+Submodules are frozen explicitly. Every Git index gitlink gets a required-read
+`tree/<submodule>/.specflow-gitlink.json` descriptor with its indexed revision.
+Initialized submodules also include recursively frozen source, the checked-out
+revision, and omitted paths. Uninitialized submodules remain unavailable; their
+revision alone cannot verify dependency behaviour. The helper never fetches or
+initializes them. Conflicts, unsafe paths and metadata collisions block capture.
+
 The helper maintains `.specflow/duo/<id>/audit.md` with actual calls, preflight
 failures, validated outcomes, criterion assessments and finding resolutions.
 Keep live interaction logging there: editing a tracked or untracked root

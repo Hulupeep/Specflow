@@ -93,8 +93,12 @@ source tree, staged/working diff, recent commit metadata, request, invocation,
 raw peer stdout/stderr and structured findings. Explicit evidence paths include
 ignored logs. No secret/environment files should be submitted as evidence.
 Snapshots use Git's tracked and nonignored untracked file list, excluding
-node_modules, duo run records and nested Claude worktrees (recorded in snapshot-policy.json); symlinks and
-submodules block rather than silently reviewing different bytes. The source
+node_modules, duo run records and nested Claude worktrees (recorded in snapshot-policy.json).
+Symlinks, including dangling links, block. Each submodule has a required-read
+`.specflow-gitlink.json` descriptor recording its indexed revision. Initialized
+submodules include recursively frozen source, their checked-out revision and
+omitted paths. Uninitialized submodules are explicitly unavailable and cannot
+verify dependency behaviour; capture never fetches or initializes them. The source
 must stay paused during review. Any source or evidence drift rejects acceptance.
 The generated audit distinguishes actual peer calls from preflight-only failures
 and records feedback and resolutions. It is excluded from product snapshots.
