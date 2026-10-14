@@ -8,6 +8,13 @@ All notable changes to `@colmbyrne/specflow`.
 
 ## Unreleased
 
+**Review continuation and actionable stops (#189).**
+
+- New Duo and scoped preparation reviews continue while first-time verified criteria or finding closures advance; fixed two/four-review caps are replaced by bounded diagnosis and evidenced recovery.
+- Reports retain the actual failure, unresolved findings, raw evidence and attempted repair separately from execution guards. Interrupted/protocol-invalid responses cannot grant acceptance or consume product repair history.
+- Optional call/time checkpoints and explicit subscription/API/unknown usage labels replace implied monetary accounting. Ceiling extensions require recorded owner authorization; ordinary recovery cannot extend them.
+- Current evidence, independent acceptance, session ownership and runtime pinning remain required. Existing pinned runs are not silently upgraded. Rejected deferrals and stale/invalid closure evidence cannot erase blockers.
+
 **`specflow improve --once` — first learning slice (#171, #174, #176; minimum #173/#175/#178).**
 
 - **Frozen ImprovementContract** with evidence strength (1 deterministic, 2 behavioural journey, 3 heuristic, 4 judgment). Level 1–2 evidence only comes from checks frozen with the contract. Judgment can never satisfy a deterministic criterion. The version frozen before implementation governs the decision.

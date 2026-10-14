@@ -14,8 +14,11 @@ function assess(root, id) {
   if (fs.existsSync(path.join(dir, 'review.lock'))) return { status: 'blocked', reason: 'A run operation is active. Wait for its result; do not start another review or edit its snapshot.' };
   const state = duo.inspect(root, id), last = state.history.at(-1);
   if (state.goalStatus === 'complete') return { status: 'reviewed', reason: 'Scoped goal finished on current evidence.' };
-  if (state.stagnantRounds >= 2 || state.repairCycle?.attempts >= 4) return { status: 'blocked', reason: 'Repair/no-progress limit reached. Report the specific unresolved findings; do not restart to evade the limit.' };
-  if (state.peerFailures >= 3) return { status: 'blocked', reason: 'Peer response failure limit reached. Inspect raw records; do not reset the run or claim verification.' };
+  const guards=duo.eligibility(root,id).blockers;
+  if (guards.length) {
+    const recoverable=guards.every(g=>g.recoverable === true);
+    return {status:recoverable?'continue_required':'blocked',reason:`Cause: ${state.lastFailure || state.blocker || 'Review unavailable'}. ${guards.map(g=>g.reason).join('; ')}. Inspect retained round evidence and use recover-review for an evidenced different action; do not reset history.`};
+  }
   if (!last) return { status: 'review_required', reason: 'No peer feedback yet. Review the completed implementation, diagnosis or verification batch, even if other goal gates remain blocked.' };
   const batch = readJson(path.join(dir, `round-${String(state.history.length).padStart(3, '0')}`, 'batch.json'));
   const fresh = last.snapshot === duo.fingerprint(root, [...Object.keys(state.pinned), ...(batch.evidence || [])]);
@@ -51,7 +54,11 @@ function stop(root, input) {
   });
   const required = pending.filter(row => ['review_required', 'continue_required'].includes(row.status));
   if (required.length) {
-    const reason = required.map(row => `Duo ${row.id}: ${row.reason}`).join('\n') + '\nRead the saved continuation.md and act on the authorized builder step now. Record your direction_response, capture the result, then use your existing owner token with node scripts/duo-build.cjs review <id> --session <token> --batch <batch.json>. Do not wait for user permission to review, unrelated live gates, or a ten-minute timer. Do not change pinned acceptance.';
+    const reason = required.map(row => {
+      const state=duo.load(root,row.id).state;
+      const entry=state.runtime.directory ? path.join('.specflow/duo',row.id,state.runtime.directory,'scripts/duo-build.cjs') : 'scripts/duo-build.cjs';
+      return `Duo ${row.id}: ${row.reason}\nUse your existing owner token with node ${entry} review ${row.id} --session <token> --batch <batch.json>.`;
+    }).join('\n') + '\nRead the saved continuation.md and act on the authorized builder step now. Record your direction_response and capture the result. Do not wait for user permission to review, unrelated live gates, or a ten-minute timer. Do not change pinned acceptance.';
     // One corrective continuation; never an unbounded Stop-hook loop.
     return input.stop_hook_active ? { continue: false, stopReason: `Duo remains unreviewed; automatic continuation exhausted. ${reason}` } : { decision: 'block', reason };
   }

@@ -149,17 +149,20 @@ describe('repairs: REQ-R1..R5',()=>{
   });
   test('no-progress: cosmetic edits and repeated observations stop across batch names and host transfer',()=>{
     const run=start();review(run,batch(),peer({outcome:'changes_required',diagnostic:'same observation'}));
-    for(let i=0;i<2;i++){
+    for(let i=0;i<1;i++){
       put('code.cjs',`// cosmetic ${i}\nmodule.exports=41;`);put('raw.txt',`same failure; timestamp ${i}`);
       const result=review(run,batch({id:`alias${i}`}),peer({outcome:'changes_required',diagnostic:'same observation'}));expect(result.outcome).toBe('changes_required');
     }
     duo.resume(root,run.id,'codex',{takeover:true,reason:'new host'});put('raw.txt','another timestamp');
-    const invoke=jest.fn();const result=review(run,batch({id:'new-alias'}),invoke);expect(result.blocker).toMatch(/No new evidence-backed progress/);expect(invoke).not.toHaveBeenCalled();
+    const invoke=jest.fn();const result=review(run,batch({id:'new-alias'}),invoke);expect(result.history.at(-1).summary).toMatch(/No new evidence-backed progress/);expect(duo.status(result)).toContain('Correct value');expect(invoke).not.toHaveBeenCalled();
   });
-  test('renamed-batch-budget: at most initial plus three repairs despite new diagnostics',()=>{
+  test('new diagnostic wording alone cannot unlock unlimited reviews',()=>{
     const run=start();
-    for(let i=0;i<4;i++){put('raw.txt',`new diagnostic evidence ${i}`);expect(review(run,batch({id:`alias${i}`}),peer({outcome:'changes_required',diagnostic:`different observation ${i}`})).outcome).toBe('changes_required');}
-    duo.resume(root,run.id,'codex',{takeover:true,reason:'resume'});put('raw.txt','extra evidence');expect(review(run,batch({id:'fifth'})).blocker).toMatch(/three repair rounds/);
+    for(let i=0;i<2;i++){put('raw.txt',`diagnostic evidence ${i}`);expect(review(run,batch({id:`alias${i}`}),peer({outcome:'changes_required',diagnostic:`different observation ${i}`})).outcome).toBe('changes_required');}
+    duo.resume(root,run.id,'codex',{takeover:true,reason:'resume'});put('raw.txt','extra evidence');
+    const result=review(run,batch({id:'third'}));
+    expect(result.history.at(-1).summary).toMatch(/No new evidence-backed progress/);
+    expect(duo.status(result)).toContain('Correct value');
   });
   test('J-DUO-CONVERGE: actual command capture, peer finding, corrected capture and explicit closure',()=>{
     const run=start();let cap=duo.capture(root,run.id,token(run.id),[process.execPath,'-e','require("assert").equal(require("./code.cjs"),42)']);
@@ -179,4 +182,46 @@ test('a failed capture can prove an observed fact while the execution gate stays
   }}));
   expect(result.outcome).toBe('changes_required');expect(result.criteria['AC-2'].status).toBe('verified');expect(result.criteria['GATE-TESTS'].status).toBe('unverified');
   expect(()=>duo.finish(root,run.id,token(run.id))).toThrow(/incomplete/);
+});
+test('J-DUO-RECOVERY: diagnose, recover once, retain concrete cause and history on repeated failure',()=>{
+ const run=start();
+ for(let i=0;i<2;i++){put('raw.txt',`failure ${i}`);review(run,batch({id:`fail${i}`}),peer({outcome:'changes_required'}));}
+ expect(duo.eligibility(root,run.id).blockers[0]).toMatchObject({kind:'stagnation',recoverable:true});
+ const cap=duo.capture(root,run.id,token(run.id),[process.execPath,'-e','console.log("diagnosis: fixture value remains 41")'],{diagnosis:true});
+ const file=cap.lastCapture.path,sha256=require('crypto').createHash('sha256').update(fs.readFileSync(path.join(root,file))).digest('hex');
+ const input={kind:'stagnation',cause:'write never reaches exported value',action:'replace the exported value and re-run assertion',evidence:[{path:file,sha256}]};
+ expect(()=>duo.recoverReview(root,run.id,'wrong-owner',input)).toThrow('does not own');
+ put('recovery.json',JSON.stringify(input));
+ const log=jest.spyOn(console,'log').mockImplementation(()=>{});
+ try{expect(duo.cli(['recover-review',run.id,'--session',token(run.id),'--input','recovery.json'],root)).not.toBe(2);}finally{log.mockRestore();}
+ expect(duo.eligibility(root,run.id).eligible).toBe(true);
+ put('raw.txt','different attempt still failed');review(run,batch({id:'recovery'}),peer({outcome:'changes_required'}));
+ const after=readRun(run.id);expect(after.reviewControl.recoveries[0].consumed).toBe(true);
+ expect(duo.eligibility(root,run.id).blockers[0]).toMatchObject({kind:'stagnation',recoverable:false});
+ expect(duo.status(after)).toContain('Correct value');expect(duo.status(after)).toContain('replace the exported value');
+ expect(()=>duo.recoverReview(root,run.id,token(run.id),input)).toThrow('did not establish progress');
+});
+test('J-DUO-LONG: more than four progressing reviews can finish with current independent evidence',()=>{
+ const criteria=Array.from({length:6},(_,i)=>({id:`AC-${i+1}`,kind:'acceptance',source:'task.md',anchor:`AC-${i+1}: requirement ${i+1}`}));
+ put('task.md',criteria.map(c=>c.anchor).join('\n'));
+ const run=duo.start(root,'long task','codex',{...context(),criteria});
+ for(let i=0;i<6;i++){
+   put('raw.txt',`requirement ${i+1} observed`);
+   const result=review(run,batch({id:`slice${i}`,criteria:[`AC-${i+1}`]}),peer());
+   expect(result.outcome).toBe('accepted');
+ }
+ const result=review(run,batch({id:'all',criteria:criteria.map(c=>c.id)}),peer());
+ expect(result.reviewControl.calls).toBe(7);expect(result.outcome).toBe('accepted');
+ expect(duo.finish(root,run.id,token(run.id)).goalStatus).toBe('complete');
+});
+test('J-DUO-CHECKPOINT: configured call ceiling prevents invocation and explicit extension preserves acceptance',()=>{
+ const run=duo.start(root,'limited task','codex',{...context(),reviewPolicy:{usageMode:'subscription',maxCalls:1}});
+ review(run,batch({criteria:['AC-1']}),peer());
+ const invoke=jest.fn();review(run,batch({id:'more',criteria:['AC-2']}),invoke);expect(invoke).not.toHaveBeenCalled();
+ expect(duo.eligibility(root,run.id).blockers[0].kind).toBe('checkpoint');
+ expect(duo.status(readRun(run.id))).toContain('subscription; monetary cost unmeasured');
+ duo.recoverReview(root,run.id,token(run.id),{ownerAuthorized:true,reason:'Explicit owner request',policy:{maxCalls:2}},true);
+ expect(readRun(run.id).reviewControl.calls).toBe(1);
+ expect(readRun(run.id).criteria['AC-1'].status).toBe('verified');
+ expect(duo.eligibility(root,run.id).eligible).toBe(true);
 });

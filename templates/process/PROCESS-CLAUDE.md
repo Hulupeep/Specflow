@@ -42,8 +42,8 @@ Follow `QA/loops/spec-build.yaml` and `SPECIFICATION.md`:
    Hand only a currently verified build-ready slice to
    `QA/loops/feature-build.yaml`; labels alone cannot grant readiness.
 
-The specification review allowance is **initial + one repair**, retained across
-hosts and sessions for the issue/tier, with a **no-new-evidence** stop. Keep failed
+The specification review allowance is **continue on verified progress with bounded diagnosis**, retained across
+hosts and sessions for the issue/tier, with a **no-new-evidence** diagnosis guard. Keep failed
 attempts and unresolved findings. A changed agent, renamed run or ungraded fix
 cannot restore the allowance or turn a blocked decision into acceptance.
 
@@ -63,7 +63,7 @@ Skipped or absent tests do not establish acceptance; separate implemented,
 tested, merged and deployed in the result.
 
 An optional automation resumes the same run, checks the durable allowance and
-stops on no new evidence, missing inputs, a human gate or exhaustion. It never
+diagnoses no new evidence and stops on repeated failure, missing inputs, a human gate or an explicit checkpoint. It never
 uses a new tick to restart a review. A commit per batch is unnecessary; retain
 the exact uncommitted snapshot and evidence. Report outcome advanced, current
 blocker and next action.

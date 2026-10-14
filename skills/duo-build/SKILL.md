@@ -54,10 +54,9 @@ the helper checks readiness before start, resume, capture and finish. Preparatio
 cannot establish production readiness. For contracted decision review or selected
 build-ready pre-flight, also set `specification.targetTier` to `contracted` or
 `build-ready`. The helper reserves the issue/tier review allowance before launching
-the peer: initial review plus one repair/regrade, retained across hosts and run
-names. This is separate from Duo's product repair budget. Unchanged evidence stops
-another automatic review. Keep FATAL/SERIOUS findings and repair attribution;
-unknown attribution cannot extend the budget. P2 cleanup does not block the goal.
+the peer. Issue/tier history survives hosts and run names. Continue while
+first-time criteria/gates or finding closures advance; repeated wording and
+closures cannot manufacture progress. P2 cleanup does not block the goal.
 
 Pinned older runs retain their recorded runtime. They do not gain tier enforcement
 by reinstalling or merely changing a label. Report that migration limitation,
@@ -152,8 +151,10 @@ appropriate command yourself within the user's authorization.
 
 Before an expensive capture, check `node scripts/duo-build.cjs eligibility <id> --session <token>`.
 Pass `--batch <batch.json>` to inspect missing evidence and unreported instruction
-responses too. An exhausted allowance is a stop, not an instruction to recapture or
-create a successor. Saved evidence and read-only status remain available.
+responses too. A diagnosis guard is work to perform now: inspect the actual
+cause, capture diagnosis with `capture ... --diagnosis -- COMMAND`, and record
+one evidenced different recovery. A checkpoint or repeated failed recovery
+stops with the concrete cause; do not reset history or create a successor.
 
 **Before ending each work turn or reporting a batch complete, review it now.**
 A batch can be a diagnosis or verification result as well as code. Do not wait
@@ -234,26 +235,43 @@ just to certify that log. Use excluded run-local notes and `direction_response`.
   Source or evidence changes conservatively invalidate older verified rows;
   perform a final review of the full acceptance set on the final source.
 
-Progress means newly verified criteria, confirmed finding closures or new factual
-diagnostic observations backed by changed raw evidence. Cosmetic edits, timestamps
-and repeated observations do not count. Stop after two consecutive no-progress
-reviews or at most three repairs after the initial review. Renaming batches and
-switching hosts never reset an open repair cycle. An exhausted run remains blocked;
-do not start a replacement merely to evade its limit.
-New invalid/interrupted peer responses have a separate cap of three consecutive
-failures. They retain raw records and the last validated continuation but cannot
-verify criteria or consume validated product repair rounds. A valid review clears
-only that failure streak. Existing recorded budgets are preserved on resume.
-For scoped preparation, helper-rejected native responses are also recorded as
-`protocol_failed` in the shared issue/tier journal. They do not consume the
-initial-plus-one-repair specification allowance, but three consecutive failures
-block that issue/tier even after changing run names or hosts. A validated scoped
-review clears the shared streak. Unknown historical failures remain charged;
-never edit old journals or pinned runtimes to manufacture another allowance.
-An exhausted issue/tier allowance is a stop: report retained findings to the human
-owner. Only the owner may run `node scripts/specflow-specification.cjs reset-review
-RECORD TIER "reason"` (audited, archives rounds, grants no readiness); never run
-it yourself or suggest a workaround.
+Progress means first-time verified criteria/gates or first-time evidenced finding
+closures. Changed files, timestamps, diagnostic wording or repeated closures do
+not earn more attempts. There is no fixed two/four review cap in new runs.
+After two valid reviews without progress, diagnose; after three invalid peer
+responses, diagnose the protocol. Perform authorized diagnosis autonomously and
+record one materially different recovery attempt per kind per progress episode.
+A repeated failure after that recovery requires a specific blocker report.
+Protocol-invalid output grants no acceptance and preserves all prior findings.
+Historical/pinned runs keep their recorded policy; never patch their runtime or
+journal to adopt this one silently. Optional finding wording is retained as
+commentary, preserving the original basis and criterion identity.
+
+Recovery input JSON: `{ "kind":"protocol", "cause":"actual observed cause",
+"action":"different repair", "evidence":[{"path":"RAW","sha256":"HASH"}] }`.
+Use `node scripts/duo-build.cjs recover-review ID --session TOKEN --input FILE`.
+For a shared scoped guard, add `scope: "specification"` to the recovery input
+and use the same owning Duo run/token. Recover both guards if both require it.
+The helper validates current hashes, preserves history and consumes the attempt
+before peer invocation. Missing/stale evidence cannot unlock a call. Include
+recovery evidence in the next review. No readiness follows from recovery itself.
+
+Optional context `reviewPolicy` accepts `usageMode` (`subscription`, `api`, or
+`unknown`, default unknown), `maxCalls`, and `maxElapsedMs` (positive integers,
+off by default). Scoped policy is initially read from `record.profile.reviewPolicy`.
+These are execution checkpoints, not monetary costs. Cost is unmeasured here;
+provider quota/auth failures retain their exact cause and require restored access.
+Never invent a reset time or poll a provider indefinitely. A checkpoint retains
+all acceptance and history. Only after explicit owner authorization, use
+`extend-review-limits` (same command arguments) with
+`{"ownerAuthorized":true,"reason":"owner instruction","policy":{"maxCalls":20}}`.
+The flag records authority; it does not manufacture it. Agents must not extend
+owner ceilings without that instruction. Scoped ceilings use the same owner-fenced command with `scope: "specification"`.
+
+Report actual cause, separate execution guard, unresolved criteria/findings,
+raw evidence paths, attempted recovery and exact next action. Do not replace the
+cause with "budget exhausted". Authentication or provider quota recovery may need
+owner input; local diagnosis and authorized repairs normally do not.
 When preparation is fully verified, return complete with no next steps. The
 builder runs finish and then specification promotion; promotion is not another
 peer-directed repair task.
@@ -365,3 +383,37 @@ scanner from `.specflow/publication-policy.json` (`command` argv and
 at every tier; when private inputs apply, require baseline-derived forms and a
 real canary. Keep private sources and raw provider evaluations local. Do not
 bypass a failed gate with a direct `gh issue comment`.
+
+## Explicit legacy review migration (#199)
+
+After explicit owner authorization to recover an old pinned review, use the
+current kit entrypoint **from the target project directory**:
+`node /absolute/path/to/updated/Specflow/scripts/duo-build.cjs migrate-review RUN --session TOKEN --input FILE`.
+Do not use the target project's old `scripts/duo-build.cjs` for migration: it
+does not have this command while installation is staged.
+Input is `{ "ownerAuthorized":true, "reason":"owner-authorized recovery",
+"evidence":[{"path":"diagnosis.txt","sha256":"HASH"}] }`.
+This is a one-time adoption of the current policy in the same run, not reset-review.
+For every subsequent command, use the exact selected-runtime entrypoint printed
+by migration/status: `node .specflow/duo/RUN/runtime-migrations/UUID/runtime/scripts/duo-build.cjs ACTION RUN --session TOKEN`.
+The project's old installed launcher is deliberately unchanged and may not
+understand the selected directory. Use this printed prefix in place of every
+`node scripts/duo-build.cjs` example above until this run completes.
+The old runtime, exact before-state, calls, raw responses, findings, instructions,
+legacy counters and shared scoped journal remain intact. Re-read the selected
+runtime's SKILL.md after migration. Fresh capture and independent review are
+required; migration never grants readiness or clears a diagnosis guard. Use
+normal evidenced recovery if the replayed history triggers a guard. It refuses
+current-policy, ceased/completed, unknown-runtime and pending-review runs, bad
+ownership/evidence and concurrent operations. Ordinary installation still cannot
+replace an active runtime. Do not invoke migration merely to gain more calls.
+
+An old installed Claude Stop hook also cannot follow the selected runtime and
+may report `Pinned duo runtime modified` even while the archived bytes are intact.
+Automatic cadence enforcement is unavailable for that legacy installation until
+the run completes and the installer can update it. Do not ignore a real integrity
+failure: verify status using the printed selected-runtime command, then run
+`node .specflow/duo/RUN/runtime-migrations/UUID/runtime/scripts/duo-cadence.cjs RUN`
+manually before ending each work turn and act on its result. For hook-format
+inspection, use the same selected cadence script with `--hook` and the normal
+session JSON on stdin. Migration does not replace installed hooks or launchers.

@@ -17,7 +17,7 @@ First tick (no artifacts) → start at `discover`: distill grounding from this t
   - schema-hook oracle to verify against the real migrations: import_batches, source_import_run_id, record_provenance, external_id_mappings, timetastic_source_rows, timetastic_import_versions, reconciliation/gap tables —
 then `draft` PRDs/tt-rollback-prd.md, and continue until blocked or handoff.
 
-Hard rules: local thin backlog capture may precede review. GATE A gates selected-decision promotion and GitHub issue creation; require a scoped SHIP verdict and human approval before creating issues; never create tickets from a DO-NOT-SHIP PRD. Use initial + one repair and a no-new-evidence stop across sessions. Gate B/B.5 and executable journeys apply only to the selected build-ready slice. Preserve never_without_human.
+Hard rules: local thin backlog capture may precede review. GATE A gates selected-decision promotion and GitHub issue creation; require a scoped SHIP verdict and human approval before creating issues; never create tickets from a DO-NOT-SHIP PRD. Use continue on verified progress with bounded diagnosis and a no-new-evidence stop across sessions. Gate B/B.5 and executable journeys apply only to the selected build-ready slice. Preserve never_without_human.
 ```
 
 ## What a correct run looks like

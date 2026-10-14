@@ -341,7 +341,7 @@ does the building. The principle:
 
 | Gate | After | What it is | Type |
 |------|-------|------------|------|
-| **A** | the PRD | Independent scoped review of selected contracted decisions through Duo: initial review plus one repair, with a durable receipt. Thin backlog writing does not require full adversary review or per-round commits. | **HARD** |
+| **A** | the PRD | Independent scoped review of selected contracted decisions through Duo: continue on verified progress with bounded diagnosis, with a durable receipt. Thin backlog writing does not require full adversary review or per-round commits. | **HARD** |
 | **B** | tickets | `specflow audit` + closure validator — every requirement → journey → test → issue, no orphans, no duplicate IDs. | soft (controller) |
 | **B.5** | tickets | **Pre-flight simulation** — examine the selected build-ready slice and direct seams; a relevant CRITICAL design gap blocks. Future tickets stay thin. *Its own gate.* | soft (controller) |
 | **C** | each build/slice | **Specflow CI** — contract tests + journey tests against a *real seeded backend* + anti-pattern audit + coverage ratchet. Runs in CI under branch protection: a violation **cannot merge**. | **HARD (unfakeable)** |

@@ -2,7 +2,7 @@
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const hash = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const base = root => path.join(root,'.specflow/duo');
-const helpers = ['specflow-tier.cjs','specflow-specification.cjs','specflow-volume.cjs','specflow-publication.cjs','specflow-reviews.cjs','typesafe-effort-analysis.cjs','typesafe-effort-trial.cjs','typesafe-routing.cjs','typesafe-routing-bridge.cjs','duo-review-receipts.cjs','typesafe-evidence.cjs','typesafe-questions-v1.cjs','duo-build.cjs','duo-progress.cjs','duo-direction.cjs','duo-actions.cjs','duo-cadence.cjs','duo-runtime.cjs','typesafe-duo.cjs','typesafe-client.cjs','typesafe-questions.cjs','typesafe-actions.cjs'];
+const helpers = ['review-continuation.cjs','specflow-tier.cjs','specflow-specification.cjs','specflow-volume.cjs','specflow-publication.cjs','specflow-reviews.cjs','typesafe-effort-analysis.cjs','typesafe-effort-trial.cjs','typesafe-routing.cjs','typesafe-routing-bridge.cjs','duo-review-receipts.cjs','typesafe-evidence.cjs','typesafe-questions-v1.cjs','duo-build.cjs','duo-progress.cjs','duo-direction.cjs','duo-actions.cjs','duo-cadence.cjs','duo-runtime.cjs','typesafe-duo.cjs','typesafe-client.cjs','typesafe-questions.cjs','typesafe-actions.cjs'];
 const read = file => JSON.parse(fs.readFileSync(noLinks(file),'utf8'));
 function write(file,value) { noLinks(file); fs.mkdirSync(path.dirname(file),{recursive:true}); const tmp=file+'.tmp-'+process.pid; fs.writeFileSync(tmp,JSON.stringify(value,null,2)); fs.renameSync(tmp,file); }
 function noLinks(file) {
@@ -30,15 +30,20 @@ function pin(root,dir,builder) {
   const result={protocolVersion:'duo-actions-1',helperHashes,skillHashes,provenance:'recorded',identity:hash(JSON.stringify({helperHashes,skillHashes}))};
   write(path.join(destination,'manifest.json'),result);return result;
 }
+function selected(dir, runtime) {
+  const name = runtime.directory || 'runtime';
+  if (name !== 'runtime' && !/^runtime-migrations\/[a-f0-9-]+\/runtime$/.test(name)) throw Error('Invalid selected runtime directory');
+  return noLinks(path.join(dir,name));
+}
 function verify(dir,runtime) {
-  for(const [rel,sha] of Object.entries({...runtime.helperHashes,...runtime.skillHashes})) if(hash(fs.readFileSync(noLinks(path.join(dir,'runtime',rel))))!==sha) throw Error(`Pinned duo runtime modified: ${rel}`);
+  for(const [rel,sha] of Object.entries({...runtime.helperHashes,...runtime.skillHashes})) if(hash(fs.readFileSync(noLinks(path.join(selected(dir,runtime),rel))))!==sha) throw Error(`Pinned duo runtime modified: ${rel}`);
 }
 function dispatch(root,id,current) {
   if(!/^[A-Za-z0-9-]+$/.test(id||'')) return null;
   const dir=path.join(base(root),id),file=path.join(dir,'run.json');if(!fs.existsSync(file))return null;
   const state=read(file); if(!state.runtime || state.runtime.provenance==='legacy_unknown')return null;
   verify(dir,state.runtime);
-  const pinned=path.join(dir,'runtime/scripts');return path.resolve(current)===path.resolve(pinned)?null:pinned;
+  const pinned=path.join(selected(dir,state.runtime),'scripts');return path.resolve(current)===path.resolve(pinned)?null:pinned;
 }
 function unfinished(root) {
   if(!fs.existsSync(base(root)))return [];
@@ -96,7 +101,7 @@ function describe(root,state) {
   }
   return {active:state.runtime?.identity||'legacy_unknown',installed:fs.existsSync(installed)?read(installed).version:'unrecorded',staged:fs.existsSync(staged)?read(staged).stagedVersion:null,staleGuide};
 }
-module.exports={helpers,lock,pin,verify,dispatch,unfinished,install,describe};
+module.exports={selected,helpers,lock,pin,verify,dispatch,unfinished,install,describe};
 if(require.main===module) {
   try { const [command,source,root,held]=process.argv.slice(2);if(command!=='install')throw Error('Use install <source> <target> [--lock-held]');const result=install(path.resolve(source),path.resolve(root),{held:held==='--lock-held'});console.log(JSON.stringify(result));process.exitCode=result.state==='staged'?10:0; }
   catch(e){console.error(e.message);process.exitCode=2;}

@@ -240,8 +240,12 @@ function cli(args=process.argv.slice(2),root=process.cwd()) {
       const record=register(root,file);
       if(cmd==='status')result=boundary(root,record,{route:'spec-build',operation:'inspect'});
       else if(cmd==='promote')result=promote(root,file,rest[0],rest.slice(1).join(' '));
-      else if(cmd==='review-failed'){const round=reviews.load(root,record.issue.number).reviews[rest[0]]?.at(-1);if(!round)throw Error('No reserved review');result=reviews.fail(root,{number:record.issue.number,tier:rest[0],id:round.id},rest.slice(1).join(' ')||'Interrupted review; no acceptance');}
-      else if(cmd==='reset-review')result=reviews.resetReview(root,record,rest[0],rest.slice(1).join(' '));// owner-only; agents must never run it
+      else if(cmd==='review-failed'){
+        const round=reviews.load(root,record.issue.number).reviews[rest[0]]?.at(-1);if(!round)throw Error('No reserved review');
+        const reservation={number:record.issue.number,tier:rest[0],id:round.id};
+        const tokenAt=rest.indexOf('--session'), reason=rest.slice(1,tokenAt<0?rest.length:tokenAt).join(' ')||'Interrupted review; no acceptance';
+        result=round.ownerRun?require('./duo-build.cjs').recordScopedInterruption(root,round.ownerRun,tokenAt<0?null:rest[tokenAt+1],reservation,reason):reviews.fail(root,reservation,reason);
+      }
       else if(cmd==='gate')result=gate(root,record,rest[0]);
       else if(cmd==='volume')result=volume.report(root,record,reviews.load(root,record.issue.number).volumeBaseline,verifiedDecisions(root,record));
       else if(cmd==='begin')result=beginBatch(root,record,rest[0]);
@@ -250,7 +254,7 @@ function cli(args=process.argv.slice(2),root=process.cwd()) {
       else if(cmd==='publish')result=publish(root,record,Number(rest[0]),rest[1],{publicFile:rest[2]});
       else if(cmd==='exception')result=ownerException(root,record,rest[0],{signatureFile:rest[1]});
       else if(cmd==='experiment')result=experiment(root,file,read(root,rest[0]));
-      else throw Error('Usage: specification <status|frontier|promote|gate|volume|begin|collect|reconcile|publish|exception|experiment|reset-review> <record.json> [arguments]');
+      else throw Error('Usage: specification <status|frontier|promote|gate|volume|begin|collect|reconcile|publish|exception|experiment> <record.json> [arguments]');
     }
     console.log(JSON.stringify(result,null,2));return ['blocked','failed','budget_exhausted'].includes(result.status)?2:0;
   }catch(e){console.error(e.message);return 2;}

@@ -1,0 +1,90 @@
+
+> @colmbyrne/specflow@0.11.1 test
+> jest --no-coverage --runInBand --roots tests --runTestsByPath tests/scripts/duo-review-migration.test.js
+
+FAIL tests/scripts/duo-review-migration.test.js
+  ✕ MIG-1/3/4: same-run migration archives exact old state/runtime and requires fresh review (76 ms)
+  ✓ MIG-2: wrong owner, missing authorization/reason, stale evidence leave original state intact (173 ms)
+  ✕ MIG-3: historical calls and validated achievements survive without granting acceptance (491 ms)
+  ✕ MIG-2: installer and active operation locks refuse migration (140 ms)
+  ✕ MIG-2: failed staging leaves old run authoritative and retry keeps abandoned archive (73 ms)
+
+  ● MIG-1/3/4: same-run migration archives exact old state/runtime and requires fresh review
+
+    TypeError: duo.migrateReview is not a function
+
+       8 | test('MIG-1/3/4: same-run migration archives exact old state/runtime and requires fresh review',()=>{
+       9 |  const old=legacy(),dir=path.join(f.root,'.specflow/duo',old.id),bytes=fs.readFileSync(path.join(dir,'run.json'));
+    > 10 |  const migrated=duo.migrateReview(f.root,old.id,old.owner.session,input());
+         |                     ^
+      11 |  expect(migrated.id).toBe(old.id);expect(migrated.history).toEqual(old.history);expect(migrated.findings).toEqual(old.findings);expect(migrated.instructions).toEqual(old.instructions);
+      12 |  expect(migrated.owner).toEqual(old.owner);expect(migrated.pinned).toEqual(old.pinned);expect(migrated.reviewControl.calls).toBe(0);expect(migrated.indexComplete).toBe(false);
+      13 |  const event=migrated.events.at(-1);expect(fs.readFileSync(path.join(f.root,event.archive))).toEqual(bytes);runtime.verify(dir,old.runtime);runtime.verify(dir,migrated.runtime);
+
+      at Object.migrateReview (tests/scripts/duo-review-migration.test.js:10:21)
+
+  ● MIG-3: historical calls and validated achievements survive without granting acceptance
+
+    TypeError: duo.migrateReview is not a function
+
+      24 |  f.put('display.cjs','console.log(42)');f.review(f.batch(f.capture()));
+      25 |  const old=legacy();expect(old.criteria['AC-TOTAL'].status).toBe('verified');
+    > 26 |  const next=duo.migrateReview(f.root,old.id,old.owner.session,input());
+         |                 ^
+      27 |  expect(next.reviewControl.calls).toBe(1);expect(next.reviewControl.achievements).toContain('criterion:AC-TOTAL');expect(next.criteria['AC-TOTAL'].status).toBe('unverified');expect(next.everVerified).toEqual(old.everVerified);
+      28 | });
+      29 | test('MIG-2: installer and active operation locks refuse migration',()=>{
+
+      at Object.migrateReview (tests/scripts/duo-review-migration.test.js:26:17)
+
+  ● MIG-2: installer and active operation locks refuse migration
+
+    expect(received).toThrow(expected)
+
+    Expected pattern: /lock/
+    Received message: "duo.migrateReview is not a function"
+
+          28 | });
+          29 | test('MIG-2: installer and active operation locks refuse migration',()=>{
+        > 30 |  const old=legacy(),data=input();runtime.lock(f.root,()=>expect(()=>duo.migrateReview(f.root,old.id,old.owner.session,data)).toThrow(/lock/));
+             |                                                                         ^
+          31 |  f.put(`.specflow/duo/${old.id}/operation.lock`,String(process.pid));expect(()=>duo.migrateReview(f.root,old.id,old.owner.session,data)).toThrow(/active/);
+          32 | });
+          33 | test('MIG-2: failed staging leaves old run authoritative and retry keeps abandoned archive',()=>{
+
+      at migrateReview (tests/scripts/duo-review-migration.test.js:30:73)
+      at Object.<anonymous> (../Specflow/node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (../Specflow/node_modules/expect/build/index.js:320:21)
+      at toThrow (tests/scripts/duo-review-migration.test.js:30:126)
+      at Object.lock (scripts/duo-runtime.cjs:17:16)
+      at Object.lock (tests/scripts/duo-review-migration.test.js:30:42)
+      at toThrow (tests/scripts/duo-review-migration.test.js:30:126)
+      at Object.lock (scripts/duo-runtime.cjs:17:16)
+      at Object.lock (tests/scripts/duo-review-migration.test.js:30:42)
+
+  ● MIG-2: failed staging leaves old run authoritative and retry keeps abandoned archive
+
+    expect(received).toThrow(expected)
+
+    Expected substring: "disk full"
+    Received message:   "duo.migrateReview is not a function"
+
+          34 |  const old=legacy(),data=input(),file=path.join(f.root,'.specflow/duo',old.id,'run.json'),before=fs.readFileSync(file);
+          35 |  const spy=jest.spyOn(runtime,'pin').mockImplementationOnce(()=>{throw Error('disk full');});
+        > 36 |  try{expect(()=>duo.migrateReview(f.root,old.id,old.owner.session,data)).toThrow('disk full');}finally{spy.mockRestore();}
+             |                     ^
+          37 |  expect(fs.readFileSync(file)).toEqual(before);expect(duo.migrateReview(f.root,old.id,old.owner.session,data).reviewControl).toBeDefined();
+          38 | });
+          39 |
+
+      at migrateReview (tests/scripts/duo-review-migration.test.js:36:21)
+      at Object.<anonymous> (../Specflow/node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (../Specflow/node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (tests/scripts/duo-review-migration.test.js:36:74)
+      at Object.toThrow (tests/scripts/duo-review-migration.test.js:36:74)
+
+Test Suites: 1 failed, 1 total
+Tests:       4 failed, 1 passed, 5 total
+Snapshots:   0 total
+Time:        1.809 s
+Ran all test suites within paths "tests/scripts/duo-review-migration.test.js".
