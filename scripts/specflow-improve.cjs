@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 'use strict';
+const binding = require('./improve-binding.cjs');
 
 // IMPROVE-CORE (#171): one verified product-improvement cycle.
 //
@@ -699,8 +700,7 @@ function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerCla
       });
     }
   }
-  for (const item of items) addEvidenceItem(runDir, { ...item, phase, producer_role: MECHANICAL_PRODUCER, executor: 'specflow-improve', contract_version: gov.entry.version });
-  return items;
+  return items.map(item=>addEvidenceItem(runDir, { ...item, phase, producer_role: MECHANICAL_PRODUCER, executor: 'specflow-improve', contract_version: gov.entry.version }));
 }
 
 function integrityBlock(runDir, gov, phase) {
@@ -712,41 +712,82 @@ function integrityBlock(runDir, gov, phase) {
   return null;
 }
 
+function inputIdentity(runDir,run,gov,phase,ws) {
+  const gitTree=binding.tree(ws.worktreePath);
+  if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
+  return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
+    artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'specflow-runner.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    git:gitTree,workspace:binding.workspace(ws.worktreePath)};
+}
+function boundReceipt(runDir,phase,{current=true}={}) {
+  try {
+    const run=loadRun(runDir),gov=governingContract(runDir),evs=events(runDir);
+    if(!verifyLedger(runDir).ok)throw Error('ledger integrity failed');
+    const selected=evs.filter(e=>e.event==='verification_receipt'&&e.phase===phase).at(-1);
+    if(!selected||!fs.existsSync(selected.path)||fileSha(selected.path)!==selected.sha256)throw Error('missing or changed verification receipt');
+    const receipt=readJson(selected.path),identity=receipt.identity;
+    if(receipt.schema!=='specflow.improve.binding/v1'||receipt.attempt!==selected.attempt||identity.run_id!==run.run_id||identity.phase!==phase||identity.base_commit!==run.base_commit||identity.contract_version!==gov.entry.version||identity.contract_sha256!==gov.entry.contract_sha256||gov.tampered||gov.artifactErrors.length)throw Error('receipt belongs to different run, phase, base or governing contract');
+    const evidence=readEvidence(runDir);
+    for(const ref of receipt.evidence) {
+      const item=evidence.find(e=>e.id===ref.id),recorded=evs.find(e=>e.event==='evidence_added'&&e.evidence_id===ref.id);
+      if(!item||binding.digest(item)!==ref.sha256||recorded?.record_sha256!==ref.sha256||item.phase!==phase||item.contract_version!==gov.entry.version||!fs.existsSync(item.evidence_path)||fileSha(item.evidence_path)!==item.evidence_sha256)throw Error('bound evidence changed or missing');
+    }
+    const completed=evs.filter(e=>e.event===(phase==='baseline'?'baseline_recorded':'verification_completed')&&e.attempt===receipt.attempt).at(-1);
+    if(!completed||completed.receipt_sha256!==selected.sha256)throw Error('verification attempt did not complete with this receipt');
+    if(current) {
+      const ws=workspaceFor(run,phase==='baseline'?'baseline':'improve');
+      if(binding.digest(inputIdentity(runDir,run,gov,phase,ws))!==binding.digest(identity))throw Error('tested inputs or verifier changed since verification');
+    }
+    return {receipt,entry:selected};
+  } catch(error) {return {error:'Evidence binding: '+error.message};}
+}
+
 async function verifyPhase(runDir, phase) {
   if (!['baseline', 'after'].includes(phase)) throw new Error('phase must be baseline or after');
   const run = loadRun(runDir);
   const gov = governingContract(runDir);
+  const attempt = require('crypto').randomUUID();
+  if(phase==='baseline')append(runDir,'baseline_attempted',{attempt,contract_version:gov?.entry.version,contract_sha256:gov?.entry.contract_sha256,base_commit:run.base_commit});
   const blocked = integrityBlock(runDir, gov, phase);
   if (blocked) return blocked;
   const evs = events(runDir);
   if (phase === 'after' && !lastEvent(evs, 'implementation_finished')) throw new Error('No recorded implementation to verify');
   // The holdout decides once. Re-running it after seeing its result would make it in-sample.
   if (phase === 'after' && lastEvent(evs, 'holdout_consumed')) throw new Error('The holdout was already consumed for this run; evaluate on that result');
+  if(phase==='after'&&evs.some(e=>(e.event==='verification_started'&&e.phase==='after'&&e.binding_version!==1)||(e.event==='verification_completed'&&e.phase==='after'&&!e.attempt)||(e.event==='evidence_added'&&e.phase==='after'&&!e.record_sha256)))throw Error('Legacy after-verification may have consumed the holdout; preserve evidence and evaluate without retry');
   if (phase === 'baseline' && lastEvent(evs, 'implementation_started')) throw new Error('Baseline must be captured before implementation starts');
   const kind = phase === 'baseline' ? 'baseline' : 'improve';
   const ws = workspaceFor(run, kind);
   if (!fs.existsSync(ws.worktreePath)) prepareWorkspace(runDir, kind);
   const dir = runPaths(runDir).phaseDir(phase);
   fs.mkdirSync(dir, { recursive: true });
-  append(runDir, 'verification_started', { phase, contract_version: gov.entry.version, workspace: ws.worktreePath });
+  append(runDir, 'verification_started', { phase, attempt, binding_version:1, contract_version: gov.entry.version, workspace: ws.worktreePath });
   const makerClaim = phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline';
   const outcome = await withRuntime(runDir, ws, gov.contract, dir, phase, ({ vars, baseUrl }) => {
+    let identity;
+    try {identity=inputIdentity(runDir,run,gov,phase,ws);}catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
+    if(phase==='after')append(runDir,'holdout_consumed',{attempt,contract_version:gov.entry.version});
     const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim };
     const items = runCheckSet(runDir, { ...ctx, set: 'holdout', gates: true });
     if (phase === 'baseline') items.push(...runCheckSet(runDir, { ...ctx, set: 'dev', gates: false }));
-    return { items };
+    try {if(binding.digest(inputIdentity(runDir,run,gov,phase,ws))!==binding.digest(identity))throw Error('inputs changed during verification');}
+    catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
+    const receipt={schema:'specflow.improve.binding/v1',attempt,identity,evidence:items.map(item=>({id:item.id,sha256:binding.digest(item)}))};
+    const receiptPath=path.join(dir,'binding-'+attempt+'.json'),receiptHash=writeJson(receiptPath,receipt);
+    append(runDir,'verification_receipt',{phase,attempt,path:receiptPath,sha256:receiptHash});
+    return { items, receiptHash };
   });
-  if (outcome.status === 'blocked') return outcome;
+  if (outcome.status === 'blocked') {append(runDir,'verification_blocked',{phase,attempt,contract_version:gov.entry.version,reason:outcome.reason});return outcome;}
   const summary = Object.fromEntries(outcome.items.map((i) => [i.set === 'dev' ? `dev:${i.criterion}` : i.criterion, i.result]));
   if (phase === 'baseline') {
     const mismatches = gov.contract.acceptance
       .filter((a) => a.check && a.baseline_expectation !== 'n/a' && summary[a.id] !== a.baseline_expectation)
       .map((a) => ({ criterion: a.id, expected: a.baseline_expectation, observed: summary[a.id] }));
-    append(runDir, mismatches.length ? 'baseline_blocked' : 'baseline_recorded', { contract_version: gov.entry.version, summary, mismatches });
+    append(runDir, mismatches.length ? 'baseline_blocked' : 'baseline_recorded', { attempt, contract_version: gov.entry.version, contract_sha256:gov.entry.contract_sha256, receipt_sha256:outcome.receiptHash, summary, mismatches });
     return { status: mismatches.length ? 'baseline_blocked' : 'baseline_recorded', summary, mismatches };
   }
-  append(runDir, 'holdout_consumed', { contract_version: gov.entry.version, summary });
-  append(runDir, 'verification_completed', { phase, contract_version: gov.entry.version, summary });
+  append(runDir, 'verification_completed', { phase, attempt, contract_version: gov.entry.version, receipt_sha256:outcome.receiptHash, summary });
   return { status: 'verified', summary };
 }
 
@@ -776,7 +817,7 @@ function addEvidenceItem(runDir, item) {
   const record = { id: `ev-${rawLines(p.evidencePath).length + 1}`, recorded_at: now(), ...item };
   fs.appendFileSync(p.evidencePath, `${JSON.stringify(record)}\n`);
   append(runDir, 'evidence_added', {
-    evidence_id: record.id, criterion: record.criterion, level: record.level, result: record.result, phase: record.phase || null,
+    record_sha256:binding.digest(record), evidence_id: record.id, criterion: record.criterion, level: record.level, result: record.result, phase: record.phase || null,
     producer_role: record.producer_role, executor: record.executor, evidence_sha256: record.evidence_sha256 || null,
   });
   return record;
@@ -1061,8 +1102,11 @@ async function build(runDir, options = {}) {
   const gov = governingContract(runDir);
   if (!gov) throw new Error('Implementation cannot start without a frozen ImprovementContract');
   if (gov.tampered || gov.artifactErrors.length) throw new Error('Frozen contract integrity failed; implementation blocked');
-  const baseline = lastEvent(evs, 'baseline_recorded');
-  const baselineBlocked = lastEvent(evs, 'baseline_blocked');
+  const latestAttempt=lastEvent(evs,'baseline_attempted');
+  const matching=latestAttempt&&latestAttempt.contract_version===gov.entry.version&&latestAttempt.contract_sha256===gov.entry.contract_sha256&&latestAttempt.base_commit===run.base_commit;
+  const baselineProof=matching?boundReceipt(runDir,'baseline'):{error:'No baseline for the current governing contract'};
+  const baseline=matching&&!baselineProof.error&&baselineProof.receipt.attempt===latestAttempt.attempt;
+  const baselineBlocked=matching&&!baseline;
   if (!baseline && !(baselineBlocked && nonempty(options.acceptBaselineBlocker))) {
     throw new Error(baselineBlocked
       ? 'Baseline did not reproduce the contract expectations; supersede the contract or pass --accept-baseline-blocker "<why>" (caps the decision at INCONCLUSIVE)'
@@ -1253,7 +1297,7 @@ function decide(state) {
   if (state.regressions.length) reasons.push(`gates regressed from baseline: ${state.regressions.join(', ')}`);
   if (reasons.length) return { decision: 'REVERT', reasons };
   const missing = state.criteria.filter((c) => c.mandatory && c.status !== 'satisfied');
-  const inconclusive = [];
+  const inconclusive = [...(state.binding_errors || [])];
   if (missing.length) inconclusive.push(`mandatory criteria without qualifying evidence: ${missing.map((c) => c.id).join(', ')}`);
   if (state.gates_missing.length) inconclusive.push(`gates without a result: ${state.gates_missing.join(', ')}`);
   if (state.baseline_blocker) inconclusive.push(`baseline blocker accepted: ${state.baseline_blocker}`);
@@ -1276,9 +1320,12 @@ function evaluate(runDir) {
   if (!started) throw new Error('Nothing to evaluate: no implementation attempt was recorded');
   const gov = governingContract(runDir);
   const evidence = readEvidence(runDir);
-  const evidenceTampered = evs.filter((e) => e.event === 'evidence_added' && e.evidence_sha256).some((e) => {
-    const item = evidence.find((x) => x.id === e.evidence_id);
-    return !item || !fs.existsSync(item.evidence_path) || fileSha(item.evidence_path) !== e.evidence_sha256;
+  const afterBinding=boundReceipt(runDir,'after'),baselineBinding=boundReceipt(runDir,'baseline',{current:false});
+  const bindingErrors=[afterBinding.error,baselineBinding.error].filter(Boolean);
+  const recordedEvidence=evs.filter(e=>e.event==='evidence_added');
+  const evidenceTampered = new Set(evidence.map(e=>e.id)).size!==evidence.length || recordedEvidence.length!==evidence.length || evidence.some(item=>{
+    const record=recordedEvidence.find(e=>e.evidence_id===item.id);
+    return !record || record.record_sha256!==binding.digest(item) || (record.evidence_sha256 && (!fs.existsSync(item.evidence_path)||fileSha(item.evidence_path)!==record.evidence_sha256));
   });
   const diff = workspaceDiff(run) || { files: [], patch: '', sha256: sha256('') };
   fs.writeFileSync(path.join(runDir, 'workspace.patch'), diff.patch);
@@ -1301,6 +1348,7 @@ function evaluate(runDir) {
     gates_missing: gates.filter((g) => g.after === 'missing' || g.after === 'unavailable').map((g) => g.id),
     preexisting_gate_failures: gates.filter((g) => g.baseline === 'fail' && g.after === 'fail').map((g) => g.id),
     baseline_blocker: started.baseline_blocker_accepted || null,
+    binding_errors:bindingErrors,
     holdout_exposed: [...new Set(evs.filter((e) => e.event === 'holdout_exposed').map((e) => e.role))],
     disputes: evs.filter((e) => e.event === 'oracle_disputed').map((e) => ({ criterion: e.criterion, reason: e.reason, role: e.role })),
     peer_recommendation: finished?.peer_recommendation || null,
@@ -1318,7 +1366,7 @@ function evaluate(runDir) {
     builder_claim: finished?.claim || 'unknown',
     divergence: finished?.claim === 'complete' && decision !== 'KEEP' ? 'builder_claimed_complete_but_decision_differs' : null,
     gates,
-    workspace: { branch: workspaceFor(run, 'improve').branch, files: diff.files, patch_sha256: diff.sha256 },
+    workspace: { branch: workspaceFor(run, 'improve').branch, files: diff.files, patch_sha256: diff.sha256, verified_git:afterBinding.receipt?.identity.git || null },
     ...state,
   };
   const digest = writeJson(runPaths(runDir).decisionPath, record);
@@ -1348,8 +1396,9 @@ function finalize(runDir) {
   if (decision.decision === 'KEEP' && diff && diff.files.length) {
     const title = readJson(governingContract(runDir).entry.path).candidate.title;
     const msg = `improve(${run.run_id}): ${title}\n\nSpecflow improve --once decision KEEP. Contract v${decision.contract.version} sha256 ${decision.contract.sha256}.`;
-    git(['-c', 'user.name=specflow-improve', '-c', 'user.email=specflow-improve@localhost', 'commit', '-m', msg], ws.worktreePath);
-    applied.commit = git(['rev-parse', 'HEAD'], ws.worktreePath);
+    const proof=boundReceipt(runDir,'after');
+    if(proof.error||binding.digest(proof.receipt.identity.git)!==binding.digest(decision.workspace.verified_git))throw Error(proof.error||'Verified Git tree changed after evaluation');
+    applied.commit = binding.retain(ws.worktreePath,proof.receipt.identity.git,msg);
     applied.branch_retained = true;
   }
   // REVERT and INCONCLUSIVE retain no product change: the attempt survives

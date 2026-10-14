@@ -1,13 +1,24 @@
-# #201 binding repair status — 2026-10-11
+# #201 binding repair — 2026-10-14
 
-Prepared, not implemented. The owner requested “continue with bind” following completed research #194. The selected slice is #201; #174/#178 remain broader tracking issues. Story and scoped simulation/audit are prepared. No production source or test assertions have changed.
+The legacy preparation blocker is resolved. PR #200 / #199 added explicit,
+history-preserving migration after #203. The original run
+`1791750889080-6f95244d` retained its runtime archive, all four historical reviews,
+findings and counters. A fresh round 5 failed because the reviewer omitted the
+required PRD read; recorded diagnosis and one bounded recovery produced native
+independent acceptance of all five BIND rows in round 6. Preparation finished,
+and the supported promotion helper established build-ready evidence for #201.
+No historical response was retroactively accepted and no allowance was reset.
 
-Duo run `1791750889080-6f95244d` (Codex builder, Claude peer): initial accepted preparation in round 2; subsequent reference-inventory correction required regrade. The current mechanical mapping gate passes 20 checks, zero skipped/failed. The current volume report has status `reported`, errors empty. Optional override-log applicability and a historical changelog reference are explicit in the local record.
+Implementation is tracked by Duo run `1791967858404-3697cc28` and PR #202.
+Q1 and Q2 were reproduced with failing tests before production changes. The
+candidate binds baseline/verification evidence to its governing contract,
+workspace and verifier, detects mutation, records holdout consumption before
+execution, and retains the verified Git tree without commit hooks. Legacy
+unbound after-results cannot authorize KEEP or an automatic holdout retry.
 
-Round 4's peer independently accepted all five BIND rows and reported no blocking findings. The scoped-review checker rejected it because it paraphrased the existing optional `P2-DIAG` basis. The recorded error is `P2-DIAG: cannot repurpose an existing finding ID`. The review was charged as complete/blocked, exhausting the initial-plus-one-regrade allowance. No current promotion receipt exists; implementation did not start. An earlier required-read failure and unread-citation failure remain recorded as protocol failures, not acceptance.
-
-This is an unresolved workflow blocker, not an approved exception. Do not edit journals, rename the run, switch reviewers to reset the allowance, or claim production readiness. The original/raw records remain under `.specflow/duo/1791750889080-6f95244d/` and `.specflow/specification/201.json`; the current source record is `.specflow/bind/record.json`.
-
-Next prerequisite: the owner-run review-allowance recovery proposed in #199 / PR #200, then a fresh same-scope review preserving the existing `P2-DIAG` identity and history. That PR is still open at this checkpoint; its reset command is not on main and has not been executed. Agent must not claim it already reset or ask the owner to run a nonexistent main command.
-
-After supported owner recovery: resume the same Duo preparation run, capture the corrected metadata on current source, regrade within the new allowance, finish and promote only #201. Then write/run the Q1/Q2 failing regressions, implement receipts/baseline admission/exact-tree retention, run focused and full canonical tests, and request independent implementation review before merge. Preserve deferred gain semantics and backend journeys.
+The executable acceptance suite is `tests/contracts/improve-core.test.js`.
+Required final gates remain the full canonical suite, current independent Duo
+implementation acceptance and publication/privacy validation. GitHub PR status
+and its final validation record state whether these gates completed; this file
+is not itself a release or acceptance receipt. Gain semantics (#178), backend
+journeys (#180), broader isolation (#176) and overnight autonomy remain separate.

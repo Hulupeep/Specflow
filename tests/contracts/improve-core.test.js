@@ -137,21 +137,21 @@ function writeTmp(f, name, data) {
 const setSteps = (ws, steps) => fs.writeFileSync(path.join(ws, 'src', 'journey.json'), JSON.stringify({ steps }));
 
 // Everything up to a recorded baseline: candidates, Duo critique, evaluator-authored holdout, frozen contract.
-async function prepare(f, { contractDoc = contract(), runId = 'improve-test', critique = PURSUE } = {}) {
+async function prepare(f, { contractDoc = contract(), runId = 'improve-test', critique = PURSUE, holdoutPrefix = '' } = {}) {
   const { runDir } = improve.startRun({ target: f.repo, mission: f.mission, runId, stateDir: f.state, worktreeRoot: f.worktrees });
   expect(improve.recordCandidates(runDir, writeTmp(f, 'cands.json', candidates())).status).toBe('recorded');
   expect(improve.critique(runDir, { invokePeer: fakePeer([critique]) }).status).toBe('recorded');
   for (const [dir, max] of [['holdout', 2], ['dev', 3]]) {
     fs.mkdirSync(path.join(runDir, dir), { recursive: true });
-    fs.writeFileSync(path.join(runDir, dir, 'steps.cjs'), stepCheck(max));
+    fs.writeFileSync(path.join(runDir, dir, 'steps.cjs'), (dir === 'holdout' ? holdoutPrefix : '') + stepCheck(max));
   }
   improve.recordOracle(runDir, { role: 'evaluator', executor: 'fake-evaluator', files: ['holdout/steps.cjs'] });
   const frozen = improve.freezeContract(runDir, writeTmp(f, 'contract.json', contractDoc));
   return { runDir, frozen };
 }
 
-async function runToImplementation(f, { contractDoc, edits = {}, peer = [KEEP], builder = FAKE_BUILDER() } = {}) {
-  const { runDir, frozen } = await prepare(f, { contractDoc });
+async function runToImplementation(f, { contractDoc, edits = {}, peer = [KEEP], builder = FAKE_BUILDER(), holdoutPrefix = '' } = {}) {
+  const { runDir, frozen } = await prepare(f, { contractDoc, holdoutPrefix });
   expect(frozen.status).toBe('frozen');
   expect((await improve.verifyPhase(runDir, 'baseline')).status).toBe('baseline_recorded');
   const invokePeer = fakePeer(peer);
@@ -512,3 +512,114 @@ describe('IMPROVE-07 ledger (#179)', () => {
     expect(improve.verifyLedger(runDir).ok).toBe(false);
   }));
 });
+
+describe('IMPROVE-BIND #201 evidence freshness', () => {
+  test('Q1: a candidate changed after passing verification cannot KEEP', quiet(async () => {
+    const f=fixture();
+    try {
+      const {runDir,ws}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});
+      await improve.verifyPhase(runDir,'after');setSteps(ws,9);
+      expect(improve.evaluate(runDir).decision).not.toBe('KEEP');
+    } finally {fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('Q2: a superseding contract cannot reuse a baseline from the old version', quiet(async () => {
+    const f=fixture();
+    try {
+      const {runDir}=await prepare(f);await improve.verifyPhase(runDir,'baseline');
+      const updated=contract({hypothesis:'Current contract must have its own baseline evidence.'});
+      expect(improve.freezeContract(runDir,writeTmp(f,'contract-next.json',updated),{supersede:'Refined expectations before build'}).status).toBe('frozen');
+      await expect(improve.build(runDir,{policy:writeTmp(f,'builder.json',FAKE_BUILDER()),invokePeer:fakePeer([KEEP])})).rejects.toThrow(/baseline/i);
+    } finally {fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+});
+
+describe('IMPROVE-BIND #201 negative routes and retention',()=>{
+  test.each(['untracked','ignored','mode','deleted','environment'])('%s input changes invalidate passing verification',quiet(async kind=>{
+    const f=fixture(),saved=process.env.SPECFLOW_BIND_FIXTURE;
+    try {
+      fs.writeFileSync(path.join(f.repo,'.gitignore'),'cache.dat\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore generated cache');
+      const {runDir,ws}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});
+      if(kind==='ignored')fs.writeFileSync(path.join(ws,'cache.dat'),'before');
+      await improve.verifyPhase(runDir,'after');
+      if(kind==='untracked')fs.writeFileSync(path.join(ws,'new-input.txt'),'after');
+      if(kind==='ignored')fs.writeFileSync(path.join(ws,'cache.dat'),'after');
+      if(kind==='mode')fs.chmodSync(path.join(ws,'src/journey.json'),0o755);
+      if(kind==='deleted')fs.unlinkSync(path.join(ws,'src/nav.json'));
+      if(kind==='environment')process.env.SPECFLOW_BIND_FIXTURE='changed-after-verification';
+      const result=improve.evaluate(runDir);expect(result.decision).not.toBe('KEEP');expect(result.binding_errors.length).toBeGreaterThan(0);
+    }finally{if(saved===undefined)delete process.env.SPECFLOW_BIND_FIXTURE;else process.env.SPECFLOW_BIND_FIXTURE=saved;fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('edit-and-restore during a holdout invalidates evidence and cannot consume it again',quiet(async()=>{
+    const f=fixture();try{
+      const prefix="if(process.env.IMPROVE_PHASE==='after'){const fs=require('fs'),p=process.env.IMPROVE_WORKSPACE+'/src/journey.json',b=fs.readFileSync(p);fs.writeFileSync(p,'changed');fs.writeFileSync(p,b);}";
+      const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)},holdoutPrefix:prefix});
+      expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');
+      expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);
+      await expect(improve.verifyPhase(runDir,'after')).rejects.toThrow(/already consumed/);
+      expect(improve.evaluate(runDir).decision).not.toBe('KEEP');
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test.each(['external','dangling'])('%s symlinks fail before consuming the holdout',quiet(async kind=>{
+    const f=fixture();try{
+      const {runDir,ws}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});
+      fs.symlinkSync(kind==='external'?f.mission:path.join(f.root,'missing'),path.join(ws,'link'));
+      expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');expect(improve.events(runDir).some(e=>e.event==='holdout_consumed')).toBe(false);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test.each(['missing','tampered','swapped-evidence'])('%s receipt/evidence cannot satisfy KEEP',quiet(async kind=>{
+    const f=fixture();try{
+      const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});await improve.verifyPhase(runDir,'after');
+      const receipt=improve.events(runDir).filter(e=>e.event==='verification_receipt'&&e.phase==='after').at(-1);
+      if(kind==='missing')fs.unlinkSync(receipt.path);
+      if(kind==='tampered')fs.appendFileSync(receipt.path,' ');
+      if(kind==='swapped-evidence'){
+        const p=path.join(runDir,'evidence.jsonl'),rows=fs.readFileSync(p,'utf8').trim().split('\n').map(JSON.parse);const after=rows.find(e=>e.phase==='after'&&e.set==='holdout');after.contract_version=999;fs.writeFileSync(p,rows.map(JSON.stringify).join('\n')+'\n');
+      }
+      expect(improve.evaluate(runDir).decision).toBe('INCONCLUSIVE');await expect(improve.verifyPhase(runDir,'after')).rejects.toThrow(/already consumed/);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('newer failed baseline attempt prevents fallback to earlier successful evidence',quiet(async()=>{
+    const f=fixture();try{
+      const {runDir}=await prepare(f);await improve.verifyPhase(runDir,'baseline');
+      const baseline=improve.events(runDir).find(e=>e.event==='workspace_prepared'&&e.kind==='baseline');
+      setSteps(path.join(f.worktrees,'improve-test-baseline'),2);expect((await improve.verifyPhase(runDir,'baseline')).status).toBe('baseline_blocked');
+      await expect(improve.build(runDir,{policy:writeTmp(f,'builder.json',FAKE_BUILDER()),invokePeer:fakePeer([KEEP])})).rejects.toThrow(/Baseline/);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('KEEP retains the verified tree without executing commit hooks',quiet(async()=>{
+    const f=fixture();try{
+      const {runDir,ws}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});await improve.verifyPhase(runDir,'after');
+      const decision=improve.evaluate(runDir);expect(decision.decision).toBe('KEEP');
+      const hooks=path.join(f.repo,'.git','hooks');fs.writeFileSync(path.join(hooks,'pre-commit'),'#!/bin/sh\necho unverified > src/journey.json\ngit add src/journey.json\n',{mode:0o755});
+      const applied=improve.finalize(runDir);expect(git(f.repo,'rev-parse',applied.commit+'^{tree}')).toBe(decision.workspace.verified_git.tree);expect(JSON.parse(git(f.repo,'show',applied.commit+':src/journey.json')).steps).toBe(2);expect(applied.base.unchanged).toBe(true);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('ignored input mutation after evaluation refuses final retention',quiet(async()=>{
+    const f=fixture();try{
+      fs.writeFileSync(path.join(f.repo,'.gitignore'),'cache.dat\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore generated input');
+      const {runDir,ws}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});fs.writeFileSync(path.join(ws,'cache.dat'),'before');await improve.verifyPhase(runDir,'after');expect(improve.evaluate(runDir).decision).toBe('KEEP');fs.writeFileSync(path.join(ws,'cache.dat'),'after');expect(()=>improve.finalize(runDir)).toThrow(/binding/i);expect(improve.status(runDir).terminal).toBe(false);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+});
+
+test('IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE',quiet(async()=>{
+  const f=fixture();try{
+    const doc=contract();doc.acceptance[0].baseline_expectation='pass';
+    const {runDir}=await prepare(f,{contractDoc:doc});expect((await improve.verifyPhase(runDir,'baseline')).status).toBe('baseline_blocked');
+    await improve.build(runDir,{policy:writeTmp(f,'builder.json',FAKE_BUILDER()),invokePeer:fakePeer([KEEP]),acceptBaselineBlocker:'Owner accepts current baseline limitation',afterBuilderRound:w=>setSteps(w,2)});
+    await improve.verifyPhase(runDir,'after');expect(improve.evaluate(runDir).decision).toBe('INCONCLUSIVE');
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('IMPROVE-BIND: legacy interrupted after-verification cannot expose the holdout again',quiet(async()=>{
+  const f=fixture();try{
+    const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});improve.append(runDir,'verification_started',{phase:'after',contract_version:1});
+    await expect(improve.verifyPhase(runDir,'after')).rejects.toThrow(/Legacy.*holdout/);expect(improve.evaluate(runDir).decision).toBe('INCONCLUSIVE');
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+test('IMPROVE-BIND: repaired prerequisite may retry before holdout consumption',quiet(async()=>{
+  const f=fixture();try{
+    const {runDir,ws}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)}});fs.symlinkSync(f.mission,path.join(ws,'bad-link'));
+    expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');fs.unlinkSync(path.join(ws,'bad-link'));expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
