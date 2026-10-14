@@ -171,6 +171,9 @@ acceptance index before finish can pass. `index <id> --session <token> --criteri
 <array.json>` attaches it or adds a previously omitted required gate; it cannot
 remove/change existing definitions. Pinned source changes need explicit user scope
 reconciliation in a new linked run. No model may silently weaken acceptance.
+A linked preparation run with a `targetTier` starts with the issue/tier's open blocking scoped findings
+from the latest complete round (#206), so the repaired specification can close them through the normal
+builder resolution and peer disposition path.
 
 `specflow duo-build` exposes the same helper subcommands. Use the native skill for
 the single-invocation interactive workflow. Only Claude Code and Codex are supported;

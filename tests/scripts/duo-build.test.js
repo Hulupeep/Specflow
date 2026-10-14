@@ -309,3 +309,38 @@ test('scoped partial batches progress on new actual evidence without changing th
  expect(result.outcome).toBe('accepted');expect(duo.finish(root,run.id,run.owner.session).goalStatus).toBe('complete');
  const journal=require('../../scripts/specflow-reviews.cjs').load(root,189);expect(journal.reviewControl.contracted.achievements).toHaveLength(4);expect(journal.reviews.contracted).toHaveLength(5);
 });
+test('#206: a linked preparation run inherits open scoped findings so a repaired specification can pass',()=>{
+ const reviews=require('../../scripts/specflow-reviews.cjs');
+ const record={issue:{number:206,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};
+ put('tier.json',JSON.stringify(record));
+ const scoped={...context,specification:{record:'tier.json',targetTier:'contracted'}};
+ const first=duo.start(root,'#206','codex',scoped);
+ expect(reviewOwned(root,first.id,batch(),fakePeer('changes_required')).outcome).toBe('changes_required');
+ expect(reviews.load(root,206).reviews.contracted.at(-1).findings.find(f=>f.id==='F1').status).toBe('open');
+ // Repairing the pinned task forces a linked run (validatePins); the old run is ceased.
+ put('task.md','AC-1: returns 42\nRepaired: result is exactly 42.');record.issue.body='AC-1: returns 42\nRepaired: result is exactly 42.';
+ record.profile.revision=1;put('tier.json',JSON.stringify(record));put('raw.txt','command: node code.js; exit: 0; observed 42; expected 42');
+ duo.cease(root,first.id,first.owner.session,'Pinned task repaired; reconcile in a linked run');
+ const linked=duo.start(root,'#206 linked','codex',scoped);
+ const inherited=duo.load(root,linked.id).state.findings.F1;
+ expect(inherited).toMatchObject({status:'open',inherited:{issue:206,tier:'contracted'}});
+ const seen=[];const result=reviewOwned(root,linked.id,{...batch(),resolutions:[{id:'F1',change:'Task repaired to require exactly 42',evidence:['raw.txt']}]},
+  fakePeer('accepted',opts=>{seen.push(JSON.parse(fs.readFileSync(path.join(opts.cwd,'request.json'))).open_findings.map(f=>f.id));}));
+ expect(seen[0]).toEqual(['F1']);
+ expect(result.outcome).toBe('accepted');
+ const last=reviews.load(root,206).reviews.contracted.at(-1);
+ expect(last.outcome).toBe('passed');expect(last.findings.find(f=>f.id==='F1').status).toBe('resolved');
+});
+test('#206: inheritance is limited to open blocking scoped findings of preparation runs',()=>{
+ const reviews=require('../../scripts/specflow-reviews.cjs');
+ const record={issue:{number:207,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};
+ put('tier.json',JSON.stringify(record));
+ const scoped={...context,specification:{record:'tier.json',targetTier:'contracted'}};
+ const first=duo.start(root,'#207','codex',scoped);
+ reviewOwned(root,first.id,batch(),fakePeer('changes_required',(_,r)=>{r.specification_nonblocking=[{id:'P2-NOTE',kind:'P2',impact:'current',basis:'Wording',action:'Tidy wording',evidence:['raw.txt']}];}));
+ duo.cease(root,first.id,first.owner.session,'fixture');
+ const linked=duo.load(root,duo.start(root,'#207 linked','codex',scoped).id).state;
+ expect(Object.keys(linked.findings)).toEqual(['F1']);
+ const plain=duo.load(root,duo.start(root,'#207 unscoped','codex',context).id).state;
+ expect(Object.keys(plain.findings)).toEqual([]);
+});
