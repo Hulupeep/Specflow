@@ -73,7 +73,7 @@ stages:
       adversary still DECIDES (one critic, not a committee).
       Why here: persona walks find PRD-level design flaws — catching them now costs a
       PRD edit; catching them at B.5 costs redone tickets, audit, and uplift.
-    review_boundary: scoped Duo preparation; initial review plus one repair, persisted by issue/tier; stop on no new evidence
+    review_boundary: scoped Duo preparation; continue on verified progress with bounded diagnosis, persisted by issue/tier; stop on no new evidence
   - id: GATE_A               # HARD — the trust gate
     type: hard
     gate: >
@@ -129,7 +129,7 @@ repair:
   on_gate_fail: route back to the owning stage with a targeted prompt
   within_run: fix fast failures inline
   across_ticks: slow/blocked state is re-read on the next automation tick
-  budget: contracted initial + one repair; build-ready initial + one re-grade; no-new-evidence stops
+  budget: continue on verified progress with bounded diagnosis; no-new-evidence requires diagnosis
   on_exhausted: escalate with the open FATAL/SERIOUS list
 
 escalate_when:

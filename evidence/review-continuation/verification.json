@@ -1,0 +1,60 @@
+{
+  "issue": "https://github.com/Hulupeep/Specflow/issues/189",
+  "recordedAt": "2026-10-12T07:22:41.122647+00:00",
+  "baseCommit": "bb5273dc6d3fdaf1d9e6268a857311938b671fd0",
+  "command": "npm test -- --runInBand --roots tests",
+  "exitCode": 0,
+  "suites": {
+    "passed": 74,
+    "total": 74
+  },
+  "tests": {
+    "passed": 1395,
+    "total": 1395,
+    "skipped": 0
+  },
+  "rawEvidence": "evidence/review-continuation/full-suite.txt",
+  "rawSha256": "2303c32d6778fa76770ec05a97a0f36078ce60d0019ab4947beb5655b737f2a7",
+  "failingFirst": {
+    "file": "evidence/review-continuation/failing-first.txt",
+    "failed": 2,
+    "sha256": "6925d88d5d2b8ea9acbd766df97672e6a272d1c4dd161fc4b5f9cce89c69ec25"
+  },
+  "sourceHashes": {
+    "bin/specflow.js": "af997fa186fcc5f4ea843595943f438ef26a264a9314572ce8b264b14eb9c7be",
+    "install-hooks.sh": "b1774ffba1df84c7847a40e0dfc54f2b1e3de1823b616de09585327efd8b192e",
+    "scripts/duo-build.cjs": "2c59eb7d2933666a9bbb61b4ee5ef787212f8c40dd1547401c6073b637f66667",
+    "scripts/duo-cadence.cjs": "7c549624cbcd8d30f4cc2c3f303cad4807fcf304a297f777991b9cdd84de35c9",
+    "scripts/duo-progress.cjs": "4b3aefc3893e493ee39d346bb4d892a678f410303b00d7f1f8d5e48e418feebd",
+    "scripts/duo-runtime.cjs": "09fa7101502c356ccc09a2e0551a3af1b91ecd010a9065dfbde96fafa272c707",
+    "scripts/review-continuation.cjs": "8dbfb650e309c9b3ca15ddd5fd1b151b4b09f54509727e79c1088cd00bf7c937",
+    "scripts/specflow-reviews.cjs": "f5b9a2b6967e80f683a7f3a3c1f4fe1a91b51d18920e95cb7d4d4bb2491a334a",
+    "scripts/specflow-specification.cjs": "10ed296f408f6da1ba645824882d401fe22c36e57e3d630b99882265345c10af",
+    "tests/contracts/duo-operations.test.js": "8c44158ad41a758cc1c79f061600cce0abdaf548d020eb5193e0eb5c1c2e1592",
+    "tests/contracts/review-continuation.test.js": "6e2ff8313f68160ebbaa3254f65b5898dc2b5bcf6aa77f5a466130c487c1d78a",
+    "tests/contracts/spec-density-alignment.test.js": "d74dec9b6ea697c3075dd16aac16b7fca5f969b4325febb15522850fb5345fe2",
+    "tests/contracts/spec-density-reviews.test.js": "5100c95327b4552eb18994fa2d4b29c94a454cb51b876f4ec66524bebd2202dd",
+    "tests/contracts/spec-density-runner.test.js": "62e9558971a4caa2171e1aa7196d3e3f5570a32dfd208653d1e6205ebc37c257",
+    "tests/contracts/typesafe-duo.test.js": "74b5a25b949a639cf96676aa48e3eeef210d78132478d9d9d554274eb134b327",
+    "tests/hooks/spec-density-install.test.js": "5d6cd6e21d91edc098d8eb2ddc035ef1ea07091df4a9204d83294c6e8566ac4d",
+    "tests/scripts/duo-action-accounting.test.js": "edf622c391b38429e2cc05fa5328f47ecef7614870d0db1c01627a5f5feef562",
+    "tests/scripts/duo-action-assessment.test.js": "4b3c1ddfd3d6c8f0c49f0ab582a2f85181e0356b313cd0b27f8bef0579b02f40",
+    "tests/scripts/duo-build.test.js": "b0ef7d9d48b45e72e44e2999a6005a326767405fc1cf5dc916ade27196fc56c6",
+    "tests/scripts/duo-cadence.test.js": "102c8fce0e60c66eead25732273af59da9623aeb4eb8b3b4a83178743cb303d0",
+    "tests/scripts/duo-direction.test.js": "e46bbc67730b42926dd4d8eaace01135bf9b4a5726556bb862aa0b535954fe17"
+  },
+  "review": {
+    "provider": "Claude Code CLI 2.1.285",
+    "mode": "live read-only code review, not live-model acceptance of fixture executions",
+    "model": "CLI default; not reported in text output",
+    "rounds": 4,
+    "finalVerdict": "No remaining findings",
+    "finalResponseSha256": "789cf83cee5eb965f26450f0061f3bca5fcc163bf01a97863ed97a0d79d9ac2b",
+    "scope": "initial full patch review followed by targeted rechecks of fixes"
+  },
+  "limits": [
+    "Peer execution transports in automated tests are deterministic doubles.",
+    "Existing pinned runs retain their recorded runtime and are not automatically migrated.",
+    "No package release, deployment or production backend validation was performed."
+  ]
+}

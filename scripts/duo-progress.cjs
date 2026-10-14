@@ -1,4 +1,5 @@
 'use strict';
+const continuation = require('./review-continuation.cjs');
 // Small, deterministic goal ledger. Sources remain authoritative; this indexes them.
 const crypto = require('crypto');
 const digest = value => crypto.createHash('sha256').update(value).digest('hex');
@@ -91,8 +92,11 @@ function validateBatch(state, batch, hashes) {
     if (!state.findings[r.id] || state.findings[r.id].status !== 'open' || !nonempty(r.change)) throw Error(`Invalid builder resolution: ${r.id}`);
     evidenceRefs(r.evidence, hashes, `Resolution ${r.id}`);
   }
-  if ((state.batchAttempts[batch.id] || 0) >= 4 || (state.repairCycle?.attempts || 0) >= 4) throw Error('Maximum three repair rounds exhausted; changing batch or host cannot reset it');
-  if (state.stagnantRounds >= 2) throw Error('No new evidence-backed progress in two consecutive reviews; investigate the blocker outside this exhausted run');
+  if (state.reviewControl) { const stop = continuation.decision(state.reviewControl); if (stop) throw Error(stop.reason); }
+  else {
+    if ((state.batchAttempts[batch.id] || 0) >= 4 || (state.repairCycle?.attempts || 0) >= 4) throw Error('Maximum three repair rounds exhausted; changing batch or host cannot reset it');
+    if (state.stagnantRounds >= 2) throw Error('No new evidence-backed progress in two consecutive reviews; investigate the blocker outside this exhausted run');
+  }
 }
 function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
   if (typeof result.index_complete !== 'boolean') throw Error('Peer must assess acceptance-index completeness');
@@ -110,6 +114,7 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
   unique(result.resolutions.map(r => r.id), 'Peer disposition IDs');
   if (result.resolutions.length !== previousOpen.length || result.resolutions.some(r => !previousOpen.some(f => f.id === r.id))) throw Error('Peer must explicitly disposition every open finding');
   let closed = 0;
+  state.everClosed ||= [];
   for (const r of result.resolutions) {
     if (!['open', 'closed'].includes(r.status) || !nonempty(r.reason)) throw Error('Invalid peer finding disposition');
     if (r.status === 'closed') {
@@ -117,7 +122,7 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
       const resolution = batch.resolutions.find(b => b.id === r.id);
       if (!resolution || r.evidence.some(p => !resolution.evidence.includes(p))) throw Error(`Closure ${r.id} lacks builder resolution evidence`);
       if (result.findings.some(f => f.id === r.id)) throw Error('Finding cannot be open and closed in the same review');
-      candidate[r.id] = { ...candidate[r.id], status: 'closed', closure: r }; closed++;
+      candidate[r.id] = { ...candidate[r.id], status: 'closed', closure: r }; if (!state.everClosed.includes(r.id)) { closed++; state.everClosed.push(r.id); }
     }
   }
   for (const f of result.findings) {
@@ -157,7 +162,7 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
   state.seenObservations = [...new Set([...state.seenObservations, ...observations])];
   state.seenEvidence = [...new Set([...state.seenEvidence, ...Object.values(hashes)])];
   const progress = { newly_verified: advanced, findings_closed: closed, new_diagnostics: observations.length };
-  state.stagnantRounds = advanced || closed || observations.length ? 0 : state.stagnantRounds + 1;
+  state.stagnantRounds = advanced || closed || (!state.reviewControl && observations.length) ? 0 : state.stagnantRounds + 1;
   if (remaining.length) state.repairCycle ||= { attempts: 1 };
   else if (result.outcome === 'accepted') state.repairCycle = null;
   state.goalStatus = 'incomplete';

@@ -1,10 +1,11 @@
 const {fixture}=require('../helpers/duo-action-fixture.cjs');const actions=require('../../scripts/duo-actions.cjs'),duo=require('../../scripts/duo-build.cjs');
+function recoverInstruction() {const raw=f.state().lastCapture.path;duo.recoverReview(f.root,f.run.id,f.run.owner.session,{kind:'stagnation',cause:'required display probe remains unproven',action:'execute the specifically requested display probe',evidence:[{path:raw,sha256:require('crypto').createHash('sha256').update(require('fs').readFileSync(require('path').join(f.root,raw))).digest('hex')}]});}
 let f;beforeEach(()=>f=fixture());afterEach(()=>f.close());
 test.each(['claude-code','codex'])('J-DUO-ACTION-ASSESS %s: omitted response plus green unrelated tests does not satisfy the instruction; actual correction does',host=>{
  if(host==='codex')f.transfer();let evidence=f.capture();expect(f.review(f.batch(evidence)).history.at(-1).stage).toBe('validated');evidence=f.capture('unrelated.cjs');
  const skipped=f.review(f.batch(evidence),f.peer((r,req)=>{expect(req.instruction_review.builderResponses['I-R1-S1'].state).toBe('unreported');expect(req.instruction_review.instructions[0].doneWhen).toContain('42');}));
  expect(skipped.instructions['I-R1-S1'].lastAssessment.outcome).toBe('unproven');expect(skipped.goalStatus).toBe('incomplete');
- f.put('display.cjs','console.log(42)');evidence=f.capture();
+ recoverInstruction();f.put('display.cjs','console.log(42)');evidence=f.capture();
  const corrected=f.review(f.batch(evidence,{resolutions:[{id:'TOTAL',change:'Corrected total after reviewer direction',evidence:[evidence]}]}));
  expect(corrected.history.at(-1).stage).toBe('validated');expect(corrected.instructions['I-R1-S1'].state).toBe('satisfied');expect(corrected.criteria['AC-TOTAL'].status).toBe('verified');
 });
@@ -30,6 +31,7 @@ test('a failed attempt and an observed non-attempt remain distinct outstanding d
  f.put('failed-attempt.cjs',"console.error('requested display probe failed');process.exit(1)");
  f.review(f.batch(f.capture()));
  for(const outcome of ['attempted_failed','not_attempted']){
+  if(outcome==='not_attempted')recoverInstruction();
   const evidence=f.capture(outcome==='attempted_failed'?'failed-attempt.cjs':'unrelated.cjs');
   expect(f.state().lastCapture.exitCode).toBe(outcome==='attempted_failed'?1:0);
   const result=f.review(f.batch(evidence),f.peer(r=>{Object.assign(r.instruction_assessments[0],{outcome,reason:outcome==='attempted_failed'?'Simulated assessment: attempted command failed':'Simulated assessment: captured attempt scope excludes required command'});}));

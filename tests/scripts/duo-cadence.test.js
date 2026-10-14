@@ -99,10 +99,10 @@ test('AC-4: generated audit distinguishes calls and validation, without owner to
   expect(audit).not.toContain(run.owner.session); expect(fs.readFileSync(path.join(root,'audit.md'),'utf8')).toBe('Owner-maintained root log');
   expect(duo.fingerprint(root,[])).toBe(before);
 });
-test('AC-2: exhausted repair limit remains blocked despite changes', () => {
+test('AC-2: failed recovery remains blocked despite changes', () => {
   const file=path.join(root,'.specflow/duo',run.id,'run.json'), state=JSON.parse(fs.readFileSync(file));
-  state.repairCycle={attempts:4}; fs.writeFileSync(file,JSON.stringify(state)); put('code.js','changed');
-  expect(cadence.stop(root,input).stopReason).toContain('limit reached');
+  state.reviewControl.stagnant=2;state.reviewControl.recoveries=[{kind:'stagnation',episode:0,consumed:true,cause:'fixture still wrong',action:'different repair',evidence:[]}];state.lastFailure='fixture still wrong'; fs.writeFileSync(file,JSON.stringify(state)); put('code.js','changed');
+  expect(cadence.stop(root,input).stopReason).toContain('recovery did not establish progress');
 });
 test.each(['codex','claude-code'])('J-DUO-GITHUB AC-5: %s peer gets GitHub context and authenticated read configuration', builder => {
   git('remote','add','origin','https://github.com/owner/repository.git');

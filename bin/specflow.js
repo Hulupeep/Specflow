@@ -48,7 +48,7 @@ const COMMANDS = {
     run: args => require('../scripts/specflow-improve.cjs').cli(args).then(code => { process.exitCode = code; }),
   },
   'duo-build': {
-    usage: 'specflow duo-build <check|start|resume|status|eligibility|capture|review|finish> [options]',
+    usage: 'specflow duo-build <check|start|resume|status|eligibility|capture|review|recover-review|extend-review-limits|finish> [options]',
     desc: 'Durable helper for the native /duo-build or $duo-build workflow',
     run: (args) => { process.exitCode = require('../scripts/duo-build.cjs').cli(args); },
   },

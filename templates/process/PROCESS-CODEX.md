@@ -39,11 +39,10 @@ Follow `QA/loops/spec-build.yaml` and the procedure in `SPECIFICATION.md`:
    a selected slice with current verified build-ready evidence can be handed to
    `QA/loops/feature-build.yaml`. A depth label alone is insufficient.
 
-Specification review has **initial + one repair**, shared across sessions and
-run names for that issue/tier, with a **no-new-evidence** stop. Inspect the durable
+Specification review has **continue on verified progress with bounded diagnosis**, shared across sessions and
+run names for that issue/tier, with a **no-new-evidence** diagnosis guard. Inspect the durable
 allowance before another call. Persist failed attempts and unresolved findings;
-“fixed as specified, not re-graded” is not acceptance. An exhausted allowance or
-unresolved material finding needs the stated owner action, not another tick.
+“fixed as specified, not re-graded” is not acceptance. A repeated failure after evidenced recovery requires a concrete blocker report.
 
 ## Feature-build: implement and verify the selected slice
 
@@ -65,7 +64,7 @@ A thread automation can re-enter the same saved run. Each invocation reads the
 shared tier record, pending discoveries, findings, review allowance and raw
 results before advancing an unblocked step. It must not restart the run or
 review counter. Stop at the bounded finish condition, a human gate, missing
-required evidence, no new evidence, or an exhausted allowance. An automation
+required evidence, repeated failure after diagnosis, or an explicit checkpoint. An automation
 schedule is not permission to keep reviewing.
 
 Durable records support uncommitted changes; a commit per batch is unnecessary.
