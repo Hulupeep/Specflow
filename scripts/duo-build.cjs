@@ -133,13 +133,29 @@ function startLocked(root, target, builder, context, hostSession) {
   state.reviewControl = continuation.create(context.reviewPolicy);
   state.typesafe = typesafe.config({}, context.typesafe || {});
   if (state.typesafe.envFile) state.typesafe.envFile = path.resolve(root, state.typesafe.envFile);
-  progress.upgrade(state); actions.upgrade(state); progress.addIndex(state, index); progress.claim(state, builder);
+  progress.upgrade(state); actions.upgrade(state); progress.addIndex(state, index); inheritScopedFindings(root, state); progress.claim(state, builder);
   if (builder === 'claude-code' && hostSession) state.owner.hostSession = hostSession;
   try { state.routingShadow = routingShadow.enrollment(root); } catch (e) { state.routingShadowError = e.message; }
   state.runtime = runtime.pin(root,dir,builder);
   write(path.join(dir, 'goal.md'), goal); save(dir, state);
   if (state.routingShadow) beginRoutingLocked(root, dir, state, context.routingLoop || 'feature-build', context.routingStage || 'implementation');
   return state;
+}
+// #206: a repaired preparation task forces a linked run (validatePins). The scoped journal still holds the
+// previous round's open blocking findings, which it only closes from peer resolutions — so the linked run must
+// carry them as its own open findings, or nobody can disposition them and the specification can never pass.
+function inheritScopedFindings(root, state) {
+  const spec = state.context.specification;
+  if ((state.context.workKind || 'implementation') !== 'preparation' || !spec?.targetTier) return;
+  const record = specificationRecord(root, state.context), number = record?.issue?.number;
+  if (!Number.isSafeInteger(number)) return;
+  const previous = (scopedReviews.load(root, number).reviews[spec.targetTier] || []).findLast(r => r.status === 'complete');
+  for (const f of previous?.findings || []) {
+    if (f.status !== 'open' || f.severity === 'P2' || state.findings[f.id]) continue;
+    state.findings[f.id] = { id: f.id, basis: f.basis, action: f.action, verification: f.verification || f.action, kind: f.kind || 'risk',
+      criterion: f.criterion && state.criteria[f.criterion] ? f.criterion : null, status: 'open',
+      inherited: { issue: number, tier: spec.targetTier, round: previous.id } };
+  }
 }
 function beginRoutingLocked(root, dir, state, loop, stage) {
   if (state.routingReceipt && !state.routingReceipt.closed) return state;

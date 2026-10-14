@@ -8,6 +8,11 @@ All notable changes to `@colmbyrne/specflow`.
 
 ## Unreleased
 
+**Linked preparation runs inherit open scoped findings (#206).**
+
+- Repairing a preparation task forces a new linked run (pinned acceptance changed). That run now starts with the issue/tier's open blocking scoped findings from the latest complete round, so the builder can submit resolutions and the peer can close them. Previously neither side could, so a repaired specification could never pass its scoped review.
+- Only `open`, non-P2 findings from preparation runs with a `targetTier` are inherited; each records its source (`inherited: {issue, tier, round}`). Implementation and unscoped runs are unchanged.
+
 **Review continuation and actionable stops (#189).**
 
 - New Duo and scoped preparation reviews continue while first-time verified criteria or finding closures advance; fixed two/four-review caps are replaced by bounded diagnosis and evidenced recovery.
