@@ -1,0 +1,13 @@
+{
+  "checked_at": "2026-10-14T10:14:33.480Z",
+  "scope": "read-only existing local HeyStax web-app workspace; no DB calls or browser execution",
+  "source_sha256": "5f04d071206c40bae7a2fc291eb1f23bf6c9402d910ea343a415be77ba56feb5",
+  "identity": "unavailable",
+  "reason": "Input tree exceeds 256 MiB",
+  "product_revision": "6cb53ac79ad1206fbe6b7168c231ac263498d588",
+  "workspace_kind": "existing feature workspace, not deployed main",
+  "node_modules_bytes": 656812042,
+  "next_build_bytes": 605399968,
+  "browser_executed": false,
+  "database_accessed": false
+}
