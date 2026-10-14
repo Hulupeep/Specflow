@@ -198,3 +198,12 @@ Exceptions remain `override:<who>:<reason>`, never passed, and cannot grant
 missing capability, privacy or production acceptance.
 
 New Duo-owned reservations require `review-failed RECORD TIER "reason" --session TOKEN` from that owning session. A live Duo operation lock prevents interruption bookkeeping. Historical unbound reservations retain the legacy local recovery path; neither path grants acceptance.
+
+### Legacy review recovery
+
+PR #203's progress policy is available to recorded legacy runs only through
+explicit owner-authorized `duo-build migrate-review` (#199). It retains the same
+run and shared review history, archives the original state/runtime, and requires
+fresh independent acceptance. It does not clear rounds or grant readiness.
+Subsequent diagnosis uses `recover-review`; owner ceilings use
+`extend-review-limits`. See the Duo skill for input and ownership requirements.

@@ -317,6 +317,57 @@ function cease(root,id,session,reason) {
     save(dir,state);return state;
   });
 }
+// Explicit owner migration, separate from installation and ordinary dispatch.
+// The run.json rename selects the new immutable bundle only after staging succeeds.
+function migrateReview(root,id,session,input) {
+  return runtime.lock(root,()=>locked(root,id,({dir,state})=>{
+    progress.own(state,session); validatePins(root,dir,state);
+    if (input.ownerAuthorized !== true || !input.reason?.trim()) throw Error('Migration requires explicit owner authorization and a reason');
+    if (state.reviewControl) throw Error('Run already uses the current review policy; use evidenced recovery, not migration');
+    if (state.runtimeCeased || state.goalStatus === 'complete') throw Error('Ceased or completed runs cannot migrate');
+    if (state.runtime.provenance !== 'recorded' || state.runtime.protocolVersion !== 'duo-actions-1') throw Error('Unknown legacy runtime cannot migrate');
+    validateRecovery(root,input.evidence);
+    const apply = journal => {
+      const tier=state.context.specification?.targetTier;
+      if (tier && journal?.reviews[tier]?.at(-1)?.status === 'pending') throw Error('Pending scoped review cannot migrate');
+      const c=continuation.create(state.context.reviewPolicy,state.history.length?Date.parse(state.history[0].at):Date.now());
+      for (const r of state.history) {
+        if (!r.attempted) continue;
+        c.calls++;
+        const validated=r.stage==='validated' && r.review;
+        const achievements=validated ? [
+          ...(r.review.assessments||[]).filter(a=>a.status==='verified' && state.criteria[a.id]).map(a=>'criterion:'+a.id),
+          ...(r.review.resolutions||[]).filter(a=>a.status==='closed').map(a=>'finding:'+a.id)
+        ] : [];
+        continuation.observe(c,{protocol:!validated && r.stage!=='scoped_blocked',achievements});
+      }
+      // Older versions may retain counters beyond the available detailed rounds.
+      c.calls=Math.max(c.calls,Object.values(state.batchAttempts || {}).reduce((a,n)=>a+(Number.isSafeInteger(n)?n:0),0),state.repairCycle?.attempts || 0);
+      c.protocolFailures=Math.max(c.protocolFailures,state.peerFailures || 0);
+      c.stagnant=Math.max(c.stagnant,state.stagnantRounds || 0);
+      const name='runtime-migrations/'+crypto.randomUUID(), staging=safe(root,path.relative(root,path.join(dir,name)));
+      fs.mkdirSync(staging,{recursive:true});
+      const archive=path.join(staging,'before.json');fs.writeFileSync(archive,fs.readFileSync(path.join(dir,'run.json')),{flag:'wx'});
+      const next=runtime.pin(root,staging,state.builder);next.directory=name+'/runtime';runtime.verify(dir,next);
+      const oldRuntime=state.runtime;state.runtime=next;state.reviewControl=c;
+      for(const row of Object.values(state.criteria)) if(row.status==='verified') {row.status='unverified';row.reason='Runtime migrated; fresh independent review required';}
+      state.indexComplete=false;state.goalStatus='incomplete';state.continuationFresh=false;state.outcome='blocked';
+      state.blocker='Runtime migrated; capture current evidence and obtain fresh independent review';state.next=state.blocker;
+      state.events.push({type:'review-policy-migration',at:new Date().toISOString(),reason:input.reason,evidence:input.evidence,
+        from:oldRuntime,to:next.identity,archive:path.relative(root,archive),archiveSha256:hash(fs.readFileSync(archive))});
+      save(dir,state);return state;
+    };
+    const record=specificationRecord(root,state.context);
+    // Hold the shared journal lock as well, without modifying or reserializing it.
+    if(record && state.context.specification?.targetTier) {
+      const lock=scopedReviews.statePath(root,record.issue.number)+'.lock';safe(root,path.relative(root,lock));
+      fs.mkdirSync(path.dirname(lock),{recursive:true});
+      try {fs.mkdirSync(lock);} catch {throw Error('Specification operation is active; migration refused');}
+      try {return apply(scopedReviews.load(root,record.issue.number));} finally {fs.rmdirSync(lock);}
+    }
+    return apply(null);
+  }));
+}
 function indexGoal(root, id, session, definitions) {
   return locked(root, id, ({dir, state}) => {
     progress.own(state, session); validatePins(root, dir, state);
@@ -658,6 +709,7 @@ function reviewLocked(root, dir, state, batch, invoke) {
 }
 function status(state) {
   const version = runtime.describe(state.root,state);
+  const migrationCommand = state.runtime.directory ? `\nRun commands with: node ${path.join('.specflow/duo',state.id,state.runtime.directory,'scripts/duo-build.cjs')} ACTION ${state.id} --session TOKEN (the old installed launcher may not understand migration)` : '';
   const routingFailures = [state.routingShadowError, ...[state.routingReceipt, state.routingReceipt?.outcome, state.routingTerminal].filter(r => r?.status === 'unavailable').map(r => r.reason)].filter(Boolean);
   const routingNotice = routingFailures.length ? '\nRouting collection unavailable: ' + [...new Set(routingFailures)].join('; ') : '';
   const rows = Object.values(state.criteria), open = progress.openFindings(state);
@@ -666,7 +718,7 @@ function status(state) {
   const blocker = state.lastFailure && state.blocker !== state.lastFailure ? `${state.lastFailure}. Latest obstacle: ${state.blocker}` : state.blocker;
   const guard = limits.map(b=>b.reason).join('; ') || 'none';
   const next = state.runtimeCeased ? state.next : state.continuationFresh !== false && state.continuation?.round === state.history.length && state.history.at(-1)?.stage === 'validated' && state.goalStatus !== 'complete' ? actions.next(state)?.reason || direction.next(state.continuation.direction) : state.goalStatus === 'complete' ? 'Goal complete' : open[0]?.verification || (pending[0] ? `Verify ${pending[0].id}: ${pending[0].anchor}` : rows.length ? 'Run finish to check all goal conditions' : 'Index the existing task acceptance and required gates');
-  return `Run: ${state.id}\nBuilder: ${state.owner?.builder || 'unclaimed'}\nTypeSafe: ${state.typesafe?.mode || 'shadow'} / ${state.history.at(-1)?.typesafe?.reason || state.history.at(-1)?.typesafe?.status || 'not evaluated'}\nGoal: ${state.context.objective}\nProgress: ${rows.length - pending.length}/${rows.length} verified; ${open.length} open findings; ${state.goalStatus}\nRuntime: ${version.active}; installed ${version.installed}; staged ${version.staged || 'none'}${version.staleGuide ? `\n${version.staleGuide}` : ''}\nInstructions: ${actions.pending(state).length} outstanding\nOutcome advanced: ${state.outcome === 'accepted' ? 'accepted within batch scope' : state.outcome}\nCurrent blocker: ${blocker ? blocker : 'none'}\nExecution guard: ${guard}\nUsage: ${state.reviewControl?.policy.usageMode || 'unknown'}; monetary cost unmeasured\nUnresolved: ${[...open.map(f=>`${f.id}: ${f.basis}; verify: ${f.verification}`),...pending.map(c=>c.id)].join('; ') || 'none'}\nEvidence: ${state.history.length ? `${path.join('.specflow/duo',state.id,'audit.md')}; latest peer: round-${String(state.history.findLastIndex(r=>r.attempted)+1).padStart(3,'0')}; latest operation: round-${String(state.history.length).padStart(3,'0')}` : 'none yet'}\nRecovery: ${JSON.stringify(state.reviewControl?.recoveries || [])}\nNext action: ${limits.length ? `${state.next || next}. ${guard}` : state.outcome === 'blocked' && state.blocker ? state.next || next : next}${routingNotice}`;
+  return `Run: ${state.id}\nBuilder: ${state.owner?.builder || 'unclaimed'}\nTypeSafe: ${state.typesafe?.mode || 'shadow'} / ${state.history.at(-1)?.typesafe?.reason || state.history.at(-1)?.typesafe?.status || 'not evaluated'}\nGoal: ${state.context.objective}\nProgress: ${rows.length - pending.length}/${rows.length} verified; ${open.length} open findings; ${state.goalStatus}\nRuntime: ${version.active}; installed ${version.installed}; staged ${version.staged || 'none'}${migrationCommand}${version.staleGuide ? `\n${version.staleGuide}` : ''}\nInstructions: ${actions.pending(state).length} outstanding\nOutcome advanced: ${state.outcome === 'accepted' ? 'accepted within batch scope' : state.outcome}\nCurrent blocker: ${blocker ? blocker : 'none'}\nExecution guard: ${guard}\nUsage: ${state.reviewControl?.policy.usageMode || 'unknown'}; monetary cost unmeasured\nUnresolved: ${[...open.map(f=>`${f.id}: ${f.basis}; verify: ${f.verification}`),...pending.map(c=>c.id)].join('; ') || 'none'}\nEvidence: ${state.history.length ? `${path.join('.specflow/duo',state.id,'audit.md')}; latest peer: round-${String(state.history.findLastIndex(r=>r.attempted)+1).padStart(3,'0')}; latest operation: round-${String(state.history.length).padStart(3,'0')}` : 'none yet'}\nRecovery: ${JSON.stringify(state.reviewControl?.recoveries || [])}\nNext action: ${limits.length ? `${state.next || next}. ${guard}` : state.outcome === 'blocked' && state.blocker ? state.next || next : next}${routingNotice}`;
 }
 function cli(args, root = process.cwd()) {
   try {
@@ -683,13 +735,14 @@ function cli(args, root = process.cwd()) {
     else if (action === 'typesafe') state = configureTypesafe(root, target, opt('session'), json(safe(root, opt('config'))), opt('reason'));
     else if (action === 'status') state = inspect(root, target, opt('session'));
     else if (action === 'resume') state = resume(root, target, opt('builder'), { session: opt('session'), takeover: args.includes('--takeover'), reason: opt('reason'), hostSession: opt('host-session') });
+    else if (action === 'migrate-review') state = migrateReview(root,target,opt('session'),json(safe(root,opt('input'))));
     else if (action === 'cease') state = cease(root,target,opt('session'),opt('reason'));
     else if (action === 'release') state = release(root, target, opt('session'));
     else if (action === 'index') state = indexGoal(root, target, opt('session'), json(safe(root, opt('criteria'))));
     else if (action === 'capture') state = capture(root, target, opt('session'), args.includes('--') ? args.slice(args.indexOf('--') + 1) : [], {diagnosis:args.slice(0,args.indexOf('--')<0?args.length:args.indexOf('--')).includes('--diagnosis')});
     else if (action === 'routing-begin') state = beginRouting(root, target, opt('session'), opt('loop'), opt('stage'));
     else if (action === 'finish') state = finish(root, target, opt('session'));
-    else throw Error('Use native /duo-build (Claude) or $duo-build (Codex). Helper: check, start, resume, status, release, cease, index, eligibility, typesafe, capture, review, recover-review, extend-review-limits, finish. Mutations require --session; host takeover requires --builder --takeover --reason.');
+    else throw Error('Use native /duo-build (Claude) or $duo-build (Codex). Helper: check, start, resume, status, release, cease, migrate-review, index, eligibility, typesafe, capture, review, recover-review, extend-review-limits, finish. Mutations require --session; host takeover requires --builder --takeover --reason.');
     console.log(status(state));
     if (state.routingShadow) console.log('Routing shadow: ' + JSON.stringify(routingShadow.reportStatus(state.routingShadow)));
     if (['review', 'resume', 'status'].includes(action)) console.log('\n' + direction.render(state) + '\n' + actions.render(state));
@@ -698,5 +751,5 @@ function cli(args, root = process.cwd()) {
     return ['review', 'resume'].includes(action) ? (state.outcome === 'accepted' ? 0 : state.outcome === 'changes_required' ? 1 : 2) : 0;
   } catch (e) { console.error(`Outcome advanced: blocked\nCurrent blocker: ${e.message}\nNext action: inspect eligibility and retained evidence; diagnose the concrete cause before retrying; preserve history and explicit owner ceilings`); return 2; }
 }
-module.exports = { recordScopedInterruption, recoverReview, beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, fingerprint, load, cli, schema };
+module.exports = { migrateReview, recordScopedInterruption, recoverReview, beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, fingerprint, load, cli, schema };
 if (require.main === module) process.exitCode = cli(process.argv.slice(2));

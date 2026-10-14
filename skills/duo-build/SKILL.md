@@ -383,3 +383,37 @@ scanner from `.specflow/publication-policy.json` (`command` argv and
 at every tier; when private inputs apply, require baseline-derived forms and a
 real canary. Keep private sources and raw provider evaluations local. Do not
 bypass a failed gate with a direct `gh issue comment`.
+
+## Explicit legacy review migration (#199)
+
+After explicit owner authorization to recover an old pinned review, use the
+current kit entrypoint **from the target project directory**:
+`node /absolute/path/to/updated/Specflow/scripts/duo-build.cjs migrate-review RUN --session TOKEN --input FILE`.
+Do not use the target project's old `scripts/duo-build.cjs` for migration: it
+does not have this command while installation is staged.
+Input is `{ "ownerAuthorized":true, "reason":"owner-authorized recovery",
+"evidence":[{"path":"diagnosis.txt","sha256":"HASH"}] }`.
+This is a one-time adoption of the current policy in the same run, not reset-review.
+For every subsequent command, use the exact selected-runtime entrypoint printed
+by migration/status: `node .specflow/duo/RUN/runtime-migrations/UUID/runtime/scripts/duo-build.cjs ACTION RUN --session TOKEN`.
+The project's old installed launcher is deliberately unchanged and may not
+understand the selected directory. Use this printed prefix in place of every
+`node scripts/duo-build.cjs` example above until this run completes.
+The old runtime, exact before-state, calls, raw responses, findings, instructions,
+legacy counters and shared scoped journal remain intact. Re-read the selected
+runtime's SKILL.md after migration. Fresh capture and independent review are
+required; migration never grants readiness or clears a diagnosis guard. Use
+normal evidenced recovery if the replayed history triggers a guard. It refuses
+current-policy, ceased/completed, unknown-runtime and pending-review runs, bad
+ownership/evidence and concurrent operations. Ordinary installation still cannot
+replace an active runtime. Do not invoke migration merely to gain more calls.
+
+An old installed Claude Stop hook also cannot follow the selected runtime and
+may report `Pinned duo runtime modified` even while the archived bytes are intact.
+Automatic cadence enforcement is unavailable for that legacy installation until
+the run completes and the installer can update it. Do not ignore a real integrity
+failure: verify status using the printed selected-runtime command, then run
+`node .specflow/duo/RUN/runtime-migrations/UUID/runtime/scripts/duo-cadence.cjs RUN`
+manually before ending each work turn and act on its result. For hook-format
+inspection, use the same selected cadence script with `--hook` and the normal
+session JSON on stdin. Migration does not replace installed hooks or launchers.

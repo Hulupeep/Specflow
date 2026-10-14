@@ -1,0 +1,17 @@
+{
+  "command": "npm test -- --runInBand --roots tests",
+  "suites": 75,
+  "tests": 1406,
+  "skipped": 0,
+  "afterFullSuite": "Only cadence test environment isolation changed per review; migration suite re-run: 11 passed, zero skipped. Runtime sources unchanged.",
+  "sourceHashes": {
+    "scripts/duo-build.cjs": "a4f4b1052f97ee209feb16d1addaeb4c2c466639673a181541383aa889267adb",
+    "scripts/duo-cadence.cjs": "e50c38bfa9bbc38c0fa365b366b4ee2735d20e8fdbcf6aa895a6064d005f9777",
+    "scripts/duo-runtime.cjs": "73a4564776e3b19c2660310e08ee3e33f8ec31eac40b143518302f0c7e35c60f",
+    "tests/scripts/duo-review-migration.test.js": "a0fd1b1fa84b7e0ff6104121b43a10b204487f148dda7188783d4e5dd3f7134c",
+    "skills/duo-build/SKILL.md": "84dcec66027aa87985002c20d7a39d549a8aa321d6dbb8074d21a9547898921b",
+    "templates/SPECIFICATION.md": "29bc3ece7f6fcbc8dd11c810f96c857e6cac647c05ff826bb52a956d2a0333c6"
+  },
+  "peerReview": "Three independent Claude CLI read-only reviews; final no remaining blockers. Not a native Duo acceptance receipt.",
+  "limitation": "Old downstream Claude Stop hook cannot dispatch migrated runtimes; selected-runtime manual cadence required until installation can update."
+}
