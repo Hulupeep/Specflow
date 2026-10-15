@@ -110,6 +110,17 @@ function apply(result, access, request) {
       const file = request.batch.evidence.includes(plain) ? `tree/${plain}` : plain;
       if (!access.inspected.includes(file)) throw Error('Peer judgment cites evidence without a successful content-access receipt');
     }
+    // Inspection is mechanical metadata, not a second model judgment. Fill only
+    // an empty duplicate list from this instruction's submitted, snapshot-bound
+    // evidence that was actually read. Explicit/malformed claims remain intact
+    // for actions.apply to reject; outcomes and evidence are never rewritten.
+    for (const row of result.instruction_assessments || []) {
+      if (!Array.isArray(row?.inspected) || row.inspected.length || !Array.isArray(row.evidence)) continue;
+      row.inspected = [...new Set(row.evidence
+        .filter(file => typeof file === 'string' && request.batch.evidence.includes(file))
+        .map(file => `tree/${file}`)
+        .filter(file => Object.hasOwn(request.instruction_review?.artifactHashes || {}, file) && access.inspected.includes(file)))];
+    }
   }
   result.inspected = access.inspected;
   return result;

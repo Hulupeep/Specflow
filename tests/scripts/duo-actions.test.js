@@ -32,3 +32,16 @@ test('five validated useful batches may advance separate criteria without losing
  }
  f.transfer();expect(f.state().instructions['I-R1-S1'].state).toBe('outstanding');expect(f.state().history).toHaveLength(5);expect(f.state().repairCycle).toBeNull();
 });
+
+test.each(['claude-code','codex'])('J-DUO-INSTRUCTION-RECEIPTS: %s accepts real read proof without duplicate model metadata, retaining the owner gate',builder=>{
+ f.close();f=fixture(builder);let e=f.capture();f.review(f.batch(e));
+ f.put('display.cjs','console.log(42)');e=f.capture();
+ const result=f.review(f.batch(e,{resolutions:[{id:'TOTAL',change:'Corrected and executed fixture total',evidence:[e]}]}),f.peer(r=>{
+  for(const row of r.instruction_assessments)row.inspected=[];
+ }));
+ expect(result.history.at(-1).stage).toBe('validated');
+ expect(result.instructions['I-R1-S1'].state).toBe('satisfied');
+ expect(result.criteria['OWNER-GATE'].status).not.toBe('verified');
+ expect(result.goalStatus).not.toBe('complete');
+ expect(result.instructions['I-R1-S1'].lastAssessment.inspected).toContain('tree/'+e);
+});

@@ -8,6 +8,11 @@ All notable changes to `@colmbyrne/specflow`.
 
 ## Unreleased
 
+**Receipt-derived instruction inspection (#213).**
+
+- Empty duplicate instruction inspection lists are populated only from submitted, frozen evidence with successful native content-read receipts. Explicit claims and independent judgments remain subject to existing validation.
+- Missing or fabricated proof, owner gates, atomic rejection and pinned runtimes retain their existing guards. Existing blocked runs are not migrated or accepted automatically.
+
 **Linked preparation runs inherit open scoped findings (#206).**
 
 - Repairing a preparation task forces a new linked run (pinned acceptance changed). That run now starts with the issue/tier's open blocking scoped findings from the latest complete round, so the builder can submit resolutions and the peer can close them. Previously neither side could, so a repaired specification could never pass its scoped review.

@@ -24,3 +24,4 @@ test_hooks:
     - file: tests/scripts/duo-runtime-pinning.test.js
     - file: tests/contracts/typesafe-action-evidence.test.js
     - file: tests/scripts/duo-action-workflow.test.js
+    - file: tests/scripts/duo-review-receipts.test.js

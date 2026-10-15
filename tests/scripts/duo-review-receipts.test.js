@@ -49,3 +49,30 @@ test('directory Grep content earns only verified partial file receipts, never fi
  for(const text of ['tree/source.js','tree/source.js:2:invented assertion','tree/source.js:99:first']){events[1].message.content[0].content=text;expect(access.collect(events,dir,['tree/source.js']).inspected).toEqual([]);}
  events[0].message.content[0].input.output_mode='files_with_matches';events[1].message.content[0].content='tree/source.js:2:assert.equal(actual,42)';expect(access.collect(events,dir,['tree/source.js']).inspected).toEqual([]);
 });
+
+test.each(['claude','codex'])('instruction evidence derives duplicate inspection metadata from current %s receipts',provider=>{
+ fs.mkdirSync(path.join(dir,'tree'));fs.copyFileSync(path.join(dir,'proof.txt'),path.join(dir,'tree/proof.txt'));
+ const events=provider==='claude'?claude('Read',{file_path:'tree/proof.txt'}):codex('cat tree/proof.txt');
+ const receipts=access.collect(events,dir,['tree/proof.txt']);
+ const request={batch:{evidence:['proof.txt']},instruction_review:{artifactHashes:{'tree/proof.txt':'frozen-hash'}}};
+ const result={instruction_assessments:[{outcome:'satisfied',inspected:[],evidence:['proof.txt']}]};
+ const normalized=access.apply(result,receipts,request);
+ expect(normalized.instruction_assessments[0]).toEqual({outcome:'satisfied',inspected:['tree/proof.txt'],evidence:['proof.txt']});
+});
+
+test.each(['unsubmitted','unbound','unread','denied','discovery'])('instruction projection cannot invent %s proof',kind=>{
+ fs.mkdirSync(path.join(dir,'tree'));fs.copyFileSync(path.join(dir,'proof.txt'),path.join(dir,'tree/proof.txt'));
+ const events=kind==='unread'?[]:kind==='discovery'?claude('Glob',{pattern:'tree/*'}):claude('Read',{file_path:'tree/proof.txt'},kind==='denied');
+ const receipts=access.collect(events,dir,['tree/proof.txt']);
+ const request={batch:{evidence:kind==='unsubmitted'?[]:['proof.txt']},instruction_review:{artifactHashes:kind==='unbound'?{}:{'tree/proof.txt':'frozen-hash'}}};
+ const normalized=access.apply({instruction_assessments:[{outcome:'satisfied',inspected:[],evidence:['proof.txt']}]},receipts,request);
+ expect(normalized.instruction_assessments[0].inspected).toEqual([]);
+});
+
+test('normalization retains explicit invalid claims for rejection and leaves malformed fields invalid',()=>{
+ const request={batch:{evidence:['proof.txt']},instruction_review:{artifactHashes:{'tree/proof.txt':'frozen-hash'}}};
+ const result={instruction_assessments:[{inspected:['invented'],evidence:['proof.txt']},{inspected:null,evidence:['proof.txt']},{inspected:[],evidence:null}]};
+ access.apply(result,{inspected:['tree/proof.txt']},request);
+ expect(result.instruction_assessments[0].inspected).toContain('invented');
+ expect(result.instruction_assessments[1].inspected).toBeNull();expect(result.instruction_assessments[2].evidence).toBeNull();
+});
