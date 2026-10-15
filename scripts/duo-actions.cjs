@@ -92,7 +92,12 @@ function apply(state, result, request, source, round) {
     s.events.push({ ...structuredClone(row), round, sourceFingerprint:source, evidenceHashes:Object.fromEntries(row.evidence.map(f => [f, expected.artifactHashes[`tree/${f}`]])) });
   }
   const oldPending = expected.outstandingInstructionIds.some(id => state.instructions[id].state === 'outstanding');
-  if (!oldPending && result.outcome === 'accepted' && state.indexComplete && Object.values(state.criteria).every(c=>c.status==='verified') && !Object.values(state.findings).some(f=>f.status==='open') && next.length) throw Error('A fully verified scoped goal must finish, not generate additional work');
+  // A validated replacement carries an existing obligation forward. Superseding
+  // its original does not satisfy it, even when every criterion is verified.
+  // Only linked replacements qualify: an extra unrelated step still fails.
+  const replacements = new Set(rows.filter(r => r.outcome === 'replaced_with_justification').map(r => r.replacementId));
+  const additionalWork = ids.some(id => !replacements.has(id));
+  if (!oldPending && result.outcome === 'accepted' && state.indexComplete && Object.values(state.criteria).every(c=>c.status==='verified') && !Object.values(state.findings).some(f=>f.status==='open') && additionalWork) throw Error('A fully verified scoped goal must finish, not generate additional work');
   state.instructionRounds.push(round);
   return newlySatisfied;
 }
