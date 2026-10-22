@@ -426,6 +426,21 @@ function validateContract(runDir, contract, selected) {
   for (const g of list(contract?.gates)) {
     if (!nonempty(g?.id) || !Array.isArray(g?.command) || !g.command.length) errors.push('gates need {id, command argv}');
   }
+  const identity = contract?.runtime?.identity;
+  if (identity !== undefined) {
+    if (!identity || typeof identity !== 'object' || Array.isArray(identity)) errors.push('runtime.identity must be an object');
+    else {
+      for (const k of ['max_bytes', 'max_entries']) {
+        if (identity[k] !== undefined && !(Number.isInteger(identity[k]) && identity[k] > 0 && identity[k] <= binding.CEILING[k])) errors.push(`runtime.identity.${k} must be a positive integer no larger than ${binding.CEILING[k]}`);
+      }
+      const outputs = identity.disposable_outputs;
+      if (outputs !== undefined && !Array.isArray(outputs)) errors.push('runtime.identity.disposable_outputs must be a list of workspace-relative paths');
+      for (const rel of list(outputs)) {
+        if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || rel.split('/').some((p) => !p || p === '.' || p === '..' || p === '.git')) errors.push(`runtime.identity.disposable_outputs: unsafe path ${rel}`);
+        else if (matchesAny(rel, list(contract?.scope?.allowed_paths)) || list(contract?.scope?.allowed_paths).some((g) => g.startsWith(`${rel}/`))) errors.push(`runtime.identity.disposable_outputs: ${rel} overlaps the change scope`);
+      }
+    }
+  }
   if (contract?.runtime?.serve && (!Array.isArray(contract.runtime.serve.command) || !contract.runtime.serve.port)) {
     errors.push('runtime.serve needs command argv and port');
   }
@@ -642,8 +657,13 @@ async function withRuntime(runDir, ws, contract, dir, phase, fn) {
     .replace(/\{run_dir\}/g, runDir)
     .replace(/\{evidence_dir\}/g, dir)
     .replace(/\{phase\}/g, phase);
+  // Disposable outputs start empty so their contents derive from sealed inputs.
+  try { binding.wipeOutputs(ws.worktreePath, identityOptions(contract).outputs); } catch (error) {
+    append(runDir, 'verification_blocked', { phase, reason: `disposable outputs: ${error.message}` });
+    return { status: 'blocked', reason: `disposable outputs: ${error.message}` };
+  }
   for (const argv of list(contract.runtime?.setup)) {
-    const r = guardedSpawn(runDir, 'verifier', argv.map(vars), { cwd: ws.worktreePath, timeoutSeconds: 900 });
+    const r = guardedSpawn(runDir, 'verifier', argv.map(vars), { cwd: ws.worktreePath, timeoutSeconds: contract.runtime?.setup_timeout_seconds || 900 });
     if (r.status !== 'ran' || r.exit_code !== 0) {
       append(runDir, 'verification_blocked', { phase, reason: `setup failed: ${argv.join(' ')}`, stderr: r.stderr.slice(-2000) });
       return { status: 'blocked', reason: `setup failed: ${argv.join(' ')}` };
@@ -719,13 +739,19 @@ function integrityBlock(runDir, gov, phase) {
   return null;
 }
 
+// Contract-declared runtime identity (#176): explicit fail-closed bounds and
+// disposable outputs. Absent, the original conservative caps apply.
+function identityOptions(contract) {
+  const id=contract?.runtime?.identity||{};
+  return {limits:{...(id.max_bytes?{max_bytes:id.max_bytes}:{}),...(id.max_entries?{max_entries:id.max_entries}:{})},outputs:list(id.disposable_outputs)};
+}
 function inputIdentity(runDir,run,gov,phase,ws) {
   const gitTree=binding.tree(ws.worktreePath);
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
     verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'specflow-runner.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
-    git:gitTree,workspace:binding.workspace(ws.worktreePath)};
+    git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
 }
 function boundReceipt(runDir,phase,{current=true}={}) {
   try {
