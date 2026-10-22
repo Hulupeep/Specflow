@@ -41,6 +41,14 @@ This is not an isolation boundary. It does not stop dependency lifecycle hooks,
 the dev server or the builder from reaching the network or reading the host;
 that remains REQ-RUNTIME-04/06 (an approved filesystem and egress adapter). Run
 unattended cycles only in a disposable environment that holds no production
-credentials. The verifier environment is still compared exactly: run baseline
-and after verification from the same shell, with the same `PATH` and working
-directory.
+credentials. The verifier environment is still compared exactly. In hosted
+agent containers the harness environment can drift between phases, so the
+first real run (#180) pinned one environment for every phase:
+
+```sh
+env -0 > pinned.env0            # once, before `improve baseline`
+mapfile -d '' VARS < pinned.env0
+env -i "${VARS[@]}" specflow improve <stage> RUN   # every later stage
+```
+
+Keep `pinned.env0` out of evidence and version control; it holds session tokens.
