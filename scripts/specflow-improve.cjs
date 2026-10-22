@@ -753,6 +753,15 @@ function inputIdentity(runDir,run,gov,phase,ws) {
     verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'specflow-runner.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
 }
+// Name what changed so a blocked verification is diagnosable (#176).
+function identityDiff(a,b) {
+  const parts=['run_id','phase','contract_sha256','artifact_sha256','base_commit','verifier','git'].filter(k=>binding.digest(a[k])!==binding.digest(b[k]));
+  const index=(id)=>new Map((id.workspace?.entries||[]).map(e=>[e.path,binding.digest(e)]));
+  const before=index(a),after=index(b),paths=[];
+  for(const p of new Set([...before.keys(),...after.keys()]))if(before.get(p)!==after.get(p))paths.push(p);
+  if(paths.length)parts.push(`workspace (${paths.length}): ${paths.slice(0,8).join(', ')}${paths.length>8?', ...':''}`);
+  return parts.join('; ')||'identity digest differs';
+}
 function boundReceipt(runDir,phase,{current=true}={}) {
   try {
     const run=loadRun(runDir),gov=governingContract(runDir),evs=events(runDir);
@@ -804,7 +813,7 @@ async function verifyPhase(runDir, phase) {
     const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim };
     const items = runCheckSet(runDir, { ...ctx, set: 'holdout', gates: true });
     if (phase === 'baseline') items.push(...runCheckSet(runDir, { ...ctx, set: 'dev', gates: false }));
-    try {if(binding.digest(inputIdentity(runDir,run,gov,phase,ws))!==binding.digest(identity))throw Error('inputs changed during verification');}
+    try {const after=inputIdentity(runDir,run,gov,phase,ws);if(binding.digest(after)!==binding.digest(identity))throw Error('inputs changed during verification: '+identityDiff(identity,after));}
     catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
     const receipt={schema:'specflow.improve.binding/v1',attempt,identity,evidence:items.map(item=>({id:item.id,sha256:binding.digest(item)}))};
     const receiptPath=path.join(dir,'binding-'+attempt+'.json'),receiptHash=writeJson(receiptPath,receipt);

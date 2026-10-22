@@ -838,11 +838,11 @@ describe('IMPROVE-04 RUNTIME scalable input identity (#176)',()=>{
       const text=JSON.stringify(frozen);expect(text).toMatch(/max_bytes/);expect(text).toMatch(/unsafe path \/abs/);expect(text).toMatch(/overlaps the change scope/);
     }finally{fs.rmSync(f.root,{recursive:true,force:true});}
   }));
-  test('RUNTIME: a pre-planted output is wiped before setup, output churn during checks does not block, and KEEP holds',quiet(async()=>{
+  test('RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds',quiet(async()=>{
     const f=fixture();try{
-      fs.writeFileSync(path.join(f.repo,'.gitignore'),'.out/\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore outputs');
-      const holdoutPrefix="{const fs=require('fs'),p=process.env.IMPROVE_WORKSPACE+'/.out';if(fs.existsSync(p+'/planted'))process.exit(3);fs.mkdirSync(p,{recursive:true});fs.writeFileSync(p+'/churn',String(Math.random()));}";
-      const doc=runtime({max_bytes:64*1024*1024,disposable_outputs:['.out']},{setup:[['node','-e',"require('fs').mkdirSync('.out',{recursive:true});require('fs').writeFileSync('.out/build','x')"]]});
+      fs.writeFileSync(path.join(f.repo,'.gitignore'),'.out/\ngen.info\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore outputs');
+      const holdoutPrefix="{const fs=require('fs'),p=process.env.IMPROVE_WORKSPACE+'/.out';if(fs.existsSync(p+'/planted'))process.exit(3);fs.mkdirSync(p,{recursive:true});fs.writeFileSync(p+'/churn',String(Math.random()));fs.writeFileSync(process.env.IMPROVE_WORKSPACE+'/gen.info',String(Math.random()));}";
+      const doc=runtime({max_bytes:64*1024*1024,disposable_outputs:['.out','gen.info']},{setup:[['node','-e',"require('fs').mkdirSync('.out',{recursive:true});require('fs').writeFileSync('.out/build','x')"]]});
       const {runDir,ws}=await runToImplementation(f,{contractDoc:doc,holdoutPrefix,edits:{1:w=>{setSteps(w,2);fs.mkdirSync(path.join(w,'.out'),{recursive:true});fs.writeFileSync(path.join(w,'.out','planted'),'builder build');}}});
       expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');
       expect(fs.existsSync(path.join(ws,'.out','planted'))).toBe(false);
@@ -850,3 +850,12 @@ describe('IMPROVE-04 RUNTIME scalable input identity (#176)',()=>{
     }finally{fs.rmSync(f.root,{recursive:true,force:true});}
   }));
 });
+
+test('IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed',quiet(async()=>{
+  const f=fixture();try{
+    const prefix="if(process.env.IMPROVE_PHASE==='after')require('fs').writeFileSync(process.env.IMPROVE_WORKSPACE+'/stray.txt','x');";
+    const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)},holdoutPrefix:prefix});
+    const r=await improve.verifyPhase(runDir,'after');
+    expect(r.status).toBe('blocked');expect(r.reason).toMatch(/workspace \(\d+\): .*stray\.txt/);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));

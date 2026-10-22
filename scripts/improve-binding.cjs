@@ -67,10 +67,13 @@ function workspace(root,options={}) {
     const file=path.join(root,rel),before=fs.lstatSync(file,{bigint:true});
     if(outputs.has(rel)) {
       if(before.isSymbolicLink())throw Error('Disposable output became a symlink: '+rel);
-      entries.push({path:rel,kind:'disposable-output'});return;
+      return;
     }
     if(entries.length>=limits.max_entries)throw Error(limits.max_entries===DEFAULT_LIMITS.max_entries?'Input tree exceeds 50000 entries':'Input tree exceeds '+limits.max_entries+' entries');
-    const entry={path:rel,token:token(before)};entries.push(entry);
+    // A directory is identified by its children (each an entry); its own
+    // mtime/ctime move whenever a disposable output appears beside them.
+    const tok=before.isDirectory()?token(before).slice(0,3):token(before);
+    const entry={path:rel,token:tok};entries.push(entry);
     if(before.isSymbolicLink()) {
       const target=fs.readlinkSync(file),real=fs.realpathSync(file);
       if(real!==root&&!real.startsWith(root+path.sep))throw Error('External symlink input is unsupported');
@@ -82,9 +85,14 @@ function workspace(root,options={}) {
       if(size>limits.max_bytes)throw Error(limits.max_bytes===DEFAULT_LIMITS.max_bytes?'Input tree exceeds 256 MiB':'Input tree exceeds '+limits.max_bytes+' bytes');
       entry.kind='file';entry.sha256=contentSha(file,entry.token);
     } else throw Error('Special input file is unsupported');
-    if(JSON.stringify(token(before))!==JSON.stringify(token(fs.lstatSync(file,{bigint:true}))))throw Error('Input changed while identity was captured');
+    const now=fs.lstatSync(file,{bigint:true});
+    if(JSON.stringify(tok)!==JSON.stringify(now.isDirectory()?token(now).slice(0,3):token(now)))throw Error('Input changed while identity was captured');
   }
-  visit('');return {sha256:digest(entries),entries,bytes:size,limits};
+  visit('');
+  // Declared outputs are recorded whether or not they exist yet, so creating
+  // one during verification does not change the identity.
+  for(const rel of [...outputs].sort())entries.push({path:rel,kind:'disposable-output'});
+  return {sha256:digest(entries),entries,bytes:size,limits};
 }
 function executable(command,cwd,env) {
   if(!Array.isArray(command)||!command.length||typeof command[0]!=='string')throw Error('Unsupported check command identity');
