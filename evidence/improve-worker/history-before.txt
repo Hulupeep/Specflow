@@ -1,0 +1,50 @@
+FAIL tests/integration/improve-preflight.test.js
+  ✕ J-PROFILES-HISTORICAL-TEARDOWN historical reads survive missing source without reviving execution or recreating the repo (1011 ms)
+  ✓ J-PROFILES-HISTORICAL-TEARDOWN current read revocation still denies historical metadata after source removal (1110 ms)
+  ○ skipped J-PROFILES-TWO-REPOS actual Node/Python Git profiles and scoped reports survive independent failures
+  ○ skipped J-PROFILES-READONLY viewer cannot execute; another authorised viewer cannot read the owner report
+  ○ skipped J-PROFILES-REVOKE new execute/publish denied after revocation while separately authorised history remains
+  ○ skipped J-PROFILES-STALE rejects changed profile after preflight
+  ○ skipped J-PROFILES-STALE rejects changed routing after preflight
+  ○ skipped J-PROFILES-STALE rejects changed ref after preflight
+  ○ skipped J-PROFILES-STALE rejects changed host after preflight
+  ○ skipped J-PROFILES-FORGED modified, expired and other-caller leases never start work
+  ○ skipped J-PROFILES-NO-FALLBACK unqualified worker, unknown usage and unavailable auth have exact remedies
+  ○ skipped J-PROFILES-SECRETS presence-only fixture references never return their values
+  ○ skipped J-PROFILES-PRIVATE failed history persistence cannot yield a usable lease or readiness
+  ○ skipped J-PROFILES-CLI actual local UID and safe CLI output never expose the internal lease
+  ○ skipped J-PROFILES-AUTH-CWD authentication metadata cannot execute a repository-relative auth script
+  ○ skipped J-PROFILES-TOOL-CWD version probes cannot load repository-relative tool configuration
+  ○ skipped J-PROFILES-VERIFIER missing pinned verifier and unobserved backend have exact actionable blockers
+  ○ skipped J-PROFILES-POLICY-TRANSITION permits only a current authorised start (fixture metadata; no worker/provider qualification)
+  ○ skipped J-PROFILES-HOST failure of trusted host capability discovery has its own remedy
+  ○ skipped J-PROFILES-BILLING subscription preflight refuses API authentication metadata
+
+  ● J-PROFILES-HISTORICAL-TEARDOWN historical reads survive missing source without reviving execution or recreating the repo
+
+    expect(received).toMatchObject(expected)
+
+    - Expected  - 2
+    + Received  + 1
+
+      Object {
+    -   "available": true,
+    -   "repo_id": "alpha",
+    +   "available": false,
+      }
+
+      455 |   expect(report.ready).toBe(false);
+      456 | });
+    > 457 | test('J-PROFILES-HISTORICAL-TEARDOWN historical reads survive missing source without reviving execution or recreating the repo',()=>{const before=service.preflight({repo_id:'alpha'});fs.rmSync(a.repository.path,{recursive:true});expect(service.inspect({repo_id:'alpha'})).toMatchObject({available:true,repo_id:'alpha'});expect(service.history({repo_id:'alpha'}).reports.map(r=>r.report_id)).toContain(before.report_id);expect(service.preflight({repo_id:'alpha'}).ready).toBe(false);let started=false;expect(service.withAuthorized(before.lease,'execute',()=>{started=true;})).toMatchObject({allowed:false});expect(started).toBe(false);expect(fs.existsSync(a.repository.path)).toBe(false);principal='viewer';expect(service.inspect({repo_id:'alpha'}).available).toBe(true);expect(service.history({repo_id:'alpha'}).reports).toEqual([]);principal='bob';expect(service.inspect({repo_id:'alpha'}).available).toBe(false);});
+          |                                                                                                                                                                                                                                                                                 ^
+      458 | test('J-PROFILES-HISTORICAL-TEARDOWN current read revocation still denies historical metadata after source removal',()=>{const before=service.preflight({repo_id:'alpha'});a.grants.alice=['preflight','execute'];profiles.registerProfile(registry,a);fs.rmSync(a.repository.path,{recursive:true});expect(service.inspect({repo_id:'alpha'}).available).toBe(false);expect(service.history({repo_id:'alpha'}).available).toBe(false);expect(service.authorize(before.lease,'execute').allowed).toBe(false);expect(()=>profiles.registerProfile(registry,a)).toThrow();});
+      459 |
+
+      at Object.toMatchObject (tests/integration/improve-preflight.test.js:457:273)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 18 skipped, 1 passed, 20 total
+Snapshots:   0 total
+Time:        2.65 s, estimated 21 s
+Ran all test suites matching /tests\/integration\/improve-preflight.test.js/i with tests matching "HISTORICAL-TEARDOWN".
+Test results written to: tmp/worker/history-before.json

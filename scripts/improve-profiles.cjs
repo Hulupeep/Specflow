@@ -74,7 +74,7 @@ function relPattern(v) {
     text(v) && !path.isAbsolute(v) && !v.includes('\\') && !v.split('/').some((p) => !p || p === '.' || p === '..')
   );
 }
-function validateProfile(p) {
+function validateProfile(p, { allowMissingRepository = false } = {}) {
   shape(p, [
     'version',
     'repo_id',
@@ -94,7 +94,11 @@ function validateProfile(p) {
   demand(p.version === 1 && id(p.repo_id) && text(p.mission), 'Unsupported profile identity/version');
   shape(p.repository, ['path', 'remote', 'refs']);
   const repo = noLinks(p.repository.path);
-  demand(fs.statSync(repo).isDirectory() && fs.realpathSync(repo) === repo, 'Canonical repository directory required');
+  if (!allowMissingRepository || fs.existsSync(repo))
+    demand(
+      fs.statSync(repo).isDirectory() && fs.realpathSync(repo) === repo,
+      'Canonical repository directory required'
+    );
   demand(
     typeof p.repository.remote === 'string' &&
       (/^https:\/\/[^/@\s]+\/[^\s]+$/.test(p.repository.remote) ||
@@ -247,13 +251,13 @@ function registerProfile(registry, profile) {
     return { repo_id: profile.repo_id, revision };
   });
 }
-function readProfile(registry, repoId) {
+function readProfile(registry, repoId, { allowMissingRepository = false } = {}) {
   demand(id(repoId), 'Invalid repository alias');
   privatePath(registry, true);
   privatePath(path.join(registry, 'profiles'), true);
   const record = JSON.parse(fs.readFileSync(privatePath(path.join(registry, 'profiles', repoId + '.json')), 'utf8'));
   demand(record.revision === digest(record.profile), 'Profile integrity failure');
-  validateProfile(record.profile);
+  validateProfile(record.profile, { allowMissingRepository });
   return record;
 }
 const finding = (check, code, observed, next_action, retryable = false) => ({
@@ -704,7 +708,7 @@ function createProfileService({
       };
     try {
       const principal = fixedPrincipal || identity(),
-        record = readProfile(registry, req.repo_id);
+        record = readProfile(registry, req.repo_id, { allowMissingRepository: op === 'read' });
       if (!record.profile.grants[principal]?.includes(op)) return { error: unavailable() };
       let host;
       try {

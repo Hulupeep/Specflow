@@ -1,0 +1,118 @@
+{
+  "pngFiles": 26,
+  "images": [
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/attachments/denied-1280-png-33c5a596536b5854693e3577316af0d9413b105b.png",
+      "sha256": "f62cbb74a74058558a8e51fd93c7e5687441a6d1ff295f9be8ee74aee54d79e3"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/attachments/final-png-53a760eac509e285287e4342cc591dce6fe9311e.png",
+      "sha256": "2e1d8a77ee909d178baa34325e5ba6207afba989a0dc73e87341ba85164e7717"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/attachments/success-1280-png-99131813502a80f47a0a8efc485f753997f80af4.png",
+      "sha256": "f55de61b26032f8217098b7c5a8c0a122e5c7b70b74848f983225409b3ce3f64"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/denied-1280.png",
+      "sha256": "f62cbb74a74058558a8e51fd93c7e5687441a6d1ff295f9be8ee74aee54d79e3"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/final.png",
+      "sha256": "2e1d8a77ee909d178baa34325e5ba6207afba989a0dc73e87341ba85164e7717"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/success-1280.png",
+      "sha256": "f55de61b26032f8217098b7c5a8c0a122e5c7b70b74848f983225409b3ce3f64"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/attachments/denied-360-png-fed41e3fafb49815b975124912dd60c845b887fa.png",
+      "sha256": "b8d609f921a31e0f62e1ac6d71df2537757aa1b15372eb723d2b8af21999f4e5"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/attachments/final-png-4de90bf72a27fbbf5cdf75be9061fcca5c297ade.png",
+      "sha256": "ae7c24c6f3e2abebac15117b62a1bd988fa026eb4f0f32ff4ddbb575b89f11d5"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/attachments/success-360-png-f609ce8bfaf500ca80a822019abf85fc8c9aad5c.png",
+      "sha256": "1c37cccb0360fbe18048d2a0dd9add9499ac34b50ead8f1eb2c26ce059a29571"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/denied-360.png",
+      "sha256": "b8d609f921a31e0f62e1ac6d71df2537757aa1b15372eb723d2b8af21999f4e5"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/final.png",
+      "sha256": "ae7c24c6f3e2abebac15117b62a1bd988fa026eb4f0f32ff4ddbb575b89f11d5"
+    },
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/success-360.png",
+      "sha256": "1c37cccb0360fbe18048d2a0dd9add9499ac34b50ead8f1eb2c26ce059a29571"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-dev/screenshots/journey_worker_qualificati-95013-nd-denied-mutation-at-360px/final-state.png",
+      "sha256": "5db5e5e9ec761064a523a752b93c0e60df65ab48879daa69f660d2c007ce29a4"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-dev/screenshots/journey_worker_qualificati-c02a3-d-denied-mutation-at-1280px/final-state.png",
+      "sha256": "35ba08b568f2a7386c402ed548f06b7bd9f179d465df8f3987e4cdb440a594c8"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/attachments/denied-1280-png-33c5a596536b5854693e3577316af0d9413b105b.png",
+      "sha256": "e6acde6c1720e6a394ca37c2772d42c5231bad977b788f578ea05c0115add35e"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/attachments/final-png-53a760eac509e285287e4342cc591dce6fe9311e.png",
+      "sha256": "3e048f3d00970b0d717fcdb2393c54e62d7f5c82e31f67eb8b57da739eefb0a6"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/attachments/success-1280-png-99131813502a80f47a0a8efc485f753997f80af4.png",
+      "sha256": "74fd14909d6b7bf5b34920aad4ed9f1c1e7895aa8773adc6d591529fa2c74043"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/denied-1280.png",
+      "sha256": "e6acde6c1720e6a394ca37c2772d42c5231bad977b788f578ea05c0115add35e"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/final.png",
+      "sha256": "3e048f3d00970b0d717fcdb2393c54e62d7f5c82e31f67eb8b57da739eefb0a6"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-desktop-owner--2ede4-d-persistence-at-width-1280/success-1280.png",
+      "sha256": "74fd14909d6b7bf5b34920aad4ed9f1c1e7895aa8773adc6d591529fa2c74043"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/attachments/denied-360-png-fed41e3fafb49815b975124912dd60c845b887fa.png",
+      "sha256": "65dd68bfafe07f054dad0db7888b1886eda8117ffefa8c67bdd48736b42c0252"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/attachments/final-png-4de90bf72a27fbbf5cdf75be9061fcca5c297ade.png",
+      "sha256": "753c3e5b1585467a2012d52d913fb4fe1b2d0e228cbff84806d6023e48e9d9d9"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/attachments/success-360-png-f609ce8bfaf500ca80a822019abf85fc8c9aad5c.png",
+      "sha256": "44c4b575f21ea544e085ac76ac35021c3f4cdbe10901735d370b0ef0ca27c808"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/denied-360.png",
+      "sha256": "65dd68bfafe07f054dad0db7888b1886eda8117ffefa8c67bdd48736b42c0252"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/final.png",
+      "sha256": "753c3e5b1585467a2012d52d913fb4fe1b2d0e228cbff84806d6023e48e9d9d9"
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/screenshots/independent-phone-owner-sa-dec15-nd-persistence-at-width-360/success-360.png",
+      "sha256": "44c4b575f21ea544e085ac76ac35021c3f4cdbe10901735d370b0ef0ca27c808"
+    }
+  ],
+  "code": "role_image_limit",
+  "providerInvoked": false,
+  "decision": "INCONCLUSIVE",
+  "manifest": "8deecd34dd86111b5116dbbb36faebd7af5f9093e5ab579ba4d1a16896983078",
+  "artifacts": 290,
+  "recoveredAfterWorkingFilesRemoved": true,
+  "holdoutConsumedExactlyOnce": true,
+  "coreGain": "baseline fail -> after pass; UX unavailable; no retained branch",
+  "byteDistinctFrames": 14
+}

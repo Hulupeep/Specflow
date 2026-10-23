@@ -1,0 +1,36 @@
+contract_meta:
+  id: feature_improve_worker
+  version: 1
+  created_from_spec: "GitHub #217; docs/specs/improve-worker/story.md"
+  covers_reqs: [AC-WORKER-01, AC-WORKER-02, AC-WORKER-03, AC-WORKER-04, AC-WORKER-05, AC-WORKER-06, AC-WORKER-07, AC-WORKER-08, AC-WORKER-09, AC-WORKER-10, AC-WORKER-11]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_improve_worker"
+invariants:
+  - id: I-WORKER-001
+    rule: "Repository Git/setup/build/runtime/check execution stays inside the qualified bounded worker. App/checker/host/cross-job filesystem and process authority remain separated; external egress and host credentials are unavailable."
+    tests: [worker-boundaries, worker-git-canary, J-WORKER-QUALIFICATION]
+  - id: I-WORKER-002
+    rule: "Model roles have no host I/O tools or MCP, fresh actual contexts/models and nonce/schema/digest-bound output. Different role names cannot grant independence from the builder."
+    tests: [worker-role-provenance, worker-output-escape]
+  - id: I-WORKER-003
+    rule: "Existing Improve freeze/baseline/holdout/decision semantics remain authoritative; the pinned launcher, helper, software and consumed generated-input identities cannot be hidden as mutable output."
+    tests: [worker-core-compatible, worker-runtime-tamper]
+  - id: I-WORKER-004
+    rule: "Artifact capture has no live writers, is bounded and no-follow, rejects special/link/traversal inputs, and confirms all worker termination before committing."
+    tests: [worker-output-escape, worker-process-lifetime]
+  - id: I-WORKER-005
+    rule: "Terminal acknowledgement follows durable authenticated commit. Lost acknowledgement is idempotent; corruption/missing/wrong-owner/job/revision evidence fails and never causes a consumed holdout replay or new KEEP authority."
+    tests: [worker-durable-recovery, worker-persistence-faults]
+  - id: I-WORKER-006
+    rule: "Execution mode is explicit and observed. Subscription work never silently selects API-key/endpoint billing, and unavailable capabilities return typed diagnoses rather than false readiness."
+    tests: [worker-mode, worker-capability-matrix]
+  - id: I-WORKER-007
+    rule: "Protected starts refresh only the same job-bound profile and revalidate permissions; historical read never revives execute/publish authority."
+    tests: [worker-stale-authority, worker-durable-recovery]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-worker.test.js
+    - file: tests/integration/improve-worker.test.js

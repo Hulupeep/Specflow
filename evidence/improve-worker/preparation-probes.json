@@ -1,0 +1,189 @@
+{
+  "scope": "Executed preparation probes only; no full worker/core/durability qualification",
+  "dockerVersion": "29.1.2",
+  "cgroupVersion": "2",
+  "image": "sha256:b73fc0c4809eb947832b712d15ead1cdc3f11004456167493ad26d0aeb3d1344",
+  "imageCreation": "local offline scratch image; no pull or push",
+  "dockerPair": {
+    "scope": "preparation probe only, not full worker/core qualification",
+    "browser": true,
+    "realHttpWriteRead": true,
+    "reloadPersistence": true,
+    "notSharedAppFilesystem": true,
+    "deniedWrite403": true,
+    "deniedWriteUnchanged": true,
+    "pageFileReadDenied": true,
+    "boundary": {
+      "hostHidden": true,
+      "oracleHidden": true,
+      "parentOracleHidden": true,
+      "fixtureInjected": true,
+      "hostBackendDenied": true,
+      "externalIPv4Denied": true,
+      "externalIPv6Denied": true,
+      "sourceReadonly": true
+    },
+    "directDockerNamespaceReadback": true,
+    "preparationOnly": true,
+    "policies": [
+      {
+        "name": "sf-prep-docker-pair-t7mo4bhg-app",
+        "memory": 805306368,
+        "pids": 128,
+        "readOnlyRootfs": true,
+        "capDrop": [
+          "ALL"
+        ],
+        "securityOpt": [
+          "no-new-privileges"
+        ],
+        "networkMode": "none",
+        "privileged": false
+      },
+      {
+        "name": "sf-prep-docker-pair-t7mo4bhg-checker",
+        "memory": 805306368,
+        "pids": 128,
+        "readOnlyRootfs": true,
+        "capDrop": [
+          "ALL"
+        ],
+        "securityOpt": [
+          "no-new-privileges"
+        ],
+        "networkMode": "container:58110c6f2fe8f85cd6ddcc1b88c69d25bb592be65df3b7facae6c9b64feb0a68",
+        "privileged": false
+      }
+    ]
+  },
+  "actualRoles": [
+    {
+      "requested": "sonnet",
+      "exitCode": 0,
+      "effectiveModel": "claude-sonnet-5-5",
+      "sessionMatches": true,
+      "tools": [
+        "StructuredOutput"
+      ],
+      "mcpServers": [],
+      "actualToolCalls": 1,
+      "hostCanaryAbsent": true,
+      "nonceMatches": true,
+      "status": "success",
+      "observedUsage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 2673,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 99,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 2673,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 99,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 2673,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 2673
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "cliEstimateUsd": 0.011686,
+      "stderrPresent": false,
+      "rawSha256": "ee0c8e60d909fea4e0d8fb572ff1fe253b992d17f354b6d1e8bef502dd5f719c",
+      "hostIOToolCalls": 0,
+      "onlyObservedTool": "StructuredOutput",
+      "usageMode": "subscription_cli",
+      "actualCharges": "unmeasured; CLI estimate is partial subscription telemetry"
+    },
+    {
+      "requested": "opus",
+      "exitCode": 0,
+      "effectiveModel": "claude-opus-5-5",
+      "sessionMatches": true,
+      "tools": [
+        "StructuredOutput"
+      ],
+      "mcpServers": [],
+      "actualToolCalls": 1,
+      "hostCanaryAbsent": true,
+      "nonceMatches": true,
+      "status": "success",
+      "observedUsage": {
+        "input_tokens": 2,
+        "cache_creation_input_tokens": 2787,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 107,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 2787,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "global",
+        "iterations": [
+          {
+            "input_tokens": 2,
+            "output_tokens": 107,
+            "cache_read_input_tokens": 0,
+            "cache_creation_input_tokens": 2787,
+            "cache_creation": {
+              "ephemeral_5m_input_tokens": 0,
+              "ephemeral_1h_input_tokens": 2787
+            },
+            "type": "message"
+          }
+        ],
+        "speed": "standard",
+        "fallback_credit": null
+      },
+      "cliEstimateUsd": 0.024444,
+      "stderrPresent": false,
+      "rawSha256": "70ba7330800451d76d80e456a3053dd3c4c37204ea4cf30328cb8f95649bf033",
+      "hostIOToolCalls": 0,
+      "onlyObservedTool": "StructuredOutput",
+      "usageMode": "subscription_cli",
+      "actualCharges": "unmeasured; CLI estimate is partial subscription telemetry"
+    }
+  ],
+  "authMetadata": {
+    "authMethod": "claude.ai",
+    "apiProvider": "firstParty",
+    "subscriptionType": "max",
+    "apiKeySource": "none",
+    "observedWithSafeModeRestricted": true
+  },
+  "rawReferences": {
+    "dockerSha256": "6ec4bbfa607a3143491a1da66ff00502432698b2d95f3319518ec17d5ebfa660",
+    "roleSummarySha256": "6ecb2e7fa301996b2d14e909553216171fa6657eac91f8c8abac218a466eae7a"
+  },
+  "limitations": [
+    "No durable store recovery or existing core cycle through Docker has run yet.",
+    "First Docker attempt assumed shared app filesystem; ENOENT-style failure corrected by isolated controller readback, not a shared mount.",
+    "Direct namespace browser attempt failed due window.status collision; diagnosis and corrected success retained.",
+    "Claude --bare is API-key-only according to installed help and was not used; --safe-mode/--restricted retain OAuth subscription auth.",
+    "Managed OpenAI account/runtime remains unprovisioned; no API-billed fallback."
+  ]
+}
