@@ -1,0 +1,36 @@
+FAIL tests/integration/improve-preflight.test.js
+  ✕ J-PROFILES-AUTH-CWD authentication metadata cannot execute a repository-relative auth script (955 ms)
+  ○ skipped J-PROFILES-TWO-REPOS actual Node/Python Git profiles and scoped reports survive independent failures
+  ○ skipped J-PROFILES-READONLY viewer cannot execute; another authorised viewer cannot read the owner report
+  ○ skipped J-PROFILES-REVOKE new execute/publish denied after revocation while separately authorised history remains
+  ○ skipped J-PROFILES-STALE rejects changed profile after preflight
+  ○ skipped J-PROFILES-STALE rejects changed routing after preflight
+  ○ skipped J-PROFILES-STALE rejects changed ref after preflight
+  ○ skipped J-PROFILES-STALE rejects changed host after preflight
+  ○ skipped J-PROFILES-FORGED modified, expired and other-caller leases never start work
+  ○ skipped J-PROFILES-NO-FALLBACK unqualified worker, unknown usage and unavailable auth have exact remedies
+  ○ skipped J-PROFILES-SECRETS presence-only fixture references never return their values
+  ○ skipped J-PROFILES-PRIVATE failed history persistence cannot yield a usable lease or readiness
+  ○ skipped J-PROFILES-CLI actual local UID and safe CLI output never expose the internal lease
+
+  ● J-PROFILES-AUTH-CWD authentication metadata cannot execute a repository-relative auth script
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: false
+    Received: true
+
+      57 | });
+      58 | test('J-PROFILES-AUTH-CWD authentication metadata cannot execute a repository-relative auth script',()=>{
+    > 59 |  a.routing.providers=[{id:'reviewer',kind:'claude-cli',tool:'node'}];profiles.registerProfile(registry,a);const script=path.join(a.repository.path,'auth'),marker=path.join(root,'unexpected-auth-execution');fs.writeFileSync(script,"require('fs').writeFileSync("+JSON.stringify(marker)+",'bad');console.log('{}');");const previous=process.cwd();try{process.chdir(a.repository.path);const report=service.preflight({repo_id:'alpha'});expect(report.findings.some(x=>x.code==='provider_auth_unavailable')).toBe(true);}finally{process.chdir(previous);}expect(fs.existsSync(marker)).toBe(false);
+         |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                ^
+      60 | });
+      61 |
+
+      at Object.toBe (tests/integration/improve-preflight.test.js:59:576)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 12 skipped, 13 total
+Snapshots:   0 total
+Time:        1.359 s, estimated 15 s
+Ran all test suites within paths "tests/integration/improve-preflight.test.js".

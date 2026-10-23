@@ -1,0 +1,123 @@
+{
+  "scope": "actual registered current Specflow repository; actual CLI auth metadata only, no inference or worker execution",
+  "repo": "Hulupeep/Specflow",
+  "base": "fbf76a555a2d9c4e3f447b5a98a20ae394bba45f",
+  "profileRevision": "686bae9ac2533455ddfe750790b04bb2160ad5185923a09622d4bb5c15e021bb",
+  "ready": false,
+  "checked_at": "2026-10-23T08:54:51.804Z",
+  "findings": [
+    {
+      "check": "repository",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Canonical Git identity and approved commits match.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "verifier",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Approved repository verifier is available at the pinned base commit; no tests were executed.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "tool:git",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Approved executable bytes and version match.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "tool:node",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Approved executable bytes and version match.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "tool:claude",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Approved executable bytes and version match.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "tool:codex",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Approved executable bytes and version match.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "routing",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Pinned routing bytes match; usage mode is subscription_cli.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "auth:claude",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Configured CLI login observed without inference. Server validity, capacity and quota are unmeasured.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "auth:codex",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Configured CLI login observed without inference. Server validity, capacity and quota are unmeasured.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "recipes",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Setup/test argv are approved; no repository recipe was executed.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "backend",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Owner profile declares no backend recipe for this slice.",
+      "retryable": false,
+      "next_action": "No action needed."
+    },
+    {
+      "check": "worker",
+      "code": "worker_unavailable",
+      "status": "blocked",
+      "observed": "No matching host-qualified isolated worker is available.",
+      "retryable": true,
+      "next_action": "Complete #217 qualification and approve the adapter revision; never run unconfined."
+    },
+    {
+      "check": "noninteractive_roles",
+      "code": "noninteractive_unverified",
+      "status": "blocked",
+      "observed": "Unattended role capability has not been observed for the selected adapter.",
+      "retryable": false,
+      "next_action": "Qualify actual noninteractive role invocations; configured login alone is insufficient."
+    },
+    {
+      "check": "evidence",
+      "code": "ok",
+      "status": "passed",
+      "observed": "Private evidence create/read/delete probe passed. Host/disk loss durability is not implied.",
+      "retryable": false,
+      "next_action": "No action needed."
+    }
+  ],
+  "sourceModuleSha256": "f1793f4d569f3148e08f40729ef8d46a55a25f6f02c2536eeb8aaa2a0d33b187"
+}

@@ -5,6 +5,8 @@ contracts:
     path: docs/contracts/feature_duo_operations.yml
   - id: feature_improve_core
     path: docs/contracts/feature_improve_core.yml
+  - id: feature_improve_profiles
+    path: docs/contracts/feature_improve_profiles.yml
   - id: feature_preflight
     path: docs/contracts/feature_preflight.yml
   - id: feature_spec_density
