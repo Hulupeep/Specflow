@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "scope": "Historical actual once-only Node HTTP fixture core cycle; no HeyStax product gain or arbitrary-repository qualification claim.",
+  "decision": "KEEP",
+  "reasons": [
+    "all declared mandatory gains established by matched holdout evidence; all mandatory criteria and required gates passed; scope and safety held"
+  ],
+  "ledger": {
+    "ok": true,
+    "entries": 41,
+    "head_sha256": "ebf907ad2b675279eb4e04d16acb9501cf9dd631be19a71852e65c2a52f1e662"
+  },
+  "events": {
+    "holdout_consumed": 1,
+    "decision_made": 1,
+    "decision_applied": 1
+  },
+  "actualJourneys": [
+    {
+      "path": "verification/after/worker-SAVE-JOURNEY-holdout/playwright.json",
+      "stats": {
+        "startTime": "2026-10-23T11:56:10.544Z",
+        "duration": 4082.161,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      }
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-dev/playwright.json",
+      "stats": {
+        "startTime": "2026-10-23T11:49:38.181Z",
+        "duration": 13458.798999999999,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      }
+    },
+    {
+      "path": "verification/baseline/worker-SAVE-JOURNEY-holdout/playwright.json",
+      "stats": {
+        "startTime": "2026-10-23T11:49:01.716Z",
+        "duration": 18725,
+        "expected": 0,
+        "skipped": 0,
+        "unexpected": 2,
+        "flaky": 0
+      }
+    }
+  ],
+  "judgeAllRecordedFramesPresent": true,
+  "manifest_sha256": "1c6fb1eef63ee8d1dc18ecab0b8aca996215324d666b1a37a95f8ef3f4849fa2",
+  "artifactCount": 248,
+  "artifactBytes": 3011936,
+  "workerGitAndCoreWorkingFilesRemoved": true,
+  "lostAcknowledgementIdempotent": true,
+  "realPersistenceFailure": {
+    "code": "artifact_persistence_failed",
+    "realEACCES": true,
+    "terminalAcknowledgement": false,
+    "coreDecisionUnchanged": "KEEP"
+  },
+  "postCommitLostAck": {
+    "code": "commit_unconfirmed",
+    "terminalAcknowledgement": false,
+    "commitPresent": true,
+    "coreDecisionUnchanged": "KEEP"
+  },
+  "retainedBundle": {
+    "sha256": "eb698c52f766d484ee1c3b4258bdb5e0e6d1adaf93ffa73cb2d588ba660dae64",
+    "size": 2477
+  },
+  "usage_mode": "subscription_cli",
+  "actual_charges": "unmeasured",
+  "cli_estimates_scope": "Partial subscription CLI telemetry for final-root roles only; excludes prior unfrozen probes and Duo reviews; not an invoice.",
+  "cli_estimate_usd": 0.92349,
+  "unqualified": [
+    "Next/Supabase worker recipe",
+    "OpenAI managed/API-billed route",
+    "general MCP/service/plugin/scheduler"
+  ],
+  "runtime_files": [
+    {
+      "path": "scripts/improve-worker.cjs",
+      "sha256": "3e69ee8ca78d7ef23d7ef9da6b145f23dbb0e2aa4149408ed59d69753a374d5e"
+    },
+    {
+      "path": "scripts/improve-worker-store.py",
+      "sha256": "e62c5a3b53efd2e4a0918ddc41d097200fe2f483b789988d100877001150d9b8"
+    },
+    {
+      "path": "scripts/improve-worker-role.cjs",
+      "sha256": "4ffdde1331a747aa727ffc27f9fdd994d3d30efb0212f8721bc7dbe1d77f6ca2"
+    },
+    {
+      "path": "scripts/improve-worker-watchdog.cjs",
+      "sha256": "04f6256df1bd7ef1a79e915235c8cc8f336fd7c007caaabab92a774425c11882"
+    },
+    {
+      "path": "scripts/improve-worker-boundary.cjs",
+      "sha256": "e9db213a419922586c93a387c0765a22225681b1c7f6c07a95135413f2f3ae54"
+    },
+    {
+      "path": "scripts/improve-worker-qualify.cjs",
+      "sha256": "1bfebebb19ae53ce1c3fe9eddc68889eec8217485af79321c29eaa8d072c7825"
+    }
+  ],
+  "exportNote": "Root/home/fixture redactions change exported hashes. The ORIGINAL private archive and ledger were verified before export; redacted JSONL is not claimed to preserve original chained byte hashes.",
+  "roles": [
+    {
+      "role": "oracle",
+      "session": "13f65840-b431-4883-a6aa-181bfbc65197",
+      "model": "claude-opus-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "59cad9411db3281c5fe2ece9edf928b214b84c7c5732cdb4457a91e9dafe3008",
+      "input_sha256": "00c57d71bbd4ce0780b6f5279fc48cd807b463c063a36edfb8e5c47821f0ef74",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 0,
+      "image_sha256": []
+    },
+    {
+      "role": "judge",
+      "session": "29c8bf1b-03df-4d84-8f9c-2ac5ac71c632",
+      "model": "claude-opus-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "ba2f0ad0e38a33880342142e66a5f348d3cef254e375d64377bb2cb0d9cfb4e0",
+      "input_sha256": "daf21d35e12c33ccdcce72949da477b14dcd1abe309efd1379c67d4f478e393c",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 12,
+      "image_sha256": [
+        "b4b2da43106a475be36b60a0d337055e640c627a199a90ddacf6926212a19d90",
+        "0cead527d2082832c055c9e19e70222db4360f22f72eddf552a654d174b6d509",
+        "9bd21986f358d94e9590fac52c570ac4911201fd1f8163297818be3ea93f7b6c",
+        "4803cc4252242a2c0740c4e04034f7cfd4f6a97a956df9203e4e1324cbf7fa60",
+        "025c3a7d2e842eaae493a6a16b01d11cf28d60372f6a254129a559219b7e8b92",
+        "060d87e83c2864b895a6f889e2d8bb5eb4e8dd69fb35590fc673e67264704c23",
+        "5db5e5e9ec761064a523a752b93c0e60df65ab48879daa69f660d2c007ce29a4",
+        "35ba08b568f2a7386c402ed548f06b7bd9f179d465df8f3987e4cdb440a594c8",
+        "8d68b0a325110accb46e272cfd73b3ab1f41e3a8d355a9b4683fe8f110670943",
+        "8d68b0a325110accb46e272cfd73b3ab1f41e3a8d355a9b4683fe8f110670943",
+        "1ca3973089967620579c850d8408cea524b0e07b080b4ca80d3ac0eaff5d3165",
+        "1ca3973089967620579c850d8408cea524b0e07b080b4ca80d3ac0eaff5d3165"
+      ]
+    },
+    {
+      "role": "builder",
+      "session": "463259e7-1702-4ed9-9b1f-32838ad52e70",
+      "model": "claude-sonnet-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "014e3a632f8964c660978874072b719fa024a05049be086b1497522ca4152a2a",
+      "input_sha256": "00c57d71bbd4ce0780b6f5279fc48cd807b463c063a36edfb8e5c47821f0ef74",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 0,
+      "image_sha256": []
+    },
+    {
+      "role": "builder",
+      "session": "50a4e86a-ff5e-4b91-a81b-c37ed5bdb73c",
+      "model": "claude-sonnet-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "9f81222f8cc9e5e0e28cdfb42c01c776aa1cff30293de9f2095d4041333495f7",
+      "input_sha256": "67d588da62636bd844ed415e7ea017786b4e44593feacf88a068c77be84dbc02",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 0,
+      "image_sha256": []
+    },
+    {
+      "role": "oracle",
+      "session": "9d7fca9d-1a78-4eec-99f8-68b393940fa5",
+      "model": "claude-opus-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "560834aeef85abbdf5f96d628a4aaa20b2ca15e4dfb9aa9b4547cae656e128c5",
+      "input_sha256": "6893f7fa62bdf624a28c575400d5bb1ec41431d53c54b3350908d469f3d971bb",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 0,
+      "image_sha256": []
+    },
+    {
+      "role": "peer",
+      "session": "deb7b662-a7eb-4d96-86c2-c5742271d0ef",
+      "model": "claude-opus-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "50e305a52601d092552219d82266c769dd00e85bdff34b2d38d84bf1e210a3bd",
+      "input_sha256": "975844ec58f11f11739174bf43fa0ddb234f53282a418c7ce913994e9039b1d5",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 0,
+      "image_sha256": []
+    },
+    {
+      "role": "peer",
+      "session": "f9a1807f-0815-4f47-a78e-d7cbf7113f58",
+      "model": "claude-opus-5-5",
+      "io_tool_calls": 0,
+      "serialization_tool_calls": 1,
+      "raw_sha256": "57f9eddcb8600597be2664946bdfdb367a3b9329f1e6dd9f05be0b76d01e2cd4",
+      "input_sha256": "2c703b1b51a6d438798e24b5a5f46d8bfbd2248d97d634ed100c7b937a3f8cee",
+      "usage_mode": "subscription_cli",
+      "actual_charges": "unmeasured",
+      "image_count": 0,
+      "image_sha256": []
+    }
+  ],
+  "post_terminal_metadata_correction": {
+    "module": "scripts/improve-profiles.cjs",
+    "current_sha256": "90c46cc3020fb98c8de44afc9aad5627dd916ddf3da4b090fc0c72be5b4dddec",
+    "scope": "Authorised historical reads after owned repository teardown; not a replay or a new decision. Original executed module retained privately."
+  }
+}

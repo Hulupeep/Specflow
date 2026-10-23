@@ -454,3 +454,33 @@ test('J-PROFILES-BILLING subscription preflight refuses API authentication metad
   );
   expect(report.ready).toBe(false);
 });
+test('J-PROFILES-HISTORICAL-TEARDOWN historical reads survive missing source without reviving execution or recreating the repo', () => {
+  const before = service.preflight({ repo_id: 'alpha' });
+  fs.rmSync(a.repository.path, { recursive: true });
+  expect(service.inspect({ repo_id: 'alpha' })).toMatchObject({ available: true, repo_id: 'alpha' });
+  expect(service.history({ repo_id: 'alpha' }).reports.map((r) => r.report_id)).toContain(before.report_id);
+  expect(service.preflight({ repo_id: 'alpha' }).ready).toBe(false);
+  let started = false;
+  expect(
+    service.withAuthorized(before.lease, 'execute', () => {
+      started = true;
+    })
+  ).toMatchObject({ allowed: false });
+  expect(started).toBe(false);
+  expect(fs.existsSync(a.repository.path)).toBe(false);
+  principal = 'viewer';
+  expect(service.inspect({ repo_id: 'alpha' }).available).toBe(true);
+  expect(service.history({ repo_id: 'alpha' }).reports).toEqual([]);
+  principal = 'bob';
+  expect(service.inspect({ repo_id: 'alpha' }).available).toBe(false);
+});
+test('J-PROFILES-HISTORICAL-TEARDOWN current read revocation still denies historical metadata after source removal', () => {
+  const before = service.preflight({ repo_id: 'alpha' });
+  a.grants.alice = ['preflight', 'execute'];
+  profiles.registerProfile(registry, a);
+  fs.rmSync(a.repository.path, { recursive: true });
+  expect(service.inspect({ repo_id: 'alpha' }).available).toBe(false);
+  expect(service.history({ repo_id: 'alpha' }).available).toBe(false);
+  expect(service.authorize(before.lease, 'execute').allowed).toBe(false);
+  expect(() => profiles.registerProfile(registry, a)).toThrow();
+});
