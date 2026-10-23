@@ -788,3 +788,74 @@ test('IMPROVE-BIND: repaired prerequisite may retry before holdout consumption',
     expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');fs.unlinkSync(path.join(ws,'bad-link'));expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);
   }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 }));
+
+describe('IMPROVE-04 RUNTIME scalable input identity (#176)',()=>{
+  const binding=require('../../scripts/improve-binding.cjs');
+  const big=(dir,mb)=>{fs.mkdirSync(path.join(dir,'node_modules','dep'),{recursive:true});const chunk=Buffer.alloc(1024*1024,7);const fd=fs.openSync(path.join(dir,'node_modules','dep','blob.bin'),'w');for(let i=0;i<mb;i++)fs.writeSync(fd,chunk);fs.closeSync(fd);};
+  const runtime=(identity,extra={})=>({...contract(),runtime:{identity,...extra}});
+  test('RUNTIME-01: the default cap still rejects a >256 MiB tree; a declared bound seals it without exclusion',()=>{
+    const root=fs.mkdtempSync(path.join(os.tmpdir(),'rt01-'));try{
+      big(root,260);
+      expect(()=>binding.workspace(root)).toThrow(/exceeds 256 MiB/);
+      const id=binding.workspace(root,{limits:{max_bytes:1024*1024*1024}});
+      expect(id.entries.some(e=>e.path==='node_modules/dep/blob.bin'&&e.sha256)).toBe(true);
+      expect(id.bytes).toBeGreaterThan(256*1024*1024);
+      expect(()=>binding.workspace(root,{limits:{max_bytes:300*1024*1024,max_entries:3}})).toThrow(/exceeds 3 entries/);
+    }finally{fs.rmSync(root,{recursive:true,force:true});}
+  });
+  test('RUNTIME-02: a changed dependency byte or a restored mtime still changes identity',()=>{
+    const root=fs.mkdtempSync(path.join(os.tmpdir(),'rt02-'));try{
+      big(root,2);const file=path.join(root,'node_modules','dep','blob.bin');
+      const before=binding.workspace(root).sha256,st=fs.statSync(file);
+      const fd=fs.openSync(file,'r+');fs.writeSync(fd,Buffer.from([9]),0,1,1024);fs.closeSync(fd);fs.utimesSync(file,st.atime,st.mtime);
+      expect(binding.workspace(root).sha256).not.toBe(before);
+    }finally{fs.rmSync(root,{recursive:true,force:true});}
+  });
+  test('RUNTIME-03: equivalent workspace-local executables compare equal across worktrees; changed bytes do not',()=>{
+    const roots=[0,1].map(i=>fs.mkdtempSync(path.join(os.tmpdir(),`rt03-${i}-`)));try{
+      for(const r of roots){fs.mkdirSync(path.join(r,'bin'));fs.writeFileSync(path.join(r,'bin','tool'),'#!/bin/sh\nexit 0\n',{mode:0o755});}
+      const c={acceptance:[{check:{command:['bin/tool']}}]},env={PATH:'/usr/bin:/bin'};
+      expect(binding.verifier(c,roots[0],env,[])).toBe(binding.verifier(c,roots[1],env,[]));
+      fs.writeFileSync(path.join(roots[1],'bin','tool'),'#!/bin/sh\nexit 1\n',{mode:0o755});
+      expect(binding.verifier(c,roots[0],env,[])).not.toBe(binding.verifier(c,roots[1],env,[]));
+    }finally{for(const r of roots)fs.rmSync(r,{recursive:true,force:true});}
+  });
+  test('RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint',()=>{
+    const f=fixture();try{
+      fs.mkdirSync(path.join(f.repo,'out'));fs.writeFileSync(path.join(f.repo,'out','x'),'1');
+      expect(binding.workspace(f.repo,{outputs:['out']}).entries.find(e=>e.path==='out').kind).toBe('disposable-output');
+      expect(()=>binding.workspace(f.repo,{outputs:['src']})).toThrow(/tracked inputs/);
+      expect(()=>binding.workspace(f.repo,{outputs:['../x']})).toThrow(/unsafe/);
+      expect(()=>binding.workspace(f.repo,{outputs:['out','out/x']})).toThrow(/overlap/);
+      fs.rmSync(path.join(f.repo,'out'),{recursive:true});fs.symlinkSync(path.join(f.repo,'src'),path.join(f.repo,'out'));
+      expect(()=>binding.workspace(f.repo,{outputs:['out']})).toThrow(/symlink/);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  });
+  test('RUNTIME: invalid identity declarations are rejected before freezing',quiet(async()=>{
+    const f=fixture();try{
+      const {frozen}=await prepare(f,{contractDoc:runtime({max_bytes:-1,disposable_outputs:['/abs','src/journey.json']})});
+      expect(frozen.status).not.toBe('frozen');
+      const text=JSON.stringify(frozen);expect(text).toMatch(/max_bytes/);expect(text).toMatch(/unsafe path \/abs/);expect(text).toMatch(/overlaps the change scope/);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds',quiet(async()=>{
+    const f=fixture();try{
+      fs.writeFileSync(path.join(f.repo,'.gitignore'),'.out/\ngen.info\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore outputs');
+      const holdoutPrefix="{const fs=require('fs'),p=process.env.IMPROVE_WORKSPACE+'/.out';if(fs.existsSync(p+'/planted'))process.exit(3);fs.mkdirSync(p,{recursive:true});fs.writeFileSync(p+'/churn',String(Math.random()));fs.writeFileSync(process.env.IMPROVE_WORKSPACE+'/gen.info',String(Math.random()));}";
+      const doc=runtime({max_bytes:64*1024*1024,disposable_outputs:['.out','gen.info']},{setup:[['node','-e',"require('fs').mkdirSync('.out',{recursive:true});require('fs').writeFileSync('.out/build','x')"]]});
+      const {runDir,ws}=await runToImplementation(f,{contractDoc:doc,holdoutPrefix,edits:{1:w=>{setSteps(w,2);fs.mkdirSync(path.join(w,'.out'),{recursive:true});fs.writeFileSync(path.join(w,'.out','planted'),'builder build');}}});
+      expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');
+      expect(fs.existsSync(path.join(ws,'.out','planted'))).toBe(false);
+      expect(improve.evaluate(runDir).decision).toBe('KEEP');
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+});
+
+test('IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed',quiet(async()=>{
+  const f=fixture();try{
+    const prefix="if(process.env.IMPROVE_PHASE==='after')require('fs').writeFileSync(process.env.IMPROVE_WORKSPACE+'/stray.txt','x');";
+    const {runDir}=await runToImplementation(f,{edits:{1:w=>setSteps(w,2)},holdoutPrefix:prefix});
+    const r=await improve.verifyPhase(runDir,'after');
+    expect(r.status).toBe('blocked');expect(r.reason).toMatch(/workspace \(\d+\): .*stray\.txt/);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
