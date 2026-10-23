@@ -77,6 +77,58 @@ describe('validateFalsification', () => {
     expect(validateFalsification(pass, { requirePass: true }).ok).toBe(true);
   });
 
+  test('the verdict line cannot declare a conflicting current result', () => {
+    const doc = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS — previous verdict, now withdrawn; current verdict: FAIL.',
+    );
+    expect(extractFinalVerdict(doc)).toBeNull();
+    expect(validateFalsification(doc, { requirePass: true }).ok).toBe(false);
+  });
+
+  test('a later explicit current verdict cannot leave an earlier PASS active', () => {
+    const doc = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS — previous verdict.\nCurrent verdict: FAIL.',
+    );
+    expect(extractFinalVerdict(doc)).toBeNull();
+    expect(validateFalsification(doc, { requirePass: true }).ok).toBe(false);
+  });
+
+  test('a later prose withdrawal cannot leave an earlier PASS active', () => {
+    const doc = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS — previous verdict.\nThis PASS is withdrawn pending a new review.',
+    );
+    expect(extractFinalVerdict(doc)).toBeNull();
+    const comma = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS — previous verdict, now withdrawn.',
+    );
+    expect(extractFinalVerdict(comma)).toBeNull();
+  });
+
+  test('a PASS stipulation may name a FAIL test case', () => {
+    const doc = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS WITH STIPULATIONS. Owner: implementer must preserve FAIL test coverage.',
+    );
+    expect(extractFinalVerdict(doc)).toBe('PASS WITH STIPULATIONS');
+  });
+
+  test('ordinary no longer wording is not a verdict withdrawal', () => {
+    const doc = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS WITH STIPULATIONS. The runner no longer caches stale results.',
+    );
+    expect(extractFinalVerdict(doc)).toBe('PASS WITH STIPULATIONS');
+  });
+
+  test('period-delimited verdicts in checked-in artifacts still parse', () => {
+    const doc = readFileSync(join(__dirname, '../../docs/specs/genuine-looper/falsification.md'), 'utf8');
+    expect(extractFinalVerdict(doc)).toBe('PASS WITH STIPULATIONS');
+  });
+
   test('the template verdict choice list is not a current verdict', () => {
     expect(extractFinalVerdict(readFileSync(TEMPLATE, 'utf8'))).toBeNull();
   });
@@ -85,6 +137,25 @@ describe('validateFalsification', () => {
     const doc = `${filled()}\n## Final Verdict\nREVIEW PENDING — previous result is withdrawn.`;
     expect(extractFinalVerdict(doc)).toBeNull();
     expect(validateFalsification(doc, { requirePass: true }).ok).toBe(false);
+  });
+
+  test('Markdown heading variants cannot hide a second verdict section', () => {
+    const variants = ['## Final Verdict ##\nFAIL', '  ## Final Verdict ##\nFAIL', '# Final Verdict\nFAIL', '### Final Verdict\nFAIL', 'Final Verdict\n-------------\nFAIL'];
+    for (const variant of variants) {
+      const doc = `${filled()}\n${variant}`;
+      expect(extractFinalVerdict(doc)).toBeNull();
+      expect(validateFalsification(doc, { requirePass: true }).ok).toBe(false);
+    }
+  });
+
+  test('a later example cannot change the current verdict', () => {
+    const doc = `${filled()}\n## Regression Cases\nVerdict: FAIL (expected for the negative case).`;
+    expect(extractFinalVerdict(doc)).toBe('PASS WITH STIPULATIONS');
+  });
+
+  test('a fenced example heading is not a duplicate verdict', () => {
+    const doc = `${filled()}\n\`\`\`markdown\n## Final Verdict\nFAIL\n\`\`\``;
+    expect(extractFinalVerdict(doc)).toBe('PASS WITH STIPULATIONS');
   });
 
   test('all 8 required sections are present in the shipped template', () => {

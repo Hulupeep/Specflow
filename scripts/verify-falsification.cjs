@@ -27,21 +27,42 @@ const REQUIRED = [
   'Banned-Mode Self-Check',
   'Final Verdict',
 ];
-const VERDICT_LINE = /^(?:\*\*|`)?(PASS WITH STIPULATIONS|PASS|FAIL)(?:\*\*|`)?(?:\s*(?:—|–|-|:)\s*.+)?$/i;
+const VERDICT_LINE = /^(?:\*\*|`)?(PASS WITH STIPULATIONS|PASS|FAIL)(?:\*\*|`)?(?:\s*(?:—|–|-|:|\.)\s*.+)?$/i;
+const WITHDRAWN_VERDICT = /\b(?:PASS(?: WITH STIPULATIONS)?|VERDICT|RESULT)\s*[,;:]?\s+(?:(?:IS|WAS|HAS BEEN)\s+)?(?:NOW\s+)?WITHDRAWN\b/i;
+const PENDING_VERDICT = /\b(?:CURRENT\s+VERDICT\s*:\s*(?:FAIL|REVIEW PENDING)|REVIEW PENDING\s*[-—–:]\s*(?:THE\s+)?PREVIOUS\s+(?:PASS|RESULT|VERDICT))\b/i;
+const LATER_VERDICT = /^\s*(?:CURRENT\s+)?VERDICT\s*:\s*(?:PASS(?: WITH STIPULATIONS)?|FAIL|REVIEW PENDING)\b/im;
 
 function sha256(buf) { return createHash('sha256').update(buf).digest('hex'); }
 
 function extractFinalVerdict(content) {
-  const parts = content.split(/^##\s+/m).slice(1);
-  const verdictSections = [];
-  for (const p of parts) {
-    const nl = p.indexOf('\n');
-    const heading = (nl === -1 ? p : p.slice(0, nl)).trim();
-    if (heading === 'Final Verdict') verdictSections.push(nl === -1 ? '' : p.slice(nl + 1));
+  const lines = content.split(/\r?\n/);
+  const headings = [];
+  let fence = null;
+  for (let i = 0; i < lines.length; i++) {
+    const marker = lines[i].match(/^[ \t]{0,3}(`{3,}|~{3,})/);
+    if (marker) {
+      if (!fence) fence = marker[1];
+      else if (marker[1][0] === fence[0] && marker[1].length >= fence.length) fence = null;
+      continue;
+    }
+    if (fence) continue;
+    const atx = lines[i].match(/^[ \t]{0,3}#{1,6}[ \t]+(.+?)[ \t]*#*[ \t]*$/);
+    if (atx) headings.push({ index: i, bodyStart: i + 1, name: atx[1].trim() });
+    else if (lines[i].trim() && /^[ \t]*[=-]{3,}[ \t]*$/.test(lines[i + 1] || '')) {
+      headings.push({ index: i, bodyStart: i + 2, name: lines[i].trim() });
+      i++;
+    }
   }
-  if (verdictSections.length !== 1) return null;
-  const firstLine = verdictSections[0].split(/\r?\n/).map(line => line.trim()).find(Boolean);
+  const starts = headings.filter(heading => heading.name === 'Final Verdict');
+  if (starts.length !== 1) return null;
+  const nextHeading = headings.find(heading => heading.index > starts[0].index);
+  const verdictBody = lines.slice(starts[0].bodyStart, nextHeading?.index ?? lines.length);
+  const firstLineIndex = verdictBody.findIndex(line => line.trim());
+  const firstLine = verdictBody[firstLineIndex]?.trim();
   const match = firstLine?.match(VERDICT_LINE);
+  if (match && match[1].toUpperCase() !== 'FAIL'
+    && (WITHDRAWN_VERDICT.test(verdictBody.join('\n')) || PENDING_VERDICT.test(verdictBody.join('\n')))) return null;
+  if (match && LATER_VERDICT.test(verdictBody.slice(firstLineIndex + 1).join('\n'))) return null;
   return match ? match[1].toUpperCase() : null;
 }
 
