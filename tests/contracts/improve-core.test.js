@@ -953,3 +953,65 @@ test('FENCE-4: actual judge trust instruction criteria and textual files are fra
   }
  }finally{if(spy)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
 }));
+
+test('PROOF-REPORT: final failed criterion owns next decision instead of stale peer question',quiet(async()=>{
+ const f=fixture();try{
+  const peer={...KEEP,direction:direction('blocked',[{criterion:'AC-2',owner:'user',action:'Supply unrelated E2E credentials.',done_when:'credentials provided'}])};
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,3)},peer:[peer]});
+  await improve.verifyPhase(runDir,'after');expect(improve.evaluate(runDir).decision).toBe('REVERT');
+  const report=fs.readFileSync(improve.writeReport(runDir),'utf8');const next=report.split('## Human next decision\n')[1].split('\n## ')[0];
+  expect(next).toContain('AC-1');expect(next).toContain('Resume journey takes at most 2 steps');expect(next).not.toContain('Supply unrelated E2E credentials');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('PROOF-REPORT: KEEP before retention asks for finalize without undefined branch',quiet(async()=>{
+ const f=fixture();try{
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');expect(improve.evaluate(runDir).decision).toBe('KEEP');
+  const next=fs.readFileSync(improve.writeReport(runDir),'utf8').split('## Human next decision\n')[1].split('\n## ')[0];
+  expect(next).toMatch(/finaliz/i);expect(next).not.toContain('undefined');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('PROOF-REPORT: absent usage never becomes zero measured spend',quiet(async()=>{
+ const f=fixture();try{
+  const {runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'report-usage',stateDir:f.state,worktreeRoot:f.worktrees});
+  const report=fs.readFileSync(improve.writeReport(runDir),'utf8');
+  expect(report).toContain('Reported estimate total unknown');expect(report).toContain('Actual charges unmeasured');expect(report).not.toContain('Measured spend');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test.each(['adapter_failed','blocked_human_required'])('PROOF-ORACLE: %s cannot relabel stale or partial draft files as authored',quiet(async(status)=>{
+ const f=fixture();let spy;try{
+  const {runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'oracle-failed',stateDir:f.state,worktreeRoot:f.worktrees});
+  const draft=path.join(runDir,'oracle-draft','holdout'),current=path.join(runDir,'holdout');fs.mkdirSync(draft,{recursive:true});fs.mkdirSync(current);
+  fs.writeFileSync(path.join(draft,'check.cjs'),'// stale or partial attempt');fs.writeFileSync(path.join(current,'check.cjs'),'// previous original');
+  const prompt=path.join(f.root,'oracle.md');fs.writeFileSync(prompt,'Author scoped checks');
+  spy=jest.spyOn(runner,'runAdapter').mockReturnValue({status,entry:{exit_code:1}});
+  const result=improve.oracle(runDir,{policy:writeTmp(f,'oracle.json',FAKE_BUILDER({id:'independent-oracle'})),prompt});
+  expect(result.status).toBe('blocked');expect(fs.readFileSync(path.join(current,'check.cjs'),'utf8')).toBe('// previous original');
+  expect(improve.events(runDir).filter(e=>e.event==='oracle_authored')).toHaveLength(0);expect(improve.events(runDir).filter(e=>e.event==='oracle_failed')).toHaveLength(1);
+ }finally{if(spy)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('PROOF-ORACLE: legacy failed-provider authorship cannot grant a fresh freeze',quiet(async()=>{
+ const f=fixture();try{
+  const {runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'legacy-oracle-failed',stateDir:f.state,worktreeRoot:f.worktrees});
+  improve.recordCandidates(runDir,writeTmp(f,'candidates.json',candidates()));improve.critique(runDir,{invokePeer:fakePeer([PURSUE])});
+  for(const dir of ['holdout','dev']){fs.mkdirSync(path.join(runDir,dir));fs.writeFileSync(path.join(runDir,dir,'steps.cjs'),stepCheck(2));}
+  const sha=require('crypto').createHash('sha256').update(fs.readFileSync(path.join(runDir,'holdout/steps.cjs'))).digest('hex');
+  improve.append(runDir,'oracle_authored',{role:'oracle-author',executor:'failed-legacy',artifacts:{'holdout/steps.cjs':sha},provenance:{stop_reason:'adapter_failed',provider:'codex-exec'}});
+  expect(improve.freezeContract(runDir,writeTmp(f,'contract.json',contract())).status).toBe('rejected');
+  expect(improve.status(runDir).next_action).toMatch(/evaluator author/);
+  const report=fs.readFileSync(improve.writeReport(runDir),'utf8');expect(report).toContain('oracle author (failed)');expect(report).toContain('Oracle authored by nobody recorded');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('PROOF-PEER: actual round schema restricts next steps to exact frozen criterion IDs',quiet(async()=>{
+ const f=fixture();try{
+  const doc=contract();doc.acceptance.push({id:'UX-RESTRAINT',statement:'Keep existing controls readable',required_level:4,mandatory:false,baseline_expectation:'n/a'});
+  const {invokePeer}=await runToImplementation(f,{contractDoc:doc,edits:{1:ws=>setSteps(ws,2)}});
+  const args=invokePeer.calls[0].args,schema=JSON.parse(args[args.indexOf('--json-schema')+1]);
+  const ids=schema.properties.direction.properties.next_steps.items.properties.criterion.enum;
+  expect(ids).toEqual(doc.acceptance.map(a=>a.id));expect(ids).not.toContain('AC-1 / UX-RESTRAINT');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));

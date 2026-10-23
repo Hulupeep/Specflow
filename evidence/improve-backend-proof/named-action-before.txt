@@ -1,0 +1,75 @@
+FAIL tests/contracts/loop-run-contract.test.js
+  local contracted loop runner
+    ○ skipped reruns hashed stage evidence checks before advancing an agent rail
+    ○ skipped CLI stage-evidence reruns do not require provider routing readiness
+    ○ skipped rejects changed artifacts without executing their stage checks
+    ○ skipped rejects stage checks that perform human-gated actions
+    ○ skipped stops rail 7 at an explicit human CI handoff
+    ○ skipped creates a default run_contract and ledger at .specflow/runs/<slug>
+    ○ skipped resumes from an existing contract instead of restarting discovery
+    ○ skipped invalid run_contract names missing fields and does not advance
+    ○ skipped validateRunContract rejects unsupported loops
+    ○ skipped loads stage order from loop YAML instead of only hardcoded defaults
+    ○ skipped materializes a stage prompt when agent action is required
+    ○ skipped state memory writes STATE.md, one lesson file, and prompt digest
+    ○ skipped bounded run-until-terminal advances through green registries and stops at next agent stage
+    ○ skipped run status reports the current contract and ledger tail
+    ○ skipped prepares isolated delegated worktree metadata without auto merge or push
+    ○ skipped scaffolds routine manifests that call specflow run and preserve human gates
+  generative adapter policy and command builders
+    ✕ PROOF-ACTIONS: named merge mutation blocks but reading merge status does not (5 ms)
+    ○ skipped normalizes and validates adapter policy
+    ○ skipped rejects unsupported adapter roles and effort levels before invocation
+    ○ skipped builds Claude print command with safety flags
+    ○ skipped builds Codex exec command with JSONL output controls
+    ○ skipped builds provider resume commands when a session id exists
+    ○ skipped adapter smoke includes a bounded prompt by default
+    ○ skipped Codex adapter smoke uses the current approval configuration syntax
+    ○ skipped resolves default adapter routing for the current loop stage
+    ○ skipped installs default adapter routing from the local policy template
+    ○ skipped checks routing model ids for known shorthand aliases
+    ○ skipped updates routing model ids using known safe aliases only
+    ○ skipped runLoop blocks routed adapter execution until model choices are confirmed
+    ○ skipped Codex routed confirmations explain ChatGPT quota semantics
+    ○ skipped detects forbidden human-gate actions in provider output
+    ○ skipped parses provider JSONL events into final text and tool events
+    ○ skipped PROOF-ACTIONS: read-only CSS verdict prose is not a merge action
+    ○ skipped PROOF-ACTIONS: actual nested Claude Write invocation still blocks
+    ○ skipped PROOF-ACTIONS: actual nested Claude Bash invocation still blocks
+    ○ skipped PROOF-ACTIONS: actual nested Claude Read invocation still blocks
+    ○ skipped PROOF-ACTIONS: Codex command and message are parsed without granting output authority
+    ○ skipped PROOF-ACTIONS: actual Codex Git merge remains blocked
+    ○ skipped PROOF-ACTIONS: reading action words as a path or result is not execution
+    ○ skipped summarizes requested and effective model accounting without guessing unknowns
+  stage verifier registry and freshness gates
+    ○ skipped runs Gate B verifier registry and advances only on pass
+    ○ skipped simulation freshness detects stale simulation evidence
+  generative adapter execution with fake provider
+    ○ skipped dry-run prints planned command without invoking provider
+    ○ skipped successful fake provider writes transcript/output and requires gate rerun
+    ○ skipped provider failure preserves transcript evidence
+    ○ skipped missing provider stops before invocation with adapter_unavailable
+    ○ skipped forbidden action blocks stage advance
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: named merge mutation blocks but reading merge status does not
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "merge"
+    Received: null
+
+      832 |   test('PROOF-ACTIONS: named merge mutation blocks but reading merge status does not', () => {
+      833 |     const mutation=parseProviderEvents('fake',JSON.stringify({type:'tool_call',name:'mcp__github__merge_pull_request',input:{number:1}}));
+    > 834 |     expect(forbiddenFromProviderEvents(mutation,['merge'],[])).toBe('merge');
+          |                                                                ^
+      835 |     const read=parseProviderEvents('fake',JSON.stringify({type:'tool_call',name:'mcp__github__read_merge_status',input:{number:1}}));
+      836 |     expect(forbiddenFromProviderEvents(read,['merge'],[])).toBeNull();
+      837 |   });
+
+      at Object.toBe (tests/contracts/loop-run-contract.test.js:834:64)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 46 skipped, 47 total
+Snapshots:   0 total
+Time:        0.571 s, estimated 1 s
+Ran all test suites matching /tests\/contracts\/loop-run-contract.test.js/i with tests matching "named merge mutation".

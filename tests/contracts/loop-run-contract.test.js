@@ -797,6 +797,53 @@ describe('generative adapter policy and command builders', () => {
     expect(forbiddenFromProviderEvents(parsed, ['git push'], [])).toBe('git push');
   });
 
+  test('PROOF-ACTIONS: read-only CSS verdict prose is not a merge action', () => {
+    const parsed=parseProviderEvents('claude-print',[
+      JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'read-1',name:'Read',input:{file_path:'/tmp/rewrite-guide.md'}}]}}),
+      JSON.stringify({type:'result',result:'The missing space merges two class names. UX fails.'})
+    ].join('\n'));
+    expect(parsed.tool_events).toHaveLength(1);
+    expect(forbiddenFromProviderEvents(parsed,['merge'],['Write','Edit','Bash'])).toBeNull();
+  });
+
+  test.each([
+    ['Write',{file_path:'/tmp/source.ts',content:'ordinary source'},[],['Write'],'Write'],
+    ['Bash',{command:'git push origin main'},['git push'],[],'git push'],
+    ['Read',{file_path:'/private/secret.json'},[],['Read(/private/**)'],'Read(/private/**)']
+  ])('PROOF-ACTIONS: actual nested Claude %s invocation still blocks', (name,input,human,denied,expected) => {
+    const parsed=parseProviderEvents('claude-print',JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'actual',name,input}]}}));
+    expect(forbiddenFromProviderEvents(parsed,human,denied)).toBe(expected);
+  });
+
+  test('PROOF-ACTIONS: Codex command and message are parsed without granting output authority', () => {
+    const parsed=parseProviderEvents('codex-exec',[
+      JSON.stringify({type:'item.completed',item:{id:'cmd',type:'command_execution',command:'git status --short',aggregated_output:'README says never git push origin main',exit_code:0}}),
+      JSON.stringify({type:'item.completed',item:{id:'answer',type:'agent_message',text:'This merges two CSS classes.'}})
+    ].join('\n'));
+    expect(parsed.tool_events).toHaveLength(1);expect(parsed.final_text).toBe('This merges two CSS classes.');
+    expect(forbiddenFromProviderEvents(parsed,['git push','merge'],[])).toBeNull();
+  });
+
+  test('PROOF-ACTIONS: actual Codex Git merge remains blocked', () => {
+    const parsed=parseProviderEvents('codex-exec',JSON.stringify({type:'item.completed',item:{id:'cmd',type:'command_execution',command:'git merge main',aggregated_output:'done',exit_code:0}}));
+    expect(forbiddenFromProviderEvents(parsed,['merge'],[])).toBe('merge');
+  });
+
+  test('PROOF-ACTIONS: named merge mutation blocks but reading merge status does not', () => {
+    const mutation=parseProviderEvents('fake',JSON.stringify({type:'tool_call',name:'mcp__github__merge_pull_request',input:{number:1}}));
+    expect(forbiddenFromProviderEvents(mutation,['merge'],[])).toBe('merge');
+    const read=parseProviderEvents('fake',JSON.stringify({type:'tool_call',name:'mcp__github__read_merge_status',input:{number:1}}));
+    expect(forbiddenFromProviderEvents(read,['merge'],[])).toBeNull();
+  });
+
+  test('PROOF-ACTIONS: reading action words as a path or result is not execution', () => {
+    const parsed=parseProviderEvents('fake',[
+      JSON.stringify({type:'tool_call',name:'Read',input:{file_path:'/tmp/git push instructions.md'}}),
+      JSON.stringify({type:'tool_result',output:'git push origin main'})
+    ].join('\n'));
+    expect(forbiddenFromProviderEvents(parsed,['git push'],['Write'])).toBeNull();
+  });
+
   test('summarizes requested and effective model accounting without guessing unknowns', () => {
     const summary = summarizeLedger([
       { verifier: 'unit', result: 'pass' },

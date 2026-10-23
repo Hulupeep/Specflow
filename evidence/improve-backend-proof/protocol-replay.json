@@ -1,0 +1,13 @@
+{
+  "kind": "protocol-replay",
+  "modelCalled": false,
+  "fakeTransport": true,
+  "sourceTranscriptSha256": "4f838e58ed3e146661944a123e89ba28b1e6879eb56ba838aae438006477d822",
+  "sourceRun": "improve-180-sealed-20261023",
+  "historicalVerdictUnchanged": "INCONCLUSIVE",
+  "qualifyingEvidenceImported": false,
+  "oldAdapterStatus": "blocked_human_required",
+  "newAdapterStatus": "gate_rerun_required",
+  "normalisedToolCalls": 17,
+  "scope": "Same recorded read-only trace is no longer mistaken for a merge operation. This is parser verification, not a new UX judgment or a replayed browser holdout."
+}

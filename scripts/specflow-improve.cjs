@@ -479,7 +479,7 @@ function freezeContract(runDir, file, options = {}) {
   if (!critique) validation.errors.push('an independent critique of the selected candidate is required before freezing (improve critique)');
   else if (critique.verdict !== 'pursue') validation.errors.push(`the latest critique verdict is ${critique.verdict}; only pursue may be frozen`);
   // Holdout checks must come from a recorded oracle author, byte for byte.
-  const authored = Object.assign({}, ...evs.filter((e) => e.event === 'oracle_authored').map((e) => e.artifacts));
+  const authored = Object.assign({}, ...evs.filter(acceptedOracle).map((e) => e.artifacts));
   for (const a of list(contract?.acceptance)) {
     const rel = a?.check?.artifact;
     if (!rel || !fs.existsSync(path.join(runDir, rel))) continue;
@@ -495,7 +495,7 @@ function freezeContract(runDir, file, options = {}) {
   for (const a of contract.acceptance) {
     for (const c of [a.check, a.dev_check]) if (c?.artifact) artifacts[c.artifact] = fileSha(path.join(runDir, c.artifact));
   }
-  const oracle = evs.filter((e) => e.event === 'oracle_authored').map((e) => ({ role: e.role, executor: e.executor, observed_model: e.provenance?.observed_model || null }));
+  const oracle = evs.filter(acceptedOracle).map((e) => ({ role: e.role, executor: e.executor, observed_model: e.provenance?.observed_model || null }));
   const implementationStarted = Boolean(lastEvent(evs, 'implementation_started'));
   const frozen = {
     schema: 'specflow.improvement-contract/v2',
@@ -1074,8 +1074,13 @@ function critique(runDir, options = {}) {
 // The deciding checks are written by an evaluator role, not by the scout,
 // contract writer or builder. `oracle` runs that role through an adapter in
 // a scratch directory and records exactly which bytes it authored.
+function acceptedOracle(entry) {
+  return entry.event === 'oracle_authored' && !['adapter_failed', 'blocked_human_required', 'dry_run', 'timeout', 'error'].includes(entry.provenance?.stop_reason);
+}
+
 function recordOracle(runDir, { role, executor, files, provenance = null }) {
   loadRun(runDir);
+  if (!acceptedOracle({ event: 'oracle_authored', provenance })) throw new Error('Failed or unexecuted provider invocation cannot establish oracle authorship');
   if (!nonempty(role) || !nonempty(executor) || ['builder', 'scout', 'contract-writer'].includes(role)) throw new Error('oracle author must be an evaluator role');
   if (lastEvent(events(runDir), 'contract_frozen')) throw new Error('The oracle is authored before the contract is frozen');
   const artifacts = {};
@@ -1098,6 +1103,10 @@ function oracle(runDir, options = {}) {
   fs.writeFileSync(promptPath, fs.readFileSync(options.prompt, 'utf8'));
   const { env } = scrubbedEnv({}, { keepProvider: true });
   const result = runner.runAdapter(policy, { promptPath, stage: 'improve.oracle', cwd: draftDir, env });
+  if (result.status !== 'gate_rerun_required' || result.entry?.exit_code !== 0) {
+    append(runDir, 'oracle_failed', { provenance: roleProvenance(policy, result) });
+    return { status: 'blocked', reason: `oracle adapter did not complete (${result.status}); draft files are not accepted`, provenance: roleProvenance(policy, result) };
+  }
   const files = [];
   for (const name of fs.readdirSync(path.join(draftDir, 'holdout'))) {
     const rel = `${HOLDOUT_DIR}${name}`;
@@ -1228,7 +1237,9 @@ async function build(runDir, options = {}) {
       'Recommend: continue (with builder next_steps), keep (practice checks all pass and the change serves the contract without UX harm), or revert (wrong approach or harm that more rounds will not fix).',
       'Your recommendation is advisory. Hidden holdout checks and an independent evaluator decide; you cannot see them and must not look for them.',
     ].join('\n');
-    const peer = runPeer(runDir, { stage: `round-${round}`, inputDir, prompt, schema: PEER_ROUND_SCHEMA, model: options.peerModel || 'opus', invoke: options.invokePeer, builderProvider: policy.provider });
+    const roundSchema = JSON.parse(JSON.stringify(PEER_ROUND_SCHEMA));
+    roundSchema.properties.direction.properties.next_steps.items.properties.criterion.enum = gov.contract.acceptance.map(a => a.id);
+    const peer = runPeer(runDir, { stage: `round-${round}`, inputDir, prompt, schema: roundSchema, model: options.peerModel || 'opus', invoke: options.invokePeer, builderProvider: policy.provider });
     if (peer.holdoutAccessed) append(runDir, 'holdout_exposed', { role: 'peer', round });
     const invalid = validatePeerRound(peer.output, gov, dev.summary);
     append(runDir, 'peer_review', {
@@ -1532,7 +1543,7 @@ function status(runDir) {
   else if (has('baseline_recorded')) next = 'implement (improve build RUN --policy P)';
   else if (has('baseline_blocked')) next = 'baseline did not reproduce the problem: supersede the contract before implementation';
   else if (has('contract_frozen')) next = 'capture the baseline (improve baseline RUN)';
-  else if (has('oracle_authored') && has('critique_recorded')) next = 'freeze the ImprovementContract (improve contract RUN FILE)';
+  else if (evs.some(acceptedOracle) && has('critique_recorded')) next = 'freeze the ImprovementContract (improve contract RUN FILE)';
   else if (has('critique_recorded')) next = 'have an evaluator author the holdout checks (improve oracle RUN --policy P --prompt F)';
   else if (has('candidates_recorded')) next = 'Duo peer critique of the selection (improve critique RUN)';
   return {
@@ -1560,15 +1571,20 @@ function writeReport(runDir) {
   const evidence = readEvidence(runDir);
   const roles = [
     ...evs.filter((e) => e.event === 'role_recorded').map((e) => ({ role: e.role, executor: e.executor, requested: e.requested_model || '-', observed: e.observed_model || 'unknown', cost: e.cost_usd ?? null })),
-    ...evs.filter((e) => ['critique_recorded', 'oracle_authored', 'builder_round', 'peer_review', 'judgment_run', 'implementation_finished'].includes(e.event) && e.provenance).map((e) => ({
-      role: e.event === 'critique_recorded' ? 'duo-peer (critique)' : e.event === 'peer_review' ? `duo-peer (round ${e.round}, ${e.provenance.independence})`
-        : e.event === 'builder_round' ? `builder (round ${e.round})` : e.event === 'oracle_authored' ? 'oracle author' : e.role,
+    ...evs.filter((e) => ['critique_recorded', 'critique_failed', 'oracle_authored', 'oracle_failed', 'builder_round', 'peer_review', 'judgment_run', 'implementation_finished'].includes(e.event) && e.provenance).map((e) => ({
+      role: e.event === 'critique_recorded' ? 'duo-peer (critique)' : e.event === 'critique_failed' ? 'duo-peer (critique failed)' : e.event === 'peer_review' ? `duo-peer (round ${e.round}, ${e.provenance.independence})`
+        : e.event === 'builder_round' ? `builder (round ${e.round})` : e.event === 'oracle_authored' ? (acceptedOracle(e) ? 'oracle author' : 'oracle author (failed)') : e.event === 'oracle_failed' ? 'oracle author (failed)' : e.role,
       executor: e.provenance.policy_id || e.provenance.executor || e.executor, requested: e.provenance.requested_model || '-', observed: e.provenance.observed_model || 'unknown', cost: e.provenance.cost_usd ?? null,
     })),
   ];
   const peerRounds = evs.filter((e) => e.event === 'peer_review');
-  // The Duo peer names decisions only a human can make (owner: user); surface them.
+  // Peer questions precede the independent result. Preserve them as advice,
+  // but derive the next action from the final decision and its actual evidence.
   const userSteps = (peerRounds.slice(-1)[0]?.direction?.next_steps || []).filter((st) => st.owner === 'user');
+  const failedCriteria = (decision?.criteria || []).filter(c => c.mandatory && c.status === 'failed');
+  const failureSummary = failedCriteria.length
+    ? failedCriteria.map(c => `${c.id}: ${c.statement}`).join('; ')
+    : (decision?.reasons || []).join('; ');
   const measured = roles.filter((r) => typeof r.cost === 'number').reduce((s, r) => s + r.cost, 0);
   const unknown = roles.filter((r) => typeof r.cost !== 'number').length;
   const pick = (criterion, phase) => {
@@ -1600,9 +1616,15 @@ function writeReport(runDir) {
     '## Human next decision',
     '',
     !decision ? `- ${status(runDir).next_action}`
-      : decision.decision === 'KEEP' ? `- Review branch \`${applied?.branch}\` (commit \`${applied?.commit}\`) and decide whether to push/open a PR. Specflow never pushes or merges.`
-        : decision.decision === 'REVERT' ? (userSteps.length ? userSteps.map((st) => `- ${st.action} Done when: ${st.done_when}`).join('\n') : '- Nothing to merge. Decide whether the opportunity deserves a differently scoped contract.')
-          : `- Decide whether to gather the missing evidence or discard. The attempted patch is preserved at \`workspace.patch\` (sha256 ${applied?.patch_sha256 || decision.workspace.patch_sha256}).`,
+      : decision.decision === 'KEEP' ? (applied?.branch && applied?.commit
+        ? `- Review branch \`${applied.branch}\` (commit \`${applied.commit}\`) and decide whether to push/open a PR. Specflow never pushes or merges.`
+        : '- Finalize this verified KEEP to retain the tested branch before requesting its review. Specflow never pushes or merges.')
+        : decision.decision === 'REVERT' ? `- Nothing to merge. Deciding failures: ${failureSummary}. Review their before/after evidence before deciding whether the opportunity deserves a differently scoped contract.`
+          : `- Resolve the current evidence blockers or discard: ${decision.reasons.join('; ')}. The attempted patch is preserved at \`workspace.patch\` (sha256 ${applied?.patch_sha256 || decision.workspace.patch_sha256}). Never rerun a consumed holdout.`,
+    '',
+    ...(userSteps.length ? ['## Earlier peer questions (advisory)', '',
+      'These questions preceded independent evaluation; the final decision and next action above take precedence.', '',
+      ...userSteps.map(st => `- ${st.action} Done when: ${st.done_when}`), ''] : []),
     '',
     '## Selected opportunity',
     '',
@@ -1642,16 +1664,18 @@ function writeReport(runDir) {
     '|---|---|---|---|',
     ...peerRounds.map((e) => `| ${e.round} | ${Object.entries(e.dev_summary || {}).map(([k, v]) => `${k} ${v}`).join(', ') || '-'} | ${e.invalid ? `invalid (${e.invalid})` : `${e.recommendation} / ${e.assessment}`} | ${(e.direction?.next_steps || []).map((st) => `${st.criterion}: ${st.action}`).join('; ').slice(0, 300) || e.reason || '-'} |`),
     '',
-    `Holdout: ${evs.some((e) => e.event === 'holdout_consumed') ? 'consumed once for the decision' : 'not yet run'}${evs.some((e) => e.event === 'holdout_exposed') ? '; **EXPOSED** during building' : ''}. Oracle authored by ${evs.filter((e) => e.event === 'oracle_authored').map((e) => e.executor).join(', ') || 'nobody recorded'}.`,
+    `Holdout: ${evs.some((e) => e.event === 'holdout_consumed') ? 'consumed once for the decision' : 'not yet run'}${evs.some((e) => e.event === 'holdout_exposed') ? '; **EXPOSED** during building' : ''}. Oracle authored by ${evs.filter(acceptedOracle).map((e) => e.executor).join(', ') || 'nobody recorded'}.`,
     ...evs.filter((e) => e.event === 'oracle_disputed').map((e) => `- Oracle dispute on ${e.criterion} by ${e.role}: ${e.reason}`),
     '',
-    '## Models and cost',
+    '## Models and usage',
     '',
-    '| Role | Executor | Requested | Observed | Cost |',
+    `Usage mode: ${gov?.contract?.safety?.usage_mode || 'unknown'} (declared; not proof of billing).`,
+    '',
+    '| Role | Executor | Requested | Observed | Reported estimate |',
     '|---|---|---|---|---|',
     ...roles.map((r) => `| ${r.role} | ${r.executor} | ${r.requested} | ${r.observed} | ${money(r.cost)} |`),
     '',
-    `Measured spend ${money(measured)}; ${unknown} role(s) with unknown cost (not counted as zero).`,
+    `Reported estimate total ${money(roles.some(r => typeof r.cost === 'number') ? measured : null)}; ${unknown} role(s) with unknown cost (not counted as zero). CLI/provider estimates are usage telemetry, not verified invoices. Actual charges unmeasured.`,
     '',
     '## Trace',
     '',

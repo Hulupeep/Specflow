@@ -12,7 +12,7 @@ const routingShadow = require('./typesafe-routing-bridge.cjs');
 const tierPolicy = require('./specflow-tier.cjs');
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
-const { basename, dirname, join, resolve } = require('path');
+const { basename, dirname, join, resolve, posix } = require('path');
 const yaml = require('js-yaml');
 const {
   installRuntimeRouting,
@@ -1895,7 +1895,15 @@ function parseProviderEvents(provider, text) {
     const type = String(event.type || event.event || event.kind || '');
     if (/error/i.test(type) || event.error) errors.push(event.error || event);
     if (event.tool || event.tool_call || event.toolCall || /tool|command|exec/i.test(type)) toolEvents.push(event);
-    const textValue = event.text || event.content || event.message?.content || event.delta?.text || event.result;
+    // Native Claude embeds invocation blocks inside assistant messages. Results
+    // and file contents are evidence, never additional attempted operations.
+    for (const block of Array.isArray(event.message?.content) ? event.message.content : []) {
+      if (block.type === 'tool_use') toolEvents.push({ type: 'tool_use', id: block.id, name: block.name, input: block.input });
+    }
+    // Current Codex JSONL wraps commands/messages in item events. Deliberately
+    // omit aggregated_output when normalising an attempted command.
+    if (event.item?.type === 'command_execution') toolEvents.push({ type: 'command_execution', id: event.item.id, name: 'Bash', command: event.item.command });
+    const textValue = event.text || event.content || event.message?.content || event.delta?.text || event.result || (event.item?.type === 'agent_message' ? event.item.text : null);
     if (typeof textValue === 'string') finalText += textValue;
   }
 
@@ -1913,17 +1921,64 @@ function parseProviderEvents(provider, text) {
   };
 }
 
-function eventText(event) {
-  return JSON.stringify(event);
+function invocation(event) {
+  if (event.type === 'tool_result') return null;
+  const call = event.tool_call || event.toolCall || (typeof event.tool === 'object' ? event.tool : null) || event;
+  let input = call.input || call.arguments || {};
+  if (typeof input === 'string') { try { input = JSON.parse(input); } catch { input = {}; } }
+  const command = call.command || input.command;
+  const name = call.name || call.tool_name || (typeof call.tool === 'string' ? call.tool : null) || (typeof command === 'string' ? 'Bash' : null);
+  return name ? { name, command: typeof command === 'string' ? command : null, file: input.file_path || input.path || null } : null;
+}
+
+function deniedInvocation(action, rule) {
+  const scoped = /^([A-Za-z0-9_.:-]+)\((.*)\)$/.exec(rule);
+  if (scoped) {
+    if (scoped[1].toLowerCase() !== action.name.toLowerCase()) return false;
+    const value = action.command || action.file;
+    if (typeof value !== 'string') return false;
+    const normal = s => action.command ? s : posix.normalize(s.replace(/\\/g, '/'));
+    const expression = normal(scoped[2]).replace(/[|\\{}()[\]^$+?.]/g, '\\$&').replace(/\*/g, '.*');
+    return new RegExp(`^${expression}$`, 'i').test(normal(value));
+  }
+  if (/^[A-Za-z0-9_.:-]+$/.test(rule)) return rule.toLowerCase() === action.name.toLowerCase();
+  return Boolean(action.command && containsForbiddenAction(action.command, [rule]));
+}
+
+function declaredForbiddenIntent(text, rules) {
+  // Preserve the existing stop on an explicit first-person plan to perform a
+  // prohibited operation. Ordinary descriptions (e.g. CSS "merges") aren't
+  // executions or permission requests.
+  for (const rule of rules) {
+    const escaped = String(rule).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const operation = rule.toLowerCase() === 'merge' ? '(?:git\\s+merge\\b|merge\\s+(?:main|master|branch|PR|pull request)\\b)' : escaped + '\\b';
+    if (new RegExp('\\b(?:I|we)\\s+(?:will|shall|am going to|are going to)\\s+(?:now\\s+)?(?:(?:run|execute|perform)\\s+)?' + operation, 'i').test(text || '')) return rule;
+  }
+  return null;
+}
+
+function forbiddenNamedAction(name, rules) {
+  const parts = name.split('__'), normal = s => s.replace(/[_:-]+/g, ' ').trim();
+  const operation = normal(parts.at(-1));
+  const candidates = [operation, parts.length > 1 ? normal(parts.at(-2)) + ' ' + operation : operation];
+  return rules.find(rule => {
+    const escaped = normal(rule).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return candidates.some(candidate => new RegExp('^' + escaped + '(?:\\s|$)', 'i').test(candidate));
+  }) || null;
 }
 
 function forbiddenFromProviderEvents(parsed, neverWithoutHuman = [], deniedTools = []) {
-  const patterns = [...neverWithoutHuman, ...deniedTools].filter(Boolean);
   for (const event of parsed.tool_events || []) {
-    const found = containsForbiddenAction(eventText(event), patterns);
+    const action = invocation(event);
+    if (!action) continue;
+    const denied = deniedTools.filter(Boolean).find(rule => deniedInvocation(action, rule));
+    if (denied) return denied;
+    const named = forbiddenNamedAction(action.name, neverWithoutHuman);
+    if (named) return named;
+    const found = action.command && containsForbiddenAction(action.command, neverWithoutHuman);
     if (found) return found;
   }
-  return containsForbiddenAction(parsed.final_text, neverWithoutHuman);
+  return declaredForbiddenIntent(parsed.final_text, neverWithoutHuman);
 }
 
 function runAdapter(policy, options = {}) {
