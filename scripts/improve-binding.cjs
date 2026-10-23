@@ -36,42 +36,52 @@ function contentSha(file,tok) {
   return contentCache.get(key);
 }
 function safeRel(rel) {
-  return typeof rel==='string'&&rel.length>0&&!path.isAbsolute(rel)&&!rel.split('/').some(p=>!p||p==='.'||p==='..'||p==='.git')&&!rel.includes('\\');
+  return typeof rel==='string'&&rel.length>0&&!path.isAbsolute(rel)&&!rel.includes('\0')&&!rel.split('/').some(p=>!p||p==='.'||p==='..'||p==='.git')&&!rel.includes('\\');
 }
-// Disposable runtime outputs (e.g. `.next`, `test-results`) are produced by the
-// frozen setup/serve/check commands from sealed inputs. They are wiped before
-// setup, must be untracked, must not be symlinks, and are recorded by path
-// rather than content. They cannot hide a consumed input because they start empty.
+// Validate all ancestors before any destructive operation. Checking only the
+// leaf permits link/cache to delete a different workspace through link (#222).
 function validateOutputs(root,outputs) {
-  const list=Array.isArray(outputs)?outputs:[];
+  if(outputs!==undefined&&!Array.isArray(outputs))throw Error('Output paths must be a list');
+  const list=outputs||[];
+  if(new Set(list).size!==list.length)throw Error('Output paths must be unique');
   for(const rel of list) {
     if(!safeRel(rel))throw Error('Disposable output path is unsafe: '+rel);
     for(const other of list)if(other!==rel&&(other+'/').startsWith(rel+'/'))throw Error('Disposable outputs overlap: '+rel+', '+other);
-    const file=path.join(root,rel);
-    if(fs.existsSync(file)||isLink(file)) {if(fs.lstatSync(file).isSymbolicLink())throw Error('Disposable output is a symlink: '+rel);}
-    if(git(root,['ls-files','-z','--',rel]))throw Error('Disposable output contains tracked inputs: '+rel);
+    let at=root;
+    for(const part of rel.split('/')) {
+      at=path.join(at,part);
+      try {if(fs.lstatSync(at).isSymbolicLink())throw Error('Disposable output has a symlink component: '+rel);}
+      catch(error){if(error.code!=='ENOENT')throw error;}
+    }
+    if(git(root,['--literal-pathspecs','ls-files','-z','--',rel]))throw Error('Disposable output contains tracked inputs: '+rel);
   }
   return list;
 }
-function isLink(file) {try{return fs.lstatSync(file).isSymbolicLink();}catch{return false;}}
-function wipeOutputs(root,outputs) {
+function outputLayout(root,outputs,mutableOutputs) {
+  const sealed=validateOutputs(root,outputs),mutable=validateOutputs(root,mutableOutputs);
+  for(const m of mutable)for(const s of sealed)if(m===s||s.startsWith(m+'/'))throw Error('Mutable output hides a sealed output: '+m);
+  const all=[...sealed,...mutable];
+  return {sealed,mutable,roots:all.filter(p=>!all.some(other=>other!==p&&p.startsWith(other+'/')))};
+}
+function wipeOutputs(root,outputs,mutableOutputs) {
   root=fs.realpathSync(root);
-  for(const rel of validateOutputs(root,outputs))fs.rmSync(path.join(root,rel),{recursive:true,force:true});
+  const {roots}=outputLayout(root,outputs,mutableOutputs);
+  for(const rel of roots) {
+    // Recheck immediately before deletion; this is not an OS race sandbox.
+    validateOutputs(root,[rel]);
+    fs.rmSync(path.join(root,rel),{recursive:true,force:true});
+  }
 }
 function workspace(root,options={}) {
   root=fs.realpathSync(root);const entries=[];let size=0;
   const limits={...DEFAULT_LIMITS,...(options.limits||{})};
-  const outputs=new Set(validateOutputs(root,options.outputs));
+  const layout=outputLayout(root,options.outputs,options.mutableOutputs),mutable=new Set(layout.mutable);
   function visit(rel) {
     if(rel==='.git')return;
     const file=path.join(root,rel),before=fs.lstatSync(file,{bigint:true});
-    if(outputs.has(rel)) {
-      if(before.isSymbolicLink())throw Error('Disposable output became a symlink: '+rel);
-      return;
-    }
+    if(mutable.has(rel))return;
     if(entries.length>=limits.max_entries)throw Error(limits.max_entries===DEFAULT_LIMITS.max_entries?'Input tree exceeds 50000 entries':'Input tree exceeds '+limits.max_entries+' entries');
-    // A directory is identified by its children (each an entry); its own
-    // mtime/ctime move whenever a disposable output appears beside them.
+    // Children bind directory contents; mutable reports may change its times.
     const tok=before.isDirectory()?token(before).slice(0,3):token(before);
     const entry={path:rel,token:tok};entries.push(entry);
     if(before.isSymbolicLink()) {
@@ -89,9 +99,9 @@ function workspace(root,options={}) {
     if(JSON.stringify(tok)!==JSON.stringify(now.isDirectory()?token(now).slice(0,3):token(now)))throw Error('Input changed while identity was captured');
   }
   visit('');
-  // Declared outputs are recorded whether or not they exist yet, so creating
-  // one during verification does not change the identity.
-  for(const rel of [...outputs].sort())entries.push({path:rel,kind:'disposable-output'});
+  // Only explicitly non-consumed reports/caches may churn. Regenerated builds
+  // are ordinary hashed inputs after setup, including before final retention.
+  for(const rel of [...mutable].sort())entries.push({path:rel,kind:'mutable-output'});
   return {sha256:digest(entries),entries,bytes:size,limits};
 }
 function executable(command,cwd,env) {
@@ -119,8 +129,12 @@ function verifier(contract,cwd,env,files) {
 // Stage the exact Git product artifact and reject transformations that would
 // retain bytes other than those tested. Ignored/generated inputs remain in the
 // workspace identity even though they are not part of the retained Git tree.
-function tree(root) {
-  git(root,['add','-A']);
+function tree(root,options={}) {
+  const {roots}=outputLayout(root,options.outputs,options.mutableOutputs);
+  const names=spawnSync('git',['ls-files','-z','--cached','--others','--exclude-standard'],{cwd:root,encoding:'utf8',maxBuffer:64*1024*1024});
+  if(names.status!==0)throw Error('Git stage input enumeration unavailable');
+  const selected=[...new Set(names.stdout.split('\0').filter(Boolean))].filter(name=>!roots.some(rel=>name===rel||name.startsWith(rel+'/')));
+  if(selected.length)git(root,['--literal-pathspecs','add','-A','--pathspec-from-file=-','--pathspec-file-nul'],{input:selected.join('\0')+'\0'});
   const raw=spawnSync('git',['ls-files','--stage','-z'],{cwd:root,encoding:'utf8',maxBuffer:64*1024*1024});
   if(raw.status!==0)throw Error('Git index identity unavailable');
   for(const line of raw.stdout.split('\0').filter(Boolean)) {

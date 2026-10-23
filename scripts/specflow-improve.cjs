@@ -433,12 +433,23 @@ function validateContract(runDir, contract, selected) {
       for (const k of ['max_bytes', 'max_entries']) {
         if (identity[k] !== undefined && !(Number.isInteger(identity[k]) && identity[k] > 0 && identity[k] <= binding.CEILING[k])) errors.push(`runtime.identity.${k} must be a positive integer no larger than ${binding.CEILING[k]}`);
       }
-      const outputs = identity.disposable_outputs;
-      if (outputs !== undefined && !Array.isArray(outputs)) errors.push('runtime.identity.disposable_outputs must be a list of workspace-relative paths');
-      for (const rel of list(outputs)) {
-        if (typeof rel !== 'string' || !rel || path.isAbsolute(rel) || rel.split('/').some((p) => !p || p === '.' || p === '..' || p === '.git')) errors.push(`runtime.identity.disposable_outputs: unsafe path ${rel}`);
-        else if (matchesAny(rel, list(contract?.scope?.allowed_paths)) || list(contract?.scope?.allowed_paths).some((g) => g.startsWith(`${rel}/`))) errors.push(`runtime.identity.disposable_outputs: ${rel} overlaps the change scope`);
+      for (const key of ['disposable_outputs','mutable_outputs']) {
+        const outputs=identity[key];
+        if(outputs!==undefined&&!Array.isArray(outputs))errors.push(`runtime.identity.${key} must be a list of workspace-relative paths`);
+        if(Array.isArray(outputs)&&new Set(outputs).size!==outputs.length)errors.push(`runtime.identity.${key} must contain unique paths`);
+        for(const rel of list(outputs)) {
+          if(typeof rel!=='string'||!rel||path.isAbsolute(rel)||rel.includes('\0')||rel.includes('\\')||rel.split('/').some(p=>!p||p==='.'||p==='..'||p==='.git'))errors.push(`runtime.identity.${key}: unsafe path ${rel}`);
+          else {
+            const conflicts=list(contract?.scope?.allowed_paths).some(g=>{
+              const prefix=g.split(/[?*\[]/,1)[0].replace(/\/$/,'');
+              return !prefix||matchesAny(rel,[g])||prefix===rel||prefix.startsWith(rel+'/')||rel.startsWith(prefix+'/');
+            });
+            if(conflicts)errors.push(`runtime.identity.${key}: ${rel} overlaps the change scope`);
+            if(key==='mutable_outputs'&&(rel==='node_modules'||rel.startsWith('node_modules/')))errors.push('runtime.identity.mutable_outputs cannot hide dependencies');
+          }
+        }
       }
+      for(const m of list(identity.mutable_outputs))for(const g of list(identity.disposable_outputs))if(typeof m==='string'&&typeof g==='string'&&(m===g||g.startsWith(m+'/')))errors.push('mutable output cannot hide a sealed output');
     }
   }
   if (contract?.runtime?.serve && (!Array.isArray(contract.runtime.serve.command) || !contract.runtime.serve.port)) {
@@ -583,11 +594,11 @@ function baseUnchanged(run) {
   return { base_ref: run.base_ref, recorded: run.base_commit, current, unchanged: current === run.base_commit };
 }
 
-function workspaceDiff(run) {
+function workspaceDiff(run,contract) {
   const { worktreePath } = workspaceFor(run, 'improve');
   if (!fs.existsSync(worktreePath)) return null;
-  // Stage everything (respecting .gitignore) so new files are part of the change set.
-  git(['add', '-A'], worktreePath);
+  // Generated runtime artifacts are never a product change, even if unignored.
+  binding.tree(worktreePath,identityOptions(contract));
   const files = git(['diff', '--cached', '--name-only', run.base_commit], worktreePath).split('\n').filter(Boolean);
   const patch = spawnSync('git', ['diff', '--cached', '--binary', run.base_commit], { cwd: worktreePath, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 }).stdout || '';
   return { files, patch, sha256: sha256(patch) };
@@ -658,7 +669,7 @@ async function withRuntime(runDir, ws, contract, dir, phase, fn) {
     .replace(/\{evidence_dir\}/g, dir)
     .replace(/\{phase\}/g, phase);
   // Disposable outputs start empty so their contents derive from sealed inputs.
-  try { binding.wipeOutputs(ws.worktreePath, identityOptions(contract).outputs); } catch (error) {
+  try { binding.wipeOutputs(ws.worktreePath, identityOptions(contract).outputs, identityOptions(contract).mutableOutputs); } catch (error) {
     append(runDir, 'verification_blocked', { phase, reason: `disposable outputs: ${error.message}` });
     return { status: 'blocked', reason: `disposable outputs: ${error.message}` };
   }
@@ -743,10 +754,10 @@ function integrityBlock(runDir, gov, phase) {
 // disposable outputs. Absent, the original conservative caps apply.
 function identityOptions(contract) {
   const id=contract?.runtime?.identity||{};
-  return {limits:{...(id.max_bytes?{max_bytes:id.max_bytes}:{}),...(id.max_entries?{max_entries:id.max_entries}:{})},outputs:list(id.disposable_outputs)};
+  return {limits:{...(id.max_bytes?{max_bytes:id.max_bytes}:{}),...(id.max_entries?{max_entries:id.max_entries}:{})},outputs:list(id.disposable_outputs),mutableOutputs:list(id.mutable_outputs)};
 }
 function inputIdentity(runDir,run,gov,phase,ws) {
-  const gitTree=binding.tree(ws.worktreePath);
+  const gitTree=binding.tree(ws.worktreePath,identityOptions(gov.contract));
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
@@ -1199,7 +1210,7 @@ async function build(runDir, options = {}) {
 
     const dev = await devRound(runDir, round);
     if (dev.status === 'blocked') { stop = `practice checks blocked: ${dev.reason}`; rounds.push(record); break; }
-    const diff = workspaceDiff(run);
+    const diff = workspaceDiff(run,gov.contract);
     const inputDir = path.join(runDir, 'peer-input', `round-${round}`);
     fs.rmSync(inputDir, { recursive: true, force: true });
     fs.mkdirSync(inputDir, { recursive: true });
@@ -1270,7 +1281,7 @@ function judge(runDir, options = {}) {
   const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, role);
   // Reuse the #100 isolation rule: the evaluator policy must differ from the builder's.
   runner.resolveVerifierPolicy({ ...policy, id: builderEntry.executor, transcript_path: path.join(runDir, 'adapters', 'builder.transcript.jsonl'), output_path: path.join(runDir, 'adapters', 'builder.final.md'), verifier_policy: policy });
-  const diff = workspaceDiff(run);
+  const diff = workspaceDiff(run,gov.contract);
   fs.writeFileSync(path.join(runDir, 'workspace.patch'), diff?.patch || '');
   const input = runner.assembleVerifierInput({
     artifactPath: path.join(runDir, 'workspace.patch'), specPath: gov.entry.path,
@@ -1406,7 +1417,7 @@ function evaluate(runDir) {
     const record=recordedEvidence.find(e=>e.evidence_id===item.id);
     return !record || record.record_sha256!==binding.digest(item) || (record.evidence_sha256 && (!fs.existsSync(item.evidence_path)||fileSha(item.evidence_path)!==record.evidence_sha256));
   });
-  const diff = workspaceDiff(run) || { files: [], patch: '', sha256: sha256('') };
+  const diff = workspaceDiff(run,gov.contract) || { files: [], patch: '', sha256: sha256('') };
   fs.writeFileSync(path.join(runDir, 'workspace.patch'), diff.patch);
   const gates = list(gov.contract.gates).map((g) => {
     const pick = (phase) => {
@@ -1471,7 +1482,8 @@ function finalize(runDir) {
   const decision = readJson(runPaths(runDir).decisionPath);
   if (fileSha(runPaths(runDir).decisionPath) !== made.decision_sha256) throw new Error('decision.json changed after it was recorded');
   const ws = workspaceFor(run, 'improve');
-  const diff = workspaceDiff(run);
+  const gov=governingContract(runDir);
+  const diff = workspaceDiff(run,gov.contract);
   if (diff && diff.sha256 !== made.workspace_patch_sha256) {
     append(runDir, 'unrecorded_mutation', { expected: made.workspace_patch_sha256, observed: diff.sha256 });
     throw new Error('Workspace changed after evaluation; re-run verification before applying a decision');

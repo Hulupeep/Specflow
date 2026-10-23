@@ -1,0 +1,198 @@
+FAIL tests/contracts/improve-core.test.js
+  ○ skipped IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE
+  ○ skipped IMPROVE-BIND: legacy interrupted after-verification cannot expose the holdout again
+  ○ skipped IMPROVE-BIND: repaired prerequisite may retry before holdout consumption
+  ○ skipped IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed
+  IMPROVE-01 candidate selection (#173/#175)
+    ○ skipped bounded evaluable refinement is selectable; alternatives stay visible
+    ○ skipped a gratuitous redesign cannot be selected; it stays an opportunity
+    ○ skipped novelty language is not a user problem, and every alternative needs a reason it lost
+    ○ skipped unevaluable high-value work cannot be silently rejected
+  IMPROVE-04 side-effect guardrails (#176)
+    ○ skipped git push origin main is blocked before execution
+    ○ skipped vercel deploy --prod is blocked before execution
+    ○ skipped supabase db push is blocked before execution
+    ○ skipped curl -X POST https://api.telegram.org/bot/sendMessage is blocked before execution
+    ○ skipped echo x > .env.local is blocked before execution
+    ○ skipped gh pr merge 12 is blocked before execution
+    ○ skipped terraform destroy is blocked before execution
+    ○ skipped pnpm exec eslint src/app.tsx is allowed
+    ○ skipped node check.cjs is allowed
+    ○ skipped git diff --stat is allowed
+    ○ skipped npx next dev -p 3100 is allowed
+    ○ skipped secrets are removed from command environments
+    ○ skipped a blocked exec is recorded in the ledger and never runs
+    ○ skipped contracts cannot declare prohibited commands
+  IMPROVE-02 frozen contract and evidence strength (#174)
+    ○ skipped implementation cannot start without a contract and a baseline
+    ○ skipped an unevaluable contract is rejected before freezing
+    ○ skipped acceptance edited after implementation is a new version that cannot rescue a failed change
+    ○ skipped judgment cannot satisfy a deterministic requirement: missing stays missing
+    ○ skipped submitted evidence cannot claim level 1 and builder self-review is not counted
+  IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)
+    ○ skipped freezing requires a Duo critique that says pursue
+    ○ skipped holdout checks must be hidden holdout artifacts written by a recorded oracle author
+    ○ skipped peer reuses the hardened duo reviewer invocation
+    ○ skipped peer redirects the builder between rounds and never sees the holdout
+    ○ skipped peer keep while a practice check fails is invalid and cannot produce KEEP
+    ○ skipped repair budget matches duo-build: 1 initial round + 3 repairs
+    ○ skipped the hidden holdout decides, not the practice checks
+    ○ skipped the holdout is single use
+    ○ skipped a builder that reads the run directory exposes the holdout: INCONCLUSIVE
+    ○ skipped peer disagreement withholds KEEP; a human decides
+    ○ skipped a failed run surfaces the peer's user-owned decision as the human next decision
+    ○ skipped an oracle dispute on a mandatory criterion is INCONCLUSIVE, and the builder cannot raise one
+    ○ skipped the builder may not be the oracle author
+  IMPROVE-GAIN (#174/#178)
+    ○ skipped GAIN-1: preservation cannot authorize a new improvement contract
+    ○ skipped GAIN-1: optional-gain cannot authorize a new improvement contract
+    ○ skipped GAIN-1: undeclared cannot authorize a new improvement contract
+    ○ skipped GAIN-2: a practice baseline mismatch names its set and blocks build
+    ○ skipped GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain
+    ○ skipped GAIN-3: a different verifier environment cannot establish a matched gain
+    ○ skipped GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain pass)
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain unavailable)
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated acceptance failure
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated gate failure
+    ○ skipped GAIN-5: a rejected late baseline command does not invalidate an admitted run
+    ○ skipped GAIN-5: legacy gain evidence cannot gain KEEP authority and is never rewritten
+    ○ skipped GAIN-5: legacy preservation evidence cannot gain KEEP authority and is never rewritten
+  IMPROVE-06 decision (#178) and reversibility (#176)
+    ○ skipped true improvement: KEEP retains an identifiable commit on an isolated branch; base untouched
+    ○ skipped regression: REVERT leaves no product diff but preserves patch and evidence
+    ○ skipped changes outside the frozen scope are reverted even when checks pass
+    ○ skipped interrupted run is never terminal and a workspace mutated after evaluation cannot be applied
+    ○ skipped a frozen check edited after freezing blocks verification
+  IMPROVE-07 ledger (#179)
+    ○ skipped editing or dropping a ledger line breaks the chain
+  IMPROVE-BIND #201 evidence freshness
+    ○ skipped Q1: a candidate changed after passing verification cannot KEEP
+    ○ skipped Q2: a superseding contract cannot reuse a baseline from the old version
+  IMPROVE-BIND #201 negative routes and retention
+    ○ skipped untracked input changes invalidate passing verification
+    ○ skipped ignored input changes invalidate passing verification
+    ○ skipped mode input changes invalidate passing verification
+    ○ skipped deleted input changes invalidate passing verification
+    ○ skipped environment input changes invalidate passing verification
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 2)
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 3)
+    ○ skipped external symlinks fail before consuming the holdout
+    ○ skipped dangling symlinks fail before consuming the holdout
+    ○ skipped missing receipt/evidence cannot satisfy KEEP
+    ○ skipped tampered receipt/evidence cannot satisfy KEEP
+    ○ skipped swapped-evidence receipt/evidence cannot satisfy KEEP
+    ○ skipped newer failed baseline attempt prevents fallback to earlier successful evidence
+    ○ skipped KEEP retains the verified tree without executing commit hooks
+    ○ skipped ignored input mutation after evaluation refuses final retention
+  IMPROVE-04 RUNTIME scalable input identity (#176)
+    ○ skipped RUNTIME-01: the default cap still rejects a >256 MiB tree; a declared bound seals it without exclusion
+    ○ skipped RUNTIME-02: a changed dependency byte or a restored mtime still changes identity
+    ○ skipped RUNTIME-03: equivalent workspace-local executables compare equal across worktrees; changed bytes do not
+    ○ skipped RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint
+    ○ skipped RUNTIME: invalid identity declarations are rejected before freezing
+    ○ skipped RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds
+  IMPROVE runtime integrity repair (#222)
+    ✕ FIX-1: reject every symlink ancestor before deleting output (37 ms)
+    ✕ FIX-2: generated input changed after verification invalidates KEEP (1269 ms)
+    ✕ FIX-2: generated input changed during checks blocks the bound receipt (624 ms)
+    ✕ FIX-2: generated input changed after evaluation cannot be retained (749 ms)
+    ✕ FIX-4: unignored generated output verifies and is not retained as product (122 ms)
+
+  ● IMPROVE runtime integrity repair (#222) › FIX-1: reject every symlink ancestor before deleting output
+
+    expect(received).toThrow(expected)
+
+    Expected pattern: /symlink|escape/i
+
+    Received function did not throw
+
+      875 |     const f=fixture();try{
+      876 |       const external=path.join(f.root,'external');fs.mkdirSync(path.join(external,'cache'),{recursive:true});fs.writeFileSync(path.join(external,'cache','canary'),'owned elsewhere');fs.symlinkSync(external,path.join(f.repo,'link'));
+    > 877 |       expect(()=>binding.wipeOutputs(f.repo,['link/cache'])).toThrow(/symlink|escape/i);
+          |                                                              ^
+      878 |       expect(fs.readFileSync(path.join(external,'cache','canary'),'utf8')).toBe('owned elsewhere');
+      879 |       expect(()=>binding.wipeOutputs(f.repo,['link/missing/cache'])).toThrow(/symlink|escape/i);
+      880 |     }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+
+      at Object.toThrow (tests/contracts/improve-core.test.js:877:62)
+
+  ● IMPROVE runtime integrity repair (#222) › FIX-2: generated input changed after verification invalidates KEEP
+
+    expect(received).not.toBe(expected) // Object.is equality
+
+    Expected: not "KEEP"
+
+      881 |   });
+      882 |   test('FIX-2: generated input changed after verification invalidates KEEP',quiet(async()=>{
+    > 883 |     const f=fixture();try{ignored(f);const {runDir,ws}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');fs.writeFileSync(path.join(ws,'.out','generated.json'),'{"steps":99}');expect(improve.evaluate(runDir).decision).not.toBe('KEEP');}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+          |                                                                                                                                                                                                                                                                                 ^
+      884 |   }));
+      885 |   test('FIX-2: generated input changed during checks blocks the bound receipt',quiet(async()=>{
+      886 |     const f=fixture();try{ignored(f);const prefix="if(process.env.IMPROVE_PHASE==='after')require('fs').writeFileSync(process.env.IMPROVE_WORKSPACE+'/.out/generated.json','{\"steps\":99}');";const {runDir}=await builtGenerated(f,prefix);expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+
+      at toBe (tests/contracts/improve-core.test.js:883:273)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+  ● IMPROVE runtime integrity repair (#222) › FIX-2: generated input changed during checks blocks the bound receipt
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "blocked"
+    Received: "verified"
+
+      884 |   }));
+      885 |   test('FIX-2: generated input changed during checks blocks the bound receipt',quiet(async()=>{
+    > 886 |     const f=fixture();try{ignored(f);const prefix="if(process.env.IMPROVE_PHASE==='after')require('fs').writeFileSync(process.env.IMPROVE_WORKSPACE+'/.out/generated.json','{\"steps\":99}');";const {runDir}=await builtGenerated(f,prefix);expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+          |                                                                                                                                                                                                                                                                                                         ^
+      887 |   }));
+      888 |   test('FIX-2: generated input changed after evaluation cannot be retained',quiet(async()=>{
+      889 |     const f=fixture();try{ignored(f);const {runDir,ws}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');fs.writeFileSync(path.join(ws,'.out','generated.json'),'{"steps":99}');expect(()=>improve.finalize(runDir)).toThrow(/binding|input/i);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+
+      at toBe (tests/contracts/improve-core.test.js:886:297)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+  ● IMPROVE runtime integrity repair (#222) › FIX-2: generated input changed after evaluation cannot be retained
+
+    expect(received).toThrow(expected)
+
+    Expected pattern: /binding|input/i
+
+    Received function did not throw
+
+      887 |   }));
+      888 |   test('FIX-2: generated input changed after evaluation cannot be retained',quiet(async()=>{
+    > 889 |     const f=fixture();try{ignored(f);const {runDir,ws}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');fs.writeFileSync(path.join(ws,'.out','generated.json'),'{"steps":99}');expect(()=>improve.finalize(runDir)).toThrow(/binding|input/i);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+          |                                                                                                                                                                                                                                                                                                                               ^
+      890 |   }));
+      891 |   test('FIX-4: unignored generated output verifies and is not retained as product',quiet(async()=>{
+      892 |     const f=fixture();try{const {runDir}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');const kept=improve.finalize(runDir);expect(git(f.repo,'ls-tree','-r','--name-only',kept.commit)).not.toMatch(/\.out/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+
+      at toThrow (tests/contracts/improve-core.test.js:889:319)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+  ● IMPROVE runtime integrity repair (#222) › FIX-4: unignored generated output verifies and is not retained as product
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "baseline_recorded"
+    Received: "blocked"
+
+      867 |   async function builtGenerated(f,prefix='') {
+      868 |     const {runDir,frozen}=await prepare(f,{contractDoc:generated(),checkInput:'.out/generated.json',holdoutPrefix:prefix});
+    > 869 |     expect(frozen.status).toBe('frozen');expect((await improve.verifyPhase(runDir,'baseline')).status).toBe('baseline_recorded');
+          |                                                                                                        ^
+      870 |     await improve.build(runDir,{policy:writeTmp(f,'builder.json',FAKE_BUILDER()),invokePeer:fakePeer([KEEP]),afterBuilderRound:ws=>setSteps(ws,2)});
+      871 |     return {runDir,ws:path.join(f.worktrees,'improve-test')};
+      872 |   }
+
+      at toBe (tests/contracts/improve-core.test.js:869:104)
+      at tests/contracts/improve-core.test.js:892:42
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:19:16)
+
+Test Suites: 1 failed, 1 total
+Tests:       5 failed, 83 skipped, 88 total
+Snapshots:   0 total
+Time:        3.624 s
+Ran all test suites within paths "tests/contracts/improve-core.test.js".
+Test results written to: tmp/foundation/failing-first.json

@@ -1,0 +1,6 @@
+{
+  "source": "scripts/improve-binding.cjs",
+  "sha256": "17bb26fc527b86fd77b15ed9359c8482350036b7389df4f4abc010013d3a9f1e",
+  "observation": "Default spawnSync ls-files buffer fails for >1 MiB path list; raw scale-failing-first.txt retains execution.",
+  "baseCommit": "ca251f50a205daafcc913776ab95c0c11bec183e"
+}
