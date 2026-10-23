@@ -82,6 +82,29 @@ test('preparation can correct two rejected peer protocols and then obtain a scop
   expect(reviews.status(root, record, 'contracted')).toMatchObject({ attempts: 1, protocolFailures: 0, passed: false });
   expect(fs.readFileSync(path.join(root, '.specflow/duo', run.id, 'round-003/prompt.txt'), 'utf8')).toContain('Promotion is a subsequent builder action');
 });
+test('#228: scoped P2 evidence uses submitted batch paths and a rejected response retains the retry', () => {
+  const record = { issue: { number: 228, body: 'AC-1: returns 42', labels: ['spec:contracted'] }, profile: { ui: false, materialSeams: [] } };
+  put('tier.json', JSON.stringify(record));
+  const run = duo.start(root, '#228', 'codex', { ...context, specification: { record: 'tier.json', targetTier: 'contracted' } });
+  const warning = evidence => ({ id: 'P2-NAME', kind: 'P2', basis: 'Future filename is generated', action: 'Record it in feature-build', impact: 'future', evidence, nonimpact: 'The contract semantics are fixed', owner_issue: '#228', trigger: 'Migration creation' });
+  const invalid = reviewOwned(root, run.id, batch(), fakePeer('accepted', (_, result) => {
+    result.specification_nonblocking = [warning(['task.md'])];
+  }));
+  expect(invalid.outcome).toBe('blocked');
+  expect(require('../../scripts/specflow-reviews.cjs').status(root, record, 'contracted')).toMatchObject({ attempts: 0, protocolFailures: 1, passed: false });
+
+  const valid = reviewOwned(root, run.id, batch(), fakePeer('accepted', (_, result) => {
+    result.specification_nonblocking = [warning(['raw.txt'])];
+  }));
+  expect(valid.outcome).toBe('accepted');
+  const reviews = require('../../scripts/specflow-reviews.cjs');
+  expect(reviews.status(root, record, 'contracted')).toMatchObject({ attempts: 1, protocolFailures: 0 });
+  expect(reviews.load(root, 228).reviews.contracted).toHaveLength(2);
+  const round = path.join(root, '.specflow/duo', run.id, 'round-002');
+  const schema = JSON.parse(fs.readFileSync(path.join(round, 'schema.json'), 'utf8'));
+  expect(schema.properties.specification_nonblocking.items.properties.evidence.items.enum).toEqual(['raw.txt']);
+  expect(fs.readFileSync(path.join(round, 'prompt.txt'), 'utf8')).toContain('specification_nonblocking evidence must use exact paths from batch.evidence');
+});
 test.each(['codex', 'claude-code'])('J-DUO-REPAIR/J-DUO-RESUME: %s builder repairs and retains evidence', builder => {
   const run = duo.start(root, '#1', builder, context);
   const first = reviewOwned(root, run.id, batch(), fakePeer('changes_required'));
