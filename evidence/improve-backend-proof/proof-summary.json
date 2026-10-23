@@ -1,0 +1,115 @@
+{
+  "executed": 67,
+  "failed": 0,
+  "skipped": 0,
+  "scope": "retained historical receipt verification only; no browser/model/holdout replay",
+  "decision": "INCONCLUSIVE",
+  "playwright": {
+    "baseline": {
+      "GAIN-RESPONSIVE": {
+        "executed": 6,
+        "passed": 1,
+        "failed": 5,
+        "skipped": 0
+      },
+      "PRESERVE-DESKTOP": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "PRESERVE-BACKEND": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    },
+    "after": {
+      "GAIN-RESPONSIVE": {
+        "executed": 6,
+        "passed": 6,
+        "failed": 0,
+        "skipped": 0
+      },
+      "PRESERVE-DESKTOP": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      },
+      "PRESERVE-BACKEND": {
+        "executed": 1,
+        "passed": 1,
+        "failed": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "successfulIndependentImageReads": 9,
+  "productBranchRetained": false,
+  "ledgerEntries": 59,
+  "verifier": "5e4115baab6705be6c9d067986398289eec685deb5bbfe02320a6c538474cc79",
+  "runId": "improve-180-sealed-20261023",
+  "productSource": {
+    "repository": "Hulupeep/tabstax-webapps",
+    "commit": "a8de4e92850e4ffe46da241e0bfd9c6703f792ae"
+  },
+  "backend": "dedicated local Supabase with156 migrations and2 fake users; actual auth/persistence/RLS, no bypass",
+  "patchSha256": "a80352d397981fb2eb1b27b2440b0c5b9adca46e94ab3f14691def4596a5ddc4",
+  "uxVerdict": {
+    "raw": "fail",
+    "acceptedByOldCore": false,
+    "reason": "prose merges two class names mistaken for prohibited merge action",
+    "successfulImageReads": 9
+  },
+  "peerBlocker": "combined criterion IDs instead of exact frozen identifiers; invalid advice not accepted",
+  "usage": {
+    "mode": "subscription_cli",
+    "coreRoleCalls": 10,
+    "reportedEstimateSubtotalUsd": 1.4614292,
+    "unknownCostCalls": 4,
+    "actualCharges": "unmeasured",
+    "note": "partial CLI/provider telemetry, not invoice; separate native Duo and transport diagnostics are outside this subtotal"
+  },
+  "postRunProtocolReplay": {
+    "newModelCalled": false,
+    "oldTerminalOutcomeUnchanged": true,
+    "qualifyingEvidenceImported": false
+  },
+  "limits": [
+    "Supervised proof, not full worker isolation; #217 owns that qualification",
+    "Broad standalone product tests do not pass; no product release claim",
+    "Original receipt coverage is unchanged; post-run archival manifest is additional retention evidence"
+  ],
+  "fixtureState": {
+    "initialFixtureDigest": "7397af56716191d6fa7c9bb4fc5f39af25bea547bb7153d108c2968f302320b6",
+    "perPhase": [
+      {
+        "phase": "baseline holdout",
+        "expectedDigest": "7397af56716191d6fa7c9bb4fc5f39af25bea547bb7153d108c2968f302320b6",
+        "rawObservedDigest": null,
+        "basis": "inferred positive match: pinned setup resets the owned fixture and throws on mismatch; normal phase reached its checks. Setup stdout was not retained separately."
+      },
+      {
+        "phase": "baseline practice",
+        "expectedDigest": "7397af56716191d6fa7c9bb4fc5f39af25bea547bb7153d108c2968f302320b6",
+        "rawObservedDigest": null,
+        "basis": "inferred positive match: pinned setup resets the owned fixture and throws on mismatch; normal phase reached its checks. Setup stdout was not retained separately."
+      },
+      {
+        "phase": "candidate practice",
+        "expectedDigest": "7397af56716191d6fa7c9bb4fc5f39af25bea547bb7153d108c2968f302320b6",
+        "rawObservedDigest": null,
+        "basis": "inferred positive match: pinned setup resets the owned fixture and throws on mismatch; normal phase reached its checks. Setup stdout was not retained separately."
+      },
+      {
+        "phase": "candidate holdout",
+        "expectedDigest": "7397af56716191d6fa7c9bb4fc5f39af25bea547bb7153d108c2968f302320b6",
+        "rawObservedDigest": null,
+        "basis": "inferred positive match: pinned setup resets the owned fixture and throws on mismatch; normal phase reached its checks. Setup stdout was not retained separately."
+      }
+    ],
+    "negativeCoverage": "Separate unchanged frozen guard executed against matching/mismatching temporary JSON. Not an interrupted real-backend mutation/recovery replay; no original phase receipt is fabricated."
+  }
+}

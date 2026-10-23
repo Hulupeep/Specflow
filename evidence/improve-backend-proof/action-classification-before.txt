@@ -1,0 +1,177 @@
+FAIL tests/contracts/loop-run-contract.test.js
+  local contracted loop runner
+    ○ skipped reruns hashed stage evidence checks before advancing an agent rail
+    ○ skipped CLI stage-evidence reruns do not require provider routing readiness
+    ○ skipped rejects changed artifacts without executing their stage checks
+    ○ skipped rejects stage checks that perform human-gated actions
+    ○ skipped stops rail 7 at an explicit human CI handoff
+    ○ skipped creates a default run_contract and ledger at .specflow/runs/<slug>
+    ○ skipped resumes from an existing contract instead of restarting discovery
+    ○ skipped invalid run_contract names missing fields and does not advance
+    ○ skipped validateRunContract rejects unsupported loops
+    ○ skipped loads stage order from loop YAML instead of only hardcoded defaults
+    ○ skipped materializes a stage prompt when agent action is required
+    ○ skipped state memory writes STATE.md, one lesson file, and prompt digest
+    ○ skipped bounded run-until-terminal advances through green registries and stops at next agent stage
+    ○ skipped run status reports the current contract and ledger tail
+    ○ skipped prepares isolated delegated worktree metadata without auto merge or push
+    ○ skipped scaffolds routine manifests that call specflow run and preserve human gates
+  generative adapter policy and command builders
+    ✕ PROOF-ACTIONS: read-only CSS verdict prose is not a merge action (4 ms)
+    ✕ PROOF-ACTIONS: actual nested Claude Write invocation still blocks (2 ms)
+    ✕ PROOF-ACTIONS: actual nested Claude Bash invocation still blocks
+    ✕ PROOF-ACTIONS: actual nested Claude Read invocation still blocks
+    ✕ PROOF-ACTIONS: Codex command and message are parsed without granting output authority (1 ms)
+    ✕ PROOF-ACTIONS: actual Codex Git merge remains blocked (1 ms)
+    ✕ PROOF-ACTIONS: reading action words as a path or result is not execution (1 ms)
+    ○ skipped normalizes and validates adapter policy
+    ○ skipped rejects unsupported adapter roles and effort levels before invocation
+    ○ skipped builds Claude print command with safety flags
+    ○ skipped builds Codex exec command with JSONL output controls
+    ○ skipped builds provider resume commands when a session id exists
+    ○ skipped adapter smoke includes a bounded prompt by default
+    ○ skipped Codex adapter smoke uses the current approval configuration syntax
+    ○ skipped resolves default adapter routing for the current loop stage
+    ○ skipped installs default adapter routing from the local policy template
+    ○ skipped checks routing model ids for known shorthand aliases
+    ○ skipped updates routing model ids using known safe aliases only
+    ○ skipped runLoop blocks routed adapter execution until model choices are confirmed
+    ○ skipped Codex routed confirmations explain ChatGPT quota semantics
+    ○ skipped detects forbidden human-gate actions in provider output
+    ○ skipped parses provider JSONL events into final text and tool events
+    ○ skipped summarizes requested and effective model accounting without guessing unknowns
+  stage verifier registry and freshness gates
+    ○ skipped runs Gate B verifier registry and advances only on pass
+    ○ skipped simulation freshness detects stale simulation evidence
+  generative adapter execution with fake provider
+    ○ skipped dry-run prints planned command without invoking provider
+    ○ skipped successful fake provider writes transcript/output and requires gate rerun
+    ○ skipped provider failure preserves transcript evidence
+    ○ skipped missing provider stops before invocation with adapter_unavailable
+    ○ skipped forbidden action blocks stage advance
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: read-only CSS verdict prose is not a merge action
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 1
+    Received length: 0
+    Received array:  []
+
+      803 |       JSON.stringify({type:'result',result:'The missing space merges two class names. UX fails.'})
+      804 |     ].join('\n'));
+    > 805 |     expect(parsed.tool_events).toHaveLength(1);
+          |                                ^
+      806 |     expect(forbiddenFromProviderEvents(parsed,['merge'],['Write','Edit','Bash'])).toBeNull();
+      807 |   });
+      808 |
+
+      at Object.toHaveLength (tests/contracts/loop-run-contract.test.js:805:32)
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: actual nested Claude Write invocation still blocks
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Write"
+    Received: null
+
+      813 |   ])('PROOF-ACTIONS: actual nested Claude %s invocation still blocks', (name,input,human,denied,expected) => {
+      814 |     const parsed=parseProviderEvents('claude-print',JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'actual',name,input}]}}));
+    > 815 |     expect(forbiddenFromProviderEvents(parsed,human,denied)).toBe(expected);
+          |                                                              ^
+      816 |   });
+      817 |
+      818 |   test('PROOF-ACTIONS: Codex command and message are parsed without granting output authority', () => {
+
+      at toBe (tests/contracts/loop-run-contract.test.js:815:62)
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: actual nested Claude Bash invocation still blocks
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "git push"
+    Received: null
+
+      813 |   ])('PROOF-ACTIONS: actual nested Claude %s invocation still blocks', (name,input,human,denied,expected) => {
+      814 |     const parsed=parseProviderEvents('claude-print',JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'actual',name,input}]}}));
+    > 815 |     expect(forbiddenFromProviderEvents(parsed,human,denied)).toBe(expected);
+          |                                                              ^
+      816 |   });
+      817 |
+      818 |   test('PROOF-ACTIONS: Codex command and message are parsed without granting output authority', () => {
+
+      at toBe (tests/contracts/loop-run-contract.test.js:815:62)
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: actual nested Claude Read invocation still blocks
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "Read(/private/**)"
+    Received: null
+
+      813 |   ])('PROOF-ACTIONS: actual nested Claude %s invocation still blocks', (name,input,human,denied,expected) => {
+      814 |     const parsed=parseProviderEvents('claude-print',JSON.stringify({type:'assistant',message:{content:[{type:'tool_use',id:'actual',name,input}]}}));
+    > 815 |     expect(forbiddenFromProviderEvents(parsed,human,denied)).toBe(expected);
+          |                                                              ^
+      816 |   });
+      817 |
+      818 |   test('PROOF-ACTIONS: Codex command and message are parsed without granting output authority', () => {
+
+      at toBe (tests/contracts/loop-run-contract.test.js:815:62)
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: Codex command and message are parsed without granting output authority
+
+    expect(received).toHaveLength(expected)
+
+    Expected length: 1
+    Received length: 0
+    Received array:  []
+
+      821 |       JSON.stringify({type:'item.completed',item:{id:'answer',type:'agent_message',text:'This merges two CSS classes.'}})
+      822 |     ].join('\n'));
+    > 823 |     expect(parsed.tool_events).toHaveLength(1);expect(parsed.final_text).toBe('This merges two CSS classes.');
+          |                                ^
+      824 |     expect(forbiddenFromProviderEvents(parsed,['git push','merge'],[])).toBeNull();
+      825 |   });
+      826 |
+
+      at Object.toHaveLength (tests/contracts/loop-run-contract.test.js:823:32)
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: actual Codex Git merge remains blocked
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: "merge"
+    Received: null
+
+      827 |   test('PROOF-ACTIONS: actual Codex Git merge remains blocked', () => {
+      828 |     const parsed=parseProviderEvents('codex-exec',JSON.stringify({type:'item.completed',item:{id:'cmd',type:'command_execution',command:'git merge main',aggregated_output:'done',exit_code:0}}));
+    > 829 |     expect(forbiddenFromProviderEvents(parsed,['merge'],[])).toBe('merge');
+          |                                                              ^
+      830 |   });
+      831 |
+      832 |   test('PROOF-ACTIONS: reading action words as a path or result is not execution', () => {
+
+      at Object.toBe (tests/contracts/loop-run-contract.test.js:829:62)
+
+  ● generative adapter policy and command builders › PROOF-ACTIONS: reading action words as a path or result is not execution
+
+    expect(received).toBeNull()
+
+    Received: "git push"
+
+      835 |       JSON.stringify({type:'tool_result',output:'git push origin main'})
+      836 |     ].join('\n'));
+    > 837 |     expect(forbiddenFromProviderEvents(parsed,['git push'],['Write'])).toBeNull();
+          |                                                                        ^
+      838 |   });
+      839 |
+      840 |   test('summarizes requested and effective model accounting without guessing unknowns', () => {
+
+      at Object.toBeNull (tests/contracts/loop-run-contract.test.js:837:72)
+
+Test Suites: 1 failed, 1 total
+Tests:       7 failed, 39 skipped, 46 total
+Snapshots:   0 total
+Time:        0.656 s
+Ran all test suites matching /tests\/contracts\/loop-run-contract.test.js/i with tests matching "PROOF-ACTIONS".

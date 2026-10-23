@@ -1,0 +1,36 @@
+{
+  "journey": "J-IMPROVE-HEYSTAX-BACKEND",
+  "source": "a8de4e92850e4ffe46da241e0bfd9c6703f792ae",
+  "backend": "dedicated local Supabase; 156 migrations, two owned fake users, no auth bypass",
+  "command": [
+    "node",
+    "@playwright/test/cli.js",
+    "test",
+    "--config",
+    "playwright.config.cjs"
+  ],
+  "stats": {
+    "startTime": "2026-10-23T06:30:33.724Z",
+    "duration": 19761.425,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 3,
+    "flaky": 0
+  },
+  "interpretation": "3 responsive gain tests fail on baseline as expected; desktop and genuine persisted-action/visible403 denied-write tests pass; zero skipped. This is preparation evidence, not a completed Improve comparison.",
+  "privateRaw": "/home/xanacan/.local/state/specflow-improve/180-cycle/practice/results.json",
+  "initialFixtureDigest": "7397af56716191d6fa7c9bb4fc5f39af25bea547bb7153d108c2968f302320b6",
+  "productionBuildExit": 0,
+  "tscExit": 0,
+  "scopedEslintExit": 0,
+  "broadUnitPreflight": {
+    "filesFailed": 55,
+    "filesPassed": 89,
+    "filesSkipped": 2,
+    "testsFailed": 90,
+    "testsPassed": 614,
+    "testsSkipped": 8,
+    "causeObserved": "Standalone Git worktree lacks parent-monorepo migrations/contracts/MCP modules referenced by tests. Some additional assertion failures retained privately; no claim all failures share one cause.",
+    "releaseGateStatus": "not passing; no product release claim"
+  }
+}

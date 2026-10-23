@@ -1,0 +1,9 @@
+{
+  "purpose": "Exact tested runtime bytes for historical proof; do not relocate/replay consumed holdout or manufacture new authority",
+  "files": {
+    "scripts/specflow-improve.cjs": "c3ff33d0d5edf5e522b525fcaee77217d813bf2ff611d9c5750dd0737841fc8e",
+    "scripts/improve-binding.cjs": "d61b1b2c852302d4655c6804cd7c89fa73fb0e0d5f690f6e9cdf48c12b4a8838",
+    "scripts/improve-untrusted.cjs": "a52961f1a6859e24f9ba79ebb53b3d1c92f31acddda709c5f7df9ed784e0757a",
+    "scripts/specflow-runner.cjs": "45bc7e274137e3449f07b35fe052eedfa7a4c59f029bfdb60074e28556ce094d"
+  }
+}
