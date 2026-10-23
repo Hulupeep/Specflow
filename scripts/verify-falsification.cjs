@@ -27,20 +27,22 @@ const REQUIRED = [
   'Banned-Mode Self-Check',
   'Final Verdict',
 ];
-const VERDICTS = ['PASS WITH STIPULATIONS', 'PASS', 'FAIL']; // longest first for matching
+const VERDICT_LINE = /^(?:\*\*|`)?(PASS WITH STIPULATIONS|PASS|FAIL)(?:\*\*|`)?(?:\s*(?:—|–|-|:)\s*.+)?$/i;
 
 function sha256(buf) { return createHash('sha256').update(buf).digest('hex'); }
 
 function extractFinalVerdict(content) {
   const parts = content.split(/^##\s+/m).slice(1);
+  const verdictSections = [];
   for (const p of parts) {
     const nl = p.indexOf('\n');
     const heading = (nl === -1 ? p : p.slice(0, nl)).trim();
-    if (heading !== 'Final Verdict') continue;
-    const body = (nl === -1 ? '' : p.slice(nl + 1)).trim().toUpperCase();
-    for (const verdict of VERDICTS) if (body.includes(verdict)) return verdict;
+    if (heading === 'Final Verdict') verdictSections.push(nl === -1 ? '' : p.slice(nl + 1));
   }
-  return null;
+  if (verdictSections.length !== 1) return null;
+  const firstLine = verdictSections[0].split(/\r?\n/).map(line => line.trim()).find(Boolean);
+  const match = firstLine?.match(VERDICT_LINE);
+  return match ? match[1].toUpperCase() : null;
 }
 
 function extractBoundPrdHash(content) {
@@ -73,8 +75,7 @@ function validateFalsification(content, options = {}) {
   for (const req of REQUIRED) {
     if (!sections.has(req)) { v.push(`missing section: "## ${req}"`); continue; }
     if (req === 'Final Verdict') {
-      const final = sections.get(req).toUpperCase();
-      if (!VERDICTS.some(verd => final.includes(verd))) {
+      if (!extractFinalVerdict(content)) {
         v.push('Final Verdict has no recognized verdict (PASS / PASS WITH STIPULATIONS / FAIL)');
       }
       continue;

@@ -6,7 +6,7 @@
 
 const { readFileSync } = require('fs');
 const { join } = require('path');
-const { validateFalsification, REQUIRED } = require('../../scripts/verify-falsification.cjs');
+const { validateFalsification, extractFinalVerdict, REQUIRED } = require('../../scripts/verify-falsification.cjs');
 
 const TEMPLATE = join(__dirname, '../../templates/loops/falsification-template.md');
 
@@ -48,6 +48,43 @@ describe('validateFalsification', () => {
     const r = validateFalsification(doc);
     expect(r.ok).toBe(false);
     expect(r.violations.some(v => v.includes('Final Verdict'))).toBe(true);
+  });
+
+  test('a pending current verdict cannot inherit a historical pass mentioned in its prose', () => {
+    const doc = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'REVIEW PENDING — The previous PASS WITH STIPULATIONS applied to another PRD and is withdrawn.',
+    );
+    expect(extractFinalVerdict(doc)).toBeNull();
+    const result = validateFalsification(doc, { requirePass: true });
+    expect(result.ok).toBe(false);
+    expect(result.finalVerdict).toBeNull();
+  });
+
+  test('the first verdict line wins over historical prose', () => {
+    const fail = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'FAIL — Prior review said PASS WITH STIPULATIONS; that result is withdrawn.',
+    );
+    expect(extractFinalVerdict(fail)).toBe('FAIL');
+    expect(validateFalsification(fail, { requirePass: true }).ok).toBe(false);
+
+    const pass = filled().replace(
+      'PASS WITH STIPULATIONS — owner: Colm',
+      'PASS — Previous draft failed; the current review closed it.',
+    );
+    expect(extractFinalVerdict(pass)).toBe('PASS');
+    expect(validateFalsification(pass, { requirePass: true }).ok).toBe(true);
+  });
+
+  test('the template verdict choice list is not a current verdict', () => {
+    expect(extractFinalVerdict(readFileSync(TEMPLATE, 'utf8'))).toBeNull();
+  });
+
+  test('duplicate final-verdict sections cannot hide a pending current review', () => {
+    const doc = `${filled()}\n## Final Verdict\nREVIEW PENDING — previous result is withdrawn.`;
+    expect(extractFinalVerdict(doc)).toBeNull();
+    expect(validateFalsification(doc, { requirePass: true }).ok).toBe(false);
   });
 
   test('all 8 required sections are present in the shipped template', () => {
