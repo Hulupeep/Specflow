@@ -27,6 +27,11 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  profiles: {
+    usage: 'specflow profiles <register|inspect|preflight|history> [repo_id] --registry OWNER_PRIVATE_DIR [--file PROFILE.json]',
+    desc: 'Owner-approved repository profiles and non-inference readiness diagnostics',
+    run: args => { process.exitCode = require('../scripts/improve-profiles.cjs').cli(args); },
+  },
   specification: {
     usage: 'specflow specification <import|status|frontier|gate|promote|experiment|begin|collect|reconcile|publish|volume|exception> [arguments]',
     desc: 'Prepare only the selected slice, execute bounded learning and reconcile discoveries',

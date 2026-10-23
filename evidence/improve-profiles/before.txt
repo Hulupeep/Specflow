@@ -1,0 +1,21 @@
+FAIL tests/contracts/improve-profiles.test.js
+  ● Test suite failed to run
+
+    Cannot find module '../../scripts/improve-profiles.cjs' from 'tests/contracts/improve-profiles.test.js'
+
+      1 | 'use strict';
+      2 | const fs=require('fs'),path=require('path'),os=require('os'),crypto=require('crypto');
+    > 3 | const profiles=require('../../scripts/improve-profiles.cjs');
+        |                ^
+      4 | const sha=b=>crypto.createHash('sha256').update(b).digest('hex');
+      5 | let root,repo,registry,profile;
+      6 | beforeEach(()=>{
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at Object.require (tests/contracts/improve-profiles.test.js:3:16)
+
+Test Suites: 1 failed, 1 total
+Tests:       0 total
+Snapshots:   0 total
+Time:        0.369 s
+Ran all test suites within paths "tests/contracts/improve-profiles.test.js".

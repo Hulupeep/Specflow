@@ -1,0 +1,30 @@
+contract_meta:
+  id: feature_improve_profiles
+  version: 1
+  created_from_spec: "GitHub #216; docs/specs/improve-profiles/preparation.md"
+  covers_reqs: [AC-PROFILES-01, AC-PROFILES-02, AC-PROFILES-03, AC-PROFILES-04, AC-PROFILES-05]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_improve_profiles"
+invariants:
+  - id: I-PROFILES-001
+    rule: "Only owner-registered immutable profiles supply repository identity, paths, commands, routing, scope, secrets references and publication policy; caller payloads supply only repo_id and optional revision."
+    tests: [AC-PROFILES-01, AC-PROFILES-02]
+  - id: I-PROFILES-002
+    rule: "Trusted host identity, owner grants and host capabilities intersect at each operation. Read-only callers cannot execute, cross-caller leases/history cannot grant authority, and repository text never updates permission."
+    tests: [J-PROFILES-READONLY, J-PROFILES-FORGED]
+  - id: I-PROFILES-003
+    rule: "Preflight performs no inference, checkout or repository recipe. Auth probes run in an empty private directory. Missing capabilities return named findings/remedies, never fabricated worker readiness or silent API billing."
+    tests: [J-PROFILES-NO-FALLBACK, J-PROFILES-AUTH-CWD, J-PROFILES-TWO-REPOS]
+  - id: I-PROFILES-004
+    rule: "Signed bounded leases cannot outlive changed profiles, permissions, pinned refs/toolchain/routing or host capabilities; protected transitions revalidate current authority before starting."
+    tests: [J-PROFILES-REVOKE, J-PROFILES-STALE, J-PROFILES-FORGED]
+  - id: I-PROFILES-005
+    rule: "Caller-scoped private preflight history survives separately revoked execute permission. Unpersisted reports cannot issue a usable lease; secret contents and other callers' private reports are never returned."
+    tests: [J-PROFILES-PRIVATE, J-PROFILES-SECRETS, J-PROFILES-READONLY]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-profiles.test.js
+    - file: tests/integration/improve-preflight.test.js
