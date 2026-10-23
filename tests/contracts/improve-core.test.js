@@ -137,13 +137,13 @@ function writeTmp(f, name, data) {
 const setSteps = (ws, steps) => fs.writeFileSync(path.join(ws, 'src', 'journey.json'), JSON.stringify({ steps }));
 
 // Everything up to a recorded baseline: candidates, Duo critique, evaluator-authored holdout, frozen contract.
-async function prepare(f, { contractDoc = contract(), runId = 'improve-test', critique = PURSUE, holdoutPrefix = '' } = {}) {
+async function prepare(f, { checkInput = 'src/journey.json', contractDoc = contract(), runId = 'improve-test', critique = PURSUE, holdoutPrefix = '' } = {}) {
   const { runDir } = improve.startRun({ target: f.repo, mission: f.mission, runId, stateDir: f.state, worktreeRoot: f.worktrees });
   expect(improve.recordCandidates(runDir, writeTmp(f, 'cands.json', candidates())).status).toBe('recorded');
   expect(improve.critique(runDir, { invokePeer: fakePeer([critique]) }).status).toBe('recorded');
   for (const [dir, max] of [['holdout', 2], ['dev', 3]]) {
     fs.mkdirSync(path.join(runDir, dir), { recursive: true });
-    fs.writeFileSync(path.join(runDir, dir, 'steps.cjs'), (dir === 'holdout' ? holdoutPrefix : '') + stepCheck(max));
+    fs.writeFileSync(path.join(runDir, dir, 'steps.cjs'), (dir === 'holdout' ? holdoutPrefix : '') + stepCheck(max).replace('/src/journey.json', '/' + checkInput));
   }
   improve.recordOracle(runDir, { role: 'evaluator', executor: 'fake-evaluator', files: ['holdout/steps.cjs'] });
   const frozen = improve.freezeContract(runDir, writeTmp(f, 'contract.json', contractDoc));
@@ -823,7 +823,7 @@ describe('IMPROVE-04 RUNTIME scalable input identity (#176)',()=>{
   test('RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint',()=>{
     const f=fixture();try{
       fs.mkdirSync(path.join(f.repo,'out'));fs.writeFileSync(path.join(f.repo,'out','x'),'1');
-      expect(binding.workspace(f.repo,{outputs:['out']}).entries.find(e=>e.path==='out').kind).toBe('disposable-output');
+      expect(binding.workspace(f.repo,{outputs:['out']}).entries.find(e=>e.path==='out/x').kind).toBe('file');
       expect(()=>binding.workspace(f.repo,{outputs:['src']})).toThrow(/tracked inputs/);
       expect(()=>binding.workspace(f.repo,{outputs:['../x']})).toThrow(/unsafe/);
       expect(()=>binding.workspace(f.repo,{outputs:['out','out/x']})).toThrow(/overlap/);
@@ -842,7 +842,7 @@ describe('IMPROVE-04 RUNTIME scalable input identity (#176)',()=>{
     const f=fixture();try{
       fs.writeFileSync(path.join(f.repo,'.gitignore'),'.out/\ngen.info\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore outputs');
       const holdoutPrefix="{const fs=require('fs'),p=process.env.IMPROVE_WORKSPACE+'/.out';if(fs.existsSync(p+'/planted'))process.exit(3);fs.mkdirSync(p,{recursive:true});fs.writeFileSync(p+'/churn',String(Math.random()));fs.writeFileSync(process.env.IMPROVE_WORKSPACE+'/gen.info',String(Math.random()));}";
-      const doc=runtime({max_bytes:64*1024*1024,disposable_outputs:['.out','gen.info']},{setup:[['node','-e',"require('fs').mkdirSync('.out',{recursive:true});require('fs').writeFileSync('.out/build','x')"]]});
+      const doc=runtime({max_bytes:64*1024*1024,disposable_outputs:['.out'],mutable_outputs:['.out/churn','gen.info']},{setup:[['node','-e',"require('fs').mkdirSync('.out',{recursive:true});require('fs').writeFileSync('.out/build','x')"]]});
       const {runDir,ws}=await runToImplementation(f,{contractDoc:doc,holdoutPrefix,edits:{1:w=>{setSteps(w,2);fs.mkdirSync(path.join(w,'.out'),{recursive:true});fs.writeFileSync(path.join(w,'.out','planted'),'builder build');}}});
       expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');
       expect(fs.existsSync(path.join(ws,'.out','planted'))).toBe(false);
@@ -859,3 +859,56 @@ test('IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed',
     expect(r.status).toBe('blocked');expect(r.reason).toMatch(/workspace \(\d+\): .*stray\.txt/);
   }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 }));
+
+
+describe('IMPROVE runtime integrity repair (#222)',()=>{
+  const binding=require('../../scripts/improve-binding.cjs');
+  const generated=()=>contract({runtime:{identity:{disposable_outputs:['.out']},setup:[['node','-e',"const fs=require('fs');fs.mkdirSync('.out',{recursive:true});fs.copyFileSync('src/journey.json','.out/generated.json')"]]}});
+  async function builtGenerated(f,prefix='') {
+    const {runDir,frozen}=await prepare(f,{contractDoc:generated(),checkInput:'.out/generated.json',holdoutPrefix:prefix});
+    expect(frozen.status).toBe('frozen');const base=await improve.verifyPhase(runDir,'baseline');if(base.status!=='baseline_recorded')throw Error(JSON.stringify(base));
+    await improve.build(runDir,{policy:writeTmp(f,'builder.json',FAKE_BUILDER()),invokePeer:fakePeer([KEEP]),afterBuilderRound:ws=>setSteps(ws,2)});
+    return {runDir,ws:path.join(f.worktrees,'improve-test')};
+  }
+  const ignored=f=>{fs.writeFileSync(path.join(f.repo,'.gitignore'),'.out/\n');git(f.repo,'add','.gitignore');git(f.repo,'commit','-m','ignore output');};
+  test('FIX-1: reject every symlink ancestor before deleting output',()=>{
+    const f=fixture();try{
+      const external=path.join(f.root,'external');fs.mkdirSync(path.join(external,'cache'),{recursive:true});fs.writeFileSync(path.join(external,'cache','canary'),'owned elsewhere');fs.symlinkSync(external,path.join(f.repo,'link'));
+      expect(()=>binding.wipeOutputs(f.repo,['link/cache'])).toThrow(/symlink|escape/i);
+      expect(fs.readFileSync(path.join(external,'cache','canary'),'utf8')).toBe('owned elsewhere');
+      expect(()=>binding.wipeOutputs(f.repo,['link/missing/cache'])).toThrow(/symlink|escape/i);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  });
+  test('FIX-2: generated input changed after verification invalidates KEEP',quiet(async()=>{
+    const f=fixture();try{ignored(f);const {runDir,ws}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');fs.writeFileSync(path.join(ws,'.out','generated.json'),'{"steps":99}');expect(improve.evaluate(runDir).decision).not.toBe('KEEP');}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('FIX-2: generated input changed during checks blocks the bound receipt',quiet(async()=>{
+    const f=fixture();try{ignored(f);const prefix="if(process.env.IMPROVE_PHASE==='after')require('fs').writeFileSync(process.env.IMPROVE_WORKSPACE+'/.out/generated.json','{\"steps\":99}');";const {runDir}=await builtGenerated(f,prefix);expect((await improve.verifyPhase(runDir,'after')).status).toBe('blocked');expect(improve.events(runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('FIX-2: generated input changed after evaluation cannot be retained',quiet(async()=>{
+    const f=fixture();try{ignored(f);const {runDir,ws}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');fs.writeFileSync(path.join(ws,'.out','generated.json'),'{"steps":99}');expect(()=>improve.finalize(runDir)).toThrow(/binding|input/i);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+  test('FIX-4: unignored generated output verifies and is not retained as product',quiet(async()=>{
+    const f=fixture();try{const {runDir}=await builtGenerated(f);expect((await improve.verifyPhase(runDir,'after')).status).toBe('verified');expect(improve.evaluate(runDir).decision).toBe('KEEP');const kept=improve.finalize(runDir);expect(git(f.repo,'ls-tree','-r','--name-only',kept.commit)).not.toMatch(/\.out/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+});
+
+test('FIX-3: mutable declarations cannot hide dependencies, sealed outputs or scope',quiet(async()=>{
+ const f=fixture();try{
+  const base=contract({runtime:{identity:{disposable_outputs:['.out/build'],mutable_outputs:['.out','node_modules','src/log']}}});
+  const {frozen}=await prepare(f,{contractDoc:base});expect(frozen.status).not.toBe('frozen');expect(JSON.stringify(frozen)).toMatch(/hide dependencies/);expect(JSON.stringify(frozen)).toMatch(/hide a sealed output/);
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('FIX-4: stage a path list exceeding the default subprocess buffer',()=>{
+  const f=fixture();try{
+    const parts=Array.from({length:8},(_,i)=>'d'+i+'x'.repeat(178));
+    const dir=path.join(f.repo,...parts);fs.mkdirSync(dir,{recursive:true});
+    for(let i=0;i<700;i++)fs.writeFileSync(path.join(dir,String(i).padStart(4,'0')+'f'.repeat(186)),String(i));
+    const names=spawnSync('git',['ls-files','-z','--cached','--others','--exclude-standard'],{cwd:f.repo,encoding:'utf8',maxBuffer:4*1024*1024});
+    expect(Buffer.byteLength(names.stdout)).toBeGreaterThan(1024*1024);
+    const tree=require('../../scripts/improve-binding.cjs').tree(f.repo);
+    expect(tree.tree).toMatch(/^[a-f0-9]{40}$/);
+    const staged=spawnSync('git',['ls-files','-z','--cached'],{cwd:f.repo,encoding:'utf8',maxBuffer:4*1024*1024});expect(staged.status).toBe(0);expect(staged.stdout.split('\0').filter(Boolean)).toHaveLength(703);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+});
