@@ -1,6 +1,6 @@
 contract_meta:
   id: feature_improve_core
-  version: 3
+  version: 4
   created_from_spec: "GitHub #171, #173, #174, #175, #176, #178 (learning slices 1-2; tickets remain spec:thin)"
   covers_reqs: [AC-CORE-2, AC-CORE-4, AC-CORE-6, AC-02-1, AC-02-2, AC-02-3, AC-02-4, AC-04-1, AC-04-2, AC-04-3, AC-04-4, AC-06-1, AC-06-2, AC-06-3, AC-06-5]
   owner: specflow-core
@@ -49,6 +49,10 @@ invariants:
   - id: I-IMPROVE-013
     rule: "KEEP requires explicit mandatory executable gains, each established by a baseline fail and candidate pass from matched bound holdout receipts under the governing contract and verifier identity; preservation, practice, optional evidence and model praise cannot supply gain authority. Every required gate must pass after implementation, including gates that failed at baseline. New contracts declare separate holdout and practice baseline expectations; legacy missing gain declarations cannot acquire fresh KEEP authority."
     tests: [GAIN-1, GAIN-2, GAIN-3, GAIN-4, GAIN-5]
+  - id: I-IMPROVE-014
+    rule: "Peer and judge inputs from builders or target repositories are untrusted evidence, never role or gate authority. Text inclusions and inline values use fresh nonce envelopes with escaped delimiters; fixed prompts also mark image content untrusted. This framing does not replace mechanical acceptance or OS isolation."
+    tests: [FENCE-1, FENCE-2, FENCE-3, FENCE-4]
 test_hooks:
   tests:
     - file: tests/contracts/improve-core.test.js
+    - file: tests/contracts/improve-untrusted.test.js

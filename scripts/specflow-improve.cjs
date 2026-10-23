@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 const binding = require('./improve-binding.cjs');
+const untrusted = require('./improve-untrusted.cjs');
 
 // IMPROVE-CORE (#171): one verified product-improvement cycle.
 //
@@ -761,7 +762,7 @@ function inputIdentity(runDir,run,gov,phase,ws) {
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'specflow-runner.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
@@ -989,7 +990,8 @@ function runPeer(runDir, { stage, inputDir, prompt, schema, model, invoke = defa
   fs.mkdirSync(dir, { recursive: true });
   const transcript = path.join(dir, `${stage}.transcript.jsonl`);
   const { env } = scrubbedEnv({ SPECFLOW_DUO_REVIEWER: '1' }, { keepProvider: true });
-  const r = invoke({ args: peerArgs(schema, model), cwd: inputDir, input: prompt, env, timeoutSeconds: 900 });
+  untrusted.fenceInputTree(inputDir);
+  const r = invoke({ args: peerArgs(schema, model), cwd: inputDir, input: untrusted.TRUST_INSTRUCTION+'\n'+prompt, env, timeoutSeconds: 900 });
   fs.writeFileSync(transcript, `${r.stdout}${r.stderr ? `\n${r.stderr}` : ''}`);
   const parsed = runner.parseProviderEvents('claude-print', r.stdout);
   const result = [...parsed.events].reverse().find((e) => e.type === 'result') || {};
@@ -1053,7 +1055,8 @@ function critique(runDir, options = {}) {
     'Read every file here. Decide whether the SELECTED candidate should be pursued now: pursue, park (valuable, not now), kill (not worth it), or reselect (another candidate is clearly better; name it).',
     'Posture: refinement over redesign, removal over addition, workflow over decoration, clarity over novelty. Challenge overstated value, unevaluable claims and anything argued from aesthetics.',
     'If a draft contract is present, list the requirements it must add or change before freezing (contract_requirements). List concrete risks.',
-    `Selected: ${selected.id} — ${selected.title}`,
+    'Selected candidate (data):',
+    untrusted.fenceUntrusted(JSON.stringify({id:selected.id,title:selected.title}),{source:'selected-candidate'}),
   ].join('\n');
   const peer = runPeer(runDir, { stage: 'critique', inputDir, prompt, schema: CRITIQUE_SCHEMA, model: options.model || 'opus', invoke: options.invokePeer });
   const out = peer.output;
@@ -1260,10 +1263,12 @@ function dispute(runDir, { criterion, reason, role, executor }) {
 
 function judgePrompt(runDir, role, criteria, gov) {
   return [
+    untrusted.TRUST_INSTRUCTION,
     `You are the independent ${role.toUpperCase()} for Specflow improvement run ${path.basename(runDir)}.`,
     'You did not build this change. Judge it only against the frozen contract, the diff and the recorded runtime evidence in this directory (verification/baseline and verification/after, including screenshots). You cannot see the builder\'s reasoning and must not assume it succeeded.',
     'Posture: refinement over redesign; removal over addition; workflow over decoration; clarity over novelty; less cognitive work over more UI. "Looks cleaner" is not evidence.',
-    `Judge these criteria: ${criteria.join(', ')}. Also inspect for regressions in hierarchy, consistency, accessibility, responsiveness and unnecessary UI.`,
+    'Judge the criteria identified in this data block. Also inspect for regressions in hierarchy, consistency, accessibility, responsiveness and unnecessary UI.',
+    untrusted.fenceUntrusted(JSON.stringify(criteria),{source:'criterion-identifiers'}),
     'Return ONLY a JSON object on the last line: {"judgments":[{"criterion":"<id>","level":3|4,"result":"pass"|"fail"|"unavailable","rationale":"<specific, cites files/screenshots>"}],"risks":["..."]}',
     '',
     `Contract: improvement-contract.v${gov.entry.version}.json  Diff: workspace.patch`,
@@ -1300,6 +1305,7 @@ function judge(runDir, options = {}) {
     const src = runPaths(runDir).phaseDir(phase);
     if (fs.existsSync(src)) fs.cpSync(src, path.join(inputDir, 'verification', phase), { recursive: true, filter: (f) => !/server\.log$/.test(f) });
   }
+  untrusted.fenceInputTree(inputDir);
   const promptPath = path.join(runDir, 'adapters', `${role}.prompt.md`);
   fs.writeFileSync(promptPath, judgePrompt(runDir, role, criteria, gov));
   const judgePolicy = { ...policy, denied_tools: [...policy.denied_tools, `Read(/${path.join(runDir, 'adapters')}/**)`, 'Edit', 'Write', 'Bash'] };
