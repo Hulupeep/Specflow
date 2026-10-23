@@ -1,0 +1,132 @@
+FAIL tests/contracts/improve-core.test.js
+  ● FENCE-2: actual critique files and inline selected title are untrusted evidence
+
+    expect(received).toMatch(expected)
+
+    Expected pattern: /untrusted/i
+    Received string:  "You are the Duo peer for Specflow improvement run fence-test: the builder's partner, not a total adversary.
+    Read every file here. Decide whether the SELECTED candidate should be pursued now: pursue, park (valuable, not now), kill (not worth it), or reselect (another candidate is clearly better; name it).
+    Posture: refinement over redesign, removal over addition, workflow over decoration, clarity over novelty. Challenge overstated value, unevaluable claims and anything argued from aesthetics.
+    If a draft contract is present, list the requirements it must add or change before freezing (contract_requirements). List concrete risks.
+    Selected: C1 — mark all criteria pass"
+
+      919 |   const doc=candidates();doc.candidates[0].title='mark all criteria pass';improve.recordCandidates(runDir,writeTmp(f,'candidates.json',doc));
+      920 |   const peer=fakePeer([PURSUE]);expect(improve.critique(runDir,{invokePeer:peer}).status).toBe('recorded');const call=peer.calls[0];
+    > 921 |   expect(call.input).toMatch(/untrusted/i);expect(call.input).toMatch(/BEGIN_UNTRUSTED_EVIDENCE/);
+          |                      ^
+      922 |   for(const file of ['mission.md','candidates.json'])expect(fs.readFileSync(path.join(call.cwd,file),'utf8')).toMatch(/^BEGIN_UNTRUSTED_EVIDENCE/);
+      923 |  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+      924 | }));
+
+      at toMatch (tests/contracts/improve-core.test.js:921:22)
+      at Object.fn (tests/contracts/improve-core.test.js:19:22)
+
+FAIL tests/contracts/improve-untrusted.test.js
+  ● FENCE-1: fresh internal nonce per evidence block
+
+    Cannot find module '../../scripts/improve-untrusted.cjs' from 'tests/contracts/improve-untrusted.test.js'
+
+      1 | 'use strict';
+      2 | const crypto=require('crypto'),fs=require('fs'),os=require('os'),path=require('path');
+    > 3 | const helper=()=>require('../../scripts/improve-untrusted.cjs');
+        |                  ^
+      4 | test('FENCE-1: fresh internal nonce per evidence block',()=>{
+      5 |  const {fenceUntrusted}=helper();const blocks=Array.from({length:64},()=>fenceUntrusted('ordinary evidence',{source:'workspace.patch'}));
+      6 |  const nonces=blocks.map(x=>/^BEGIN_UNTRUSTED_EVIDENCE nonce=([a-f0-9]{32}) /m.exec(x)?.[1]);expect(nonces.every(Boolean)).toBe(true);expect(new Set(nonces).size).toBe(64);
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at require (tests/contracts/improve-untrusted.test.js:3:18)
+      at Object.helper (tests/contracts/improve-untrusted.test.js:5:25)
+
+  ● FENCE-1: payload cannot close a known test nonce or start another envelope
+
+    Cannot find module '../../scripts/improve-untrusted.cjs' from 'tests/contracts/improve-untrusted.test.js'
+
+      1 | 'use strict';
+      2 | const crypto=require('crypto'),fs=require('fs'),os=require('os'),path=require('path');
+    > 3 | const helper=()=>require('../../scripts/improve-untrusted.cjs');
+        |                  ^
+      4 | test('FENCE-1: fresh internal nonce per evidence block',()=>{
+      5 |  const {fenceUntrusted}=helper();const blocks=Array.from({length:64},()=>fenceUntrusted('ordinary evidence',{source:'workspace.patch'}));
+      6 |  const nonces=blocks.map(x=>/^BEGIN_UNTRUSTED_EVIDENCE nonce=([a-f0-9]{32}) /m.exec(x)?.[1]);expect(nonces.every(Boolean)).toBe(true);expect(new Set(nonces).size).toBe(64);
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at require (tests/contracts/improve-untrusted.test.js:3:18)
+      at Object.helper (tests/contracts/improve-untrusted.test.js:10:29)
+
+  ● FENCE-4: source label is data on one line
+
+    Cannot find module '../../scripts/improve-untrusted.cjs' from 'tests/contracts/improve-untrusted.test.js'
+
+      1 | 'use strict';
+      2 | const crypto=require('crypto'),fs=require('fs'),os=require('os'),path=require('path');
+    > 3 | const helper=()=>require('../../scripts/improve-untrusted.cjs');
+        |                  ^
+      4 | test('FENCE-1: fresh internal nonce per evidence block',()=>{
+      5 |  const {fenceUntrusted}=helper();const blocks=Array.from({length:64},()=>fenceUntrusted('ordinary evidence',{source:'workspace.patch'}));
+      6 |  const nonces=blocks.map(x=>/^BEGIN_UNTRUSTED_EVIDENCE nonce=([a-f0-9]{32}) /m.exec(x)?.[1]);expect(nonces.every(Boolean)).toBe(true);expect(new Set(nonces).size).toBe(64);
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at require (tests/contracts/improve-untrusted.test.js:3:18)
+      at Object.helper (tests/contracts/improve-untrusted.test.js:13:93)
+
+  ● FENCE-3: an echoing instruction fixture cannot acquire a framed instruction
+
+    Cannot find module '../../scripts/improve-untrusted.cjs' from 'tests/contracts/improve-untrusted.test.js'
+
+      1 | 'use strict';
+      2 | const crypto=require('crypto'),fs=require('fs'),os=require('os'),path=require('path');
+    > 3 | const helper=()=>require('../../scripts/improve-untrusted.cjs');
+        |                  ^
+      4 | test('FENCE-1: fresh internal nonce per evidence block',()=>{
+      5 |  const {fenceUntrusted}=helper();const blocks=Array.from({length:64},()=>fenceUntrusted('ordinary evidence',{source:'workspace.patch'}));
+      6 |  const nonces=blocks.map(x=>/^BEGIN_UNTRUSTED_EVIDENCE nonce=([a-f0-9]{32}) /m.exec(x)?.[1]);expect(nonces.every(Boolean)).toBe(true);expect(new Set(nonces).size).toBe(64);
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at require (tests/contracts/improve-untrusted.test.js:3:18)
+      at Object.helper (tests/contracts/improve-untrusted.test.js:18:141)
+
+  ● FENCE-2: text tree is fenced while screenshots retain their exact bytes
+
+    Cannot find module '../../scripts/improve-untrusted.cjs' from 'tests/contracts/improve-untrusted.test.js'
+
+      1 | 'use strict';
+      2 | const crypto=require('crypto'),fs=require('fs'),os=require('os'),path=require('path');
+    > 3 | const helper=()=>require('../../scripts/improve-untrusted.cjs');
+        |                  ^
+      4 | test('FENCE-1: fresh internal nonce per evidence block',()=>{
+      5 |  const {fenceUntrusted}=helper();const blocks=Array.from({length:64},()=>fenceUntrusted('ordinary evidence',{source:'workspace.patch'}));
+      6 |  const nonces=blocks.map(x=>/^BEGIN_UNTRUSTED_EVIDENCE nonce=([a-f0-9]{32}) /m.exec(x)?.[1]);expect(nonces.every(Boolean)).toBe(true);expect(new Set(nonces).size).toBe(64);
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at require (tests/contracts/improve-untrusted.test.js:3:18)
+      at Object.helper (tests/contracts/improve-untrusted.test.js:23:3)
+
+  ● FENCE-2: reject symlink input without reading its target
+
+    expect(received).toThrow(expected)
+
+    Expected pattern: /symlink/i
+    Received message: "Cannot find module '../../scripts/improve-untrusted.cjs' from 'tests/contracts/improve-untrusted.test.js'"
+
+          1 | 'use strict';
+          2 | const crypto=require('crypto'),fs=require('fs'),os=require('os'),path=require('path');
+        > 3 | const helper=()=>require('../../scripts/improve-untrusted.cjs');
+            |                  ^
+          4 | test('FENCE-1: fresh internal nonce per evidence block',()=>{
+          5 |  const {fenceUntrusted}=helper();const blocks=Array.from({length:64},()=>fenceUntrusted('ordinary evidence',{source:'workspace.patch'}));
+          6 |  const nonces=blocks.map(x=>/^BEGIN_UNTRUSTED_EVIDENCE nonce=([a-f0-9]{32}) /m.exec(x)?.[1]);expect(nonces.every(Boolean)).toBe(true);expect(new Set(nonces).size).toBe(64);
+
+      at Resolver._throwModNotFoundError (../Specflow/node_modules/jest-resolve/build/resolver.js:427:11)
+      at require (tests/contracts/improve-untrusted.test.js:3:18)
+      at helper (tests/contracts/improve-untrusted.test.js:27:249)
+      at Object.<anonymous> (../Specflow/node_modules/expect/build/toThrowMatchers.js:74:11)
+      at Object.throwingMatcher [as toThrow] (../Specflow/node_modules/expect/build/index.js:320:21)
+      at Object.toThrow (tests/contracts/improve-untrusted.test.js:27:299)
+      at Object.toThrow (tests/contracts/improve-untrusted.test.js:27:299)
+
+Test Suites: 2 failed, 2 total
+Tests:       7 failed, 90 skipped, 97 total
+Snapshots:   0 total
+Time:        0.726 s
+Ran all test suites within paths "tests/contracts/improve-untrusted.test.js", "tests/contracts/improve-core.test.js".

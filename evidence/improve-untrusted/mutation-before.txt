@@ -1,0 +1,542 @@
+
+MUTATION round-files; argv=['node', 'node_modules/jest/bin/jest.js', '--runInBand', 'tests/contracts/improve-core.test.js', '-t', 'actual round peer']; exit=1
+FAIL tests/contracts/improve-core.test.js
+  ✕ FENCE-4: actual round peer trust instruction and all textual files are framed (632 ms)
+  ○ skipped IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE
+  ○ skipped IMPROVE-BIND: legacy interrupted after-verification cannot expose the holdout again
+  ○ skipped IMPROVE-BIND: repaired prerequisite may retry before holdout consumption
+  ○ skipped IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed
+  ○ skipped FIX-3: mutable declarations cannot hide dependencies, sealed outputs or scope
+  ○ skipped FIX-4: stage a path list exceeding the default subprocess buffer
+  ○ skipped FENCE-2: actual critique files and inline selected title are untrusted evidence
+  ○ skipped FENCE-4: actual judge trust instruction criteria and textual files are framed
+  IMPROVE-01 candidate selection (#173/#175)
+    ○ skipped bounded evaluable refinement is selectable; alternatives stay visible
+    ○ skipped a gratuitous redesign cannot be selected; it stays an opportunity
+    ○ skipped novelty language is not a user problem, and every alternative needs a reason it lost
+    ○ skipped unevaluable high-value work cannot be silently rejected
+  IMPROVE-04 side-effect guardrails (#176)
+    ○ skipped git push origin main is blocked before execution
+    ○ skipped vercel deploy --prod is blocked before execution
+    ○ skipped supabase db push is blocked before execution
+    ○ skipped curl -X POST https://api.telegram.org/bot/sendMessage is blocked before execution
+    ○ skipped echo x > .env.local is blocked before execution
+    ○ skipped gh pr merge 12 is blocked before execution
+    ○ skipped terraform destroy is blocked before execution
+    ○ skipped pnpm exec eslint src/app.tsx is allowed
+    ○ skipped node check.cjs is allowed
+    ○ skipped git diff --stat is allowed
+    ○ skipped npx next dev -p 3100 is allowed
+    ○ skipped secrets are removed from command environments
+    ○ skipped a blocked exec is recorded in the ledger and never runs
+    ○ skipped contracts cannot declare prohibited commands
+  IMPROVE-02 frozen contract and evidence strength (#174)
+    ○ skipped implementation cannot start without a contract and a baseline
+    ○ skipped an unevaluable contract is rejected before freezing
+    ○ skipped acceptance edited after implementation is a new version that cannot rescue a failed change
+    ○ skipped judgment cannot satisfy a deterministic requirement: missing stays missing
+    ○ skipped submitted evidence cannot claim level 1 and builder self-review is not counted
+  IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)
+    ○ skipped freezing requires a Duo critique that says pursue
+    ○ skipped holdout checks must be hidden holdout artifacts written by a recorded oracle author
+    ○ skipped peer reuses the hardened duo reviewer invocation
+    ○ skipped peer redirects the builder between rounds and never sees the holdout
+    ○ skipped peer keep while a practice check fails is invalid and cannot produce KEEP
+    ○ skipped repair budget matches duo-build: 1 initial round + 3 repairs
+    ○ skipped the hidden holdout decides, not the practice checks
+    ○ skipped the holdout is single use
+    ○ skipped a builder that reads the run directory exposes the holdout: INCONCLUSIVE
+    ○ skipped peer disagreement withholds KEEP; a human decides
+    ○ skipped a failed run surfaces the peer's user-owned decision as the human next decision
+    ○ skipped an oracle dispute on a mandatory criterion is INCONCLUSIVE, and the builder cannot raise one
+    ○ skipped the builder may not be the oracle author
+  IMPROVE-GAIN (#174/#178)
+    ○ skipped GAIN-1: preservation cannot authorize a new improvement contract
+    ○ skipped GAIN-1: optional-gain cannot authorize a new improvement contract
+    ○ skipped GAIN-1: undeclared cannot authorize a new improvement contract
+    ○ skipped GAIN-2: a practice baseline mismatch names its set and blocks build
+    ○ skipped GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain
+    ○ skipped GAIN-3: a different verifier environment cannot establish a matched gain
+    ○ skipped GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain pass)
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain unavailable)
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated acceptance failure
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated gate failure
+    ○ skipped GAIN-5: a rejected late baseline command does not invalidate an admitted run
+    ○ skipped GAIN-5: legacy gain evidence cannot gain KEEP authority and is never rewritten
+    ○ skipped GAIN-5: legacy preservation evidence cannot gain KEEP authority and is never rewritten
+  IMPROVE-06 decision (#178) and reversibility (#176)
+    ○ skipped true improvement: KEEP retains an identifiable commit on an isolated branch; base untouched
+    ○ skipped regression: REVERT leaves no product diff but preserves patch and evidence
+    ○ skipped changes outside the frozen scope are reverted even when checks pass
+    ○ skipped interrupted run is never terminal and a workspace mutated after evaluation cannot be applied
+    ○ skipped a frozen check edited after freezing blocks verification
+  IMPROVE-07 ledger (#179)
+    ○ skipped editing or dropping a ledger line breaks the chain
+  IMPROVE-BIND #201 evidence freshness
+    ○ skipped Q1: a candidate changed after passing verification cannot KEEP
+    ○ skipped Q2: a superseding contract cannot reuse a baseline from the old version
+  IMPROVE-BIND #201 negative routes and retention
+    ○ skipped untracked input changes invalidate passing verification
+    ○ skipped ignored input changes invalidate passing verification
+    ○ skipped mode input changes invalidate passing verification
+    ○ skipped deleted input changes invalidate passing verification
+    ○ skipped environment input changes invalidate passing verification
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 2)
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 3)
+    ○ skipped external symlinks fail before consuming the holdout
+    ○ skipped dangling symlinks fail before consuming the holdout
+    ○ skipped missing receipt/evidence cannot satisfy KEEP
+    ○ skipped tampered receipt/evidence cannot satisfy KEEP
+    ○ skipped swapped-evidence receipt/evidence cannot satisfy KEEP
+    ○ skipped newer failed baseline attempt prevents fallback to earlier successful evidence
+    ○ skipped KEEP retains the verified tree without executing commit hooks
+    ○ skipped ignored input mutation after evaluation refuses final retention
+  IMPROVE-04 RUNTIME scalable input identity (#176)
+    ○ skipped RUNTIME-01: the default cap still rejects a >256 MiB tree; a declared bound seals it without exclusion
+    ○ skipped RUNTIME-02: a changed dependency byte or a restored mtime still changes identity
+    ○ skipped RUNTIME-03: equivalent workspace-local executables compare equal across worktrees; changed bytes do not
+    ○ skipped RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint
+    ○ skipped RUNTIME: invalid identity declarations are rejected before freezing
+    ○ skipped RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds
+  IMPROVE runtime integrity repair (#222)
+    ○ skipped FIX-1: reject every symlink ancestor before deleting output
+    ○ skipped FIX-2: generated input changed after verification invalidates KEEP
+    ○ skipped FIX-2: generated input changed during checks blocks the bound receipt
+    ○ skipped FIX-2: generated input changed after evaluation cannot be retained
+    ○ skipped FIX-4: unignored generated output verifies and is not retained as product
+
+  ● FENCE-4: actual round peer trust instruction and all textual files are framed
+
+    expect(received).toMatch(expected)
+
+    Expected pattern: /^BEGIN_UNTRUSTED_EVIDENCE nonce=/
+    Received string:  "diff --git a/src/journey.json b/src/journey.json
+    index e003a5a..59c3d48 100644
+    --- a/src/journey.json
+    +++ b/src/journey.json
+    @@ -1 +1 @@
+    -{\"steps\":4}
+    \\ No newline at end of file
+    +{\"steps\":2}
+    \\ No newline at end of file
+    "
+
+      931 |   const call=invokePeer.calls[0];expect(call.input.startsWith(TRUST_INSTRUCTION+'\n')).toBe(true);
+      932 |   for(const name of ['workspace.patch','builder-summary.md','contract.json','direction-memory.json','practice-checks/AC-1.dev.out.txt']){
+    > 933 |    expect(fs.readFileSync(path.join(call.cwd,name),'utf8')).toMatch(/^BEGIN_UNTRUSTED_EVIDENCE nonce=/);
+          |                                                             ^
+      934 |   }
+      935 |  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+      936 | }));
+
+      at toMatch (tests/contracts/improve-core.test.js:933:61)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:21:16)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 92 skipped, 93 total
+Snapshots:   0 total
+Time:        0.963 s, estimated 2 s
+Ran all test suites matching /tests\/contracts\/improve-core.test.js/i with tests matching "actual round peer".
+
+MUTATION round-instruction; argv=['node', 'node_modules/jest/bin/jest.js', '--runInBand', 'tests/contracts/improve-core.test.js', '-t', 'actual round peer']; exit=1
+FAIL tests/contracts/improve-core.test.js
+  ✕ FENCE-4: actual round peer trust instruction and all textual files are framed (660 ms)
+  ○ skipped IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE
+  ○ skipped IMPROVE-BIND: legacy interrupted after-verification cannot expose the holdout again
+  ○ skipped IMPROVE-BIND: repaired prerequisite may retry before holdout consumption
+  ○ skipped IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed
+  ○ skipped FIX-3: mutable declarations cannot hide dependencies, sealed outputs or scope
+  ○ skipped FIX-4: stage a path list exceeding the default subprocess buffer
+  ○ skipped FENCE-2: actual critique files and inline selected title are untrusted evidence
+  ○ skipped FENCE-4: actual judge trust instruction criteria and textual files are framed
+  IMPROVE-01 candidate selection (#173/#175)
+    ○ skipped bounded evaluable refinement is selectable; alternatives stay visible
+    ○ skipped a gratuitous redesign cannot be selected; it stays an opportunity
+    ○ skipped novelty language is not a user problem, and every alternative needs a reason it lost
+    ○ skipped unevaluable high-value work cannot be silently rejected
+  IMPROVE-04 side-effect guardrails (#176)
+    ○ skipped git push origin main is blocked before execution
+    ○ skipped vercel deploy --prod is blocked before execution
+    ○ skipped supabase db push is blocked before execution
+    ○ skipped curl -X POST https://api.telegram.org/bot/sendMessage is blocked before execution
+    ○ skipped echo x > .env.local is blocked before execution
+    ○ skipped gh pr merge 12 is blocked before execution
+    ○ skipped terraform destroy is blocked before execution
+    ○ skipped pnpm exec eslint src/app.tsx is allowed
+    ○ skipped node check.cjs is allowed
+    ○ skipped git diff --stat is allowed
+    ○ skipped npx next dev -p 3100 is allowed
+    ○ skipped secrets are removed from command environments
+    ○ skipped a blocked exec is recorded in the ledger and never runs
+    ○ skipped contracts cannot declare prohibited commands
+  IMPROVE-02 frozen contract and evidence strength (#174)
+    ○ skipped implementation cannot start without a contract and a baseline
+    ○ skipped an unevaluable contract is rejected before freezing
+    ○ skipped acceptance edited after implementation is a new version that cannot rescue a failed change
+    ○ skipped judgment cannot satisfy a deterministic requirement: missing stays missing
+    ○ skipped submitted evidence cannot claim level 1 and builder self-review is not counted
+  IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)
+    ○ skipped freezing requires a Duo critique that says pursue
+    ○ skipped holdout checks must be hidden holdout artifacts written by a recorded oracle author
+    ○ skipped peer reuses the hardened duo reviewer invocation
+    ○ skipped peer redirects the builder between rounds and never sees the holdout
+    ○ skipped peer keep while a practice check fails is invalid and cannot produce KEEP
+    ○ skipped repair budget matches duo-build: 1 initial round + 3 repairs
+    ○ skipped the hidden holdout decides, not the practice checks
+    ○ skipped the holdout is single use
+    ○ skipped a builder that reads the run directory exposes the holdout: INCONCLUSIVE
+    ○ skipped peer disagreement withholds KEEP; a human decides
+    ○ skipped a failed run surfaces the peer's user-owned decision as the human next decision
+    ○ skipped an oracle dispute on a mandatory criterion is INCONCLUSIVE, and the builder cannot raise one
+    ○ skipped the builder may not be the oracle author
+  IMPROVE-GAIN (#174/#178)
+    ○ skipped GAIN-1: preservation cannot authorize a new improvement contract
+    ○ skipped GAIN-1: optional-gain cannot authorize a new improvement contract
+    ○ skipped GAIN-1: undeclared cannot authorize a new improvement contract
+    ○ skipped GAIN-2: a practice baseline mismatch names its set and blocks build
+    ○ skipped GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain
+    ○ skipped GAIN-3: a different verifier environment cannot establish a matched gain
+    ○ skipped GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain pass)
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain unavailable)
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated acceptance failure
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated gate failure
+    ○ skipped GAIN-5: a rejected late baseline command does not invalidate an admitted run
+    ○ skipped GAIN-5: legacy gain evidence cannot gain KEEP authority and is never rewritten
+    ○ skipped GAIN-5: legacy preservation evidence cannot gain KEEP authority and is never rewritten
+  IMPROVE-06 decision (#178) and reversibility (#176)
+    ○ skipped true improvement: KEEP retains an identifiable commit on an isolated branch; base untouched
+    ○ skipped regression: REVERT leaves no product diff but preserves patch and evidence
+    ○ skipped changes outside the frozen scope are reverted even when checks pass
+    ○ skipped interrupted run is never terminal and a workspace mutated after evaluation cannot be applied
+    ○ skipped a frozen check edited after freezing blocks verification
+  IMPROVE-07 ledger (#179)
+    ○ skipped editing or dropping a ledger line breaks the chain
+  IMPROVE-BIND #201 evidence freshness
+    ○ skipped Q1: a candidate changed after passing verification cannot KEEP
+    ○ skipped Q2: a superseding contract cannot reuse a baseline from the old version
+  IMPROVE-BIND #201 negative routes and retention
+    ○ skipped untracked input changes invalidate passing verification
+    ○ skipped ignored input changes invalidate passing verification
+    ○ skipped mode input changes invalidate passing verification
+    ○ skipped deleted input changes invalidate passing verification
+    ○ skipped environment input changes invalidate passing verification
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 2)
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 3)
+    ○ skipped external symlinks fail before consuming the holdout
+    ○ skipped dangling symlinks fail before consuming the holdout
+    ○ skipped missing receipt/evidence cannot satisfy KEEP
+    ○ skipped tampered receipt/evidence cannot satisfy KEEP
+    ○ skipped swapped-evidence receipt/evidence cannot satisfy KEEP
+    ○ skipped newer failed baseline attempt prevents fallback to earlier successful evidence
+    ○ skipped KEEP retains the verified tree without executing commit hooks
+    ○ skipped ignored input mutation after evaluation refuses final retention
+  IMPROVE-04 RUNTIME scalable input identity (#176)
+    ○ skipped RUNTIME-01: the default cap still rejects a >256 MiB tree; a declared bound seals it without exclusion
+    ○ skipped RUNTIME-02: a changed dependency byte or a restored mtime still changes identity
+    ○ skipped RUNTIME-03: equivalent workspace-local executables compare equal across worktrees; changed bytes do not
+    ○ skipped RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint
+    ○ skipped RUNTIME: invalid identity declarations are rejected before freezing
+    ○ skipped RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds
+  IMPROVE runtime integrity repair (#222)
+    ○ skipped FIX-1: reject every symlink ancestor before deleting output
+    ○ skipped FIX-2: generated input changed after verification invalidates KEEP
+    ○ skipped FIX-2: generated input changed during checks blocks the bound receipt
+    ○ skipped FIX-2: generated input changed after evaluation cannot be retained
+    ○ skipped FIX-4: unignored generated output verifies and is not retained as product
+
+  ● FENCE-4: actual round peer trust instruction and all textual files are framed
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      929 |  const f=fixture();try{
+      930 |   const {invokePeer}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});
+    > 931 |   const call=invokePeer.calls[0];expect(call.input.startsWith(TRUST_INSTRUCTION+'\n')).toBe(true);
+          |                                                                                        ^
+      932 |   for(const name of ['workspace.patch','builder-summary.md','contract.json','direction-memory.json','practice-checks/AC-1.dev.out.txt']){
+      933 |    expect(fs.readFileSync(path.join(call.cwd,name),'utf8')).toMatch(/^BEGIN_UNTRUSTED_EVIDENCE nonce=/);
+      934 |   }
+
+      at toBe (tests/contracts/improve-core.test.js:931:88)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:21:16)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 92 skipped, 93 total
+Snapshots:   0 total
+Time:        0.971 s, estimated 1 s
+Ran all test suites matching /tests\/contracts\/improve-core.test.js/i with tests matching "actual round peer".
+
+MUTATION judge-files; argv=['node', 'node_modules/jest/bin/jest.js', '--runInBand', 'tests/contracts/improve-core.test.js', '-t', 'actual judge']; exit=1
+FAIL tests/contracts/improve-core.test.js
+  ✕ FENCE-4: actual judge trust instruction criteria and textual files are framed (787 ms)
+  ○ skipped IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE
+  ○ skipped IMPROVE-BIND: legacy interrupted after-verification cannot expose the holdout again
+  ○ skipped IMPROVE-BIND: repaired prerequisite may retry before holdout consumption
+  ○ skipped IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed
+  ○ skipped FIX-3: mutable declarations cannot hide dependencies, sealed outputs or scope
+  ○ skipped FIX-4: stage a path list exceeding the default subprocess buffer
+  ○ skipped FENCE-2: actual critique files and inline selected title are untrusted evidence
+  ○ skipped FENCE-4: actual round peer trust instruction and all textual files are framed
+  IMPROVE-01 candidate selection (#173/#175)
+    ○ skipped bounded evaluable refinement is selectable; alternatives stay visible
+    ○ skipped a gratuitous redesign cannot be selected; it stays an opportunity
+    ○ skipped novelty language is not a user problem, and every alternative needs a reason it lost
+    ○ skipped unevaluable high-value work cannot be silently rejected
+  IMPROVE-04 side-effect guardrails (#176)
+    ○ skipped git push origin main is blocked before execution
+    ○ skipped vercel deploy --prod is blocked before execution
+    ○ skipped supabase db push is blocked before execution
+    ○ skipped curl -X POST https://api.telegram.org/bot/sendMessage is blocked before execution
+    ○ skipped echo x > .env.local is blocked before execution
+    ○ skipped gh pr merge 12 is blocked before execution
+    ○ skipped terraform destroy is blocked before execution
+    ○ skipped pnpm exec eslint src/app.tsx is allowed
+    ○ skipped node check.cjs is allowed
+    ○ skipped git diff --stat is allowed
+    ○ skipped npx next dev -p 3100 is allowed
+    ○ skipped secrets are removed from command environments
+    ○ skipped a blocked exec is recorded in the ledger and never runs
+    ○ skipped contracts cannot declare prohibited commands
+  IMPROVE-02 frozen contract and evidence strength (#174)
+    ○ skipped implementation cannot start without a contract and a baseline
+    ○ skipped an unevaluable contract is rejected before freezing
+    ○ skipped acceptance edited after implementation is a new version that cannot rescue a failed change
+    ○ skipped judgment cannot satisfy a deterministic requirement: missing stays missing
+    ○ skipped submitted evidence cannot claim level 1 and builder self-review is not counted
+  IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)
+    ○ skipped freezing requires a Duo critique that says pursue
+    ○ skipped holdout checks must be hidden holdout artifacts written by a recorded oracle author
+    ○ skipped peer reuses the hardened duo reviewer invocation
+    ○ skipped peer redirects the builder between rounds and never sees the holdout
+    ○ skipped peer keep while a practice check fails is invalid and cannot produce KEEP
+    ○ skipped repair budget matches duo-build: 1 initial round + 3 repairs
+    ○ skipped the hidden holdout decides, not the practice checks
+    ○ skipped the holdout is single use
+    ○ skipped a builder that reads the run directory exposes the holdout: INCONCLUSIVE
+    ○ skipped peer disagreement withholds KEEP; a human decides
+    ○ skipped a failed run surfaces the peer's user-owned decision as the human next decision
+    ○ skipped an oracle dispute on a mandatory criterion is INCONCLUSIVE, and the builder cannot raise one
+    ○ skipped the builder may not be the oracle author
+  IMPROVE-GAIN (#174/#178)
+    ○ skipped GAIN-1: preservation cannot authorize a new improvement contract
+    ○ skipped GAIN-1: optional-gain cannot authorize a new improvement contract
+    ○ skipped GAIN-1: undeclared cannot authorize a new improvement contract
+    ○ skipped GAIN-2: a practice baseline mismatch names its set and blocks build
+    ○ skipped GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain
+    ○ skipped GAIN-3: a different verifier environment cannot establish a matched gain
+    ○ skipped GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain pass)
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain unavailable)
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated acceptance failure
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated gate failure
+    ○ skipped GAIN-5: a rejected late baseline command does not invalidate an admitted run
+    ○ skipped GAIN-5: legacy gain evidence cannot gain KEEP authority and is never rewritten
+    ○ skipped GAIN-5: legacy preservation evidence cannot gain KEEP authority and is never rewritten
+  IMPROVE-06 decision (#178) and reversibility (#176)
+    ○ skipped true improvement: KEEP retains an identifiable commit on an isolated branch; base untouched
+    ○ skipped regression: REVERT leaves no product diff but preserves patch and evidence
+    ○ skipped changes outside the frozen scope are reverted even when checks pass
+    ○ skipped interrupted run is never terminal and a workspace mutated after evaluation cannot be applied
+    ○ skipped a frozen check edited after freezing blocks verification
+  IMPROVE-07 ledger (#179)
+    ○ skipped editing or dropping a ledger line breaks the chain
+  IMPROVE-BIND #201 evidence freshness
+    ○ skipped Q1: a candidate changed after passing verification cannot KEEP
+    ○ skipped Q2: a superseding contract cannot reuse a baseline from the old version
+  IMPROVE-BIND #201 negative routes and retention
+    ○ skipped untracked input changes invalidate passing verification
+    ○ skipped ignored input changes invalidate passing verification
+    ○ skipped mode input changes invalidate passing verification
+    ○ skipped deleted input changes invalidate passing verification
+    ○ skipped environment input changes invalidate passing verification
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 2)
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 3)
+    ○ skipped external symlinks fail before consuming the holdout
+    ○ skipped dangling symlinks fail before consuming the holdout
+    ○ skipped missing receipt/evidence cannot satisfy KEEP
+    ○ skipped tampered receipt/evidence cannot satisfy KEEP
+    ○ skipped swapped-evidence receipt/evidence cannot satisfy KEEP
+    ○ skipped newer failed baseline attempt prevents fallback to earlier successful evidence
+    ○ skipped KEEP retains the verified tree without executing commit hooks
+    ○ skipped ignored input mutation after evaluation refuses final retention
+  IMPROVE-04 RUNTIME scalable input identity (#176)
+    ○ skipped RUNTIME-01: the default cap still rejects a >256 MiB tree; a declared bound seals it without exclusion
+    ○ skipped RUNTIME-02: a changed dependency byte or a restored mtime still changes identity
+    ○ skipped RUNTIME-03: equivalent workspace-local executables compare equal across worktrees; changed bytes do not
+    ○ skipped RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint
+    ○ skipped RUNTIME: invalid identity declarations are rejected before freezing
+    ○ skipped RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds
+  IMPROVE runtime integrity repair (#222)
+    ○ skipped FIX-1: reject every symlink ancestor before deleting output
+    ○ skipped FIX-2: generated input changed after verification invalidates KEEP
+    ○ skipped FIX-2: generated input changed during checks blocks the bound receipt
+    ○ skipped FIX-2: generated input changed after evaluation cannot be retained
+    ○ skipped FIX-4: unignored generated output verifies and is not retained as product
+
+  ● FENCE-4: actual judge trust instruction criteria and textual files are framed
+
+    expect(received).toMatch(expected)
+
+    Expected pattern: /^BEGIN_UNTRUSTED_EVIDENCE nonce=/
+    Received string:  "diff --git a/src/journey.json b/src/journey.json
+    index e003a5a..59c3d48 100644
+    --- a/src/journey.json
+    +++ b/src/journey.json
+    @@ -1 +1 @@
+    -{\"steps\":4}
+    \\ No newline at end of file
+    +{\"steps\":2}
+    \\ No newline at end of file
+    "
+
+      950 |   expect(observed.prompt).toMatch(/BEGIN_UNTRUSTED_EVIDENCE nonce=[a-f0-9]{32} source_json="criterion-identifiers"\n\["AC-2"\]\nEND_UNTRUSTED_EVIDENCE nonce=/);
+      951 |   for(const name of ['workspace.patch','improvement-contract.v1.json','UX_REFINEMENT_PROFILE.md','verification/after/AC-1.out.txt']){
+    > 952 |    expect(fs.readFileSync(path.join(observed.cwd,name),'utf8')).toMatch(/^BEGIN_UNTRUSTED_EVIDENCE nonce=/);
+          |                                                                 ^
+      953 |   }
+      954 |  }finally{if(spy)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+      955 | }));
+
+      at toMatch (tests/contracts/improve-core.test.js:952:65)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:21:16)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 92 skipped, 93 total
+Snapshots:   0 total
+Time:        1.11 s
+Ran all test suites matching /tests\/contracts\/improve-core.test.js/i with tests matching "actual judge".
+
+MUTATION judge-prompt; argv=['node', 'node_modules/jest/bin/jest.js', '--runInBand', 'tests/contracts/improve-core.test.js', '-t', 'actual judge']; exit=1
+FAIL tests/contracts/improve-core.test.js
+  ✕ FENCE-4: actual judge trust instruction criteria and textual files are framed (810 ms)
+  ○ skipped IMPROVE-BIND: explicit current baseline blocker still caps a passing candidate at INCONCLUSIVE
+  ○ skipped IMPROVE-BIND: legacy interrupted after-verification cannot expose the holdout again
+  ○ skipped IMPROVE-BIND: repaired prerequisite may retry before holdout consumption
+  ○ skipped IMPROVE-04 RUNTIME: a blocked verification names the inputs that changed
+  ○ skipped FIX-3: mutable declarations cannot hide dependencies, sealed outputs or scope
+  ○ skipped FIX-4: stage a path list exceeding the default subprocess buffer
+  ○ skipped FENCE-2: actual critique files and inline selected title are untrusted evidence
+  ○ skipped FENCE-4: actual round peer trust instruction and all textual files are framed
+  IMPROVE-01 candidate selection (#173/#175)
+    ○ skipped bounded evaluable refinement is selectable; alternatives stay visible
+    ○ skipped a gratuitous redesign cannot be selected; it stays an opportunity
+    ○ skipped novelty language is not a user problem, and every alternative needs a reason it lost
+    ○ skipped unevaluable high-value work cannot be silently rejected
+  IMPROVE-04 side-effect guardrails (#176)
+    ○ skipped git push origin main is blocked before execution
+    ○ skipped vercel deploy --prod is blocked before execution
+    ○ skipped supabase db push is blocked before execution
+    ○ skipped curl -X POST https://api.telegram.org/bot/sendMessage is blocked before execution
+    ○ skipped echo x > .env.local is blocked before execution
+    ○ skipped gh pr merge 12 is blocked before execution
+    ○ skipped terraform destroy is blocked before execution
+    ○ skipped pnpm exec eslint src/app.tsx is allowed
+    ○ skipped node check.cjs is allowed
+    ○ skipped git diff --stat is allowed
+    ○ skipped npx next dev -p 3100 is allowed
+    ○ skipped secrets are removed from command environments
+    ○ skipped a blocked exec is recorded in the ledger and never runs
+    ○ skipped contracts cannot declare prohibited commands
+  IMPROVE-02 frozen contract and evidence strength (#174)
+    ○ skipped implementation cannot start without a contract and a baseline
+    ○ skipped an unevaluable contract is rejected before freezing
+    ○ skipped acceptance edited after implementation is a new version that cannot rescue a failed change
+    ○ skipped judgment cannot satisfy a deterministic requirement: missing stays missing
+    ○ skipped submitted evidence cannot claim level 1 and builder self-review is not counted
+  IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)
+    ○ skipped freezing requires a Duo critique that says pursue
+    ○ skipped holdout checks must be hidden holdout artifacts written by a recorded oracle author
+    ○ skipped peer reuses the hardened duo reviewer invocation
+    ○ skipped peer redirects the builder between rounds and never sees the holdout
+    ○ skipped peer keep while a practice check fails is invalid and cannot produce KEEP
+    ○ skipped repair budget matches duo-build: 1 initial round + 3 repairs
+    ○ skipped the hidden holdout decides, not the practice checks
+    ○ skipped the holdout is single use
+    ○ skipped a builder that reads the run directory exposes the holdout: INCONCLUSIVE
+    ○ skipped peer disagreement withholds KEEP; a human decides
+    ○ skipped a failed run surfaces the peer's user-owned decision as the human next decision
+    ○ skipped an oracle dispute on a mandatory criterion is INCONCLUSIVE, and the builder cannot raise one
+    ○ skipped the builder may not be the oracle author
+  IMPROVE-GAIN (#174/#178)
+    ○ skipped GAIN-1: preservation cannot authorize a new improvement contract
+    ○ skipped GAIN-1: optional-gain cannot authorize a new improvement contract
+    ○ skipped GAIN-1: undeclared cannot authorize a new improvement contract
+    ○ skipped GAIN-2: a practice baseline mismatch names its set and blocks build
+    ○ skipped GAIN-2: holdout preservation and practice improvement may differ without counting practice as gain
+    ○ skipped GAIN-3: a different verifier environment cannot establish a matched gain
+    ○ skipped GAIN-4: a pre-existing required gate failure vetoes KEEP despite a real gain
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain pass)
+    ○ skipped GAIN-3: every mandatory gain needs matched evidence (second gain unavailable)
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated acceptance failure
+    ○ skipped GAIN-4: input drift cannot erase a demonstrated gate failure
+    ○ skipped GAIN-5: a rejected late baseline command does not invalidate an admitted run
+    ○ skipped GAIN-5: legacy gain evidence cannot gain KEEP authority and is never rewritten
+    ○ skipped GAIN-5: legacy preservation evidence cannot gain KEEP authority and is never rewritten
+  IMPROVE-06 decision (#178) and reversibility (#176)
+    ○ skipped true improvement: KEEP retains an identifiable commit on an isolated branch; base untouched
+    ○ skipped regression: REVERT leaves no product diff but preserves patch and evidence
+    ○ skipped changes outside the frozen scope are reverted even when checks pass
+    ○ skipped interrupted run is never terminal and a workspace mutated after evaluation cannot be applied
+    ○ skipped a frozen check edited after freezing blocks verification
+  IMPROVE-07 ledger (#179)
+    ○ skipped editing or dropping a ledger line breaks the chain
+  IMPROVE-BIND #201 evidence freshness
+    ○ skipped Q1: a candidate changed after passing verification cannot KEEP
+    ○ skipped Q2: a superseding contract cannot reuse a baseline from the old version
+  IMPROVE-BIND #201 negative routes and retention
+    ○ skipped untracked input changes invalidate passing verification
+    ○ skipped ignored input changes invalidate passing verification
+    ○ skipped mode input changes invalidate passing verification
+    ○ skipped deleted input changes invalidate passing verification
+    ○ skipped environment input changes invalidate passing verification
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 2)
+    ○ skipped edit-and-restore during a holdout invalidates positive evidence but preserves failures (steps 3)
+    ○ skipped external symlinks fail before consuming the holdout
+    ○ skipped dangling symlinks fail before consuming the holdout
+    ○ skipped missing receipt/evidence cannot satisfy KEEP
+    ○ skipped tampered receipt/evidence cannot satisfy KEEP
+    ○ skipped swapped-evidence receipt/evidence cannot satisfy KEEP
+    ○ skipped newer failed baseline attempt prevents fallback to earlier successful evidence
+    ○ skipped KEEP retains the verified tree without executing commit hooks
+    ○ skipped ignored input mutation after evaluation refuses final retention
+  IMPROVE-04 RUNTIME scalable input identity (#176)
+    ○ skipped RUNTIME-01: the default cap still rejects a >256 MiB tree; a declared bound seals it without exclusion
+    ○ skipped RUNTIME-02: a changed dependency byte or a restored mtime still changes identity
+    ○ skipped RUNTIME-03: equivalent workspace-local executables compare equal across worktrees; changed bytes do not
+    ○ skipped RUNTIME-03: disposable outputs must be untracked, non-symlink and disjoint
+    ○ skipped RUNTIME: invalid identity declarations are rejected before freezing
+    ○ skipped RUNTIME: a pre-planted output is wiped before setup, outputs created or churned during checks do not block, and KEEP holds
+  IMPROVE runtime integrity repair (#222)
+    ○ skipped FIX-1: reject every symlink ancestor before deleting output
+    ○ skipped FIX-2: generated input changed after verification invalidates KEEP
+    ○ skipped FIX-2: generated input changed during checks blocks the bound receipt
+    ○ skipped FIX-2: generated input changed after evaluation cannot be retained
+    ○ skipped FIX-4: unignored generated output verifies and is not retained as product
+
+  ● FENCE-4: actual judge trust instruction criteria and textual files are framed
+
+    expect(received).toBe(expected) // Object.is equality
+
+    Expected: true
+    Received: false
+
+      947 |   });
+      948 |   improve.judge(runDir,{policy:writeTmp(f,'judge.json',FAKE_BUILDER({id:'independent-judge'})),criteria:['AC-2']});
+    > 949 |   expect(observed.prompt.startsWith(TRUST_INSTRUCTION+'\n')).toBe(true);
+          |                                                              ^
+      950 |   expect(observed.prompt).toMatch(/BEGIN_UNTRUSTED_EVIDENCE nonce=[a-f0-9]{32} source_json="criterion-identifiers"\n\["AC-2"\]\nEND_UNTRUSTED_EVIDENCE nonce=/);
+      951 |   for(const name of ['workspace.patch','improvement-contract.v1.json','UX_REFINEMENT_PROFILE.md','verification/after/AC-1.out.txt']){
+      952 |    expect(fs.readFileSync(path.join(observed.cwd,name),'utf8')).toMatch(/^BEGIN_UNTRUSTED_EVIDENCE nonce=/);
+
+      at toBe (tests/contracts/improve-core.test.js:949:62)
+      at Object.<anonymous> (tests/contracts/improve-core.test.js:21:16)
+
+Test Suites: 1 failed, 1 total
+Tests:       1 failed, 92 skipped, 93 total
+Snapshots:   0 total
+Time:        1.146 s, estimated 2 s
+Ran all test suites matching /tests\/contracts\/improve-core.test.js/i with tests matching "actual judge".
