@@ -27,6 +27,11 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  'improve-controller': {
+    usage: 'specflow improve-controller <register|admit|status|report|cancel|schedule> --host OWNER_PRIVATE_HOST.json [--repo ID] [--request ID] [--run ID] [--file POLICY.json] [--state paused|disabled|enabled]',
+    desc: 'Durable bounded owner-local admission and diagnoses; live activation unavailable until recovery',
+    run: args => { process.exitCode = require('../scripts/improve-controller-cli.cjs').cli(args); },
+  },
   profiles: {
     usage: 'specflow profiles <register|inspect|preflight|history> [repo_id] --registry OWNER_PRIVATE_DIR [--file PROFILE.json]',
     desc: 'Owner-approved repository profiles and non-inference readiness diagnostics',

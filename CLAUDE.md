@@ -87,6 +87,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 | `feature_spec_density` | Shared tier applicability and evidence-based readiness | I-DENSITY-001 through I-DENSITY-009 |
 | `feature_improve_core` | `specflow improve --once` contract freeze, evidence strength, isolation, Duo rounds, hidden holdout and decision | I-IMPROVE-001 through I-IMPROVE-012 |
 | `feature_improve_profiles` | Owner-private repo registry, actionable non-inference preflight and fresh caller-bound protected operations | I-PROFILES-001 through I-PROFILES-005 |
+| `feature_improve_controller` | Durable bounded admission, shared limits, precise stops and disabled schedule activation | I-CONTROLLER-001 through I-CONTROLLER-008 |
 | `feature_improve_worker` | Confined execution, independent role provenance and durable historical recovery | I-WORKER-001 through I-WORKER-007 |
 | `feature_specflow_project` | Project structure & code quality | PROJ-001 through PROJ-004 |
 | `security_defaults` | OWASP baseline patterns | SEC-001 through SEC-005 |
