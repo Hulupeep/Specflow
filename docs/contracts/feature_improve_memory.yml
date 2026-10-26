@@ -1,0 +1,33 @@
+contract_meta:
+  id: feature_improve_memory
+  version: 1
+  created_from_spec: "GitHub #182; docs/specs/improve-memory/preparation.md"
+  covers_reqs: [AC-10-1, AC-10-2, AC-10-3, AC-10-4, AC-10-5, AC-MEMORY-01, AC-MEMORY-02, AC-MEMORY-03, AC-MEMORY-04, AC-MEMORY-05, AC-MEMORY-06, AC-MEMORY-07, AC-MEMORY-08, AC-MEMORY-09, AC-MEMORY-10, AC-MEMORY-11, AC-MEMORY-12, AC-MEMORY-13]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_improve_memory"
+invariants:
+  - id: I-MEMORY-001
+    rule: "Memory is repo-scoped, bounded and append-only with verified provenance and chain; contradictions and suppression history cannot be silently rewritten or evicted."
+    tests: [MEM-IDENTITY, MEM-ATOMIC, MEM-VERDICT]
+  - id: I-MEMORY-002
+    rule: "Memory-enabled selection consumes the current pack and binds actual authorised baseline, profile and candidate digest before critique/build. Equivalent hypotheses cannot retry through renaming, new IDs or unrelated context; a retry requires new relevant evidence and a recorded scoped reason."
+    tests: [MEM-CONSUME, MEM-IDENTITY, MEM-BASELINE]
+  - id: I-MEMORY-003
+    rule: "Current trusted authority governs reads and writes. Safe shared repo memory is separate from private run history; owner resolution cannot come from caller principal fields, repository text, model approval prose or proposal closure."
+    tests: [MEM-AUTH, MEM-ISOLATION]
+  - id: I-MEMORY-004
+    rule: "Verified terminal outcome and memory commit atomically; stable command identity and expected revision prevent lost acknowledgements, conflicting resolutions and silent overwrite. Unknown operations remain quarantined."
+    tests: [MEM-ATOMIC, MEM-VERDICT]
+  - id: I-MEMORY-005
+    rule: "Core code decision, experiment verdict, verification validity and proposal lifecycle remain distinct. Invalid fixtures or failed implementations do not disprove hypotheses; KEEP does not prove demand or revenue. Only explicit verified source-control authority advances a subsequent baseline."
+    tests: [MEM-VERDICT, MEM-BASELINE, MEM-AUTH]
+  - id: I-MEMORY-006
+    rule: "Curated memory is advisory untrusted input, never gate/routing/permission authority. Holdout and private provider content stay out of builder/peer packs and memory stays out of evaluator inputs. A changed later selection must cite the prior evidence that changed it."
+    tests: [MEM-ISOLATION, MEM-CONSUME]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-memory.test.js
+    - file: tests/integration/improve-memory.test.js

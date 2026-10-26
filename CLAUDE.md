@@ -86,6 +86,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 | `feature_preflight` | Board-auditor compliance | ARCH-001 through ARCH-008 |
 | `feature_spec_density` | Shared tier applicability and evidence-based readiness | I-DENSITY-001 through I-DENSITY-009 |
 | `feature_improve_core` | `specflow improve --once` contract freeze, evidence strength, isolation, Duo rounds, hidden holdout and decision | I-IMPROVE-001 through I-IMPROVE-012 |
+| `feature_improve_memory` | Repo-scoped decision memory, selection consumption, authenticated resolution and separate verdicts | I-MEMORY-001 through I-MEMORY-006 |
 | `feature_improve_profiles` | Owner-private repo registry, actionable non-inference preflight and fresh caller-bound protected operations | I-PROFILES-001 through I-PROFILES-005 |
 | `feature_improve_controller` | Durable bounded admission, shared limits, precise stops and disabled schedule activation | I-CONTROLLER-001 through I-CONTROLLER-008 |
 | `feature_improve_worker` | Confined execution, independent role provenance and durable historical recovery | I-WORKER-001 through I-WORKER-007 |

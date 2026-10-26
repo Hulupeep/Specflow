@@ -128,6 +128,7 @@ function fixture({ simulation = false } = {}) {
   const register = (extra) => service().registerPolicy(policy(extra));
   return {
     root,
+    git,
     repo,
     registry,
     store,

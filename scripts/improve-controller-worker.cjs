@@ -38,6 +38,29 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       'finalize'
     ];
     if (!permitted.includes(stage) || !Array.isArray(args)) throw new ControllerError('invalid_stage');
+    if (bound.memory_required) {
+      const memory = require('./improve-memory.cjs');
+      const run = stage === 'startRun' ? args[0] :
+        JSON.parse(fs.readFileSync(path.join(args[0], 'run.json'), 'utf8'));
+      const baseCommit = stage === 'startRun' ?
+        bound.cycles.find(c => c.id === binding.cycle_id)?.memory_selection?.base_commit : run.base_commit;
+      const candidates = stage === 'startRun' ? null : JSON.parse(fs.readFileSync(
+        stage === 'recordCandidates' ? args[1] : path.join(args[0], 'candidates.json'), 'utf8'));
+      const criteria = stage === 'freezeContract' ? JSON.parse(fs.readFileSync(args[1], 'utf8')).acceptance
+        .map(c => ({id:c.id,statement:c.statement})) : null;
+      const checked = service.validateMemoryStage({ repo_id: binding.repo_id, run_id: binding.run_id,
+        cycle_id: binding.cycle_id, stage }, {core_run_id: run.runId || run.run_id,
+        base_commit: baseCommit, candidate_digest: candidates ? memory.digest(candidates) : null,
+        criteria_revision: criteria ? memory.digest(criteria) : null});
+      if (stage === 'startRun' && (run.target !== bound.canonical_repo || run.base !== checked.selection.base_ref))
+        throw new ControllerError('memory_core_binding_mismatch');
+      if (stage === 'critique') {
+        const include = path.join(evidenceDir, 'memory-' + checked.selection.receipt_id + '.json');
+        const safe = require('./improve-untrusted.cjs').fenceUntrusted(JSON.stringify(checked.pack), { source: 'repo-decision-memory' });
+        if (!fs.existsSync(include)) fs.writeFileSync(include, safe, { mode: 0o600, flag: 'wx' });
+        args = [args[0], { ...(args[1] || {}), include: [...(args[1]?.include || []), include] }];
+      }
+    }
     const req = { repo_id: binding.repo_id, run_id: binding.run_id, cycle_id: binding.cycle_id, stage };
     const admitted = service.startStage(req, (entry) => {
       const child = spawn(cfg.launcher, ['stage', stage, JSON.stringify(args)], {
