@@ -97,8 +97,19 @@ function reviewDiff(root, cached = false) {
   const paths = git(root, 'diff', ...(cached ? ['--cached'] : ['HEAD']), '--name-only', '-z').split('\0').filter(f => f && !typesafe.excluded(f));
   return paths.length ? git(root, 'diff', '--binary', ...(cached ? ['--cached'] : ['HEAD']), '--', ...paths) : '';
 }
-function fingerprint(root, extras) {
-  return hash(JSON.stringify({ head: git(root, 'rev-parse', 'HEAD'), diff: git(root, 'diff', '--binary', 'HEAD'), index: git(root, 'diff', '--cached', '--binary'), files: manifest(root, extras) }));
+function fingerprint(root, extras, ignored = []) {
+  const files = manifest(root, extras);
+  for (const file of ignored) delete files[file];
+  const scope = ignored.length ? ['--', '.', ...ignored.map(file => `:(exclude)${file}`)] : [];
+  return hash(JSON.stringify({ head: git(root, 'rev-parse', 'HEAD'), diff: git(root, 'diff', '--binary', 'HEAD', ...scope), index: git(root, 'diff', '--cached', '--binary', ...scope), files }));
+}
+function stableSpecification(file) {
+  const record = json(file);
+  // A scoped reservation mutates these control fields in the canonical record.
+  // Its issue, profile, gates and other source fields must remain frozen.
+  delete record.reviews;
+  delete record.reviewControl;
+  return hash(JSON.stringify(record));
 }
 function location(root, id) {
   if (!/^[a-zA-Z0-9-]+$/.test(id || '')) throw Error('Invalid run identifier');
@@ -530,6 +541,9 @@ function reviewLocked(root, dir, state, batch, invoke) {
     const recoveryRefs = recoveries.flatMap(r=>r.evidence.map(e=>e.path));
     const extras = [...Object.keys(state.pinned), ...sourceExtras(state), ...batch.evidence, ...recoveryRefs];
     const before = fingerprint(root, extras);
+    const specRecord = state.context.specification?.targetTier ? state.context.specification.record : null;
+    const stableBefore = specRecord ? fingerprint(root, extras, [specRecord]) : null;
+    const specificationBefore = specRecord ? stableSpecification(safe(root, specRecord)) : null;
     record.snapshot = before;
     if (previous.at(-1)?.snapshot === before && previous.at(-1)?.outcome === 'changes_required') throw Error('No new evidence or progress since previous review');
     record.stage = 'peer_check';
@@ -611,6 +625,13 @@ function reviewLocked(root, dir, state, batch, invoke) {
       if (state.reviewControl) continuation.beforeCall(state.reviewControl,refs=>validateRecovery(root,refs));
       if (state.context.specification?.targetTier) record.scopedReservation = scopedReviews.begin(root, specificationRecord(root, state.context), state.context.specification.targetTier, state.builder, {criteria:Object.keys(state.criteria),ownerRun:state.id,evidenceFingerprint:hash(JSON.stringify({snapshot:before,criteria:[...batch.criteria].sort(),evidence:evidenceHashes}))});
     } catch (error) { if (beforeCallControl) state.reviewControl=beforeCallControl; throw error; }
+    // The reservation is a trusted control write after the frozen peer snapshot.
+    // Check every other source field, then fence edits made during the peer call
+    // against the live state immediately after that reservation.
+    if (specRecord && (stableSpecification(safe(root, specRecord)) !== specificationBefore || fingerprint(root, extras, [specRecord]) !== stableBefore)) {
+      throw Error('Source changed while scoped review was reserved');
+    }
+    const reviewBaseline = specRecord ? fingerprint(root, extras) : before;
     record.attempted = true;
     state.peerFailures = (state.peerFailures || 0) + 1; // Persist before launch, including hard interruptions.
     save(dir, state);
@@ -635,7 +656,7 @@ function reviewLocked(root, dir, state, batch, invoke) {
     typesafe.validate(result, request, round);
     record.review = validateReview(result, request);
 
-    if (fingerprint(root, extras) !== before) throw Error('Source changed during review; stale acceptance rejected');
+    if (fingerprint(root, extras) !== reviewBaseline) throw Error('Source changed during review; stale acceptance rejected');
     const after = {};
     const walk = (base, prefix = '') => {
       for (const name of fs.readdirSync(base).sort()) {
