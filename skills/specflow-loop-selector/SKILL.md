@@ -13,6 +13,14 @@ small diff do not establish low risk. Reuse current tickets and evidence. State
 one short decision in the existing task/issue or response: **weight, reason,
 required checks, simulation needed or not, loop needed or not**. Do not create a
 triage document, ticket, run contract or provider call just to make this decision.
+Include the observable outcome and key uncertainty in that same brief decision;
+reuse the existing goal and acceptance rather than creating another artifact.
+For a research-agent handoff with selected issues, start at the first missing
+contract/check, not discovery. Reuse cited research; return a concrete evidenced
+contradiction to the researcher instead of silently selecting a different idea.
+Bind handoffs to a role and durable task/contract identity, not a bot brand or
+chat session. A replacement reads the current authorised role brief, assignment
+and prior evidence; it reconciles existing work before starting a new job.
 
 | Weight | Typical ask | Parts to invoke |
 |---|---|---|
@@ -51,6 +59,31 @@ simulation finding would make us stop, simplify or reframe it. Record the result
 with the existing acceptance notes before building; do not invent another gate
 artifact. Re-triage if implementation reveals a new risk or a wider seam.
 
+### Match The Evidence To The Question
+
+Choose the cheapest credible check that could distinguish the desired outcome
+from a plausible false success. Regression tests answer a known logic defect;
+real API/auth/readback checks answer whether a write worked; an executed journey
+answers whether a user can reach and complete the feature. Feasibility needs a
+bounded experiment with real inputs and fixed pass/fail conditions. Product
+desirability or revenue claims need relevant product/market evidence; more unit
+tests or reviewers cannot establish them. Mark proxies and hypotheses explicitly.
+
+Resolve consequential uncertainty with a small probe before a large build. Add
+specialist review or simulation for the specific uncertainty it can resolve,
+not by default reviewer count. Reduce future planning overhead when evidence
+resolves uncertainty, but preserve applicable safety floors. Never make a failed
+check easier, change frozen pass/fail conditions, or replay a consumed holdout
+to manufacture a pass; a changed experiment retains its predecessor and reason.
+
+Within standing authority, choose ordinary implementation details and the next
+useful step without repeatedly asking the owner. If an option requires forbidden
+spend, outreach or another repo, choose an allowed alternative or return an
+evidenced limitation and next action. Missing access, invalid verification and a
+disproven hypothesis are different outcomes. Required authority and explicit
+human gates still apply; do not leave an unattended job silently waiting for an
+approval it is not allowed to request or grant itself.
+
 ### Journey Evidence Is A Floor
 
 For every required journey involving server state, run the emulator/browser
@@ -68,6 +101,23 @@ access means **blocked verification**, not a pass. A missing, skipped or never-r
 required UI journey is CRITICAL for Specflow compliance; deferral needs a linked
 tracking issue and remains an explicit gap, not completion. Owner testing and
 feature flags never substitute for this evidence.
+
+### Effort Follows Progress And Route Policy
+
+Do not invent a fixed review-count or estimated-dollar stop for subscription or
+declared low-cost work. Several useful reviews are normal. Repeated failure
+requires diagnosis and a materially different, evidenced recovery, not automatic
+owner handback. Prefer a bounded next experiment or smaller slice over repeating
+an unchanged failing approach. Financial brakes belong to explicitly costly
+routes or owner-set limits; do not infer billing mode or price from a model name.
+
+Keep a configured working-session/overnight horizon so unattended work does not
+run for days without explicit long-run intent. At the boundary preserve state,
+report the actual outcome and use only already-authorised continuation/recovery.
+This is separate from financial cost. Existing hard runtime guards and explicit
+limits still apply until changed through reviewed policy: do not reset journals,
+extend a frozen deadline, grant acceptance or switch to paid API fallback to
+evade them. Report the exact policy/capability gap rather than “budget exhausted”.
 
 ### Decide Whether A Loop Is Needed
 
@@ -100,6 +150,16 @@ The detailed lifecycle below applies only to evidence justified for the selected
 slice. Thin selection ends at planning state; it does not generate a full spec.
 
 ## Select The Loop (Only When Needed)
+
+The coding agent owns building and delivery. Select lifecycle and review depth
+separately: `spec-build` resolves missing requirements; `feature-build` executes
+ready work; Duo adds independent scrutiny where justified and can span either
+preparation or implementation. They are not mutually exclusive work weights.
+A display-only heading-colour change can proceed directly with a visual check
+and relevant existing checks, without a new ticket or loop. A ready research
+handoff does not automatically need `spec-build` before `feature-build`. Record
+the short routing reason with the existing work; do not ask the owner to choose
+the workflow when standing authority and the task already determine it.
 
 - Rough idea, discovery, PRD, story slicing, ticket creation, or "turn this into ready tickets":
   use `QA/loops/spec-build.yaml`.

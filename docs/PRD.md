@@ -9,6 +9,21 @@
 
 ## 1. Product summary
 
+The desired outcome is unassisted intent-to-evidence development: an owner sets
+general intent and standing boundaries; agents choose useful work, build and
+test it, report a defensible experiment verdict, and learn from the result.
+HeyStax is the target operational control plane for human/agent instruction and
+explainability. Verification effort adapts to the problem's uncertainty and
+consequences. Faster validated value and revenue are the purpose; more tickets,
+reviewers or green checks are not success measures. This is the product target,
+not a claim that unattended delivery or HeyStax command dispatch is available.
+For research-led work, the research agent owns discovery and selection; Specflow
+consumes its issues, strengthens the contract, builds and returns evidence.
+Existing research is reused, not restarted as mandatory ceremony.
+Researcher, builder, reviewer and chief of staff are replaceable roles. Their
+briefs, assignments and durable work live in HeyStax and versioned task/evidence
+artifacts, so replacing an agent does not require rebuilding its chat memory.
+
 Specflow is a model-agnostic trust harness for frontier coding agents. It lets Claude, Codex, Fable-class models, Ruflo, or other agent swarms produce the work — but only contracts, verifier evidence, mechanical gates, ledger state, and human boundaries decide what advances or ships. The model is the actuator; the gate is the sensor. A provider's output — and its exit code — is never a gate verdict. Specflow runs an LLM as an untrusted worker inside a contracted loop (`specflow run`), requires an independent verifier to exercise the built thing where behavior matters, records everything to a durable on-disk ledger, and mechanically enforces the boundaries (push, merge, PR, override) that only a human may cross. The thesis in one line: **frontier models can carry more of the work; Specflow must carry the trust.**
 
 ---
