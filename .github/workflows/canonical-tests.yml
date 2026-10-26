@@ -1,0 +1,44 @@
+name: Canonical tests
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: canonical-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  canonical-tests:
+    name: canonical-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Execute canonical suites
+        run: npm test -- --maxWorkers=2 --roots tests --json --outputFile canonical-tests.json
+      - name: Reject missing, failed or skipped checks
+        run: |
+          node - <<'JS'
+          const fs=require('fs'),assert=require('assert');
+          const r=JSON.parse(fs.readFileSync('canonical-tests.json'));
+          assert(r.success && r.numTotalTests>0 && r.numPassedTests===r.numTotalTests);
+          assert(r.numFailedTests===0 && r.numPendingTests===0 && r.numTodoTests===0 && !r.wasInterrupted);
+          console.log(JSON.stringify({passed:r.numPassedTests,suites:r.numPassedTestSuites,failed:0,skipped:0}));
+          JS
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: canonical-tests-${{ github.sha }}
+          path: canonical-tests.json
+          if-no-files-found: error
+          retention-days: 14
