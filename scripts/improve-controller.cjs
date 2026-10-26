@@ -14,6 +14,7 @@ const DEFAULT_LIMITS = Object.freeze({
   maxConsecutiveNoProgress: 2,
   maxWallMs: 1800000
 });
+const DEFAULT_LIMITS_V2 = Object.freeze({ maxCycles: 1, maxAttempts: null, maxConsecutiveNoProgress: null, maxWallMs: 7200000 });
 class ControllerError extends Error {
   constructor(code, next_action = 'Inspect the retained controller evidence; do not replay unknown work.') {
     super(code);
@@ -56,6 +57,19 @@ function limits(value = DEFAULT_LIMITS, ceiling = null) {
   );
   return out;
 }
+function limitsV2(value = {}, ceiling = null) {
+  shape(value, Object.keys(DEFAULT_LIMITS_V2), []);
+  const out = { ...DEFAULT_LIMITS_V2, ...value };
+  for (const key of Object.keys(out)) {
+    const optional = ['maxAttempts', 'maxConsecutiveNoProgress'].includes(key);
+    need((optional && out[key] === null) || (Number.isSafeInteger(out[key]) && out[key] > 0), 'invalid_limits');
+    if (ceiling && ceiling[key] !== null) need(out[key] !== null && out[key] <= ceiling[key], 'limit_escalation');
+  }
+  need(out.maxWallMs <= 7 * 86400000 && out.maxCycles <= 100 &&
+    (out.maxAttempts === null || out.maxAttempts <= 10000) &&
+    (out.maxConsecutiveNoProgress === null || out.maxConsecutiveNoProgress <= 100), 'invalid_limits');
+  return out;
+}
 function privatePath(file, directory = false) {
   need(path.isAbsolute(file), 'private_store_required');
   for (let p = file; p !== path.dirname(p); p = path.dirname(p))
@@ -84,9 +98,9 @@ function syncDir(dir) {
     fs.closeSync(fd);
   }
 }
-function empty(simulation) {
+function empty(simulation, version = 1) {
   return {
-    version: 1,
+    version,
     simulation,
     revision: 0,
     policies: {},
@@ -99,15 +113,18 @@ function empty(simulation) {
   };
 }
 class ControllerStore {
-  constructor({ root, simulation = false, fault = () => {} }) {
+  constructor({ root, simulation = false, fault = () => {}, format = 1, lockTool = null }) {
     this.root = directory(root);
     this.simulation = simulation;
     this.fault = fault;
+    need(format === 1 || (format === 2 && lockTool), 'invalid_store_format');
+    this.format = format;
+    this.lockTool = lockTool;
     this.file = path.join(this.root, 'controller.json');
     this.lock = path.join(this.root, 'writer.lock');
   }
   read() {
-    if (!fs.existsSync(this.file)) return empty(this.simulation);
+    if (!fs.existsSync(this.file)) return empty(this.simulation, this.format);
     privatePath(this.file);
     need(fs.statSync(this.file).size <= 16 * 1024 * 1024, 'store_limit');
     let s;
@@ -118,7 +135,7 @@ class ControllerStore {
     }
     shape(s, Object.keys(empty(this.simulation)));
     need(
-      s.version === 1 &&
+      (s.version === 1 || (this.format === 2 && s.version === 2)) &&
         s.simulation === this.simulation &&
         Number.isSafeInteger(s.revision) &&
         s.revision >= 0,
@@ -140,13 +157,18 @@ class ControllerStore {
           Number.isFinite(r.deadline_ms),
         'store_corrupt'
       );
-      limits(r.limits);
+      (s.version === 2 ? limitsV2 : limits)(r.limits);
       for (const n of ['consumed_cycles', 'consumed_attempts', 'terminal_cycles', 'no_progress'])
         need(Number.isSafeInteger(r[n]) && r[n] >= 0, 'store_corrupt');
     }
     return s;
   }
   change(fn, afterCommit) {
+    if (this.format === 2) {
+      need(this.read().version === 2, 'legacy_recovery_unavailable');
+      return require('./improve-kernel-lock.cjs').withLock(this.lock, this.lockTool,
+        () => this.commit(fn, afterCommit), { create: true, fault: this.fault });
+    }
     let fd;
     try {
       fd = fs.openSync(this.lock, 'wx', 0o600);
@@ -158,10 +180,21 @@ class ControllerStore {
         );
       throw e;
     }
-    const tmp = this.file + '.' + crypto.randomUUID() + '.tmp';
     try {
       fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }));
       fs.fsyncSync(fd);
+      return this.commit(fn, afterCommit);
+    } catch (e) {
+      if (e instanceof ControllerError || e instanceof require('./improve-memory.cjs').MemoryError) throw e;
+      throw new ControllerError('storage_commit_unconfirmed', 'Read the committed request and preserve any uncertain intent; do not replay unknown work.');
+    } finally {
+      fs.closeSync(fd);
+      fs.unlinkSync(this.lock);
+    }
+  }
+  commit(fn, afterCommit) {
+    const tmp = this.file + '.' + crypto.randomUUID() + '.tmp';
+    try {
       this.fault('before_transition');
       const s = this.read(),
         result = fn(s);
@@ -191,12 +224,7 @@ class ControllerStore {
         'Read the last committed request using the same ID; preserve any uncertain intent and original limits for #183.'
       );
     } finally {
-      try {
-        fs.rmSync(tmp, { force: true });
-      } finally {
-        fs.closeSync(fd);
-        fs.unlinkSync(this.lock);
-      }
+      fs.rmSync(tmp, { force: true });
     }
   }
 }
@@ -273,18 +301,37 @@ function createControllerService({
   now = Date.now,
   simulation = false,
   fault,
-  memory
+  memory,
+  recovery
 } = {}) {
   need(
     typeof resolvePrincipal === 'function' && typeof hostCapabilities === 'function' && id(ownerPrincipal),
     'trusted_host_required'
   );
-  const store = new ControllerStore({ root, simulation, fault }),
-    profileService = profiles.createProfileService({ registry, resolvePrincipal, hostCapabilities, now });
+  const store = new ControllerStore({ root, simulation, fault, format: recovery?.format || 1, lockTool: recovery?.lockTool }),
+    profileService = profiles.createProfileService({ registry, resolvePrincipal, hostCapabilities, now, lockTool: recovery?.lockTool, fault });
   function identity() {
     const p = resolvePrincipal();
     need(id(p), 'authority_unresolved');
     return p;
+  }
+  function migrate(req) {
+    shape(req, ['repo_id', 'request_id']);
+    need(id(req.repo_id) && id(req.request_id) && recovery?.format === 2 && identity() === ownerPrincipal, 'migration_owner_required');
+    need(recovery.migration?.dedicated === true && Array.isArray(recovery.migration.stores) && recovery.migration.stores.length === 1 &&
+      typeof recovery.migration.stores[0] === 'string' && path.isAbsolute(recovery.migration.stores[0]) &&
+      path.resolve(recovery.migration.stores[0]) === store.root, 'legacy_recovery_unavailable');
+    const inspected = profileService.inspect({ repo_id: req.repo_id });
+    need(inspected.available && inspected.operations?.includes('execute'), 'authority_revoked');
+    const pre = profileService.preflight({ repo_id: req.repo_id, revision: inspected.revision });
+    need(pre.ready, pre.findings?.find(f => f.status !== 'passed')?.code || 'preflight_blocked');
+    require('./improve-recovery-migration.cjs').recoverAuthority({ store, registry, recovery, request: req, principal: ownerPrincipal });
+    if (fs.existsSync(path.join(registry, '.authority-lock')) && !fs.existsSync(path.join(registry, '.authority-lock', 'kernel-v2.lock')))
+      throw new ControllerError('legacy_recovery_unavailable', 'Legacy authority mutex has no confirmed migration ownership; preserve it and inspect retained evidence. No protected work started.');
+    const out = profileService.withMigration(pre.lease, () =>
+      require('./improve-recovery-migration.cjs').migrate({ store, registry, recovery, request: req, principal: ownerPrincipal, fault }));
+    need(out.allowed, 'authority_revoked');
+    return out.result;
   }
   function access(repo_id, execute = false, revision = null, fn) {
     need(id(repo_id), 'invalid_request');
@@ -1022,6 +1069,7 @@ function createControllerService({
     store, access, ownerPrincipal, now, memory
   });
   return {
+    migrate,
     registerPolicy,
     report,
     admit,
@@ -1177,7 +1225,9 @@ module.exports = {
   ControllerError,
   ControllerStore,
   DEFAULT_LIMITS,
+  DEFAULT_LIMITS_V2,
   limits,
+  limitsV2,
   view,
   createControllerService
 };

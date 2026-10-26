@@ -1,0 +1,34 @@
+contract_meta:
+  id: feature_improve_recovery
+  version: 2
+  created_from_spec: "GitHub #183 / #235 B; docs/specs/improve-recovery/preparation.md"
+  covers_reqs: [AC-11-1, AC-11-2, AC-11-3, AC-11-4, AC-11-5, AC-11-6, AC-RECOVERY-01, AC-RECOVERY-02, AC-RECOVERY-03, AC-RECOVERY-04, AC-RECOVERY-05, AC-RECOVERY-06, AC-RECOVERY-07, AC-RECOVERY-08, AC-RECOVERY-09, AC-RECOVERY-10, AC-RECOVERY-11, AC-RECOVERY-12, AC-RECOVERY-13, AC-RECOVERY-14, AC-EFFORT-01, AC-EFFORT-02, AC-EFFORT-03, AC-EFFORT-04, AC-EFFORT-05]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_improve_recovery"
+invariants:
+  - id: I-RECOVERY-001
+    rule: "Opted-in v2 authority and controller transactions use qualified crash-releasing kernel exclusion over permanent private inodes. No legacy/live lock is deleted or implicitly migrated. Original v1 contracts/runtimes/limits remain intact."
+    tests: [REC-LOCK]
+  - id: I-RECOVERY-002
+    rule: "Current authenticated host assignment, grants and generation serialize protected launch before outbound effects; original authorship remains immutable. Unknown process/launch/receipt is not permission for takeover or replay."
+    tests: [REC-FENCE, REC-RECEIPT]
+  - id: I-RECOVERY-003
+    rule: "Only a current holder adopts exact integrity-bound original-operation evidence idempotently. Conflicting/missing proof retains unknown; consumed holdout cannot replay and terminal memory remains atomic with actual verified core result."
+    tests: [REC-RECEIPT, REC-CYCLE]
+  - id: I-RECOVERY-004
+    rule: "V2 subscription/owner-registered cheap routes have no invented financial/start/no-progress cap; optional caps are explicit null. Explicit ceilings, route class, original consumption and absolute finite window survive recovery. Unsupported/unknown/expensive routes cannot bypass qualified authority or required brakes."
+    tests: [EFFORT-V2, REC-FENCE]
+  - id: I-RECOVERY-005
+    rule: "Deadline/cancel stops new protected work, while authenticated receipt-only reconciliation may revise the same job/report without extending the window, refunding usage or replaying checks/holdout/provider. Cleanup targets only positively owned resources."
+    tests: [REC-RECEIPT, EFFORT-V2]
+  - id: I-RECOVERY-006
+    rule: "Morning results derive from current verified retained/archive/memory facts, distinguish code/experiment/verification/lifecycle, preserve exact unknown cause and billing knownness, and give one next action. A historical KEEP or reconciliation alone is not product gain."
+    tests: [REC-REPORT, REC-CYCLE]
+test_hooks:
+  tests:
+    - file: tests/integration/improve-resume.test.js
+    - file: tests/contracts/improve-report.test.js
+    - file: tests/contracts/improve-limits.test.js
