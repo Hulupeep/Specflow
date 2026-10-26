@@ -54,6 +54,26 @@ a portability statement or a fresh prompt is not sufficient proof.
 
 ## The complete loop
 
+The coding role is a builder and delivery owner, not merely a specification
+checker. For any coding task received through a Stax, use the existing selector
+to choose the lightest sufficient process:
+
+| First unmet need | Route |
+|---|---|
+| Trivial display-only instruction, such as a heading colour | Implement directly and visually check; no new ticket/loop. |
+| Known bounded defect | Reproduce, fix, run relevant regression/contracts. |
+| Ready feature with credible acceptance | Feature build; reuse its specification. |
+| Missing consequential decisions or requirements | Spec build for the missing depth, then feature build. |
+| Independent scrutiny justified by risk/uncertainty | Add Duo at the relevant preparation/build boundary; it is not a competing executor. |
+
+Ordinary work does not become an Improve experiment merely because it arrived
+through HeyStax. The #215/#218 service scope is the Improve route; do not force
+every small change through its frozen-experiment machinery. Required project
+checks and permission boundaries still apply to direct/light work. Record a
+short decision in the existing task rather than adding a routing ceremony.
+
+For an actual research-led experiment, the complete loop is:
+
 1. **Imagine:** explore valuable possibilities from the general intent.
 2. **Constrain:** find hard walls using real numbers and dated, cited sources;
    keep a buildable, potentially monetizable hypothesis. Unknown data stays unknown.
@@ -129,12 +149,37 @@ records and audit tools, but no run-dispatch, atomic claim or command-ack tool.
 Do not infer these capabilities from a successful Stax text write. Reuse service
 admission/fencing; qualify any new transport/schema at its owning slice.
 
+## Effort and cost policy
+
+The owner's subscription/low-cost routes should default to no financial or
+review-count cap. Three or four useful reviews are ordinary work. Diagnostic
+thresholds should prompt investigation and a changed, evidenced strategy, not
+make Colm the recovery button. Repeating the same failed approach without new
+evidence is not progress. Explicitly expensive routes need configured brakes;
+unapproved spend, actual quota exhaustion and authority are separate facts.
+Never report a CLI estimate as actual charges or assume a billing mode from the
+provider/model name. Kimi follows the same policy when its adapter is qualified;
+this document does not claim that adapter currently exists.
+
+Use an explicit working-session/overnight horizon, configurable for deliberate
+long runs; do not default to a multi-day loop. At a horizon preserve evidence and
+give a truthful result/checkpoint, without silently resetting the original job.
+Continue only under existing authority and a verified recovery/schedule policy.
+
+Current implementation gap, observed 26 October: Duo has no default maxCalls or
+maxElapsedMs, but its protocol/stagnation controller permits only one recovery
+per failure episode. The Improve controller separately defaults to 24 starts and
+30 minutes. Align these mechanisms through [#235](https://github.com/Hulupeep/Specflow/issues/235),
+including legacy policy migration and tests; this guidance does not remove the
+current guards, change explicit limits or authorise journal/deadline resets.
+
 ## Existing delivery slices
 
 | Slice | Adaptation; preserve existing acceptance |
 |---|---|
 | #215 | Own the complete intent-to-evidence loop and two-way HeyStax target, with explicit standing policy per repo. |
-| #182, next | Bounded intent, fixed criteria, alternatives, outcomes/evidence and contradictions; separate implementation failure from hypothesis failure. Changed selection cites actual learning. Keep evaluator/holdout channels separate. |
+| #235, slice A next | Remove the review continuation dead end with evidenced adaptive recovery. Controller/window alignment follows the qualified #183 recovery boundary. |
+| #182 | Bounded intent, fixed criteria, alternatives, outcomes/evidence and contradictions; separate implementation failure from hypothesis failure. Changed selection cites actual learning. Keep evaluator/holdout channels separate. |
 | #183 | Reconcile interruption/unknown work without another authoritative build. Finish with an explainable result/limitation; no silent owner-wait or narrative-based recovery. |
 | #218 | One authenticated service for human/agent callers; stable role/task identity, current holder authority, fenced claim/admission and command acknowledgement. Replacement reconciles the original job; task prose cannot grant permissions. |
 | #219 | Two-way configured HeyStax adapter and thin plugin: two installed callers, version/resource hashes, instruction-to-job and result-to-a-replacement-researcher proof, deduplicated delivery. No new launch UI is required for the first adapter. |
@@ -149,6 +194,6 @@ Revenue impact requires suitable observed measurement; PR/test counts and
 speculative financial estimates are not revenue proof.
 
 These are product requirements and routing guidance, not implemented service
-capabilities. #181 is merged; #182 is next. Live scheduling stays gated by #183.
+capabilities. #181 is merged; #235 slice A precedes #182. Live scheduling stays gated by #183.
 Future API/HeyStax schemas and atomic claim decisions still require scoped
 simulation, audit, qualification and build-ready promotion.

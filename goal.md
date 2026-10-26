@@ -10,6 +10,9 @@ When a research agent has already selected an opportunity and opened issues,
 Specflow begins there: strengthen the issues proportionately, build, verify and
 return evidence. Do not repeat discovery or replace the researcher's choice
 without a concrete contradiction, safety conflict or failed feasibility check.
+The coding role owns implementation and delivery, not just issue auditing.
+Choose direct work, a light fix, feature-build, spec-build then feature-build, or
+independent Duo review according to the first unmet need and actual risk.
 
 HeyStax is the intended operational control plane where people and agents set
 intent, exchange scoped work, inspect results and instruct the next cycle. The
@@ -21,6 +24,12 @@ Roles are portable across agents and providers. The Chief of Staff Stax holds
 the standing role brief; project/task state and evidence must survive changing
 the role holder. A particular bot, chat session or notification transport is not
 the source of authority or the only place operational knowledge is stored.
+
+Effort is progress-led. Subscription and low-cost routes have no implicit
+financial/review-count stop; repeated failure calls for diagnosis and a changed
+approach. Explicit expensive-route limits, authority, real quota failures and a
+configured working-session/overnight horizon remain separate controls. Do not
+silently turn an ordinary diagnostic threshold into a request for Colm to resume.
 
 Specflow is a trust harness for coding agents: turn a user's intent into work
 whose acceptance is established by contracts, executable evidence and independent

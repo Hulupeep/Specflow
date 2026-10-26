@@ -102,6 +102,23 @@ required UI journey is CRITICAL for Specflow compliance; deferral needs a linked
 tracking issue and remains an explicit gap, not completion. Owner testing and
 feature flags never substitute for this evidence.
 
+### Effort Follows Progress And Route Policy
+
+Do not invent a fixed review-count or estimated-dollar stop for subscription or
+declared low-cost work. Several useful reviews are normal. Repeated failure
+requires diagnosis and a materially different, evidenced recovery, not automatic
+owner handback. Prefer a bounded next experiment or smaller slice over repeating
+an unchanged failing approach. Financial brakes belong to explicitly costly
+routes or owner-set limits; do not infer billing mode or price from a model name.
+
+Keep a configured working-session/overnight horizon so unattended work does not
+run for days without explicit long-run intent. At the boundary preserve state,
+report the actual outcome and use only already-authorised continuation/recovery.
+This is separate from financial cost. Existing hard runtime guards and explicit
+limits still apply until changed through reviewed policy: do not reset journals,
+extend a frozen deadline, grant acceptance or switch to paid API fallback to
+evade them. Report the exact policy/capability gap rather than “budget exhausted”.
+
 ### Decide Whether A Loop Is Needed
 
 Use individual parts directly when the selected work is bounded. Tweak and Bug
@@ -133,6 +150,16 @@ The detailed lifecycle below applies only to evidence justified for the selected
 slice. Thin selection ends at planning state; it does not generate a full spec.
 
 ## Select The Loop (Only When Needed)
+
+The coding agent owns building and delivery. Select lifecycle and review depth
+separately: `spec-build` resolves missing requirements; `feature-build` executes
+ready work; Duo adds independent scrutiny where justified and can span either
+preparation or implementation. They are not mutually exclusive work weights.
+A display-only heading-colour change can proceed directly with a visual check
+and relevant existing checks, without a new ticket or loop. A ready research
+handoff does not automatically need `spec-build` before `feature-build`. Record
+the short routing reason with the existing work; do not ask the owner to choose
+the workflow when standing authority and the task already determine it.
 
 - Rough idea, discovery, PRD, story slicing, ticket creation, or "turn this into ready tickets":
   use `QA/loops/spec-build.yaml`.
