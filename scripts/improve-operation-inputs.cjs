@@ -14,6 +14,6 @@ function stageInput(stage,args,configFile){
  const visit=v=>{if(typeof v==='string')add(v);else if(Array.isArray(v))v.forEach(visit);else if(v&&typeof v==='object')Object.values(v).forEach(visit);};
  visit(args);if(configFile)add(configFile);
  if(typeof args[0]==='string'&&path.isAbsolute(args[0]))for(const name of ['run.json','ledger.jsonl','candidates.json'])add(path.join(args[0],name));
- return m.digest({stage,args,files:[...files].sort(([a],[b])=>a.localeCompare(b))});
+ return m.digest({stage,args,files:[...files].sort(([a],[b])=>a<b?-1:a>b?1:0)});
 }
 module.exports={stageInput};

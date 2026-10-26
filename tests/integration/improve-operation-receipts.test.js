@@ -35,3 +35,9 @@ test.each(['receipt_file_synced','receipt_renamed','receipt_directory_synced'])(
  const killed=cp.spawnSync(process.execPath,[path.resolve('tests/fixtures/improve-worker/receipt-producer.cjs'),file],{encoding:'utf8',timeout:10000});expect(killed.signal).toBe('SIGKILL');
  const doc=store.put(input);expect(store.get(doc.id)).toEqual(doc);expect(store.put(input)).toEqual(doc);expect(fs.statSync(path.join(store.root,'receipts',doc.id+'.json')).nlink).toBe(1);expect(fs.readdirSync(path.join(store.root,'receipts')).filter(n=>n.endsWith('.json'))).toEqual([doc.id+'.json']);
 });
+test('REC-RECEIPT real single-byte UTF-8 chunks retain exact stdout bytes in the receipt and caller',async()=>{
+ const {opts,store,binding}=setup(),text='é漢🧪',child=spawnOperation({executable:process.execPath,args:['-e','const b=Buffer.from('+JSON.stringify(text)+');let i=0;const timer=setInterval(()=>{if(i===b.length){clearInterval(timer);return;}process.stdout.write(b.subarray(i,i+1));i++;},10);'],options:{env:{PATH:'/usr/bin:/bin'}},receipt:opts,binding,kind:'stage'});child.stdin.end();const waiting=require('../../scripts/improve-worker.cjs').awaitStage(child);child.recoveryRelease();const result=await waiting;expect(result.status).toBe(0);expect(result.stdout).toBe(text);expect(store.get(binding.operation_id).stdout_sha256).toBe(m.hash(text));
+},15000);
+test('REC-RECEIPT actual worker stdout/stderr byte chunks decode independently without UTF-8 corruption',async()=>{
+ const text='é漢🧪',child=cp.spawn(process.execPath,['-e','const b=Buffer.from('+JSON.stringify(text)+');let i=0;const t=setInterval(()=>{if(i===b.length*2){clearInterval(t);return;}require("fs").writeSync(i<b.length?1:2,b.subarray(i%b.length,i%b.length+1));i++;},10);'],{detached:true,stdio:['ignore','pipe','pipe']});const result=await require('../../scripts/improve-worker.cjs').awaitStage(child);expect(result).toEqual({status:0,stdout:text,stderr:text});
+},15000);

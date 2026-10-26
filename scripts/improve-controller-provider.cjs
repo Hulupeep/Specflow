@@ -14,13 +14,14 @@ function check(v, code) {
 }
 function service(ctx) {
   check(process.getuid() === ctx.uid, 'host_identity_mismatch');
+  const recovery=require('./improve-recovery-host.cjs').fromConfig(ctx.recovery,{principal:ctx.principal,store:ctx.store,registry:ctx.registry,routing:ctx.routing,requested_models:ctx.requested_models});
   return c.createControllerService({
     root: ctx.store,
     registry: ctx.registry,
-    resolvePrincipal: () => ctx.principal,
+    resolvePrincipal: () => recovery?recovery.resolveAssignment().principal:ctx.principal,
     ownerPrincipal: ctx.ownerPrincipal,
     hostCapabilities: () => ctx.host,
-    recovery: require('./improve-recovery-host.cjs').fromConfig(ctx.recovery,{principal:ctx.principal,store:ctx.store,registry:ctx.registry,routing:ctx.routing,requested_models:ctx.requested_models})
+    recovery
   });
 }
 function invocation(args, ctx) {
@@ -92,12 +93,22 @@ function classify(output, error, status) {
   if (status !== 0) return 'provider_failure';
   return null;
 }
+function terminalCompletion(output,expected,reason){
+ const records=String(output).split('\n').filter(Boolean).flatMap(line=>{try{return [JSON.parse(line)];}catch{return [];}});
+ if(!expected?.session||!expected?.model)return false;
+ const init=records.filter(e=>e.type==='system'&&e.subtype==='init'),end=records.filter(e=>e.type==='result');
+ // Observed native auth refusal: an explicit same-session assistant API-error
+ // record followed by a terminal api_error result; the result has no error field.
+ const nativeAuth=end.length===1&&end[0].is_error===true&&end[0].terminal_reason==='api_error'&&records.some(e=>e.type==='assistant'&&e.session_id===expected.session&&e.is_api_error_message===true&&e.error==='authentication_failed');
+ return init.length===1&&init[0].session_id===expected.session&&init[0].model===expected.model&&end.length===1&&end[0].session_id===expected.session&&
+  (end[0].subtype==='success'&&!end[0].is_error||reason==='provider_auth'&&(nativeAuth||/^(authentication|unauthorized|invalid_api_key|not_logged_in)(?:[:\s_]|$)/i.test(String(end[0].error||'')))||reason==='provider_quota'&&/^(rate_limit|quota_exceeded)(?:[:\s_]|$)/i.test(String(end[0].error||'')));
+}
 async function run(ctx, args = process.argv.slice(2)) {
   const svc = service(ctx);
   const current = p
     .createProfileService({
       registry: ctx.registry,
-      resolvePrincipal: () => ctx.principal,
+      resolvePrincipal: () => ctx.recovery?.ticketRoot ? require('./improve-execution-tickets.cjs').resolve({root:ctx.recovery.ticketRoot,registry:ctx.registry,scope:ctx.recovery.scope}).assignment.principal : ctx.principal,
       hostCapabilities: () => ctx.host,
       lockTool:ctx.recovery?.lockTool
     })
@@ -185,13 +196,14 @@ async function run(ctx, args = process.argv.slice(2)) {
       }
     }, 100);
     let size = 0;
+    child.stdout.setEncoding('utf8');child.stderr.setEncoding('utf8');
     child.stdout.on('data', (b) => {
-      size += b.length;
+      size += Buffer.byteLength(b);
       if (size > 8 * 1024 * 1024) return kill('output_limit');
       output += b.toString();
     });
     child.stderr.on('data', (b) => {
-      size += b.length;
+      size += Buffer.byteLength(b);
       if (size > 8 * 1024 * 1024) return kill('output_limit');
       stderr += b.toString();
     });
@@ -234,11 +246,25 @@ async function run(ctx, args = process.argv.slice(2)) {
   fs.writeFileSync(outputPath, output, { mode: 0o600, flag: 'wx' });
   if (failure) stderr += '\n' + JSON.stringify({ controller_error: failure, reason_code: reason }) + '\n';
   fs.writeFileSync(errorPath, stderr, { mode: 0o600, flag: 'wx' });
-  if(bound.policy_version===2){const sealed=new (require('./improve-operation-receipts.cjs').OperationReceipts)({root:ctx.recovery.receiptRoot||path.join(ctx.store,'operation-receipts'),registry:ctx.registry,lockTool:ctx.recovery.lockTool}).get(op.id);reason=sealed.result.reason_code;estimate=sealed.result.estimate_usd;}
-  svc.recordAttempt(
+  if(bound.policy_version===2){
+   const receipts=new (require('./improve-operation-receipts.cjs').OperationReceipts)({root:ctx.recovery.receiptRoot||path.join(ctx.store,'operation-receipts'),registry:ctx.registry,lockTool:ctx.recovery.lockTool});
+   try{const sealed=receipts.completion(op.id);check(require('./improve-memory.cjs').digest(sealed.binding)===require('./improve-memory.cjs').digest(require('./improve-operation-receipts.cjs').forOperation(bound,op))&&sealed.result.exit_code===outcome&&sealed.stdout_sha256===sha(output),'receipt_binding_mismatch');reason=sealed.result.reason_code;estimate=sealed.result.estimate_usd;}catch(e){
+    if(e.code!=='external_completion_unknown')throw e;
+    try{svc.reconcile({repo_id:ctx.repo_id,run_id:ctx.run_id,request_id:'provider-observation-'+op.id,expected_generation:op.generation,receipt_id:op.id});}catch{}
+    throw new c.ControllerError('external_completion_unknown','Keep the original provider operation reserved. Inspect its original session/evidence; do not issue a replacement call.');
+   }
+  }
+  try{svc.recordAttempt(
     { repo_id: ctx.repo_id, run_id: ctx.run_id, operation_id: op.id },
     { exit_code: outcome, reason_code: reason, evidence: [outputPath, errorPath], estimate_usd: estimate }
-  );
+  );}catch(e){
+    if(bound.policy_version!==2||!['stale_execution_generation','recovery_assignment_mismatch','authority_revoked','store_busy','authority_busy','storage_commit_unconfirmed','stale_profile'].includes(e.code))throw e;
+    // The original inference is positively complete and sealed. Preserve its
+    // output for the already-issued original stage; defer authoritative ack.
+    stderr+='\n'+JSON.stringify({controller_error:e.code,authoritative_ack:'deferred'})+'\n';
+    fs.writeFileSync(path.join(evidenceDir,op.id+'.ack-deferred.json'),JSON.stringify({code:e.code,operation_id:op.id}),{mode:0o600,flag:'wx'});
+  }
+  process.stdout.on('error',()=>{});process.stderr.on('error',()=>{});
   process.stdout.write(output);
   process.stderr.write(stderr);
   process.exitCode = reason ? 2 : outcome;
@@ -261,4 +287,4 @@ function writeGateway(directory, ctx) {
   require(gateway);
   return gateway;
 }
-module.exports = { run, writeGateway, invocation, classify };
+module.exports = { run, writeGateway, invocation, classify, terminalCompletion };

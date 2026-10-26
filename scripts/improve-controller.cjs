@@ -261,6 +261,7 @@ function view(r, now) {
   const unresolved = r.operations.some((o) => o.state === 'reserved'),
     reasons = [...r.reasons];
   if (r.cancel_requested && !reasons.includes('operator_cancelled')) reasons.unshift('operator_cancelled');
+  for(const op of r.operations.filter(o=>o.state==='reserved'&&o.unknown_reason))if(!reasons.includes(op.unknown_reason))reasons.push(op.unknown_reason);
   if (unresolved && !reasons.includes('reconciliation_required')) reasons.push('reconciliation_required');
   if (now >= r.deadline_ms && !reasons.includes('deadline')) reasons.push('deadline');
   if (r.last_failure && !reasons.includes(r.last_failure.reason_code))
@@ -316,6 +317,7 @@ function createControllerService({
     return p;
   }
   function migrate(req) {
+    need(!recovery?.scope,'scoped_execution_only');
     shape(req, ['repo_id', 'request_id']);
     need(id(req.repo_id) && id(req.request_id) && recovery?.format === 2 && identity() === ownerPrincipal, 'migration_owner_required');
     need(recovery.migration?.dedicated === true && Array.isArray(recovery.migration.stores) && recovery.migration.stores.length === 1 &&
@@ -335,6 +337,7 @@ function createControllerService({
   }
   function access(repo_id, execute = false, revision = null, fn) {
     need(id(repo_id), 'invalid_request');
+    if(recovery?.scope)need(repo_id===recovery.scope.repo_id,'authority_revoked');
     const principal = identity(),
       inspected = profileService.inspect({ repo_id });
     need(
@@ -367,7 +370,7 @@ function createControllerService({
   }
   function run(s, repo_id, run_id, principal) {
     const r = s.runs[run_id];
-    need(r && r.repo_id === repo_id && (r.principal === principal ||
+    need((!recovery?.scope||recovery.scope.run_id===run_id)&&r && r.repo_id === repo_id && (r.principal === principal ||
       (r.policy_version === 2 && (principal === ownerPrincipal || r.recovery.authorised.principal === principal))), 'run_unavailable');
     return r;
   }
@@ -500,6 +503,7 @@ function createControllerService({
     return { ...receipt, run: view(r, now()) };
   }
   function registerPolicy(policy) {
+    need(!recovery?.scope,'scoped_execution_only');
     shape(policy, ['version', 'repo_id', 'profile_revision', 'limits', 'schedule', ...(policy?.version === 2 ? ['routes'] : [])]);
     need(
       [1, 2].includes(policy.version) && id(policy.repo_id) && /^[a-f0-9]{64}$/.test(policy.profile_revision),
@@ -540,6 +544,7 @@ function createControllerService({
     );
   }
   function admit(req) {
+    need(!recovery?.scope,'scoped_execution_only');
     shape(req, ['repo_id', 'request_id', 'limits'], ['repo_id', 'request_id']);
     need(id(req.request_id), 'invalid_request');
     return access(req.repo_id, true, null, (ctx) => store.change((s) => admitIn(s, req, ctx, simulation)));
@@ -551,7 +556,7 @@ function createControllerService({
       const runs = req.run_id
         ? [view(run(s, req.repo_id, req.run_id, ctx.principal), now())]
         : Object.values(s.runs)
-            .filter((r) => r.repo_id === req.repo_id && (r.principal === ctx.principal ||
+            .filter((r) => (!recovery?.scope||r.id===recovery.scope.run_id) && r.repo_id === req.repo_id && (r.principal === ctx.principal ||
               (r.policy_version === 2 && (ctx.principal === ownerPrincipal || r.recovery.authorised.principal === ctx.principal))))
             .map((r) => view(r, now()));
       return {
@@ -560,7 +565,7 @@ function createControllerService({
         activation: 'recovery_required',
         simulation,
         schedule:
-          s.policies[req.repo_id]?.creator === ctx.principal
+          !recovery?.scope && s.policies[req.repo_id]?.creator === ctx.principal
             ? { ...s.schedules[req.repo_id], next_intended: nextSlot(s.policies[req.repo_id], now()) }
             : null,
         runs: runs.map((r) => ({
@@ -573,10 +578,10 @@ function createControllerService({
           }
         })),
         admissions: Object.values(s.requests).filter(
-          (a) => a.repo_id === req.repo_id && a.principal === ctx.principal
+          (a) => a.repo_id === req.repo_id && a.principal === ctx.principal && (!recovery?.scope||a.run_id===recovery.scope.run_id)
         ),
         occurrences: Object.values(s.occurrences).filter(
-          (o) => o.repo_id === req.repo_id && o.principal === ctx.principal
+          (o) => o.repo_id === req.repo_id && o.principal === ctx.principal && (!recovery?.scope||o.result?.run_id===recovery.scope.run_id)
         )
       };
     });
@@ -587,7 +592,7 @@ function createControllerService({
       const snapshot = store.read(), r = run(snapshot, req.repo_id, req.run_id, ctx.principal);
       const asOf = r.stopped_at_ms ?? (now() >= r.deadline_ms ? r.deadline_ms : now()),
         v = view(r, asOf);
-      if(r.policy_version===2)return require('./improve-recovery-report.cjs').report({r,ctx,now:now(),host:recoveryService.host(),memory:r.memory_required?memoryService.summary(snapshot,r):null,view:view(r,now()),verifyTerminalArchive});
+      if(r.policy_version===2)return require('./improve-recovery-report.cjs').report({r,ctx,now:now(),host:recoveryService.host(),memory:r.memory_required?memoryService.summary(snapshot,r):null,view:view(r,now()),verifyTerminalArchive,ownsRepo:snapshot.owners[r.canonical_repo]===r.id});
       return {
         version: 1,
         kind: 'controller-report',
@@ -642,6 +647,7 @@ function createControllerService({
       store.change((s) => {
         const r = run(s, req.repo_id, req.run_id, ctx.principal);
         recoveryService.guard(r, ctx, { historical, control });
+        if(!historical&&!control&&!r.reasons.length)need(s.owners[r.canonical_repo]===r.id,'run_ownership_unavailable');
         return fn(s, r, ctx);
       }, launch)
     );
@@ -751,6 +757,7 @@ function createControllerService({
           r.stopped_at_ms ??= now();
           r.state = 'incomplete';
         }
+        recoveryService.clearReconciliation(r);
         event(s, 'stage_recorded', r.id, { operation_id: op.id, exit_code: result.exit_code });
         return view(r, now());
   }
@@ -850,6 +857,7 @@ function createControllerService({
           r.failed_check = result.reason_code;
           r.state = retryable ? 'active' : 'incomplete';
         } else r.last_failure = null;
+        recoveryService.clearReconciliation(r);
         event(s, 'attempt_recorded', r.id, { operation_id: o.id });
         return view(r, now());
   }
@@ -1026,6 +1034,7 @@ function createControllerService({
     });
   }
   function controlSchedule(req) {
+    need(!recovery?.scope,'scoped_execution_only');
     shape(req, ['repo_id', 'state']);
     need(['enabled', 'paused', 'disabled'].includes(req.state), 'invalid_schedule');
     return access(req.repo_id, true, null, (ctx) =>

@@ -24,23 +24,29 @@ class OperationReceipts{
   try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);this.fault('receipt_file_synced',{kind:path.basename(path.dirname(file))});fs.renameSync(tmp,file);this.fault('receipt_renamed',{kind:path.basename(path.dirname(file))});}finally{fs.closeSync(fd);fs.rmSync(tmp,{force:true});}
   k.syncDir(path.dirname(file));this.fault('receipt_directory_synced',{kind:path.basename(path.dirname(file))});
  }
- get(id){
-  need(m.token(id),'invalid_receipt_id');const file=path.join(this.root,'receipts',id+'.json');privatePath(file);let doc;
+ get(id){return this.read(id,false);}
+ getObservation(id){return this.read(id,true);}
+ completion(id){try{return this.get(id);}catch(e){if(e.code!=='ENOENT')throw e;let observation;try{observation=this.getObservation(id);}catch(missing){if(missing.code==='ENOENT')throw e;throw missing;}const unknown=new RecoveryError('external_completion_unknown');unknown.observation=observation;throw unknown;}}
+ read(id,observation){
+  need(m.token(id),'invalid_receipt_id');const file=path.join(this.root,observation?'observations':'receipts',id+'.json');privatePath(file);let doc;
   try{doc=JSON.parse(fs.readFileSync(file,'utf8'));}catch{throw new RecoveryError('receipt_corrupt');}
   shape(doc,['version','id','binding','phase','result','stdout_sha256','stderr_sha256','seal']);binding(doc.binding);result(doc.result);
-  need(doc.version===2&&doc.id===id&&['complete','not_started'].includes(doc.phase)&&m.sha(doc.stdout_sha256)&&m.sha(doc.stderr_sha256)&&m.sha(doc.seal),'invalid_operation_receipt');
+  need(doc.version===2&&doc.id===id&&(observation?doc.phase==='unknown':['complete','not_started'].includes(doc.phase))&&m.sha(doc.stdout_sha256)&&m.sha(doc.stderr_sha256)&&m.sha(doc.seal),'invalid_operation_receipt');
   const {seal,...body}=doc;need(crypto.timingSafeEqual(Buffer.from(seal,'hex'),Buffer.from(this.mac(body),'hex')),'receipt_integrity_failure');
   for(const hash of [doc.stdout_sha256,doc.stderr_sha256]){const blob=path.join(this.root,'blobs',hash);privatePath(blob);need(m.hash(fs.readFileSync(blob))===hash,'receipt_evidence_changed');}
   return structuredClone(doc);
  }
- put({binding:identity,phase='complete',result:outcome,stdout='',stderr=''}){
-  const b=binding(identity),r=result(outcome);need(['complete','not_started'].includes(phase)&&typeof stdout==='string'&&typeof stderr==='string'&&Buffer.byteLength(stdout)+Buffer.byteLength(stderr)<=8*1024*1024,'invalid_operation_receipt');
+ put(input){return this.write(input,false);}
+ putUnknown(input){return this.write({...input,phase:'unknown'},true);}
+ write({binding:identity,phase='complete',result:outcome,stdout='',stderr=''},observation){
+  const b=binding(identity),r=result(outcome);need((observation?phase==='unknown':['complete','not_started'].includes(phase))&&typeof stdout==='string'&&typeof stderr==='string'&&Buffer.byteLength(stdout)+Buffer.byteLength(stderr)<=8*1024*1024,'invalid_operation_receipt');
   const body={version:2,id:b.operation_id,binding:b,phase,result:r,stdout_sha256:m.hash(stdout),stderr_sha256:m.hash(stderr)},doc={...body,seal:this.mac(body)};
   return k.withLock(path.join(this.root,'receipt.lock'),this.tool,()=>{
-   const file=path.join(this.root,'receipts',doc.id+'.json');
-   if(fs.existsSync(file)){const old=this.get(doc.id);need(same(old,doc),'receipt_idempotency_conflict');return old;}
+   const directory=path.join(this.root,observation?'observations':'receipts');if(observation)fs.mkdirSync(directory,{mode:0o700,recursive:true});privatePath(directory,true);
+   const file=path.join(directory,doc.id+'.json');
+   if(fs.existsSync(file)){const old=this.read(doc.id,observation);need(same(old,doc),'receipt_idempotency_conflict');return old;}
    this.publish(path.join(this.root,'blobs',body.stdout_sha256),Buffer.from(stdout));this.publish(path.join(this.root,'blobs',body.stderr_sha256),Buffer.from(stderr));this.fault('receipt_blobs_synced');
-   this.publish(file,Buffer.from(JSON.stringify(doc)));this.fault('receipt_published');return this.get(doc.id);
+   this.publish(file,Buffer.from(JSON.stringify(doc)));this.fault('receipt_published');return this.read(doc.id,observation);
   },{create:true});
  }
 }

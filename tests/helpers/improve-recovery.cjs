@@ -10,7 +10,7 @@ function recoveryFixture({initialProcess=null,policyOverrides={}}={}){
  const successors=new Map(),actualRoutes=Object.fromEntries(['builder','oracle','peer','judge'].map(role=>[role,{requested_model:'sonnet',effective_model:'fixture-'+role,billing:'subscription_cli'}]));
  const recovery={format:2,lockTool,resolveAssignment:()=>structuredClone(current),resolveExecution:()=>execution?structuredClone(execution):null,
   resolveSuccessor:key=>{const value=successors.get(JSON.stringify(key));if(!value)throw Error('Unregistered successor');return structuredClone(value);},resolveProcess:proc.state,
-  resolveRoute:role=>structuredClone(actualRoutes[role]),resolveReceipt:id=>new (require('../../scripts/improve-operation-receipts.cjs').OperationReceipts)({root:path.join(root,'operation-receipts'),registry,lockTool}).get(id),resolveTerminalArchive:()=>{throw Error('No terminal archive registered in this boundary fixture');}};
+  resolveRoute:role=>structuredClone(actualRoutes[role]),resolveReceipt:id=>new (require('../../scripts/improve-operation-receipts.cjs').OperationReceipts)({root:path.join(root,'operation-receipts'),registry,lockTool}).completion(id),resolveTerminalArchive:()=>{throw Error('No terminal archive registered in this boundary fixture');}};
  const config=()=>({...f.config(),registry,root,recovery}),service=()=>c.createControllerService(config());
  const policy=(extra={})=>({version:2,repo_id:'fixture',profile_revision:f.revision,limits:{maxCycles:2},schedule:null,
   routes:Object.entries(actualRoutes).map(([role,r])=>({role,...r,cost:'ordinary',maxStarts:null})),...extra});

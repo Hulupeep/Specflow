@@ -1,7 +1,7 @@
 'use strict';
 // Owner-host projection only: archived decisions, current retained Git and memory.
 const fs=require('fs'),path=require('path'),cp=require('child_process'),m=require('./improve-memory.cjs');
-function report({r,ctx,now,host,memory,view,verifyTerminalArchive}){
+function report({r,ctx,now,host,memory,view,verifyTerminalArchive,ownsRepo}){
  const code=[],verification=[];
  for(const cycle of r.cycles.filter(c=>c.state==='terminal')){
   let row={cycle_id:cycle.id,decision:cycle.decision,retained_commit:null,available:false,retained:false,base_commit:null,criteria:[],gains:[],regressions:[],risks:[],reason_code:null},valid=false;
@@ -24,16 +24,29 @@ function report({r,ctx,now,host,memory,view,verifyTerminalArchive}){
  const unresolved=[...r.operations.filter(o=>o.state==='reserved').map(o=>o.id),...(r.active_cycle?[r.active_cycle]:[])];
  const established=gains.length>0&&ctx.revision===r.profile_revision&&!unresolved.length;
  const missing=code.some(c=>!c.available);
- const reason=unresolved.length?'reconciliation_required':missing?'terminal_evidence_unavailable':r.reasons.includes('pending_review')&&!established?'retained_state_unverified':view.reason_code||(!established?'improvement_not_established':'pending_review');
- const next=unresolved.length?{owner:'agent',action:'Reconcile the original operation receipts and terminal archive without repeating uncertain work.',reason_code:reason}:
+ const issued=r.operations.filter(o=>o.state==='reserved');
+ const running=issued.length>0&&issued.every(o=>o.process_identity&&host.resolveProcess(o.process_identity)==='live');
+ const ready=ownsRepo&&!issued.length&&!r.reasons.length&&!r.cancel_requested&&now<r.deadline_ms&&r.recovery.current&&host.resolveProcess(r.recovery.current.assignment.process)==='live';
+ const holderState=r.recovery.current?host.resolveProcess(r.recovery.current.assignment.process):'dead';
+ const holderLost=ownsRepo&&!issued.length&&!r.reasons.length&&!r.cancel_requested&&now<r.deadline_ms&&(r.active_cycle||view.remaining.cycles===null||view.remaining.cycles>0)&&holderState!=='live';
+ const holderReason=holderState==='unknown'?'previous_holder_unknown':'recovery_holder_unavailable';
+ const knownStageFailure=!issued.length&&r.reasons.includes('stage_failure')&&!r.cancel_requested&&now<r.deadline_ms;
+ const unknown=r.operations.find(o=>o.state==='reserved'&&o.unknown_reason)?.unknown_reason;
+ const reason=unknown|| (knownStageFailure?'stage_failure':holderLost?holderReason:r.cancel_requested?'operator_cancelled':now>=r.deadline_ms?'deadline':running?'work_running':ready?(r.active_cycle?'cycle_in_progress':'ready_for_next_cycle'):unresolved.length?'reconciliation_required':missing?'terminal_evidence_unavailable':r.reasons.includes('pending_review')&&!established?'retained_state_unverified':view.reason_code||(!established?'improvement_not_established':'pending_review'));
+ const next=unknown?{owner:'owner',action:'The original provider outcome is unknown. No automatic resolution is available; the repository remains held. Decide a safe audited disposition without repeating the call.',reason_code:reason}:
+  knownStageFailure?{owner:'owner',action:'All operations are complete; there are no uncertain receipts to resolve. No automatic resume is available. The repository remains held until an authorised audited repair of '+(r.failed_check||'the recorded stage failure')+'.',reason_code:reason}:
+  holderLost?{owner:'agent',action:'Verify the original holder is positively dead, then claim the same job through resume within its original work window; do not repeat issued work.',reason_code:reason}:
+  !unknown&&running&&!r.cancel_requested&&now<r.deadline_ms?{owner:'agent',action:'Monitor the original issued work and its authenticated receipt; start no replacement call.',reason_code:reason}:
+  !unknown&&ready?{owner:'agent',action:r.active_cycle?'Continue the original cycle at its next unconsumed checkpoint.':'Select the next evidence-backed opportunity within the original remaining window.',reason_code:reason}:
+  unresolved.length?{owner:'agent',action:'Reconcile the original operation receipts and terminal archive without repeating uncertain work.',reason_code:reason}:
   missing?{owner:'agent',action:'Restore and authenticate the original terminal evidence before requesting a proposal decision.',reason_code:reason}:
   r.reasons.includes('pending_review')&&!established?{owner:'agent',action:'Revalidate the retained proposal and exact verified Git tree before requesting review.',reason_code:reason}:
   r.reasons.includes('pending_review')&&established?{owner:'owner',action:'Review the authenticated retained proposal and accept or reject its baseline.',reason_code:'pending_review'}:
-  {owner:'agent',action:r.cancel_requested||now>=r.deadline_ms?'Finish the evidence-backed report and reconcile delivery; start no new protected work.':'Continue the authorised job from its current verified checkpoint within the original work window.',reason_code:reason};
+  {owner:'agent',action:!ownsRepo?'Use the preserved completed result; any further work requires a new authorised job.':r.cancel_requested||now>=r.deadline_ms?'Finish the evidence-backed report and reconcile delivery; start no new protected work.':'Continue the authorised job from its current verified checkpoint within the original work window.',reason_code:reason};
  const facts={version:2,kind:'controller-report',run_id:r.id,report_id:r.id,repo_id:r.repo_id,profile_revision:r.profile_revision,
   claim:established?'Verified retained local improvement: '+gains.flatMap(c=>c.criteria.filter(a=>a.status==='satisfied'&&a.mandatory).map(a=>a.statement)).join('; '):'improvement not established',established,code_results:code,verification_results:verification,
   experiment_results:(memory?.outcomes||[]).map(o=>({outcome_id:o.id,verdict:o.experiment_verdict})),memory_revision:memory?.revision||null,
-  unresolved,original_limits:r.limits,deadline_ms:r.deadline_ms,window_ended:now>=r.deadline_ms,cancel_requested:r.cancel_requested,
+  failed_check:r.failed_check||null,operations_complete:issued.length===0,lifecycle:knownStageFailure?'blocked':holderLost?'interrupted':unresolved.length?(r.cancel_requested?'cancelling':running||ready?'running':'interrupted'):ready?'running':code.length?'completed':r.cancel_requested?'cancelled':r.reasons.length?'blocked':'queued',repo_owned:ownsRepo,unresolved,original_limits:r.limits,deadline_ms:r.deadline_ms,window_ended:now>=r.deadline_ms,cancel_requested:r.cancel_requested,
   consumed:{cycles:r.consumed_cycles,terminal_cycles:r.terminal_cycles,attempts:r.consumed_attempts,consecutive_no_progress:r.no_progress},
   usage:{mode:'subscription_cli',attempts:r.consumed_attempts,estimates_usd:r.estimates.length?r.estimates.reduce((n,e)=>n+e.usd,0):null,actual_charges_usd:null},
   reason_code:reason,reasons:view.reasons,next_action:next,activation:'recovery_required'};

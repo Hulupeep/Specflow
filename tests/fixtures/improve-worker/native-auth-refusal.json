@@ -1,0 +1,51 @@
+{
+  "native_cli_version": "2.1.285",
+  "actual_empty_config_capture_sha256": "01058e8b5b9e1681e9800a021c597293bb4d31005e30119baca92edc72813381",
+  "normalization": "Session and model placeholders; unrelated local paths, UUIDs, plugins and message body omitted. Native refusal and terminal fields preserved. No model inference: duration_api_ms0 and native usage0.",
+  "records": [
+    {
+      "type": "system",
+      "subtype": "init",
+      "session_id": "<SESSION>",
+      "model": "<MODEL>",
+      "apiKeySource": "none"
+    },
+    {
+      "type": "assistant",
+      "session_id": "<SESSION>",
+      "error": "authentication_failed",
+      "is_api_error_message": true
+    },
+    {
+      "type": "result",
+      "subtype": "success",
+      "session_id": "<SESSION>",
+      "is_error": true,
+      "terminal_reason": "api_error",
+      "result": "Not logged in \u00b7 Please run /login",
+      "duration_api_ms": 0,
+      "usage": {
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "input_tokens": 0,
+        "cache_creation_input_tokens": 0,
+        "cache_read_input_tokens": 0,
+        "output_tokens": 0,
+        "server_tool_use": {
+          "web_search_requests": 0,
+          "web_fetch_requests": 0
+        },
+        "service_tier": "standard",
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 0
+        },
+        "inference_geo": "",
+        "iterations": [],
+        "speed": "standard",
+        "fallback_credit": null
+      }
+    }
+  ]
+}

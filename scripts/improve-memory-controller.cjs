@@ -72,6 +72,7 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
   }
   function selectMemory(req) {
     return command(req,['selection'],(s,r,ctx,actor)=>{
+      m.need(r.policy_version!==2||s.owners[r.canonical_repo]===r.id,'memory_run_not_owned');
       m.need(r.profile_revision===ctx.revision&&!r.active_cycle&&!r.operations.some(o=>o.state==='reserved'),'memory_selection_unavailable');
       const data=selectedData(req.selection,ctx),all=rows(s,r),group=equivalence(all,data.family_key);
       m.need(!all.some(e=>e.data.task?.experiment_id===data.task.experiment_id&&
@@ -177,6 +178,7 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
     return access(req.repo_id,true,null,ctx=>store.change(s=>{
       const r=s.runs[req.run_id];m.need(r&&r.repo_id===req.repo_id&&(r.principal===ctx.principal||(r.policy_version===2&&r.recovery.authorised.principal===ctx.principal))&&r.profile_revision===ctx.revision,'memory_run_unavailable');
       guardWrite(r,ctx,{historical:true});
+      m.need(r.policy_version!==2||s.owners[r.canonical_repo]===r.id,'memory_run_not_owned');
       if(!r.memory_required)return {required:false};
       beforeStage(s,r,req.stage,false);const c=r.cycles.find(c=>c.id===req.cycle_id),selected=c?.memory_selection;
       m.need(selected&&value.core_run_id===c.binding.core_run_id&&value.base_commit===selected.base_commit,'memory_core_binding_mismatch');
