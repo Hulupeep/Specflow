@@ -7,7 +7,7 @@ function git(repo,args) {
     env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0'}});
   m.need(r.status===0,'memory_baseline_unavailable');return r.stdout.trim();
 }
-function attach({store,access,ownerPrincipal,now,memory}) {
+function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
   if(memory)m.need(memory.required===true&&typeof memory.resolveActor==='function'&&typeof memory.resolveEvidence==='function','memory_trusted_host_required');
   const who=ctx=>{m.need(memory,'memory_host_unavailable');return m.actor(memory.resolveActor(),ctx.principal);};
   const rows=(s,r)=>m.events(s,r.canonical_repo);
@@ -23,8 +23,8 @@ function attach({store,access,ownerPrincipal,now,memory}) {
   function owned(s,req,ctx,owner=false) {
     const r=s.runs[req.run_id];
     m.need(r&&r.repo_id===req.repo_id&&r.canonical_repo===canonical(ctx)&&
-      (r.principal===ctx.principal||(owner&&ctx.principal===ownerPrincipal)),'memory_run_unavailable');
-    m.need(r.memory_required===true,'memory_not_enabled');return r;
+      (r.principal===ctx.principal||(r.policy_version===2&&r.recovery.authorised.principal===ctx.principal)||(owner&&ctx.principal===ownerPrincipal)),'memory_run_unavailable');
+    m.need(r.memory_required===true,'memory_not_enabled');guardWrite(r,ctx,{historical:true,control:owner});return r;
   }
   function command(req,allowed,fn,owner=false) {
     m.shape(req,['repo_id','run_id','request_id','expected_revision',...allowed]);
@@ -175,7 +175,8 @@ function attach({store,access,ownerPrincipal,now,memory}) {
     m.shape(req,['repo_id','run_id','cycle_id','stage']);
     m.shape(value,['core_run_id','base_commit','candidate_digest','criteria_revision']);
     return access(req.repo_id,true,null,ctx=>store.change(s=>{
-      const r=s.runs[req.run_id];m.need(r&&r.repo_id===req.repo_id&&r.principal===ctx.principal&&r.profile_revision===ctx.revision,'memory_run_unavailable');
+      const r=s.runs[req.run_id];m.need(r&&r.repo_id===req.repo_id&&(r.principal===ctx.principal||(r.policy_version===2&&r.recovery.authorised.principal===ctx.principal))&&r.profile_revision===ctx.revision,'memory_run_unavailable');
+      guardWrite(r,ctx,{historical:true});
       if(!r.memory_required)return {required:false};
       beforeStage(s,r,req.stage,false);const c=r.cycles.find(c=>c.id===req.cycle_id),selected=c?.memory_selection;
       m.need(selected&&value.core_run_id===c.binding.core_run_id&&value.base_commit===selected.base_commit,'memory_core_binding_mismatch');

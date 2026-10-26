@@ -12,7 +12,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
   const cfg = require('./improve-controller-cli.cjs').readPrivate(configFile);
   const bound = service.status({ repo_id: binding.repo_id, run_id: binding.run_id }).runs[0];
   if (
-    cfg.authority?.principal !== bound.principal ||
+    cfg.authority?.principal !== (bound.policy_version===2?bound.recovery.authorised.principal:bound.principal) ||
     cfg.authority?.revision !== bound.profile_revision ||
     cfg.controller_binding?.run_id !== binding.run_id ||
     cfg.controller_binding?.cycle_id !== binding.cycle_id ||
@@ -62,15 +62,23 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       }
     }
     const req = { repo_id: binding.repo_id, run_id: binding.run_id, cycle_id: binding.cycle_id, stage };
+    if(bound.policy_version===2) req.input_sha256=require('./improve-memory.cjs').digest({stage,args});
     const admitted = service.startStage(req, (entry) => {
-      const child = spawn(cfg.launcher, ['stage', stage, JSON.stringify(args)], {
+      const options={
         cwd: cfg.emptyCwd,
         env: { ...worker.controlledEnvironment(), PATH: cfg.bin + ':' + worker.controlledEnvironment().PATH },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true
-      });
+      };
+      let child;
+      if(entry.operation.generation){
+        const receipt={root:cfg.recovery.receiptRoot||path.join(cfg.controller_store||cfg.store||cfg.recovery.store,'operation-receipts'),registry:cfg.recovery.registry||cfg.authority.registry,lockTool:cfg.recovery.lockTool};
+        new (require('./improve-operation-receipts.cjs').OperationReceipts)({...receipt,create:true});
+        child=require('./improve-paused-operation.cjs').spawnOperation({executable:cfg.launcher,args:['stage',stage,JSON.stringify(args)],options,receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'stage'});
+      }else child=spawn(cfg.launcher,['stage',stage,JSON.stringify(args)],options);
       const identity = watch.birth(child.pid);
       if (!identity) throw new ControllerError('stage_launch_unconfirmed');
+      child.controllerIdentity = require('./improve-process-identity.cjs').identity(child.pid);
       const guardian = spawn(
         process.execPath,
         [
@@ -79,6 +87,8 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
             parent: child.pid,
             group: child.pid,
             started: identity.start,
+            boot_id: require('./improve-process-identity.cjs').boot(),
+            group_started: identity.start,
             deadline: entry.deadline_ms + 1000
           })
         ],
@@ -101,12 +111,12 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
         const r = service.status({ repo_id: binding.repo_id, run_id: binding.run_id }).runs[0];
         if (r.cancel_requested) interruption = 'operator_cancelled';
         else if (r.remaining.wall_ms === 0) interruption = 'deadline';
-        if (interruption) process.kill(-child.pid, 'SIGKILL');
+        if (interruption) watch.signalGroup(child.controllerIdentity);
       } catch (e) {
         if (e.code !== 'ESRCH') {
           interruption = 'authority_unavailable';
           try {
-            process.kill(-child.pid, 'SIGKILL');
+            watch.signalGroup(child.controllerIdentity);
           } catch {}
         }
       }

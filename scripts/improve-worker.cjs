@@ -1117,12 +1117,13 @@ function roleCall({
       detached: true
     });
   const child = authorizeStart ? authorizeStart(launch) : launch();
+  const relayIdentity = require('./improve-process-identity.cjs').identity(child.pid);
   const deadline = Date.now() + 245000;
   while (!fs.existsSync(relay.done) && Date.now() < deadline)
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
   if (!fs.existsSync(relay.done)) {
     try {
-      process.kill(-child.pid, 'SIGKILL');
+      require('./improve-controller-watchdog.cjs').signalGroup(relayIdentity);
     } catch {}
     throw new WorkerError('role_deadline', 'model');
   }
@@ -1346,16 +1347,18 @@ function startAuthorizedStage(configFile, stage, args) {
     })
   );
   need(started.allowed, 'permission_revoked', 'authority');
+  started.result.improveIdentity = require('./improve-process-identity.cjs').identity(started.result.pid);
   return started.result;
 }
 async function awaitStage(child, { timeout = 600000, maxBytes = 8 * 1024 * 1024 } = {}) {
+  const identity = child.controllerIdentity || child.improveIdentity || require('./improve-process-identity.cjs').identity(child.pid);
   return new Promise((resolve, reject) => {
     let stdout = '',
       stderr = '',
       size = 0;
     const timer = setTimeout(() => {
       try {
-        process.kill(-child.pid, 'SIGKILL');
+        require('./improve-controller-watchdog.cjs').signalGroup(identity);
       } catch {}
       reject(new WorkerError('worker_deadline', 'stage'));
     }, timeout);
@@ -1367,7 +1370,7 @@ async function awaitStage(child, { timeout = 600000, maxBytes = 8 * 1024 * 1024 
         size += b.length;
         if (size > maxBytes) {
           try {
-            process.kill(-child.pid, 'SIGKILL');
+            require('./improve-controller-watchdog.cjs').signalGroup(identity);
           } catch {}
           clearTimeout(timer);
           reject(new WorkerError('worker_output_limit', 'stage'));

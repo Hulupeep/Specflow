@@ -19,7 +19,8 @@ function service(ctx) {
     registry: ctx.registry,
     resolvePrincipal: () => ctx.principal,
     ownerPrincipal: ctx.ownerPrincipal,
-    hostCapabilities: () => ctx.host
+    hostCapabilities: () => ctx.host,
+    recovery: require('./improve-recovery-host.cjs').fromConfig(ctx.recovery,{principal:ctx.principal,store:ctx.store,registry:ctx.registry,routing:ctx.routing,requested_models:ctx.requested_models})
   });
 }
 function invocation(args, ctx) {
@@ -96,7 +97,8 @@ async function run(ctx, args = process.argv.slice(2)) {
     .createProfileService({
       registry: ctx.registry,
       resolvePrincipal: () => ctx.principal,
-      hostCapabilities: () => ctx.host
+      hostCapabilities: () => ctx.host,
+      lockTool:ctx.recovery?.lockTool
     })
     .inspect({ repo_id: ctx.repo_id });
   check(current.available && current.operations?.includes('execute'), 'authority_revoked');
@@ -129,8 +131,10 @@ async function run(ctx, args = process.argv.slice(2)) {
     check(svc.status({ repo_id: ctx.repo_id, run_id: ctx.run_id }).runs[0]?.active_stage, 'stage_required');
   const parsed = invocation(args, ctx),
     req = { repo_id: ctx.repo_id, run_id: ctx.run_id, cycle_id: ctx.cycle_id, role: parsed.role };
+  const bound=svc.status({repo_id:ctx.repo_id,run_id:ctx.run_id}).runs[0];
+  if(bound.policy_version===2)req.input_sha256=parsed.schema.properties._binding.properties.input_sha256.const;
   const self = watch.birth(process.pid);
-  check(self && (self.group === process.pid || self.group === process.ppid), 'owned_provider_group_required');
+  check(self && (bound.policy_version===2 && bound.active_stage ? bound.operations.find(o=>o.id===bound.active_stage)?.process_identity?.group===self.group : self.group === process.pid || self.group === process.ppid), 'owned_provider_group_required');
   let child, guardian;
   const admitted = svc.startAttempt(req, (entry) => {
     guardian = spawn(
@@ -141,13 +145,20 @@ async function run(ctx, args = process.argv.slice(2)) {
           parent: process.pid,
           group: self.group,
           started: self.start,
+          boot_id: require('./improve-process-identity.cjs').boot(),
+          group_started: watch.birth(self.group)?.start || null,
           deadline: entry.deadline_ms + 1000
         })
       ],
       { detached: true, stdio: 'ignore', env: { PATH: '/usr/bin:/bin' } }
     );
     guardian.unref();
-    child = spawn(ctx.cli, args, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
+    if(entry.operation.generation){
+      const receipt={root:ctx.recovery.receiptRoot||path.join(ctx.store,'operation-receipts'),registry:ctx.registry,lockTool:ctx.recovery.lockTool};
+      new (require('./improve-operation-receipts.cjs').OperationReceipts)({...receipt,create:true});
+      const b=parsed.schema.properties._binding.properties;
+      child=require('./improve-paused-operation.cjs').spawnOperation({executable:ctx.cli,args,options:{env:process.env},receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'provider',expected:{session:parsed.session,model:ctx.routing[parsed.role],role:b.role.const,nonce:b.nonce.const,input_sha256:b.input_sha256.const}});
+    }else child = spawn(ctx.cli, args, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
     return child;
   });
   if (!admitted.result.allowed)
