@@ -3,13 +3,13 @@
 const fs=require('fs'),path=require('path'),core=require('../../scripts/specflow-improve.cjs'),worker=require('../../scripts/improve-worker.cjs');
 const {memoryFixture}=require('./improve-memory.cjs'),m=require('../../scripts/improve-memory.cjs');
 const CANARY='PRIVATE_HOLDOUT_AND_PROVIDER_MEMORY_CANARY_182';
-function coreFixture(){return memoryFixture({affectedPaths:['journey.json'],initialise:f=>{
+function coreFixture({configure=null}={}){return memoryFixture({configure,affectedPaths:['journey.json'],initialise:f=>{
   fs.writeFileSync(path.join(f.repo,'journey.json'),JSON.stringify({steps:4}));f.git('add','journey.json');f.git('commit','-m','seed actual measurement input');
   f.update(p=>{p.repository.refs[0].commit=f.git('rev-parse','HEAD');p.scope.allowed=['journey.json'];});
 }});}
 const peer=output=>()=>({status:0,stderr:'',stdout:[JSON.stringify({type:'system',subtype:'init',model:'fixture-peer'}),JSON.stringify({type:'result',subtype:'success',structured_output:output,total_cost_usd:0})].join('\n')});
 const write=(file,doc)=>{fs.writeFileSync(file,JSON.stringify(doc,null,2)+'\n',{mode:0o600});return file;};
-async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,consumed=[]}={}){
+async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,consumed=[],afterVerified=null}={}){
   const selection=f.selection({id,retry,consumed});
   const selected=f.service().selectMemory(f.command({selection}));if(!selected.allowed)throw Error(selected.reason_code);
   const binding={job_id:'memory-job-'+number,operation_id:'memory-operation-'+number,core_run_id:'memory-core-'+number};
@@ -36,6 +36,7 @@ async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,
     invokePeer:peer({direction:{assessment:'complete',goal_connection:'Controlled step reduction',next_steps:[],preserve:['input shape']},recommendation:'keep',reason:'Practice check observed'}),
     afterBuilderRound:workspace=>fs.writeFileSync(path.join(workspace,'journey.json'),JSON.stringify({steps}))});
   const after=await core.verifyPhase(runDir,'after');if(after.status!=='verified')throw Error(JSON.stringify(after));
+  if(afterVerified)await afterVerified({cycle,binding,runDir});
   // Separate successful measurement over the actual candidate bytes, not a
   // fabricated measurement result or a rerun of the deciding holdout.
   const candidateSource=path.join(f.root,'worktrees',binding.core_run_id,'journey.json');

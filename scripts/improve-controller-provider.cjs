@@ -72,7 +72,8 @@ function invocation(args, ctx) {
 function classify(output, error, status) {
   if (error === 'output_limit') return 'protocol_failure';
   if (error === 'deadline') return 'deadline';
-  if (error === 'cancelled') return 'operator_cancelled';
+  if (error === 'cancelled' || error === 'operator_cancelled') return 'operator_cancelled';
+  if (error === 'authority_unavailable') return 'authority_unavailable';
   // Only explicit native error records are classified; prompt/evidence text is not diagnosis.
   const records = String(output)
     .split('\n')
@@ -134,10 +135,10 @@ async function run(ctx, args = process.argv.slice(2)) {
   const bound=svc.status({repo_id:ctx.repo_id,run_id:ctx.run_id}).runs[0];
   if(bound.policy_version===2)req.input_sha256=parsed.schema.properties._binding.properties.input_sha256.const;
   const self = watch.birth(process.pid);
-  check(self && (bound.policy_version===2 && bound.active_stage ? bound.operations.find(o=>o.id===bound.active_stage)?.process_identity?.group===self.group : self.group === process.pid || self.group === process.ppid), 'owned_provider_group_required');
+  check(self && (bound.policy_version===2 && bound.active_stage ? (()=>{const op=bound.operations.find(o=>o.id===bound.active_stage);return op&&c.descendsFrom(process.pid,op.pid,op.birth);})() : self.group === process.pid || self.group === process.ppid), 'owned_provider_group_required');
   let child, guardian;
   const admitted = svc.startAttempt(req, (entry) => {
-    guardian = spawn(
+    guardian = entry.operation.generation ? null : spawn(
       process.execPath,
       [
         path.join(__dirname, 'improve-controller-watchdog.cjs'),
@@ -152,12 +153,12 @@ async function run(ctx, args = process.argv.slice(2)) {
       ],
       { detached: true, stdio: 'ignore', env: { PATH: '/usr/bin:/bin' } }
     );
-    guardian.unref();
+    guardian?.unref();
     if(entry.operation.generation){
       const receipt={root:ctx.recovery.receiptRoot||path.join(ctx.store,'operation-receipts'),registry:ctx.registry,lockTool:ctx.recovery.lockTool};
       new (require('./improve-operation-receipts.cjs').OperationReceipts)({...receipt,create:true});
       const b=parsed.schema.properties._binding.properties;
-      child=require('./improve-paused-operation.cjs').spawnOperation({executable:ctx.cli,args,options:{env:process.env},receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'provider',expected:{session:parsed.session,model:ctx.routing[parsed.role],role:b.role.const,nonce:b.nonce.const,input_sha256:b.input_sha256.const}});
+      child=require('./improve-paused-operation.cjs').spawnOperation({executable:ctx.cli,args,options:{env:process.env},receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'provider',expected:{session:parsed.session,model:ctx.routing[parsed.role],role:b.role.const,nonce:b.nonce.const,input_sha256:b.input_sha256.const},control:{store:ctx.store,deadline_ms:entry.deadline_ms}});
     }else child = spawn(ctx.cli, args, { stdio: ['pipe', 'pipe', 'pipe'], env: process.env });
     return child;
   });
@@ -171,7 +172,7 @@ async function run(ctx, args = process.argv.slice(2)) {
     const kill = (why) => {
       failure ||= why;
       try {
-        child.kill('SIGKILL');
+        if(bound.policy_version!==2)child.kill('SIGKILL');
       } catch {}
     };
     const poll = setInterval(() => {
@@ -206,7 +207,7 @@ async function run(ctx, args = process.argv.slice(2)) {
   });
   // Child has quiesced; stop the independent guardian before persisting the observation.
   try {
-    guardian.kill('SIGTERM');
+    guardian?.kill('SIGTERM');
   } catch {}
   let reason = classify(output, failure, outcome),
     estimate = null;
@@ -233,6 +234,7 @@ async function run(ctx, args = process.argv.slice(2)) {
   fs.writeFileSync(outputPath, output, { mode: 0o600, flag: 'wx' });
   if (failure) stderr += '\n' + JSON.stringify({ controller_error: failure, reason_code: reason }) + '\n';
   fs.writeFileSync(errorPath, stderr, { mode: 0o600, flag: 'wx' });
+  if(bound.policy_version===2){const sealed=new (require('./improve-operation-receipts.cjs').OperationReceipts)({root:ctx.recovery.receiptRoot||path.join(ctx.store,'operation-receipts'),registry:ctx.registry,lockTool:ctx.recovery.lockTool}).get(op.id);reason=sealed.result.reason_code;estimate=sealed.result.estimate_usd;}
   svc.recordAttempt(
     { repo_id: ctx.repo_id, run_id: ctx.run_id, operation_id: op.id },
     { exit_code: outcome, reason_code: reason, evidence: [outputPath, errorPath], estimate_usd: estimate }

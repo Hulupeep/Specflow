@@ -1319,7 +1319,8 @@ function profileService(config) {
     registry: config.authority.registry,
     resolvePrincipal: () => config.authority.principal,
     hostCapabilities: () => config.authority.host,
-    environment: controlledEnvironment()
+    environment: controlledEnvironment(),
+    lockTool: config.recovery?.lockTool
   });
 }
 function currentAuthority(config) {

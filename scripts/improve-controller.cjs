@@ -587,6 +587,7 @@ function createControllerService({
       const snapshot = store.read(), r = run(snapshot, req.repo_id, req.run_id, ctx.principal);
       const asOf = r.stopped_at_ms ?? (now() >= r.deadline_ms ? r.deadline_ms : now()),
         v = view(r, asOf);
+      if(r.policy_version===2)return require('./improve-recovery-report.cjs').report({r,ctx,now:now(),host:recoveryService.host(),memory:r.memory_required?memoryService.summary(snapshot,r):null,view:view(r,now()),verifyTerminalArchive});
       return {
         version: 1,
         kind: 'controller-report',
@@ -874,7 +875,8 @@ function createControllerService({
           'test_failure',
           'deadline',
           'operator_cancelled',
-          'provider_failure'
+          'provider_failure',
+          'authority_unavailable'
         ].includes(result.reason_code),
       'invalid_attempt_result'
     );
@@ -1254,7 +1256,7 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
         gates_missing: d.gates_missing || [],
         baseline_blocker: d.baseline_blocker || null,
         binding_errors: d.binding_errors || [],
-        holdout_exposed: d.holdout_exposed === true
+        holdout_exposed: Array.isArray(d.holdout_exposed) ? d.holdout_exposed.length > 0 : d.holdout_exposed === true
       }
     };
   } finally {

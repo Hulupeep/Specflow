@@ -13,7 +13,7 @@ test('REC-RECEIPT real holder SIGKILL does not replay its live child; designated
  fs.writeFileSync(gate,'complete');const store=new R.OperationReceipts({root:path.join(f.rootV2,'operation-receipts'),registry:f.registryV2,lockTool:f.recovery.lockTool});
  await until(()=>fs.existsSync(path.join(store.root,'receipts',started.operation.id+'.json')));const op=f.serviceV2().status(f.req).runs[0].operations[0];await until(()=>proc.state(op.process_identity)==='dead');
  expect(f.serviceV2().reconcile(f.command({receipt_id:op.id}))).toMatchObject({allowed:true,generation:1});expect(f.claim().generation).toBe(2);
- const after=f.serviceV2().status(f.req).runs[0];expect(after.operations).toHaveLength(1);expect(after.operations[0].state).toBe('complete');expect(after.consumed_cycles).toBe(1);expect(fs.readFileSync(marker,'utf8')).toBe('one launch\n');expect(after.principal).toBe('owner');expect(after.deadline_ms-after.started_at_ms).not.toBeGreaterThan(7200000);
+ const after=f.serviceV2().status(f.req).runs[0];expect(after.operations).toHaveLength(1);expect(after.operations[0].state).toBe('complete');expect(after.consumed_cycles).toBe(1);expect(fs.readFileSync(marker,'utf8')).toBe('one launch\n');expect(after.principal).toBe('owner');expect(after.deadline_ms-after.created_at_ms).toBe(after.limits.maxWallMs);
 },20000);
 test('REC-FENCE holder SIGKILL after fork before PID ack keeps unknown launch quarantined with zero protected starts',async()=>{
  holder=cp.fork(path.resolve('tests/fixtures/improve-worker/recovery-operation-holder.cjs'),[],{stdio:['ignore','ignore','pipe','ipc']});await new Promise(r=>holder.once('message',r));

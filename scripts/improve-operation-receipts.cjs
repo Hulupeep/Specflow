@@ -19,8 +19,10 @@ class OperationReceipts{
  publish(file,bytes){
   if(fs.existsSync(file)){privatePath(file);need(fs.readFileSync(file).equals(bytes),'receipt_idempotency_conflict');return;}
   const tmp=file+'.'+crypto.randomUUID()+'.tmp',fd=fs.openSync(tmp,'wx',0o600);
-  try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);fs.linkSync(tmp,file);}finally{fs.closeSync(fd);fs.rmSync(tmp,{force:true});}
-  k.syncDir(path.dirname(file));
+  // All publication is under receipt.lock; atomic rename cannot expose a
+  // half-written file or leave a second hard-link after process death.
+  try{fs.writeFileSync(fd,bytes);fs.fsyncSync(fd);this.fault('receipt_file_synced',{kind:path.basename(path.dirname(file))});fs.renameSync(tmp,file);this.fault('receipt_renamed',{kind:path.basename(path.dirname(file))});}finally{fs.closeSync(fd);fs.rmSync(tmp,{force:true});}
+  k.syncDir(path.dirname(file));this.fault('receipt_directory_synced',{kind:path.basename(path.dirname(file))});
  }
  get(id){
   need(m.token(id),'invalid_receipt_id');const file=path.join(this.root,'receipts',id+'.json');privatePath(file);let doc;

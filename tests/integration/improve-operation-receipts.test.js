@@ -30,3 +30,8 @@ test('REC-FENCE supervisor performs no outbound call until the acknowledged rele
 test('REC-RECEIPT loss of the release pipe proves not-started rather than inventing a completion',async()=>{
  const r=await supervise(false);expect(r.error).toBe('');expect(r.status).toBe(2);expect(fs.existsSync(r.marker)).toBe(false);expect(r.store.get(r.binding.operation_id).phase).toBe('not_started');
 },15000);
+test.each(['receipt_file_synced','receipt_renamed','receipt_directory_synced'])('REC-RECEIPT real producer SIGKILL at %s recovers one authenticated receipt',phase=>{
+ const {opts,store,binding}=setup(),input={binding,result,stdout:'one independently saved result'},file=path.join(f.root,'receipt-producer.json');fs.writeFileSync(file,JSON.stringify({options:opts,input,killAt:phase}),{mode:0o600});
+ const killed=cp.spawnSync(process.execPath,[path.resolve('tests/fixtures/improve-worker/receipt-producer.cjs'),file],{encoding:'utf8',timeout:10000});expect(killed.signal).toBe('SIGKILL');
+ const doc=store.put(input);expect(store.get(doc.id)).toEqual(doc);expect(store.put(input)).toEqual(doc);expect(fs.statSync(path.join(store.root,'receipts',doc.id+'.json')).nlink).toBe(1);expect(fs.readdirSync(path.join(store.root,'receipts')).filter(n=>n.endsWith('.json'))).toEqual([doc.id+'.json']);
+});

@@ -62,7 +62,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       }
     }
     const req = { repo_id: binding.repo_id, run_id: binding.run_id, cycle_id: binding.cycle_id, stage };
-    if(bound.policy_version===2) req.input_sha256=require('./improve-memory.cjs').digest({stage,args});
+    if(bound.policy_version===2) req.input_sha256=require('./improve-operation-inputs.cjs').stageInput(stage,args,configFile);
     const admitted = service.startStage(req, (entry) => {
       const options={
         cwd: cfg.emptyCwd,
@@ -74,12 +74,12 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       if(entry.operation.generation){
         const receipt={root:cfg.recovery.receiptRoot||path.join(cfg.controller_store||cfg.store||cfg.recovery.store,'operation-receipts'),registry:cfg.recovery.registry||cfg.authority.registry,lockTool:cfg.recovery.lockTool};
         new (require('./improve-operation-receipts.cjs').OperationReceipts)({...receipt,create:true});
-        child=require('./improve-paused-operation.cjs').spawnOperation({executable:cfg.launcher,args:['stage',stage,JSON.stringify(args)],options,receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'stage'});
+        child=require('./improve-paused-operation.cjs').spawnOperation({executable:cfg.launcher,args:['stage',stage,JSON.stringify(args)],options,receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'stage',control:{store:cfg.controller_store||cfg.store||cfg.recovery.store,deadline_ms:entry.deadline_ms}});
       }else child=spawn(cfg.launcher,['stage',stage,JSON.stringify(args)],options);
       const identity = watch.birth(child.pid);
       if (!identity) throw new ControllerError('stage_launch_unconfirmed');
       child.controllerIdentity = require('./improve-process-identity.cjs').identity(child.pid);
-      const guardian = spawn(
+      const guardian = entry.operation.generation ? null : spawn(
         process.execPath,
         [
           path.join(__dirname, 'improve-controller-watchdog.cjs'),
@@ -94,7 +94,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
         ],
         { stdio: 'ignore', detached: true, env: { PATH: '/usr/bin:/bin' } }
       );
-      guardian.unref();
+      guardian?.unref();
       child.controllerGuardian = guardian;
       return child;
     });
@@ -111,12 +111,12 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
         const r = service.status({ repo_id: binding.repo_id, run_id: binding.run_id }).runs[0];
         if (r.cancel_requested) interruption = 'operator_cancelled';
         else if (r.remaining.wall_ms === 0) interruption = 'deadline';
-        if (interruption) watch.signalGroup(child.controllerIdentity);
+        if (interruption && bound.policy_version!==2) watch.signalGroup(child.controllerIdentity);
       } catch (e) {
         if (e.code !== 'ESRCH') {
           interruption = 'authority_unavailable';
           try {
-            watch.signalGroup(child.controllerIdentity);
+            if(bound.policy_version!==2)watch.signalGroup(child.controllerIdentity);
           } catch {}
         }
       }
@@ -126,11 +126,12 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
         prefix = path.join(evidenceDir, child.controllerOperation);
       fs.writeFileSync(prefix + '.stdout', result.stdout || '', { mode: 0o600, flag: 'wx' });
       fs.writeFileSync(prefix + '.stderr', result.stderr || '', { mode: 0o600, flag: 'wx' });
+      const sealed=bound.policy_version===2?new (require('./improve-operation-receipts.cjs').OperationReceipts)({root:cfg.recovery.receiptRoot||path.join(cfg.controller_store||cfg.store||cfg.recovery.store,'operation-receipts'),registry:cfg.recovery.registry||cfg.authority.registry,lockTool:cfg.recovery.lockTool}).get(child.controllerOperation):null;
       service.recordStage(
         { repo_id: binding.repo_id, run_id: binding.run_id, operation_id: child.controllerOperation },
         {
-          exit_code: result.status ?? 2,
-          reason_code: interruption || (result.status === 0 ? null : 'stage_failure'),
+          exit_code: sealed?sealed.result.exit_code:result.status ?? 2,
+          reason_code: sealed?sealed.result.reason_code:interruption || (result.status === 0 ? null : 'stage_failure'),
           evidence: [prefix + '.stdout', prefix + '.stderr']
         }
       );
