@@ -438,6 +438,7 @@ function review(root, id, batch, invoke = command, session) {
 function validateRecovery(root, refs) {
   if (!Array.isArray(refs) || !refs.length) throw Error('Recovery requires diagnosis evidence');
   for (const ref of refs) if (!ref || hash(fs.readFileSync(safe(root,ref.path))) !== ref.sha256) throw Error('Recovery evidence changed or is missing');
+  return continuation.evidenceSummary(refs.map(ref=>({...ref,text:fs.readFileSync(safe(root,ref.path),'utf8')})));
 }
 function recordScopedInterruption(root,id,session,reservation,reason) {
   return locked(root,id,({state})=>{

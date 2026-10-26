@@ -166,19 +166,21 @@ long runs; do not default to a multi-day loop. At a horizon preserve evidence an
 give a truthful result/checkpoint, without silently resetting the original job.
 Continue only under existing authority and a verified recovery/schedule policy.
 
-Current implementation gap, observed 26 October: Duo has no default maxCalls or
-maxElapsedMs, but its protocol/stagnation controller permits only one recovery
-per failure episode. The Improve controller separately defaults to 24 starts and
-30 minutes. Align these mechanisms through [#235](https://github.com/Hulupeep/Specflow/issues/235),
-including legacy policy migration and tests; this guidance does not remove the
-current guards, change explicit limits or authorise journal/deadline resets.
+The original gap observed on 26 October was Duo's one-recovery dead end despite
+having no default maxCalls/maxElapsedMs. #235 slice A changes updated review
+policy to permit further distinct, fresh executed recovery observations. It
+preserves explicit ceilings and keeps old pinned runtimes unchanged. This does
+not prove arbitrary new evidence is useful or grant acceptance from activity.
+The Improve controller still separately defaults to 24 starts and 30 minutes;
+controller/window and old-runtime migration work remains with #235 B/#183.
+No journal/deadline resets or new cost/provider authority follow from the change.
 
 ## Existing delivery slices
 
 | Slice | Adaptation; preserve existing acceptance |
 |---|---|
 | #215 | Own the complete intent-to-evidence loop and two-way HeyStax target, with explicit standing policy per repo. |
-| #235, slice A next | Remove the review continuation dead end with evidenced adaptive recovery. Controller/window alignment follows the qualified #183 recovery boundary. |
+| #235 | Slice A permits further evidenced review recovery; controller/window alignment follows the qualified #183 recovery boundary. |
 | #182 | Bounded intent, fixed criteria, alternatives, outcomes/evidence and contradictions; separate implementation failure from hypothesis failure. Changed selection cites actual learning. Keep evaluator/holdout channels separate. |
 | #183 | Reconcile interruption/unknown work without another authoritative build. Finish with an explainable result/limitation; no silent owner-wait or narrative-based recovery. |
 | #218 | One authenticated service for human/agent callers; stable role/task identity, current holder authority, fenced claim/admission and command acknowledgement. Replacement reconciles the original job; task prose cannot grant permissions. |
@@ -194,6 +196,6 @@ Revenue impact requires suitable observed measurement; PR/test counts and
 speculative financial estimates are not revenue proof.
 
 These are product requirements and routing guidance, not implemented service
-capabilities. #181 is merged; #235 slice A precedes #182. Live scheduling stays gated by #183.
+capabilities. #181 is merged; #182 follows the #235 A review fix. Live scheduling stays gated by #183.
 Future API/HeyStax schemas and atomic claim decisions still require scoped
 simulation, audit, qualification and build-ready promotion.
