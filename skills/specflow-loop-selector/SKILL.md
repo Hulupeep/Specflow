@@ -13,6 +13,14 @@ small diff do not establish low risk. Reuse current tickets and evidence. State
 one short decision in the existing task/issue or response: **weight, reason,
 required checks, simulation needed or not, loop needed or not**. Do not create a
 triage document, ticket, run contract or provider call just to make this decision.
+Include the observable outcome and key uncertainty in that same brief decision;
+reuse the existing goal and acceptance rather than creating another artifact.
+For a research-agent handoff with selected issues, start at the first missing
+contract/check, not discovery. Reuse cited research; return a concrete evidenced
+contradiction to the researcher instead of silently selecting a different idea.
+Bind handoffs to a role and durable task/contract identity, not a bot brand or
+chat session. A replacement reads the current authorised role brief, assignment
+and prior evidence; it reconciles existing work before starting a new job.
 
 | Weight | Typical ask | Parts to invoke |
 |---|---|---|
@@ -50,6 +58,31 @@ the user’s problem, whether an existing interaction already does so, and which
 simulation finding would make us stop, simplify or reframe it. Record the result
 with the existing acceptance notes before building; do not invent another gate
 artifact. Re-triage if implementation reveals a new risk or a wider seam.
+
+### Match The Evidence To The Question
+
+Choose the cheapest credible check that could distinguish the desired outcome
+from a plausible false success. Regression tests answer a known logic defect;
+real API/auth/readback checks answer whether a write worked; an executed journey
+answers whether a user can reach and complete the feature. Feasibility needs a
+bounded experiment with real inputs and fixed pass/fail conditions. Product
+desirability or revenue claims need relevant product/market evidence; more unit
+tests or reviewers cannot establish them. Mark proxies and hypotheses explicitly.
+
+Resolve consequential uncertainty with a small probe before a large build. Add
+specialist review or simulation for the specific uncertainty it can resolve,
+not by default reviewer count. Reduce future planning overhead when evidence
+resolves uncertainty, but preserve applicable safety floors. Never make a failed
+check easier, change frozen pass/fail conditions, or replay a consumed holdout
+to manufacture a pass; a changed experiment retains its predecessor and reason.
+
+Within standing authority, choose ordinary implementation details and the next
+useful step without repeatedly asking the owner. If an option requires forbidden
+spend, outreach or another repo, choose an allowed alternative or return an
+evidenced limitation and next action. Missing access, invalid verification and a
+disproven hypothesis are different outcomes. Required authority and explicit
+human gates still apply; do not leave an unattended job silently waiting for an
+approval it is not allowed to request or grant itself.
 
 ### Journey Evidence Is A Floor
 
