@@ -162,6 +162,7 @@ class ControllerStore {
     try {
       fs.writeFileSync(fd, JSON.stringify({ pid: process.pid, started_at: new Date().toISOString() }));
       fs.fsyncSync(fd);
+      this.fault('before_transition');
       const s = this.read(),
         result = fn(s);
       s.revision++;
@@ -184,7 +185,7 @@ class ControllerStore {
       const started = afterCommit ? afterCommit(result, s) : undefined;
       return afterCommit ? { result, started } : result;
     } catch (e) {
-      if (e instanceof ControllerError) throw e;
+      if (e instanceof ControllerError || e instanceof require('./improve-memory.cjs').MemoryError) throw e;
       throw new ControllerError(
         'storage_commit_unconfirmed',
         'Read the last committed request using the same ID; preserve any uncertain intent and original limits for #183.'
@@ -271,7 +272,8 @@ function createControllerService({
   ownerPrincipal,
   now = Date.now,
   simulation = false,
-  fault
+  fault,
+  memory
 } = {}) {
   need(
     typeof resolvePrincipal === 'function' && typeof hostCapabilities === 'function' && id(ownerPrincipal),
@@ -293,7 +295,11 @@ function createControllerService({
       'authority_revoked'
     );
     if (revision) need(inspected.revision === revision, 'stale_profile');
-    if (!execute) return fn({ principal, revision: inspected.revision });
+    if (!execute) {
+      const loaded = profiles.readProfile(registry, repo_id, { allowMissingRepository: true });
+      need(loaded.revision === inspected.revision, 'stale_profile');
+      return fn({ principal, revision: inspected.revision, profile: loaded.profile });
+    }
     const pre = profileService.preflight({ repo_id, revision: inspected.revision });
     need(pre.ready, pre.findings?.find((f) => f.status !== 'passed')?.code || 'preflight_blocked');
     let r;
@@ -428,6 +434,7 @@ function createControllerService({
         estimates: [],
         synthetic
       };
+    if (memory) r.memory_required = true;
     s.runs[run_id] = r;
     s.owners[canonical] = run_id;
     const receipt = {
@@ -522,7 +529,7 @@ function createControllerService({
   function report(req) {
     shape(req, ['repo_id', 'run_id']);
     return access(req.repo_id, false, null, (ctx) => {
-      const r = run(store.read(), req.repo_id, req.run_id, ctx.principal);
+      const snapshot = store.read(), r = run(snapshot, req.repo_id, req.run_id, ctx.principal);
       const asOf = r.stopped_at_ms ?? (now() >= r.deadline_ms ? r.deadline_ms : now()),
         v = view(r, asOf);
       return {
@@ -565,6 +572,7 @@ function createControllerService({
         retryable: v.retryable,
         next_action: v.next_action,
         product_success: v.product_success,
+        ...(r.memory_required ? { memory: memoryService.summary(snapshot, r) } : {}),
         activation: 'recovery_required'
       };
     });
@@ -582,8 +590,9 @@ function createControllerService({
     shape(req, ['repo_id', 'run_id', 'binding']);
     shape(req.binding, ['job_id', 'operation_id', 'core_run_id']);
     need(Object.values(req.binding).every(id), 'invalid_cycle_binding');
-    return mutation(req, (s, r) => {
+    return mutation(req, (s, r, ctx) => {
       if (!guard(r, true)) return { allowed: false, run: view(r, now()) };
+      memoryService.beforeCycle(s, r, ctx);
       need(!r.active_cycle, 'reconciliation_required');
       need(!r.synthetic, 'synthetic_execution_denied');
       need(
@@ -599,6 +608,7 @@ function createControllerService({
         state: 'reserved',
         decision: null
       };
+      memoryService.bindCycle(s, r, c);
       r.cycles.push(c);
       r.active_cycle = c.id;
       r.state = 'active';
@@ -614,6 +624,7 @@ function createControllerService({
       req,
       (s, r) => {
         if (!guard(r, false, false, false)) return { allowed: false, run: view(r, now()) };
+        memoryService.beforeStage(s, r, req.stage);
         need(!r.synthetic && r.active_cycle === req.cycle_id && !r.active_stage, 'cycle_unavailable');
         const op = {
           id: crypto.randomUUID(),
@@ -706,6 +717,7 @@ function createControllerService({
     return mutation(
       req,
       (s, r) => {
+        if (r.memory_required) need(r.active_stage, 'memory_stage_required');
         if (r.active_stage) {
           const parent = r.operations.find((o) => o.id === r.active_stage);
           need(parent && descendsFrom(process.pid, parent.pid, parent.birth), 'stage_owner_mismatch');
@@ -835,7 +847,7 @@ function createControllerService({
     }
     return mutation(
       req,
-      (s, r) => {
+      (s, r, ctx) => {
         const c = r.cycles.find((c) => c.id === req.cycle_id);
         if (c.state === 'terminal') {
           need(c.manifest_sha256 === proof.manifest_sha256, 'idempotency_conflict');
@@ -849,6 +861,7 @@ function createControllerService({
         c.decision = proof.decision;
         c.manifest_sha256 = proof.manifest_sha256;
         c.core_diagnosis = proof.core_diagnosis;
+        memoryService.terminal(s, r, c, proof, ctx);
         const failed = proof.core_diagnosis.gates_failed[0];
         r.failed_check =
           proof.decision === 'KEEP'
@@ -1005,6 +1018,9 @@ function createControllerService({
       })
     );
   }
+  const memoryService = require('./improve-memory-controller.cjs').attach({
+    store, access, ownerPrincipal, now, memory
+  });
   return {
     registerPolicy,
     report,
@@ -1020,7 +1036,8 @@ function createControllerService({
     recordAttempt,
     completeCycle,
     stop,
-    store
+    store,
+    ...memoryService.public
   };
 }
 function descendsFrom(pid, ancestor, started) {
@@ -1127,6 +1144,18 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
       );
     return {
       ...receipt,
+      base_commit: r.base_commit,
+      retained_commit: last('decision_applied')?.commit || null,
+      contract_revision: last('contract_frozen')?.contract_sha256 || null,
+      candidate_digest: (() => {
+        const entry = receipt.files.find(f => f.path === 'candidates.json');
+        if (!entry) return null;
+        const file = privatePath(path.join(store.root, 'blobs', entry.sha256));
+        const content = fs.readFileSync(file);
+        need(sha(content) === entry.sha256 && last('candidates_recorded')?.candidates_sha256 === entry.sha256,
+          'terminal_candidates_binding');
+        return require('./improve-memory.cjs').digest(JSON.parse(content));
+      })(),
       core_diagnosis: {
         decision_sha256: sha(bytes['decision.json']),
         reasons: d.reasons || [],

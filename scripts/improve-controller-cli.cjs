@@ -29,12 +29,18 @@ function cli(args = process.argv.slice(2)) {
     const host = readPrivate(opts['--host']);
     if (host.version !== 1 || host.uid !== process.getuid())
       throw new c.ControllerError('host_identity_mismatch');
+    const memory = host.memory ? {
+      required: true,
+      resolveActor: () => ({ ...host.memory.actor, principal: host.principal }),
+      resolveEvidence: require('./improve-memory.cjs').createFileEvidenceResolver(host.memory.evidenceRoot)
+    } : undefined;
     const svc = c.createControllerService({
       root: host.store,
       registry: host.registry,
       resolvePrincipal: () => host.principal,
       ownerPrincipal: host.ownerPrincipal,
-      hostCapabilities: () => host.host
+      hostCapabilities: () => host.host,
+      memory
     });
     let result;
     if (action === 'register') result = svc.registerPolicy(readPrivate(opts['--file']));
@@ -44,6 +50,10 @@ function cli(args = process.argv.slice(2)) {
       result = svc.status({ repo_id: opts['--repo'], ...(opts['--run'] ? { run_id: opts['--run'] } : {}) });
     else if (action === 'report') result = svc.report({ repo_id: opts['--repo'], run_id: opts['--run'] });
     else if (action === 'cancel') result = svc.cancel({ repo_id: opts['--repo'], run_id: opts['--run'] });
+    else if (action === 'memory-pack') result = svc.decisionPack({ repo_id: opts['--repo'] });
+    else if (action === 'memory-select') result = svc.selectMemory(readPrivate(opts['--file']));
+    else if (action === 'memory-resolve') result = svc.resolveMemory(readPrivate(opts['--file']));
+    else if (action === 'memory-observe') result = svc.observeMemory(readPrivate(opts['--file']));
     else if (action === 'schedule')
       result = svc.controlSchedule({ repo_id: opts['--repo'], state: opts['--state'] });
     else
