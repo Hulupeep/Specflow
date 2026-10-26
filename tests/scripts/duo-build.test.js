@@ -65,6 +65,33 @@ test('native Duo review path consumes the shared tier budget before invoking a p
   const rounds = require('../../scripts/specflow-reviews.cjs').load(root, 165).reviews.contracted;
   expect(rounds).toHaveLength(2); expect(rounds.every(r => r.identity.mode === 'simulated')).toBe(true);
 });
+test.each(['untracked', 'tracked'])('scoped reservation in the %s canonical specification record does not invalidate an unchanged review', recordState => {
+  const file = '.specflow/specification/238.json';
+  put(file, JSON.stringify({ issue: { number: 238, body: 'AC-1: returns 42', labels: ['spec:contracted'] }, profile: { ui: false, materialSeams: [] }, reviews: {}, reviewControl: {}, discoveries: [], experiments: [], batches: {}, events: [] }));
+  if (recordState === 'tracked') { git('add', file); git('commit', '-m', 'Track canonical record'); }
+  const scoped = { ...context, specification: { record: file, targetTier: 'contracted' } };
+  const run = duo.start(root, '#238', 'codex', scoped);
+  const result = reviewOwned(root, run.id, batch(), fakePeer('accepted'));
+  expect(result.outcome).toBe('accepted');
+  expect(result.history.at(-1).stage).toBe('validated');
+  expect(result.criteria['AC-1'].status).toBe('verified');
+});
+test.each(['specification', 'product'])('scoped review still rejects concurrent %s source changes', change => {
+  const file = '.specflow/specification/239.json';
+  put(file, JSON.stringify({ issue: { number: 239, body: 'AC-1: returns 42', labels: ['spec:contracted'] }, profile: { ui: false, materialSeams: [] }, reviews: {}, reviewControl: {}, discoveries: [], experiments: [], batches: {}, events: [] }));
+  const scoped = { ...context, specification: { record: file, targetTier: 'contracted' } };
+  const run = duo.start(root, '#239', 'codex', scoped);
+  const result = reviewOwned(root, run.id, batch(), fakePeer('accepted', () => {
+    if (change === 'product') put('code.js', 'module.exports = 43;');
+    else {
+      const record = JSON.parse(fs.readFileSync(path.join(root, file), 'utf8'));
+      record.issue.body += '\nAn unauthorized requirement change';
+      put(file, JSON.stringify(record));
+    }
+  }));
+  expect(result.outcome).toBe('blocked');
+  expect(result.blocker).toMatch(/Source changed during review/);
+});
 test('preparation can correct two rejected peer protocols and then obtain a scoped review', () => {
   const record = { issue: { number: 189, body: 'AC-1: returns 42', labels: ['spec:contracted'] }, profile: { ui: false, materialSeams: [] } };
   put('tier.json', JSON.stringify(record));
