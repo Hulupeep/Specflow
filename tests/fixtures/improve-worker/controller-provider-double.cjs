@@ -46,6 +46,9 @@ else {
     const session = args[args.indexOf('--session-id') + 1],
       requested = args[args.indexOf('--model') + 1],
       model = requested === 'sonnet' ? 'fixture-builder' : requested;
+    const finish=()=>{
+    if(mode==='native-auth-refusal'){for(const record of require('./native-auth-refusal.json').records){const frame={...record,session_id:session};if(frame.model)frame.model=model;console.log(JSON.stringify(frame));}process.exit(1);}
+
     console.log(
       JSON.stringify({
         type: 'system',
@@ -79,5 +82,6 @@ else {
         total_cost_usd: 99
       })
     );
+    };if(mode==='delayed-success')setTimeout(finish,1500);else finish();
   });
 }

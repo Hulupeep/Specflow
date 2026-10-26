@@ -34,16 +34,19 @@ function cli(args = process.argv.slice(2)) {
       resolveActor: () => ({ ...host.memory.actor, principal: host.principal }),
       resolveEvidence: require('./improve-memory.cjs').createFileEvidenceResolver(host.memory.evidenceRoot)
     } : undefined;
+    const recovery=require('./improve-recovery-host.cjs').fromConfig(host.recovery,{principal:host.principal,store:host.store,registry:host.registry});
     const svc = c.createControllerService({
       root: host.store,
       registry: host.registry,
-      resolvePrincipal: () => host.principal,
+      resolvePrincipal: () => recovery?recovery.resolveAssignment().principal:host.principal,
       ownerPrincipal: host.ownerPrincipal,
       hostCapabilities: () => host.host,
-      memory
+      memory,
+      recovery
     });
     let result;
-    if (action === 'register') result = svc.registerPolicy(readPrivate(opts['--file']));
+    if (['resume','assign','reconcile','migrate'].includes(action)) result = svc[action](readPrivate(opts['--file']));
+    else if (action === 'register') result = svc.registerPolicy(readPrivate(opts['--file']));
     else if (action === 'admit')
       result = svc.admit({ repo_id: opts['--repo'], request_id: opts['--request'] });
     else if (action === 'status')

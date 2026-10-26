@@ -7,8 +7,8 @@ function candidateDocument(id='A',hypothesis='Remove redundant confirmation to r
   const alternatives=['A','B','C'].filter(other=>other!==id).slice(0,2);
   return {sources:[{kind:'runtime',ref:'fixture'}],candidates:[c,...alternatives.map(alt)],selection:{candidate_id:id,rationale:'Bounded observed defect',outranked:alternatives.map(id=>({id,why:'Later opportunity'}))}};
 }
-function memoryFixture({initialise=null,affectedPaths=['test.cjs']}={}) {
-  const f=fixture();if(initialise)initialise(f);f.register();
+function memoryFixture({initialise=null,affectedPaths=['test.cjs'],configure=null}={}) {
+  const f=fixture();if(initialise)initialise(f);f.register();if(configure)configure(f);
   const root=path.join(f.root,'memory-evidence');fs.mkdirSync(root,{mode:0o700});
   let holder='researcher-A',role='researcher',assignment=1;
   const actor=()=>({principal:f.config().resolvePrincipal(),holder,assignment_revision:'assignment-'+assignment,role});

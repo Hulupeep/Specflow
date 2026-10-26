@@ -12,7 +12,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
   const cfg = require('./improve-controller-cli.cjs').readPrivate(configFile);
   const bound = service.status({ repo_id: binding.repo_id, run_id: binding.run_id }).runs[0];
   if (
-    cfg.authority?.principal !== bound.principal ||
+    worker.executionPrincipal(cfg) !== (bound.policy_version===2?bound.recovery.authorised.principal:bound.principal) ||
     cfg.authority?.revision !== bound.profile_revision ||
     cfg.controller_binding?.run_id !== binding.run_id ||
     cfg.controller_binding?.cycle_id !== binding.cycle_id ||
@@ -62,16 +62,24 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       }
     }
     const req = { repo_id: binding.repo_id, run_id: binding.run_id, cycle_id: binding.cycle_id, stage };
+    if(bound.policy_version===2) req.input_sha256=require('./improve-operation-inputs.cjs').stageInput(stage,args,configFile);
     const admitted = service.startStage(req, (entry) => {
-      const child = spawn(cfg.launcher, ['stage', stage, JSON.stringify(args)], {
+      const options={
         cwd: cfg.emptyCwd,
         env: { ...worker.controlledEnvironment(), PATH: cfg.bin + ':' + worker.controlledEnvironment().PATH },
         stdio: ['ignore', 'pipe', 'pipe'],
         detached: true
-      });
+      };
+      let child;
+      if(entry.operation.generation){
+        const receipt={root:cfg.recovery.receiptRoot||path.join(cfg.controller_store||cfg.store||cfg.recovery.store,'operation-receipts'),registry:cfg.recovery.registry||cfg.authority.registry,lockTool:cfg.recovery.lockTool};
+        new (require('./improve-operation-receipts.cjs').OperationReceipts)({...receipt,create:true});
+        child=require('./improve-paused-operation.cjs').spawnOperation({executable:cfg.launcher,args:['stage',stage,JSON.stringify(args)],options,receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'stage',inputCheck:{stage,args,configFile},control:{store:cfg.controller_store||cfg.store||cfg.recovery.store,deadline_ms:entry.deadline_ms}});
+      }else child=spawn(cfg.launcher,['stage',stage,JSON.stringify(args)],options);
       const identity = watch.birth(child.pid);
       if (!identity) throw new ControllerError('stage_launch_unconfirmed');
-      const guardian = spawn(
+      child.controllerIdentity = require('./improve-process-identity.cjs').identity(child.pid);
+      const guardian = entry.operation.generation ? null : spawn(
         process.execPath,
         [
           path.join(__dirname, 'improve-controller-watchdog.cjs'),
@@ -79,12 +87,14 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
             parent: child.pid,
             group: child.pid,
             started: identity.start,
+            boot_id: require('./improve-process-identity.cjs').boot(),
+            group_started: identity.start,
             deadline: entry.deadline_ms + 1000
           })
         ],
         { stdio: 'ignore', detached: true, env: { PATH: '/usr/bin:/bin' } }
       );
-      guardian.unref();
+      guardian?.unref();
       child.controllerGuardian = guardian;
       return child;
     });
@@ -92,6 +102,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       throw new ControllerError(admitted.result.run.reason_code, admitted.result.run.next_action);
     const child = admitted.started;
     child.controllerOperation = admitted.result.operation.id;
+    child.controllerGeneration = admitted.result.operation.generation;
     return child;
   }
   async function wait(child) {
@@ -101,12 +112,12 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
         const r = service.status({ repo_id: binding.repo_id, run_id: binding.run_id }).runs[0];
         if (r.cancel_requested) interruption = 'operator_cancelled';
         else if (r.remaining.wall_ms === 0) interruption = 'deadline';
-        if (interruption) process.kill(-child.pid, 'SIGKILL');
+        if (interruption && bound.policy_version!==2) watch.signalGroup(child.controllerIdentity);
       } catch (e) {
         if (e.code !== 'ESRCH') {
           interruption = 'authority_unavailable';
           try {
-            process.kill(-child.pid, 'SIGKILL');
+            if(bound.policy_version!==2)watch.signalGroup(child.controllerIdentity);
           } catch {}
         }
       }
@@ -116,11 +127,13 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
         prefix = path.join(evidenceDir, child.controllerOperation);
       fs.writeFileSync(prefix + '.stdout', result.stdout || '', { mode: 0o600, flag: 'wx' });
       fs.writeFileSync(prefix + '.stderr', result.stderr || '', { mode: 0o600, flag: 'wx' });
+      const sealed=bound.policy_version===2?new (require('./improve-operation-receipts.cjs').OperationReceipts)({root:cfg.recovery.receiptRoot||path.join(cfg.controller_store||cfg.store||cfg.recovery.store,'operation-receipts'),registry:cfg.recovery.registry||cfg.authority.registry,lockTool:cfg.recovery.lockTool}).get(child.controllerOperation):null;
+      if(sealed?.phase==='not_started'){service.reconcile({repo_id:binding.repo_id,run_id:binding.run_id,request_id:'not-started-'+child.controllerOperation,expected_generation:child.controllerGeneration,receipt_id:child.controllerOperation});throw new ControllerError(sealed.result.reason_code,'Declared stage input changed before release; no protected child started. Revalidate the original input in the same job and window.');}
       service.recordStage(
         { repo_id: binding.repo_id, run_id: binding.run_id, operation_id: child.controllerOperation },
         {
-          exit_code: result.status ?? 2,
-          reason_code: interruption || (result.status === 0 ? null : 'stage_failure'),
+          exit_code: sealed?sealed.result.exit_code:result.status ?? 2,
+          reason_code: sealed?sealed.result.reason_code:interruption || (result.status === 0 ? null : 'stage_failure'),
           evidence: [prefix + '.stdout', prefix + '.stderr']
         }
       );

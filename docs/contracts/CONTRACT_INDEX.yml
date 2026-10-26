@@ -11,6 +11,8 @@ contracts:
     path: docs/contracts/feature_improve_memory.yml
   - id: feature_improve_profiles
     path: docs/contracts/feature_improve_profiles.yml
+  - id: feature_improve_recovery
+    path: docs/contracts/feature_improve_recovery.yml
   - id: feature_improve_worker
     path: docs/contracts/feature_improve_worker.yml
   - id: feature_preflight

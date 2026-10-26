@@ -1117,12 +1117,13 @@ function roleCall({
       detached: true
     });
   const child = authorizeStart ? authorizeStart(launch) : launch();
+  const relayIdentity = require('./improve-process-identity.cjs').identity(child.pid);
   const deadline = Date.now() + 245000;
   while (!fs.existsSync(relay.done) && Date.now() < deadline)
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
   if (!fs.existsSync(relay.done)) {
     try {
-      process.kill(-child.pid, 'SIGKILL');
+      require('./improve-controller-watchdog.cjs').signalGroup(relayIdentity);
     } catch {}
     throw new WorkerError('role_deadline', 'model');
   }
@@ -1312,16 +1313,26 @@ Object.assign(module.exports, {
   command,
   controlledEnvironment
 });
+function executionPrincipal(config){
+ if(!config.recovery?.ticketRoot)return config.authority.principal;
+ return require('./improve-execution-tickets.cjs').resolve({root:config.recovery.ticketRoot,registry:config.authority.registry,scope:config.recovery.scope}).assignment.principal;
+}
+function assertExecution(config){
+ if(config.recovery?.ticketRoot)require('./improve-execution-tickets.cjs').current({root:config.recovery.ticketRoot,registry:config.authority.registry,scope:config.recovery.scope,store:config.recovery.store});
+}
+Object.assign(module.exports,{executionPrincipal,assertExecution});
 function profileService(config) {
   need(config.authority?.uid === process.getuid(), 'principal_unavailable');
   return profiles.createProfileService({
     registry: config.authority.registry,
-    resolvePrincipal: () => config.authority.principal,
+    resolvePrincipal: () => executionPrincipal(config),
     hostCapabilities: () => config.authority.host,
-    environment: controlledEnvironment()
+    environment: controlledEnvironment(),
+    lockTool: config.recovery?.lockTool
   });
 }
 function currentAuthority(config) {
+  executionPrincipal(config);
   const service = profileService(config),
     report = service.preflight({ repo_id: config.authority.repo_id, revision: config.authority.revision });
   if (!report.ready)
@@ -1332,6 +1343,7 @@ function currentAuthority(config) {
       true,
       'Repair the exact preflight finding; do not replace the job revision or override permissions.'
     );
+  assertExecution(config);
   return { service, report };
 }
 function startAuthorizedStage(configFile, stage, args) {
@@ -1346,28 +1358,31 @@ function startAuthorizedStage(configFile, stage, args) {
     })
   );
   need(started.allowed, 'permission_revoked', 'authority');
+  started.result.improveIdentity = require('./improve-process-identity.cjs').identity(started.result.pid);
   return started.result;
 }
 async function awaitStage(child, { timeout = 600000, maxBytes = 8 * 1024 * 1024 } = {}) {
+  const identity = child.controllerIdentity || child.improveIdentity || require('./improve-process-identity.cjs').identity(child.pid);
   return new Promise((resolve, reject) => {
     let stdout = '',
       stderr = '',
       size = 0;
     const timer = setTimeout(() => {
       try {
-        process.kill(-child.pid, 'SIGKILL');
+        require('./improve-controller-watchdog.cjs').signalGroup(identity);
       } catch {}
       reject(new WorkerError('worker_deadline', 'stage'));
     }, timeout);
     for (const [stream, name] of [
       [child.stdout, 'stdout'],
       [child.stderr, 'stderr']
-    ])
+    ]){
+      stream.setEncoding?.('utf8');
       stream.on('data', (b) => {
-        size += b.length;
+        size += Buffer.byteLength(b);
         if (size > maxBytes) {
           try {
-            process.kill(-child.pid, 'SIGKILL');
+            require('./improve-controller-watchdog.cjs').signalGroup(identity);
           } catch {}
           clearTimeout(timer);
           reject(new WorkerError('worker_output_limit', 'stage'));
@@ -1375,6 +1390,7 @@ async function awaitStage(child, { timeout = 600000, maxBytes = 8 * 1024 * 1024 
         if (name === 'stdout') stdout += b;
         else stderr += b;
       });
+    }
     child.on('error', (e) => {
       clearTimeout(timer);
       reject(new WorkerError('worker_start_failed', 'stage'));
@@ -1442,7 +1458,7 @@ Object.assign(module.exports, {
 
 function authorizedStart(config, transition) {
   const { service, report } = currentAuthority(config);
-  const result = service.withAuthorized(report.lease, 'execute', transition);
+  const result = service.withAuthorized(report.lease, 'execute',()=>{assertExecution(config);return transition();});
   need(result.allowed, 'permission_revoked', 'authority');
   return result.result;
 }

@@ -1,0 +1,15 @@
+'use strict';
+const fs=require('fs'),path=require('path'),cp=require('child_process'),core=require('../../scripts/specflow-improve.cjs'),c=require('../../scripts/improve-controller.cjs'),proc=require('../../scripts/improve-process-identity.cjs'),{fromConfig}=require('../../scripts/improve-recovery-host.cjs'),{DurableStore}=require('../../scripts/improve-worker.cjs');
+test('REC-RECEIPT actual holder SIGKILL after consumed holdout cannot repeat verification or manufacture a terminal decision',async()=>{
+ const child=cp.fork(path.resolve('tests/fixtures/improve-worker/recovery-consumed-holder.cjs'),[],{stdio:['ignore','ignore','pipe','ipc']});let d;
+ try{
+  const exited=new Promise(r=>child.once('exit',(code,signal)=>r({code,signal})));d=await new Promise((r,j)=>{child.once('message',r);child.once('error',j);});expect(d.error).toBeUndefined();expect((await exited).signal).toBe('SIGKILL');
+  const assignment={principal:'owner',holder:'replacement',revision:'assignment-replacement',process:proc.identity()},raw={format:2,lockTool:d.lockTool,assignment,successors:[assignment]},recovery=fromConfig(raw,{principal:'owner',store:d.store,registry:d.registry}),memory={required:true,resolveActor:()=>({principal:'owner',holder:'replacement-researcher',assignment_revision:'researcher-replacement',role:'researcher'}),resolveEvidence:require('../../scripts/improve-memory.cjs').createFileEvidenceResolver(d.evidenceRoot)},svc=()=>c.createControllerService({root:d.store,registry:d.registry,resolvePrincipal:()=> 'owner',ownerPrincipal:'owner',hostCapabilities:()=>d.host,recovery,memory});
+  const req={...d.req,request_id:'assign-replacement',expected_generation:1};svc().assign({...req,principal:'owner',holder:assignment.holder,assignment_revision:assignment.revision});expect(svc().resume({...req,request_id:'claim-replacement'}).generation).toBe(2);raw.generation=2;
+  expect(core.events(d.run.runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);await expect(core.verifyPhase(d.run.runDir,'after')).rejects.toThrow('holdout was already consumed');expect(core.events(d.run.runDir).filter(e=>e.event==='holdout_consumed')).toHaveLength(1);
+  const unavailable=new DurableStore({root:path.join(d.root,'missing-terminal-archive'),sourceRoot:d.run.runDir});expect(()=>svc().completeCycle({...d.req,cycle_id:d.run.cycle.id},unavailable)).toThrow();
+  const state=svc().status(d.req).runs[0],report=svc().report(d.req);expect(state.active_cycle).toBe(d.run.cycle.id);expect(state.terminal_cycles).toBe(0);expect(state.consumed_cycles).toBe(1);expect(report.claim).toBe('improvement not established');expect(report.code_results).toHaveLength(0);expect(svc().decisionPack({repo_id:'fixture'}).events.filter(e=>e.kind==='outcome')).toHaveLength(0);expect(fs.existsSync(path.join(d.run.runDir,'decision.json'))).toBe(false);
+ }finally{
+  if(child.exitCode===null&&child.signalCode===null)child.kill('SIGKILL');if(d?.root&&path.basename(d.root).startsWith('controller-test-'))fs.rmSync(d.root,{recursive:true,force:true});
+ }
+},30000);

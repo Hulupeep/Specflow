@@ -217,9 +217,21 @@ function registryKey(registry) {
   privatePath(registry, true);
   return fs.readFileSync(privatePath(path.join(registry, 'lease-key')));
 }
-function locked(registry, fn) {
+function locked(registry, fn, lockTool = null, fault = () => {}, retainV2 = false) {
   privatePath(registry, true);
   const lock = path.join(registry, '.authority-lock');
+  if (lockTool) {
+    const kernel = require('./improve-kernel-lock.cjs');
+    try {
+      return kernel.withLock(path.join(lock, 'kernel-v2.lock'), lockTool, () => {
+        fault('authority_locked');
+        return fn();
+      });
+    } catch (e) {
+      if (e.code === 'store_busy') throw new ProfileError('Owner registry operation active; retry without overriding the lock');
+      throw e;
+    }
+  }
   try {
     fs.mkdirSync(lock, { mode: 0o700 });
   } catch {
@@ -228,13 +240,14 @@ function locked(registry, fn) {
   try {
     return fn();
   } finally {
-    fs.rmdirSync(lock);
+    if (!(retainV2 && (fs.existsSync(path.join(lock, 'kernel-v2.lock')) || fs.existsSync(path.join(lock, '.migration-owner.json'))))) fs.rmdirSync(lock);
   }
 }
-function registerProfile(registry, profile) {
+function registerProfile(registry, profile, { lockTool = null, fault = () => {} } = {}) {
   registry = mkdirPrivate(path.resolve(registry));
   validateProfile(profile);
   demand(!under(registry, profile.repository.path), 'Registry must be outside repository');
+  if (lockTool) require('./improve-kernel-lock.cjs').prepareAuthority(registry, lockTool, { fault });
   return locked(registry, () => {
     const key = path.join(registry, 'lease-key');
     if (!fs.existsSync(key))
@@ -249,7 +262,7 @@ function registerProfile(registry, profile) {
       revision
     });
     return { repo_id: profile.repo_id, revision };
-  });
+  }, lockTool, fault);
 }
 function readProfile(registry, repoId, { allowMissingRepository = false } = {}) {
   demand(id(repoId), 'Invalid repository alias');
@@ -680,7 +693,9 @@ function createProfileService({
   hostCapabilities,
   environment = process.env,
   now = Date.now,
-  leaseSeconds = 300
+  leaseSeconds = 300,
+  lockTool = null,
+  fault = () => {}
 } = {}) {
   demand(typeof resolvePrincipal === 'function', 'Trusted principal resolver required');
   demand(typeof hostCapabilities === 'function', 'Trusted host capability resolver required');
@@ -903,6 +918,10 @@ function createProfileService({
   function withAuthorized(lease, operation, transition) {
     demand(typeof transition === 'function', 'Trusted synchronous transition required');
     return locked(registry, () => {
+      if (lockTool && fs.existsSync(path.join(registry, '.migration-v2.json'))) {
+        const migration = JSON.parse(fs.readFileSync(privatePath(path.join(registry, '.migration-v2.json'))));
+        if (migration.status !== 'complete') throw new (require('./improve-kernel-lock.cjs').KernelLockError)('recovery_migration_incomplete');
+      }
       const result = authorize(lease, operation);
       if (!result.allowed) return result;
       const value = decode(lease),
@@ -913,7 +932,18 @@ function createProfileService({
         'Protected transition must synchronously start work; revalidate each later protected operation'
       );
       return { ...result, result: out };
-    });
+    }, lockTool, fault);
+  }
+  function withMigration(lease, transition) {
+    demand(lockTool && typeof transition === 'function', 'Qualified v2 owner migration required');
+    const mode = fs.existsSync(path.join(registry, '.authority-lock', 'kernel-v2.lock')) ? lockTool : null;
+    return locked(registry, () => {
+      const checked = authorize(lease, 'execute');
+      if (!checked.allowed) return checked;
+      const value = decode(lease), record = readProfile(registry, value.repo_id), out = transition(record.profile);
+      demand(!out || typeof out.then !== 'function', 'Synchronous migration required');
+      return { ...checked, result: out };
+    }, mode, fault, true);
   }
   function history(req) {
     const c = lookup(req, 'read');
@@ -949,7 +979,7 @@ function createProfileService({
       };
     }
   }
-  return { inspect, preflight, authorize, withAuthorized, history };
+  return { inspect, preflight, authorize, withAuthorized, withMigration, history };
 }
 function cli(args = process.argv.slice(2)) {
   try {
