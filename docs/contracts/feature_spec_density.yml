@@ -1,7 +1,7 @@
 contract_meta:
   id: feature_spec_density
-  version: 3
-  created_from_spec: "GitHub #162–167; #189"
+  version: 4
+  created_from_spec: "GitHub #162–167; #189; #235 slice A owner effort policy"
   covers_reqs: [AC-163-1, AC-163-2, AC-163-3, AC-163-4, AC-163-5, AC-163-6, AC-163-7, AC-165-2, AC-164-1, AC-164-5, AC-164-7, AC-166-1, AC-166-3, AC-167-1, AC-167-5]
   owner: specflow-core
 llm_policy:
@@ -16,7 +16,7 @@ invariants:
   - id: I-DENSITY-003
     rule: "Production eligibility is distinct from implementation, test, merge, deployment and customer validation status."
   - id: I-DENSITY-004
-    rule: "Scoped specification review continues on first-time verified progress; two non-progress reviews or three protocol failures require diagnosis with one evidenced recovery per failure kind per episode. Issue/tier state, causes and history survive host and run names. Unknown impact, required skips, missing evidence and incomplete scoped acceptance cannot pass."
+    rule: "Scoped specification review continues on first-time verified progress; repeated non-progress or protocol failure requires diagnosis. Further recoveries need fresh stable execution observations not already used in the episode, without an implicit recovery-count ceiling. Issue/tier state, causes, explicit limits and history survive host and run names. Unknown impact, required skips, missing evidence and incomplete scoped acceptance cannot pass."
   - id: I-DENSITY-005
     rule: "Promotion binds current scope, dependency capability, live scoped review and the same raw required gates; no recursive dependency promotion."
   - id: I-DENSITY-006

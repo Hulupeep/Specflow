@@ -30,15 +30,15 @@ test('first-time achievements allow long productive runs; repeat achievements an
  for(let i=0;i<2;i++){continuation.beforeCall(c,()=>{});continuation.observe(c,{achievements:['criterion:0']});}
  expect(continuation.decision(c)).toMatchObject({kind:'stagnation',recoverable:true});expect(c.calls).toBe(10);
 });
-test('one current evidenced recovery; failure retains guard and historical counts',()=>{
+test('current evidenced recovery; failure retains diagnosis and rejects reworded notes',()=>{
  const c=continuation.create(); for(let i=0;i<3;i++){continuation.beforeCall(c,()=>{});continuation.observe(c,{protocol:true});}
  expect(()=>continuation.recover(c,{kind:'protocol',cause:'missing required read',action:'read task',evidence:[]},()=>{})).toThrow('evidence');
  const refs=[evidence('diagnosis')],validate=xs=>xs.forEach(r=>{if(policy.sha(fs.readFileSync(path.join(root,r.path)))!==r.sha256)throw Error('changed');});
  continuation.recover(c,{kind:'protocol',cause:'missing required read',action:'read task explicitly',evidence:refs},validate);
  fs.writeFileSync(path.join(root,'diagnosis'),'tampered');expect(()=>continuation.beforeCall(c,validate)).toThrow('changed');expect(c.calls).toBe(3);
  fs.writeFileSync(path.join(root,'diagnosis'),'diagnosis');continuation.beforeCall(c,validate);continuation.observe(c,{protocol:true});
- expect(c.calls).toBe(4);expect(continuation.decision(c)).toMatchObject({kind:'protocol',recoverable:false});
- expect(()=>continuation.recover(c,{kind:'protocol',cause:'new wording',action:'again',evidence:refs},validate)).toThrow('did not establish progress');
+ expect(c.calls).toBe(4);expect(continuation.decision(c)).toMatchObject({kind:'protocol',recoverable:true});
+ expect(()=>continuation.recover(c,{kind:'protocol',cause:'new wording',action:'again',evidence:refs},validate)).toThrow('fresh captured execution evidence');
 });
 test('explicit ceilings preserve state; authorized extension is recorded, not an implicit reset',()=>{
  const c=continuation.create({usageMode:'subscription',maxCalls:1});continuation.beforeCall(c,()=>{});continuation.observe(c,{achievements:['criterion:1']});
@@ -64,6 +64,19 @@ test('scoped reports can advance beyond two reviews and repeated gate passes do 
  expect(reviews.status(root,r,'build-ready')).toMatchObject({attempts:5,guard:null});
  for(let i=0;i<2;i++){r.profile.revision++;const result=report();result.verifiedCriteria=['AC-0'];reviews.complete(root,reviews.begin(root,r,'build-ready','codex',{criteria:Array.from({length:5},(_,i)=>`AC-${i}`)}),result);}
  expect(reviews.status(root,r,'build-ready').guard).toMatchObject({kind:'stagnation'});
+});
+test('J-EFFORT-RETRY scoped state permits a further fresh executed diagnosis across host changes',()=>{
+ const r=record();for(let i=0;i<3;i++)reviews.fail(root,reviews.begin(root,r,'build-ready','codex'),'Missing native read',{kind:'protocol'});
+ reviews.recover(root,r,'build-ready',{kind:'protocol',cause:'missing read',action:'explicit read list',evidence:[evidence('legacy-diagnosis')]});
+ reviews.fail(root,reviews.begin(root,r,'build-ready','claude-code'),'Different source read missing',{kind:'protocol'});
+ const raw=JSON.stringify({duo_capture:1,command:['node','diagnose.js'],exitCode:0,error:null,stdout:'new missing source B',stderr:'',sourceBefore:'a'.repeat(64),sourceAfter:'a'.repeat(64),stable:true,finishedAt:new Date().toISOString()});
+ fs.writeFileSync(path.join(root,'executed.json'),raw);
+ reviews.recover(root,r,'build-ready',{kind:'protocol',cause:'new source omitted',action:'split batch by source',evidence:[{path:'executed.json',sha256:policy.sha(raw)}]});
+ reviews.fail(root,reviews.begin(root,r,'build-ready','codex'),'Still unaccepted; no fabricated progress',{kind:'protocol'});
+ const s=reviews.load(root,189);expect(s.reviewControl['build-ready'].calls).toBe(5);
+ expect(s.events.filter(e=>e.kind==='review-recovery')).toHaveLength(2);
+ expect(reviews.status(root,r,'build-ready').passed).toBe(false);
+ expect(s.reviewControl['build-ready'].achievements).toEqual([]);
 });
 test('protocol-invalid findings do not partially replace prior material findings',()=>{
  const r=record(), f={...optional('Original risk'),severity:'SERIOUS',criterion:'AC-1'};

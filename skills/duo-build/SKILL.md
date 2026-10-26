@@ -153,8 +153,10 @@ Before an expensive capture, check `node scripts/duo-build.cjs eligibility <id> 
 Pass `--batch <batch.json>` to inspect missing evidence and unreported instruction
 responses too. A diagnosis guard is work to perform now: inspect the actual
 cause, capture diagnosis with `capture ... --diagnosis -- COMMAND`, and record
-one evidenced different recovery. A checkpoint or repeated failed recovery
-stops with the concrete cause; do not reset history or create a successor.
+an evidenced different recovery. Further recoveries require fresh captured
+execution facts, not renamed notes or timestamp-only recapture. Explicit
+checkpoints and missing recovery evidence retain their concrete cause; do not
+reset history or create a successor to bypass them.
 
 **Before ending each work turn or reporting a batch complete, review it now.**
 A batch can be a diagnosis or verification result as well as code. Do not wait
@@ -244,11 +246,18 @@ just to certify that log. Use excluded run-local notes and `direction_response`.
 
 Progress means first-time verified criteria/gates or first-time evidenced finding
 closures. Changed files, timestamps, diagnostic wording or repeated closures do
-not earn more attempts. There is no fixed two/four review cap in new runs.
+not count as verified progress. There is no fixed two/four review cap in new runs.
 After two valid reviews without progress, diagnose; after three invalid peer
 responses, diagnose the protocol. Perform authorized diagnosis autonomously and
-record one materially different recovery attempt per kind per progress episode.
-A repeated failure after that recovery requires a specific blocker report.
+record a materially different recovery with its current evidence. The first
+legacy evidenced recovery remains compatible. Any further recovery in the same
+episode needs a stable `duo_capture: 1` observation finished after the previous
+call and not already used in that episode. The helper ignores capture filenames,
+metadata timestamps and attached narrative when comparing execution facts;
+regrouping old observations is not new evidence. Diagnose again when an attempt
+fails; continue only with another justified strategy and novel executed facts.
+There is no one-recovery lifetime cap. If no relevant new evidence/allowed action
+exists, report that concrete limitation, never a fictitious financial exhaustion.
 Protocol-invalid output grants no acceptance and preserves all prior findings.
 Historical/pinned runs keep their recorded policy; never patch their runtime or
 journal to adopt this one silently. Optional finding wording is retained as

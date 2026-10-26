@@ -94,8 +94,12 @@ user does not copy review messages or run three separate workflows.
 6. Fix evidenced findings and re-review while first-time criteria/gates or finding
    closures advance. There is no fixed two-review allowance. Two consecutive
    no-progress reviews require diagnosis; three protocol failures require
-   protocol diagnosis. One evidenced different recovery attempt per failure
-   episode is allowed; a repeated failure reports its actual cause and stops.
+   protocol diagnosis. Perform diagnosis autonomously. Further materially different
+   recoveries need fresh stable captured execution observations not already used
+   in that episode; a fixed recovery count does not end subscription work. Renamed
+   notes, metadata timestamps and regrouped old captures are not new observations.
+   No new evidence/allowed action means a specific limitation report, not invented
+   financial exhaustion. Explicit ceilings and original history remain enforced.
    Invalid native responses remain `protocol_failed`, grant no acceptance and
    do not consume product repair history. Changed wording and repeated closures
    are not progress. Issue/tier history survives host and run names.

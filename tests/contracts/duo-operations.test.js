@@ -183,7 +183,7 @@ test('a failed capture can prove an observed fact while the execution gate stays
   expect(result.outcome).toBe('changes_required');expect(result.criteria['AC-2'].status).toBe('verified');expect(result.criteria['GATE-TESTS'].status).toBe('unverified');
   expect(()=>duo.finish(root,run.id,token(run.id))).toThrow(/incomplete/);
 });
-test('J-DUO-RECOVERY: diagnose, recover once, retain concrete cause and history on repeated failure',()=>{
+test('J-DUO-RECOVERY: different executed diagnosis permits another recovery without erasing history',()=>{
  const run=start();
  for(let i=0;i<2;i++){put('raw.txt',`failure ${i}`);review(run,batch({id:`fail${i}`}),peer({outcome:'changes_required'}));}
  expect(duo.eligibility(root,run.id).blockers[0]).toMatchObject({kind:'stagnation',recoverable:true});
@@ -197,9 +197,17 @@ test('J-DUO-RECOVERY: diagnose, recover once, retain concrete cause and history 
  expect(duo.eligibility(root,run.id).eligible).toBe(true);
  put('raw.txt','different attempt still failed');review(run,batch({id:'recovery'}),peer({outcome:'changes_required'}));
  const after=readRun(run.id);expect(after.reviewControl.recoveries[0].consumed).toBe(true);
- expect(duo.eligibility(root,run.id).blockers[0]).toMatchObject({kind:'stagnation',recoverable:false});
+ expect(duo.eligibility(root,run.id).blockers[0]).toMatchObject({kind:'stagnation',recoverable:true});
  expect(duo.status(after)).toContain('Correct value');expect(duo.status(after)).toContain('replace the exported value');
- expect(()=>duo.recoverReview(root,run.id,token(run.id),input)).toThrow('did not establish progress');
+ expect(()=>duo.recoverReview(root,run.id,token(run.id),input)).toThrow(/predates|No new recovery observation/);
+ const next=duo.capture(root,run.id,token(run.id),[process.execPath,'-e','console.log("diagnosis: changed batch now exposes a different missing field")'],{diagnosis:true});
+ const second=next.lastCapture.path,secondHash=require('crypto').createHash('sha256').update(fs.readFileSync(path.join(root,second))).digest('hex');
+ duo.recoverReview(root,run.id,token(run.id),{...input,action:'repair the newly observed field using a smaller batch',evidence:[{path:second,sha256:secondHash}]});
+ expect(readRun(run.id).reviewControl.recoveries).toHaveLength(2);
+ expect(duo.eligibility(root,run.id).eligible).toBe(true);
+ review(run,batch({id:'second-recovery'}),peer({outcome:'changes_required'}));
+ expect(readRun(run.id).reviewControl.calls).toBe(4);
+ expect(()=>duo.finish(root,run.id,token(run.id))).toThrow(/incomplete/);
 });
 test('J-DUO-LONG: more than four progressing reviews can finish with current independent evidence',()=>{
  const criteria=Array.from({length:6},(_,i)=>({id:`AC-${i+1}`,kind:'acceptance',source:'task.md',anchor:`AC-${i+1}: requirement ${i+1}`}));

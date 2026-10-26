@@ -49,6 +49,7 @@ function control(state, tier, input) {
 }
 function validateRecovery(root, refs) {
   const errors = checkedRefs(root, refs, 'Recovery'); if (errors.length) throw Error(errors.join('; '));
+  return continuation.evidenceSummary(refs.map(ref=>({...ref,text:fs.readFileSync(policy.localFile(root,ref.path),'utf8')})));
 }
 function recover(root, record, tier, input) {
   if (!['contracted','build-ready'].includes(tier)) throw Error('Unknown review tier');
