@@ -9,7 +9,8 @@ adapter_policy:
   args: [-p, --output-format, stream-json, --verbose, --permission-mode, acceptEdits]
   model: sonnet
   requested_model: sonnet
-  max_budget_usd: 5
+  billing: unknown
+  cost: unknown
   timeout_seconds: 1500
   max_iterations: 1
   allowed_tools: [Read, Grep, Glob, Edit, Write, "Bash(ls *)", "Bash(cat *)", "Bash(grep *)", "Bash(rg *)", "Bash(git diff*)", "Bash(git status*)", "Bash(pnpm exec eslint *)", "Bash(pnpm exec tsc *)", "Bash(npx tsc *)"]

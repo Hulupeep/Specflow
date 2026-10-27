@@ -9,7 +9,8 @@ adapter_policy:
   args: [-p, --output-format, stream-json, --verbose, --permission-mode, default]
   model: opus
   requested_model: opus
-  max_budget_usd: 3
+  billing: unknown
+  cost: unknown
   timeout_seconds: 900
   max_iterations: 1
   allowed_tools: [Read, Grep, Glob]

@@ -1015,3 +1015,70 @@ test('PROOF-PEER: actual round schema restricts next steps to exact frozen crite
   expect(ids).toEqual(doc.acceptance.map(a=>a.id));expect(ids).not.toContain('AC-1 / UX-RESTRAINT');
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 }));
+
+
+describe('Billing-aware peer policy (#232)',()=>{
+  const failedPeer=(output,extra={})=>()=>({status:0,stdout:peerStream(output).replace('"subtype":"success"','"subtype":"error_max_budget_usd","is_error":true'),stderr:'',...extra});
+  test.each([
+    ['error_max_budget_usd',{}],
+    ['peer_timeout',{status:null,errorCode:'ETIMEDOUT',stdout:peerStream(PURSUE)}],
+    ['peer_process_failed',{status:1,stdout:peerStream(PURSUE)}],
+  ])('EFFORT-PEER-ERROR critique rejects structured output after %s',quiet(async(reason,extra)=>{
+    const f=fixture();const {runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'peer-failure',stateDir:f.state,worktreeRoot:f.worktrees});
+    improve.recordCandidates(runDir,writeTmp(f,'c.json',candidates()));
+    const result=improve.critique(runDir,{invokePeer:failedPeer(PURSUE,extra)});
+    expect(result.status).toBe('blocked');expect(result.provenance.stop_reason).toBe(reason);
+    expect(result.reason).toContain(reason);
+  }));
+  test('EFFORT-PEER-ERROR build cannot accept failed keep output',quiet(async()=>{
+    const f=fixture(),{runDir}=await prepare(f);await improve.verifyPhase(runDir,'baseline');
+    const result=await improve.build(runDir,{policy:writeTmp(f,'p.json',FAKE_BUILDER()),invokePeer:failedPeer(KEEP),afterBuilderRound:ws=>setSteps(ws,2)});
+    expect(result.peer_recommendation).toBeNull();expect(result.stop_reason).toContain('error_max_budget_usd');
+  }));
+  test('EFFORT-PEER-POLICY local file applies only billing fields; forbidden keys never call peer',quiet(async()=>{
+    const f=fixture(),{runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'peer-policy',stateDir:f.state,worktreeRoot:f.worktrees});improve.recordCandidates(runDir,writeTmp(f,'c.json',candidates()));
+    for(const field of ['tools','model','command','provider','args']){
+      const invoke=jest.fn(fakePeer([PURSUE]));
+      expect(()=>improve.critique(runDir,{peerPolicy:writeTmp(f,'peer.json',{[field]:'untrusted'}),invokePeer:invoke})).toThrow(/peer_policy_field/);
+      expect(invoke).not.toHaveBeenCalled();
+    }
+    const invoke=fakePeer([PURSUE]);
+    const result=improve.critique(runDir,{peerPolicy:writeTmp(f,'peer.json',{billing:'subscription_cli',cost:'ordinary',max_budget_usd:0.5}),invokePeer:invoke});
+    expect(invoke.calls[0].args).toEqual(expect.arrayContaining(['--max-budget-usd','0.5']));
+    expect(result.provenance).toMatchObject({billing:'subscription_cli',cost:'ordinary',max_budget_usd:0.5,enforcement:'cli',cost_status:'estimate'});
+  }));
+  test('EFFORT-REPORT estimates, unknown and applied caps are visible without invoice claims',quiet(async()=>{
+    const f=fixture(),{runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'peer-report',stateDir:f.state,worktreeRoot:f.worktrees});improve.recordCandidates(runDir,writeTmp(f,'c.json',candidates()));
+    const result=improve.critique(runDir,{peerPolicy:writeTmp(f,'peer.json',{billing:'subscription_cli',cost:'ordinary',max_budget_usd:0.5}),invokePeer:fakePeer([PURSUE])});
+    expect(result.provenance.cost_status).toBe('estimate');
+    const report=fs.readFileSync(improve.writeReport(runDir),'utf8');
+    expect(report).toContain('Billing / cost class');expect(report).toContain('subscription_cli / ordinary');expect(report).toContain('0.5000');expect(report).toContain('Actual charges unmeasured');
+  }));
+  test('EFFORT-LEGACY-CAP re-entry preserves recorded cap while defaults change',quiet(async()=>{
+    const f=fixture(),{runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'legacy-cap',stateDir:f.state,worktreeRoot:f.worktrees});improve.recordCandidates(runDir,writeTmp(f,'c.json',candidates()));
+    const p=writeTmp(f,'peer.json',{billing:'subscription_cli',cost:'ordinary',max_budget_usd:0.25});
+    const first=improve.critique(runDir,{peerPolicy:p,invokePeer:fakePeer([PURSUE])});
+    const prior=fs.readFileSync(path.join(runDir,'ledger.jsonl'),'utf8');improve.status(runDir);
+    expect(fs.readFileSync(path.join(runDir,'ledger.jsonl'),'utf8')).toBe(prior);
+    expect(first.provenance.max_budget_usd).toBe(0.25);
+    const next=improve.critique(runDir,{peerPolicy:p,invokePeer:fakePeer([PURSUE])});expect(next.provenance.max_budget_usd).toBe(0.25);
+  }));
+});
+
+
+test('EFFORT-REPORT adapter roles retain declared billing and cap in report and provenance',quiet(async()=>{
+ const f=fixture(),{runDir}=await runToImplementation(f,{builder:FAKE_BUILDER({billing:'subscription_cli',cost:'ordinary',max_budget_usd:0.25}),edits:{1:ws=>setSteps(ws,2)}});
+ const events=fs.readFileSync(path.join(runDir,'ledger.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
+ const builder=events.find(e=>e.event==='builder_round');
+ expect(builder.provenance).toMatchObject({billing:'subscription_cli',cost:'ordinary',max_budget_usd:0.25,cost_status:'unknown'});
+ const report=fs.readFileSync(improve.writeReport(runDir),'utf8');
+ expect(report).toContain('subscription_cli / ordinary');expect(report).toContain('0.2500');expect(report).toContain('Actual charges unmeasured');
+}));
+
+
+test('EFFORT-PEER-POLICY wrapper cannot hide forbidden policy fields',quiet(async()=>{
+ const f=fixture(),{runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'peer-wrapper',stateDir:f.state,worktreeRoot:f.worktrees});improve.recordCandidates(runDir,writeTmp(f,'c.json',candidates()));
+ const invoke=jest.fn(fakePeer([PURSUE]));
+ expect(()=>improve.critique(runDir,{peerPolicy:writeTmp(f,'peer.json',{adapter_policy:{billing:'subscription_cli'},model:'ignored-model'}),invokePeer:invoke})).toThrow(/peer_policy_field/);
+ expect(invoke).not.toHaveBeenCalled();
+}));

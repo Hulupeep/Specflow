@@ -34,6 +34,7 @@ const CANDIDATE_KINDS = ['ux-refinement', 'workflow', 'defect', 'feature', 'clea
 const MIN_CANDIDATES = 3;
 // Same budget as duo-build: three product repairs after the initial reviewed batch.
 const MAX_REPAIRS = 3;
+const adapterSpend = require('./adapter-spend.cjs');
 const HOLDOUT_DIR = 'holdout/';
 const DEV_DIR = 'dev/';
 const PEER_RECOMMENDATIONS = ['continue', 'keep', 'revert'];
@@ -911,6 +912,11 @@ function loadPolicy(file) {
   return raw.adapter_policy || raw;
 }
 
+function loadPeerPolicy(file) {
+  const raw = !file ? {} : /\.json$/.test(file) ? readJson(file) : yaml.load(fs.readFileSync(file, 'utf8'));
+  return adapterSpend.peerPolicy(raw);
+}
+
 function rolePolicy(runDir, raw, role) {
   const dir = path.join(runDir, 'adapters');
   const denied = ['Bash(git push*)', 'Bash(git merge*)', 'Bash(git rebase*)', 'Bash(git checkout main*)', 'Bash(gh *)',
@@ -927,10 +933,11 @@ function rolePolicy(runDir, raw, role) {
 function roleProvenance(policy, result) {
   const e = result.entry || {};
   return {
+    ...adapterSpend.resolve(policy),
     policy_id: policy.id, provider: policy.provider, requested_model: policy.requested_model || null,
     observed_model: e.effective_model || 'unknown', fallback_model: policy.fallback_model || null,
     cost_usd: typeof e.estimated_cost_usd === 'number' ? e.estimated_cost_usd : null,
-    cost_status: typeof e.estimated_cost_usd === 'number' ? 'measured' : 'unknown',
+    cost_status: typeof e.estimated_cost_usd === 'number' ? 'estimate' : 'unknown',
     input_tokens: e.input_tokens ?? null, output_tokens: e.output_tokens ?? null, stop_reason: e.stop_reason || result.status,
   };
 }
@@ -972,38 +979,44 @@ const CRITIQUE_SCHEMA = {
   },
 };
 
-function peerArgs(schema, model) {
+function peerArgs(schema, model, rawPolicy = {}) {
+  const spend = adapterSpend.resolve({ ...adapterSpend.peerPolicy(rawPolicy), provider: 'claude-print' });
   // duo-build invocation('codex') is its Claude-as-reviewer command: Read/Glob/Grep only, dontAsk, no MCP, no settings.
   const args = [...duoBuild.invocation('codex', os.tmpdir()).args];
   args[args.indexOf('--json-schema') + 1] = JSON.stringify(schema);
   if (model) args.push('--model', model);
-  return args;
+  return adapterSpend.apply(args, spend);
 }
 
 function defaultInvokePeer({ args, cwd, input, env, timeoutSeconds }) {
   const r = spawnSync('claude', args, { cwd, input, env, encoding: 'utf8', timeout: timeoutSeconds * 1000, maxBuffer: 32 * 1024 * 1024 });
-  return { status: r.status, stdout: r.stdout || '', stderr: `${r.stderr || ''}${r.error ? `\n${r.error.message}` : ''}` };
+  return { status: r.status, errorCode: r.error?.code || null, stdout: r.stdout || '', stderr: `${r.stderr || ''}${r.error ? `\n${r.error.message}` : ''}` };
 }
 
-function runPeer(runDir, { stage, inputDir, prompt, schema, model, invoke = defaultInvokePeer, builderProvider }) {
+function runPeer(runDir, { stage, inputDir, prompt, schema, model, invoke = defaultInvokePeer, builderProvider, spendPolicy = {} }) {
+  const spend = adapterSpend.resolve({ ...adapterSpend.peerPolicy(spendPolicy), provider: 'claude-print' });
   const dir = path.join(runDir, 'peer');
   fs.mkdirSync(dir, { recursive: true });
   const transcript = path.join(dir, `${stage}.transcript.jsonl`);
   const { env } = scrubbedEnv({ SPECFLOW_DUO_REVIEWER: '1' }, { keepProvider: true });
   untrusted.fenceInputTree(inputDir);
-  const r = invoke({ args: peerArgs(schema, model), cwd: inputDir, input: untrusted.TRUST_INSTRUCTION+'\n'+prompt, env, timeoutSeconds: 900 });
+  const r = invoke({ args: peerArgs(schema, model, spendPolicy), cwd: inputDir, input: untrusted.TRUST_INSTRUCTION+'\n'+prompt, env, timeoutSeconds: 900 });
   fs.writeFileSync(transcript, `${r.stdout}${r.stderr ? `\n${r.stderr}` : ''}`);
   const parsed = runner.parseProviderEvents('claude-print', r.stdout);
   const result = [...parsed.events].reverse().find((e) => e.type === 'result') || {};
   const tools = toolCommands(transcript);
+  const failure = r.status !== 0 ? (r.errorCode === 'ETIMEDOUT' ? 'peer_timeout' : 'peer_process_failed')
+    : result.is_error || result.subtype !== 'success' || parsed.errors.length
+      ? (['error_max_budget_usd', 'error_during_execution', 'error_max_turns', 'error_max_structured_output_retries'].includes(result.subtype) ? result.subtype : 'peer_error_result') : null;
   const provenance = {
+    ...spend, stop_reason: failure || 'success',
     executor: 'duo-peer:claude', requested_model: model || null, observed_model: parsed.effective_model,
-    cost_usd: typeof result.total_cost_usd === 'number' ? result.total_cost_usd : null,
-    cost_status: typeof result.total_cost_usd === 'number' ? 'measured' : 'unknown',
+    cost_usd: Number.isFinite(result.total_cost_usd) ? result.total_cost_usd : null,
+    cost_status: Number.isFinite(result.total_cost_usd) ? 'estimate' : 'unknown',
     independence: builderProvider === 'codex-exec' ? 'cross-vendor' : 'same-vendor',
     exit_code: r.status, tool_calls: tools.length,
   };
-  return { output: result.structured_output || null, provenance, transcript, holdoutAccessed: holdoutTouched(runDir, tools) };
+  return { output: failure ? null : result.structured_output || null, failure, provenance, transcript, holdoutAccessed: holdoutTouched(runDir, tools) };
 }
 
 // Any tool input naming the run directory's holdout, or the run directory at
@@ -1037,6 +1050,7 @@ function publicContract(gov) {
 }
 
 function critique(runDir, options = {}) {
+  const spendPolicy = loadPeerPolicy(options.peerPolicy);
   const run = loadRun(runDir);
   const evs = events(runDir);
   if (!lastEvent(evs, 'candidates_recorded')) throw new Error('Record candidates before a critique');
@@ -1058,11 +1072,11 @@ function critique(runDir, options = {}) {
     'Selected candidate (data):',
     untrusted.fenceUntrusted(JSON.stringify({id:selected.id,title:selected.title}),{source:'selected-candidate'}),
   ].join('\n');
-  const peer = runPeer(runDir, { stage: 'critique', inputDir, prompt, schema: CRITIQUE_SCHEMA, model: options.model || 'opus', invoke: options.invokePeer });
+  const peer = runPeer(runDir, { stage: 'critique', inputDir, prompt, schema: CRITIQUE_SCHEMA, model: options.model || 'opus', invoke: options.invokePeer, spendPolicy });
   const out = peer.output;
   if (!out || !CRITIQUE_VERDICTS.includes(out.verdict)) {
     append(runDir, 'critique_failed', { provenance: peer.provenance });
-    return { status: 'blocked', reason: 'peer returned no valid critique', provenance: peer.provenance };
+    return { status: 'blocked', reason: peer.failure || 'peer returned no valid critique', provenance: peer.provenance };
   }
   append(runDir, 'critique_recorded', {
     candidate_id: selected.id, verdict: out.verdict, reselect_to: out.reselect_to, challenges: out.challenges,
@@ -1164,6 +1178,7 @@ function validatePeerRound(out, gov, devSummary) {
 }
 
 async function build(runDir, options = {}) {
+  const spendPolicy = loadPeerPolicy(options.peerPolicy);
   const run = loadRun(runDir);
   const evs = events(runDir);
   const gov = governingContract(runDir);
@@ -1239,9 +1254,9 @@ async function build(runDir, options = {}) {
     ].join('\n');
     const roundSchema = JSON.parse(JSON.stringify(PEER_ROUND_SCHEMA));
     roundSchema.properties.direction.properties.next_steps.items.properties.criterion.enum = gov.contract.acceptance.map(a => a.id);
-    const peer = runPeer(runDir, { stage: `round-${round}`, inputDir, prompt, schema: roundSchema, model: options.peerModel || 'opus', invoke: options.invokePeer, builderProvider: policy.provider });
+    const peer = runPeer(runDir, { stage: `round-${round}`, inputDir, prompt, schema: roundSchema, model: options.peerModel || 'opus', invoke: options.invokePeer, builderProvider: policy.provider, spendPolicy });
     if (peer.holdoutAccessed) append(runDir, 'holdout_exposed', { role: 'peer', round });
-    const invalid = validatePeerRound(peer.output, gov, dev.summary);
+    const invalid = peer.failure || validatePeerRound(peer.output, gov, dev.summary);
     append(runDir, 'peer_review', {
       round, recommendation: peer.output?.recommendation || null, assessment: peer.output?.direction?.assessment || null,
       reason: peer.output?.reason || null, direction: peer.output?.direction || null, invalid, provenance: peer.provenance, dev_summary: dev.summary,
@@ -1574,6 +1589,7 @@ function writeReport(runDir) {
     ...evs.filter((e) => ['critique_recorded', 'critique_failed', 'oracle_authored', 'oracle_failed', 'builder_round', 'peer_review', 'judgment_run', 'implementation_finished'].includes(e.event) && e.provenance).map((e) => ({
       role: e.event === 'critique_recorded' ? 'duo-peer (critique)' : e.event === 'critique_failed' ? 'duo-peer (critique failed)' : e.event === 'peer_review' ? `duo-peer (round ${e.round}, ${e.provenance.independence})`
         : e.event === 'builder_round' ? `builder (round ${e.round})` : e.event === 'oracle_authored' ? (acceptedOracle(e) ? 'oracle author' : 'oracle author (failed)') : e.event === 'oracle_failed' ? 'oracle author (failed)' : e.role,
+      billing: e.provenance.billing || 'unknown', costClass: e.provenance.cost || 'unknown', cap: e.provenance.max_budget_usd ?? null, enforcement: e.provenance.enforcement || 'unknown',
       executor: e.provenance.policy_id || e.provenance.executor || e.executor, requested: e.provenance.requested_model || '-', observed: e.provenance.observed_model || 'unknown', cost: e.provenance.cost_usd ?? null,
     })),
   ];
@@ -1671,9 +1687,9 @@ function writeReport(runDir) {
     '',
     `Usage mode: ${gov?.contract?.safety?.usage_mode || 'unknown'} (declared; not proof of billing).`,
     '',
-    '| Role | Executor | Requested | Observed | Reported estimate |',
-    '|---|---|---|---|---|',
-    ...roles.map((r) => `| ${r.role} | ${r.executor} | ${r.requested} | ${r.observed} | ${money(r.cost)} |`),
+    '| Role | Executor | Requested | Observed | Billing / cost class (declared) | Configured cap / enforcement | Reported estimate |',
+    '|---|---|---|---|---|---|---|',
+    ...roles.map((r) => `| ${r.role} | ${r.executor} | ${r.requested} | ${r.observed} | ${r.billing || 'unknown'} / ${r.costClass || 'unknown'} | ${r.cap == null ? 'none recorded' : money(r.cap)} / ${r.enforcement || 'unknown'} | ${money(r.cost)} |`),
     '',
     `Reported estimate total ${money(roles.some(r => typeof r.cost === 'number') ? measured : null)}; ${unknown} role(s) with unknown cost (not counted as zero). CLI/provider estimates are usage telemetry, not verified invoices. Actual charges unmeasured.`,
     '',
@@ -1694,7 +1710,7 @@ function recordRole(runDir, role) {
   return append(runDir, 'role_recorded', {
     role: role.role, executor: role.executor, requested_model: role.requested_model || null,
     observed_model: role.observed_model || 'unknown', cost_usd: typeof role.cost_usd === 'number' ? role.cost_usd : null,
-    cost_status: typeof role.cost_usd === 'number' ? 'measured' : 'unknown', note: role.note || null,
+    cost_status: typeof role.cost_usd === 'number' ? 'estimate' : 'unknown', note: role.note || null,
   });
 }
 
@@ -1705,11 +1721,11 @@ const USAGE = `Usage:
   specflow improve --once --target DIR --mission FILE [--base REF] [--run-id ID] [--state-dir DIR] [--worktree-root DIR]
   specflow improve status RUN_DIR
   specflow improve candidates RUN_DIR CANDIDATES.json
-  specflow improve critique RUN_DIR [--draft CONTRACT.json] [--include a.png,b.json] [--model opus]
+  specflow improve critique RUN_DIR [--peer-policy SPEND.json] [--draft CONTRACT.json] [--include a.png,b.json] [--model opus]
   specflow improve oracle RUN_DIR --policy EVALUATOR.yml --prompt ORACLE_BRIEF.md
   specflow improve contract RUN_DIR CONTRACT.json [--supersede "reason"]
   specflow improve baseline RUN_DIR
-  specflow improve build RUN_DIR --policy POLICY.yml [--prompt EXTRA.md] [--peer-model opus] [--dry-run] [--accept-baseline-blocker "why"]
+  specflow improve build RUN_DIR --policy POLICY.yml [--prompt EXTRA.md] [--peer-model opus] [--peer-policy SPEND.json] [--dry-run] [--accept-baseline-blocker "why"]
   specflow improve dispute RUN_DIR --criterion AC-n --reason "why the oracle is wrong" --role ROLE --executor ID
   specflow improve exec RUN_DIR --role ROLE -- COMMAND...
   specflow improve verify RUN_DIR
@@ -1741,9 +1757,9 @@ async function cli(argv = process.argv.slice(2)) {
       case 'candidates': result = recordCandidates(runDir, fileArg); break;
       case 'contract': result = freezeContract(runDir, fileArg, { supersede: args.supersede }); break;
       case 'baseline': result = await verifyPhase(runDir, 'baseline'); break;
-      case 'critique': result = critique(runDir, { draft: args.draft, include: args.include ? String(args.include).split(',') : [], model: args.model }); break;
+      case 'critique': result = critique(runDir, { draft: args.draft, include: args.include ? String(args.include).split(',') : [], model: args.model, peerPolicy: args.peerPolicy }); break;
       case 'oracle': result = oracle(runDir, { policy: args.policy, prompt: args.prompt }); break;
-      case 'build': result = await build(runDir, { policy: args.policy, prompt: args.prompt, dryRun: Boolean(args.dryRun), acceptBaselineBlocker: args.acceptBaselineBlocker, peerModel: args.peerModel }); break;
+      case 'build': result = await build(runDir, { policy: args.policy, prompt: args.prompt, dryRun: Boolean(args.dryRun), acceptBaselineBlocker: args.acceptBaselineBlocker, peerModel: args.peerModel, peerPolicy: args.peerPolicy }); break;
       case 'dispute': result = dispute(runDir, { criterion: args.criterion, reason: args.reason, role: args.role, executor: args.executor }); break;
       case 'exec': {
         const run = loadRun(runDir);
