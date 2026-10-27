@@ -215,3 +215,15 @@ test('DS005: explicitly optional unsupported data proof stays visible without bl
     expect(result.data_seams.find(s => s.id === 'S-optional')).toMatchObject({ required: false, compatibility: 'unsupported', runtime_status: 'unsupported' });
   } finally { env.remove(); }
 });
+
+test('DS003/004: an owning data check cannot qualify in a configuration where its mapped seam is absent', () => {
+  const env = apiFixture(), executor = require('../../scripts/test-execution.cjs');
+  try {
+    env.contract.outcome_contract.configurations.push({ id: 'B', environment: 'isolated-B' });
+    env.contract.outcome_contract.obligations[0].configuration_ids = ['B'];
+    env.contract.runtime_checks.forEach(c => c.configuration_ids = ['B']);
+    const contract = env.accept().contract;
+    const result = executor.execute(contract.runtime_checks[0], { root: env.root, runDir: env.runDir, verificationContract: contract, configurationId: 'local', environment: 'isolated-node' });
+    expect(result).toMatchObject({ executable: false, result: 'blocked', reason: expect.stringContaining('unsupported data seam configuration') });
+  } finally { env.remove(); }
+});

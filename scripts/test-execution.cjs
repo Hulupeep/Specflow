@@ -158,6 +158,8 @@ function execute(check,options={}) {
   const selectedSeams=dataSeams.selectedForCheck(contract,check);
   if(selectedSeams.length) {
    seams=dataSeams.inspect(contract,root,{phase:'built',configurationId:options.configurationId});
+   const missing=selectedSeams.find(s=>!seams.data_seams.some(current=>current.id===s.id));
+   if(missing)throw Error(`unsupported data seam configuration: ${missing.id} is not applicable to ${options.configurationId}`);
    const unproven=seams.data_seams.filter(s=>selectedSeams.some(selected=>selected.id===s.id)&&s.compatibility!=='compatible');
    if(!seams.ok||unproven.length)throw Error(`data seam compatibility blocked: ${[...seams.errors,...unproven.flatMap(s=>s.errors)].join('; ')}`);
   }
