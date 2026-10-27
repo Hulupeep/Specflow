@@ -1502,3 +1502,17 @@ execution command or relevant input/checker files can receive fresh independent
 verifier acceptance without a new owner checkpoint when obligations, references
 and support scope remain unchanged; the full accepted-contract identity still
 invalidates old evidence.
+
+Shared per-obligation states are strictly `missing`, `failed`, `stale`,
+`unsupported`, `waived`, `passed`. Coverage separately reports
+`coverage_status: planned|missing`; planned coverage has no executed pass.
+`projectObligations` only aggregates owning-consumer states and cannot grant
+parent acceptance. The runner and trace record a human skip as `waived`, retain
+stale/unsupported bindings, and leave parent acceptance unverified. Owning check
+provenance remains #44's responsibility and final acceptance remains #73's.
+
+The published package supplies the schema dependency. A copied legacy project
+loads it only when selecting an outcome contract; if it is unavailable, parent
+readiness blocks with the exact dependency repair. Existing legacy helpers do
+not gain a new unconditional dependency. Complete installed-host setup remains
+part of #124's qualification.

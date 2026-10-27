@@ -35,7 +35,6 @@ test('OC001/003: real process transformation agrees with fixed reviewed CLI refe
   const wrong = cp.spawnSync(process.execPath, ['-e', 'process.stdout.write("2400")'], { encoding: 'utf8' });
   expect(wrong.status).toBe(0);
   // Two child substitutes may pass; a fixed independent parent reference still rejects.
-  expect(['pass', 'pass'].every(s => s === 'pass')).toBe(true);
   expect(Number(wrong.stdout)).not.toBe(reference.balance);
   expect(reference.balance).toBe(900);
   expect(outcome.validate(contract).ok).toBe(true);
@@ -62,7 +61,7 @@ test.each([
 ])('OC001 schema rejects %s', (_, mutate) => { mutate(contract); expect(outcome.validate(contract).ok).toBe(false); });
 
 test('OC002: owned planned coverage passes without requiring unbuilt implementation files', () => {
-  expect(outcome.coverage(contract, documents())).toMatchObject({ ok: true, obligations: [{ id: 'O-CLI', status: 'planned' }] });
+  expect(outcome.coverage(contract, documents())).toMatchObject({ ok: true, obligations: [{ id: 'O-CLI', status: 'missing', coverage_status: 'planned' }] });
 });
 test.each([
   ['dropped', docs => docs[0].document.contract_meta.covers_reqs = []],
@@ -219,4 +218,37 @@ test('OC005: fresh independent acceptance of a changed execution command does no
   contract.runtime_checks[0].command = 'node transform.cjs input.txt --new-implementation';
   expect(() => accept()).not.toThrow();
   expect(runner.requireAcceptedVerificationContract({ runDir }).accepted).toBe(true);
+});
+
+test.each(['missing', 'failed', 'stale', 'unsupported', 'waived', 'passed'])('OC006: shared %s state stays distinct and a projection never grants parent acceptance', state => {
+  const result = outcome.readiness(contract, { checkStates: { 'C-CLI': state } });
+  expect(outcome.obligationStateSchema.safeParse(state).success).toBe(true);
+  expect(result).toMatchObject({ status: 'unverified', obligations: [{ id: 'O-CLI', status: state }] });
+});
+test('OC006: one failed/stale required check cannot roll up to passed', () => {
+  contract.outcome_contract.obligations[0].check_ids.push('C-OTHER');
+  contract.runtime_checks.push({ ...contract.runtime_checks[0], id: 'C-OTHER' });
+  for (const status of ['failed', 'stale', 'missing', 'unsupported', 'waived']) {
+    expect(outcome.readiness(contract, { checkStates: { 'C-CLI': 'passed', 'C-OTHER': status } }).obligations[0].status).toBe(status);
+  }
+});
+test('OC006: human skip is a visible waiver on the actual runner and trace, never passed parent evidence', () => {
+  accept();
+  const result = runner.runVerifierStage({ runDir, root, sliceTags: ['cli'], humanSkip: { approved_by: 'fixture-owner', reason: 'isolated test environment unavailable' } });
+  expect(result).toMatchObject({ gate: 'skipped', parent_outcome: { status: 'unverified', obligations: [{ status: 'waived' }] } });
+  expect(runner.verifierTrace({ runDir, root }).parent_outcome).toMatchObject({ status: 'unverified', obligations: [{ status: 'waived' }] });
+});
+
+test('OC002: mixed existing local requirement references are not reinterpreted as unknown parent obligations', () => {
+  const docs = documents(); docs[0].document.contract_meta.covers_reqs.push('REQ-LOCAL-001');
+  expect(outcome.coverage(contract, docs).ok).toBe(true);
+});
+
+test('OC001 migration: an actual isolated copy without the new schema dependency preserves legacy helpers and blocks parent readiness actionably', () => {
+  fs.copyFileSync(path.resolve(__dirname, '../../scripts/outcome-contract.cjs'), path.join(root, 'standalone.cjs'));
+  const result = cp.spawnSync(process.execPath, ['-e', "const o=require('./standalone.cjs');console.log(JSON.stringify({legacy:o.readiness({}),hash:o.contractHash({journey_id:'J'}),parent:o.validate({outcome_contract:{}})}))"], { cwd: root, encoding: 'utf8', env: { ...process.env, NODE_PATH: '' } });
+  expect(result.status).toBe(0);
+  const report = JSON.parse(result.stdout);
+  expect(report.legacy.status).toBe('migration_required'); expect(report.hash).toMatch(/^[a-f0-9]{64}$/);
+  expect(report.parent).toMatchObject({ ok: false, errors: [expect.stringContaining('install zod@4.6.7')] });
 });

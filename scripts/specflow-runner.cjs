@@ -319,7 +319,7 @@ function validateRunContract(contract) {
   });
   if (missing.length) return { ok: false, errors: missing.map((field) => `run_contract.${field} is required`) };
   if (!LOOP_PATHS[contract.loop]) return { ok: false, errors: [`run_contract.loop is unsupported: ${contract.loop}`] };
-  if (contract.verification_contract_path !== undefined && !outcomeContract.pathSchema.safeParse(contract.verification_contract_path).success) return { ok: false, errors: ['run_contract.verification_contract_path must be a repository-relative file'] };
+  if (contract.verification_contract_path !== undefined && !outcomeContract.validLocalPath(contract.verification_contract_path)) return { ok: false, errors: ['run_contract.verification_contract_path must be a repository-relative file'] };
   return { ok: true, errors: [] };
 }
 
@@ -1228,10 +1228,12 @@ function runVerifierStage(options = {}) {
     const approvedBy = options.humanSkip.approved_by || options.humanSkip.approvedBy;
     const reason = options.humanSkip.reason;
     if (!approvedBy || !reason) throw new Error('verifier skip requires a human exception with approved_by and reason');
+    const parentOutcome = candidate?.outcome_contract ? outcomeContract.readiness(candidate, { state: 'waived' }) : null;
     appendLedger(paths.ledgerPath, {
       stage: 'verifier_stage', event: 'verifier_skip_override', required, slice_tags: sliceTags, approved_by: approvedBy, reason,
+      ...(parentOutcome ? { parent_outcome: parentOutcome, contract_sha256: outcomeContract.contractHash(candidate) } : {}),
     });
-    return { status: 'skipped_human_override', required, gate: 'skipped' };
+    return { status: 'skipped_human_override', required, gate: 'skipped', ...(parentOutcome ? { parent_outcome: parentOutcome } : {}) };
   }
 
   if (!required) return { status: 'not_required', required: false, gate: 'not_applicable' };
@@ -1253,7 +1255,7 @@ function runVerifierStage(options = {}) {
 
   if (contractGate.contract.outcome_contract) {
     const bound = outcomeContract.bind(contractGate.contract, options);
-    const parent = outcomeContract.readiness(contractGate.contract);
+    const parent = outcomeContract.readiness(contractGate.contract, { state: bound.status === 'unsupported' ? 'unsupported' : 'missing' });
     // #44 will consume owning case-level execution; an exit code alone must
     // never create parent acceptance while that consumer is unavailable.
     const reason = bound.status === 'bound' ? 'owning case-level execution receipt required (#44)' : bound.errors.join('; ');
@@ -1347,7 +1349,7 @@ function verifierTrace(options = {}) {
   else if (mechanicalGate.result === 'fail') disposition = 'gate_failed';
   else if (mechanicalGate.result === 'pass' && contractGate.accepted) disposition = 'passed';
 
-  const parentOutcome = outcomeContract.readiness(contractGate.contract);
+  let parentOutcome = outcomeContract.readiness(contractGate.contract);
   if (contractGate.accepted && contractGate.contract.outcome_contract) {
     const previous = last(e => e.event === 'verifier_stage' && e.outcome_binding)?.outcome_binding;
     const current = outcomeContract.bind(contractGate.contract, {
@@ -1360,6 +1362,11 @@ function verifierTrace(options = {}) {
       : { status: current.status === 'unsupported' ? 'unsupported' : 'stale', reason: current.errors.join('; ') };
     parentOutcome.binding_status = fresh.status;
     parentOutcome.reason = fresh.reason || null;
+    if (['stale', 'unsupported'].includes(fresh.status)) parentOutcome.obligations = outcomeContract.projectObligations(contractGate.contract, { state: fresh.status });
+    const latestStage = last(e => e.stage === 'verifier_stage' && ['verifier_stage', 'verifier_skip_override'].includes(e.event));
+    if (latestStage?.event === 'verifier_skip_override' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
+      parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { state: 'waived' }) };
+    }
   }
 
   return {
