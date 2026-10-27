@@ -76,6 +76,15 @@ function command(exe, args, options = {}) {
   return combineOutput ? (result.stdout || '') + (result.stderr || '') : result.stdout;
 }
 function git(root, ...args) { return command('git', args, { cwd: root }); }
+function applicableInstructions(entries, reviewedPaths) {
+  return Object.keys(entries).filter(file => {
+    if (!/(^|\/)(AGENTS|CLAUDE)\.md$/.test(file)) return false;
+    const directory = path.posix.dirname(file);
+    return directory === '.' || reviewedPaths.some(reviewed =>
+      typeof reviewed === 'string' &&
+      (reviewed === file || reviewed.startsWith(`${directory}/`)));
+  }).sort();
+}
 function peer(builder) {
   if (!['codex', 'claude-code'].includes(builder)) throw Error('builder must be codex or claude-code');
   return builder === 'codex' ? 'claude' : 'codex';
@@ -566,7 +575,11 @@ function reviewLocked(root, dir, state, batch, invoke) {
     write(path.join(round, 'index.patch'), reviewDiff(root, true));
     write(path.join(round, 'commits.txt'), git(root, 'log', '-5', '--format=fuller', '--stat'));
     let reviewSchema = schema;
-    const instructions = Object.keys(entries).filter(f => /(^|\/)(AGENTS|CLAUDE)\.md$/.test(f));
+    const reviewedPaths = [state.context.task, ...batch.evidence, ...recoveryRefs,
+      ...sourceExtras(state), ...Object.keys(state.pinned),
+      ...(specRecord ? (json(safe(root,specRecord)).profile?.artifacts || []).map(artifact => artifact.path) : []),
+      ...git(root,'diff','--name-only','-z','HEAD').split('\0').filter(Boolean)];
+    const instructions = applicableInstructions(entries, reviewedPaths);
     const requiredReads = [...new Set(['goal.md', `tree/${state.context.task}`, ...batch.evidence.map(f => `tree/${f}`), ...recoveryRefs.map(f=>`tree/${f}`), ...sourceExtras(state).map(f => `tree/${f}`), ...Object.keys(state.pinned).map(f => `tree/${f}`), ...instructions.map(f => `tree/${f}`)])];
     const submodules = snapshot.submodules(entries);
     requiredReads.push(...submodules.map(s => `tree/${s.evidence}`));
@@ -786,5 +799,5 @@ function cli(args, root = process.cwd()) {
     return ['review', 'resume'].includes(action) ? (state.outcome === 'accepted' ? 0 : state.outcome === 'changes_required' ? 1 : 2) : 0;
   } catch (e) { console.error(`Outcome advanced: blocked\nCurrent blocker: ${e.message}\nNext action: inspect eligibility and retained evidence; diagnose the concrete cause before retrying; preserve history and explicit owner ceilings`); return 2; }
 }
-module.exports = { migrateReview, recordScopedInterruption, recoverReview, beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, fingerprint, load, cli, schema };
+module.exports = { migrateReview, recordScopedInterruption, recoverReview, beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, applicableInstructions, fingerprint, load, cli, schema };
 if (require.main === module) process.exitCode = cli(process.argv.slice(2));
