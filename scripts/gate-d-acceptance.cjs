@@ -68,7 +68,8 @@ function report(contract, root, dir) {
       const lines = [...s.body.matchAll(/^\s*(?:status|result)\s*:\s*([^\r\n]+)\s*$/gm)];
       const status = lines.length === 1 ? lines[0][1].trim() : null;
       if (!states.has(status)) errors.push(`${s.id}: one exact documented status/result required`);
-      return { id: s.id, status };
+      const declaration = key => s.body.match(new RegExp(`^\\s*${key}\\s*:\\s*([^\\r\\n]+)$`, 'm'))?.[1].trim() || 'unknown';
+      return { id: s.id, status, evidence_refs: [...new Set(lint.evidenceRefs(s.body))], declared_authority: declaration('authority'), risk: declaration('risk'), authority_status: 'unverified' };
     });
     return { report_validity: errors.length ? 'invalid' : 'valid', errors, files, hops, legacyPolicy };
   } catch (error) { errors.push(error.message); return { report_validity: 'invalid', errors, files, hops: [] }; }
@@ -79,8 +80,9 @@ function accept(options = {}) {
   const context = { root, runDir: options.verificationRunDir || options.runDir, requiredMode: 'always', sliceTags: ['integration'], makerClaim: 'gate_d_requested' };
   const paths = runner.verificationPaths(context), accepted = runner.requireAcceptedVerificationContract(context);
   const finish = result => {
-    runner.appendLedger(paths.ledgerPath, { stage: 'GATE_D', event: 'gate_d_acceptance', ...result });
-    return result;
+    const recorded = { report_dir: reportDir, ...result };
+    runner.appendLedger(paths.ledgerPath, { stage: 'GATE_D', event: 'gate_d_acceptance', ...recorded });
+    return recorded;
   };
   if (!accepted.accepted || !accepted.contract?.outcome_contract) return finish({ report_validity: 'invalid', outcome_acceptance: 'blocked', errors: [accepted.reason || 'accepted parent outcome contract required'] });
   const contract = accepted.contract, valid = outcome.validate(contract);
@@ -90,7 +92,7 @@ function accept(options = {}) {
   if (before.legacyPolicy?.required === true && contract.outcome_contract.acceptance?.signoff_required === undefined) return finish({ report_validity: 'valid', outcome_acceptance: 'blocked', errors: ['legacy required signoff must be explicitly migrated to protected outcome_contract.acceptance.signoff_required; legacy hash attribution is not owner authority'] });
   const requiredHops = mappings(contract).filter(h => h.obligation_ids.some(id => contract.outcome_contract.obligations.some(o => o.id === id && o.required)));
   const bad = before.hops.filter(h => requiredHops.some(r => r.id === h.id) && !['green', 'passed'].includes(h.status));
-  if (bad.length) return finish({ report_validity: 'valid', outcome_acceptance: bad.some(h => h.status === 'waived') ? 'waived' : bad.some(h => h.status === 'stale') ? 'stale' : 'failed', errors: bad.map(h => `${h.id}: required hop ${h.status}; disposition is not a passing result`), hops: bad, authority: 'report attribution only; no authenticated waiver inferred' });
+  if (bad.length) return finish({ report_validity: 'valid', outcome_acceptance: bad.some(h => h.status === 'waived') ? 'waived' : bad.some(h => h.status === 'stale') ? 'stale' : 'failed', errors: bad.map(h => `${h.id}: required hop ${h.status}; disposition is not a passing result`), hops: bad, execution_status: 'not_run', report_files: before.files, contract_sha256: outcome.contractHash(contract), authority: 'report attribution only; no authenticated waiver inferred' });
   const required = contract.outcome_contract.obligations.filter(o => o.required);
   if (!required.length) return finish({ report_validity: 'valid', outcome_acceptance: 'blocked', errors: ['at least one required parent obligation needed'] });
   const ids = new Set(required.flatMap(o => o.configuration_ids));

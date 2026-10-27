@@ -163,3 +163,8 @@ test('GD005: legacy configured required signoff cannot silently disappear during
 test('GD005: explicit protected optional policy supersedes legacy attribution without adding a signature checkpoint', () => {
   const env = oracleFixture(); try { env.contract.outcome_contract.acceptance = { hops: [{ id: 'J-CLI', obligation_ids: ['O-values'] }], signoff_required: false }; const dir = report(env); fs.writeFileSync(dir + '/signoff-policy.json', JSON.stringify({ signoff_policy: { required: true } })); env.accept(); expect(acceptance.accept({ root: env.root, runDir: env.runDir, reportDir: dir }).outcome_acceptance).toBe('passed'); } finally { env.remove(); }
 });
+test('GD006: a waived report retains evidence, claimed authority and risk without authenticating or passing it', () => {
+  const env = oracleFixture(); try { const dir = report(env, 'waived'); fs.appendFileSync(dir + '/findings.md', 'authority: owner decision in evidence/result.json\nrisk: required calculation is not proved\n'); env.accept(); const r = acceptance.accept({ root: env.root, runDir: env.runDir, reportDir: dir });
+    expect(r).toMatchObject({ outcome_acceptance: 'waived', report_dir: dir, execution_status: 'not_run' }); expect(Object.hasOwn(r.report_files, '.specflow/gate-d/evidence/result.json')).toBe(true); expect(r.hops[0]).toMatchObject({ id: 'J-CLI', status: 'waived', evidence_refs: ['evidence/result.json'], declared_authority: 'owner decision in evidence/result.json', risk: 'required calculation is not proved', authority_status: 'unverified' });
+  } finally { env.remove(); }
+});
