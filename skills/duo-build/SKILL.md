@@ -387,6 +387,13 @@ failed calls, pipelines and ambiguous commands cannot satisfy an inspection gate
 Partial reads are labelled partial, not proof of complete file contents.
 Instruction citations still require actual content receipts.
 
+Successful native image-only Read results can earn receipts for frozen PNG,
+JPEG, GIF and WebP artifacts. The canonical base64 payload, declared media type,
+recognized container and exact frozen bytes must agree. Text beside a missing or
+different image cannot supply image inspection. Resized/re-encoded bytes remain
+unqualified for exact identity. This proves content access, not visual correctness.
+Older pinned collectors retain their recorded behavior and historical outcomes.
+
 Complete direction has no next_steps. Running finish is a helper action printed
 by the continuation, never a new repair instruction. Existing finish checks still
 require current peer-verified criteria and no open findings/instructions.

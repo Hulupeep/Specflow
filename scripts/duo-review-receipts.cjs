@@ -35,6 +35,25 @@ function commandRead(command) {
   if (!args.length || args.some(f => !f || f.startsWith('-'))) return null;
   return { files: args, start, end, tool: exe };
 }
+// Native Read renders the image. This checks its encoding, media/container
+// identity and exact frozen bytes; it does not infer equivalent resized pixels.
+function imageBytes(part, frozen) {
+  const source = part?.source;
+  if (source?.type !== 'base64' || typeof source.data !== 'string' || !source.data) return null;
+  let mime = null;
+  if (frozen.length >= 57 && frozen.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))
+    && frozen.readUInt32BE(8) === 13 && frozen.subarray(12, 16).toString('ascii') === 'IHDR'
+    && frozen.readUInt32BE(16) > 0 && frozen.readUInt32BE(20) > 0
+    && frozen.subarray(-12).equals(Buffer.from('0000000049454e44ae426082', 'hex'))) mime = 'image/png';
+  else if (frozen.length >= 16 && frozen[0] === 255 && frozen[1] === 216 && frozen[2] === 255 && frozen.subarray(-2).equals(Buffer.from('ffd9', 'hex'))) mime = 'image/jpeg';
+  else if (frozen.length >= 14 && /^(GIF87a|GIF89a)$/.test(frozen.subarray(0, 6).toString('ascii'))
+    && frozen.readUInt16LE(6) > 0 && frozen.readUInt16LE(8) > 0 && frozen[frozen.length - 1] === 59) mime = 'image/gif';
+  else if (frozen.length >= 20 && frozen.subarray(0, 4).toString('ascii') === 'RIFF' && frozen.subarray(8, 12).toString('ascii') === 'WEBP'
+    && ['VP8 ', 'VP8L', 'VP8X'].includes(frozen.subarray(12, 16).toString('ascii')) && frozen.readUInt32LE(4) + 8 === frozen.length) mime = 'image/webp';
+  if (!mime || source.media_type !== mime || source.data.length !== 4 * Math.ceil(frozen.length / 3)) return null;
+  const bytes = Buffer.from(source.data, 'base64');
+  return bytes.toString('base64') === source.data && bytes.equals(frozen) ? bytes : null;
+}
 function collect(events, round, allowed) {
   const receipts = [], calls = new Map(), allow = new Set(allowed), seen = new Set();
   const relative = file => path.relative(round, path.resolve(round, file)).split(path.sep).join('/');
@@ -51,9 +70,22 @@ function collect(events, round, allowed) {
       if (event.type === 'assistant' && block.type === 'tool_use') calls.set(block.id, block);
       if (event.type !== 'user' || block.type !== 'tool_result' || block.is_error) continue;
       const call = calls.get(block.tool_use_id);
-      const output = typeof block.content === 'string' ? block.content : (block.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-      if (!call || !output || /^\s*(?:Error:|<tool_use_error>)/.test(output)) continue;
+      const parts = Array.isArray(block.content) ? block.content : [];
+      const output = typeof block.content === 'string' ? block.content : parts.filter(b => b?.type === 'text').map(b => b.text).join('\n');
+      if (!call || /^\s*(?:Error:|<tool_use_error>)/.test(output)) continue;
       if (call.name === 'Read' && typeof call.input?.file_path === 'string') {
+        const name = relative(call.input.file_path);
+        if (!allow.has(name) || name === '..' || name.startsWith('../') || path.isAbsolute(name)) continue;
+        const images = parts.filter(b => b?.type === 'image');
+        if (images.length || /\.(png|jpe?g|gif|webp)$/i.test(name)) {
+          // Never fall back to explanatory text for a missing/different image.
+          if (images.length !== 1) continue;
+          let bytes;
+          try { bytes = imageBytes(images[0], fs.readFileSync(path.join(round, name))); } catch { continue; }
+          if (bytes) add(call.input.file_path, 'Read', call.id, 'full', bytes);
+          continue;
+        }
+        if (!output) continue;
         let extent = 'partial';
         try {
           const text = fs.readFileSync(path.join(round, relative(call.input.file_path)), 'utf8');
@@ -62,7 +94,7 @@ function collect(events, round, allowed) {
           if (output === text || (seen.size === lines.length && lines.every((line, i) => seen.get(i + 1) === line))) extent = 'full';
         } catch { /* Unknown extent never means complete contents. */ }
         add(call.input.file_path, 'Read', call.id, extent, output);
-      } else if (call.name === 'Grep' && call.input?.output_mode === 'content' && !/^No matches found/.test(output)) {
+      } else if (output && call.name === 'Grep' && call.input?.output_mode === 'content' && !/^No matches found/.test(output)) {
         const search = path.resolve(round, call.input.path || '.');
         if (allow.has(relative(search))) {
           add(search, 'Grep', call.id, 'partial', output);
