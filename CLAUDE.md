@@ -83,6 +83,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 
 | Contract | Protects | Rules |
 |----------|----------|-------|
+| `gate_d_acceptance` | Current required outcome/configuration proof and protected optional signoff | GD-001 through GD-007 |
 | `data_seams` | Declared schema semantics, required integration mappings and built-reference/native consumers | DS-001 through DS-006 |
 | `oracle_correctness` | Independent value comparison and distinct provenance/consistency | PC-001 through PC-006 |
 | `test_execution` | Owning native case accounting, current attempts and hook/CI consumers | TE-001 through TE-006 |

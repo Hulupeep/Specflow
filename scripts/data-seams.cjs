@@ -128,18 +128,19 @@ function inspect(contract, root, { phase = 'built', configurationId } = {}) {
   return { ok: !errors.length, scope: 'declared data interfaces; not whole-program dependency discovery', phase, runtime_status: 'unverified', errors, warnings,
     data_seams: results, files: [...files], derivedHops: results.map(s => ({ id: s.id, interface_id: s.interface_id, required: s.required, producer_ids: s.producer_ids, consumer_ids: s.consumer_ids, obligation_ids: s.obligation_ids, check_ids: s.check_ids, runtime_status: 'unverified' })) };
 }
-function selectedForCheck(contract, check) {
+function selectedForCheck(contract, check, configurationId) {
   const ids = check.execution?.seam_ids || [], selected = (contract.outcome_contract?.data_seams || []).filter(s => s.check_ids.includes(check.id));
   if (selected.length !== ids.length || ids.some(id => !selected.some(s => s.id === id))) throw Error(`${check.id}: exact accepted data seam mapping required`);
-  return selected;
+  return configurationId ? selected.filter(s => s.obligation_ids.some(id => contract.outcome_contract.obligations.find(o => o.id === id).configuration_ids.includes(configurationId))) : selected;
 }
 module.exports = { entriesSchema, validateDeclarations, readArtifact, compareFacts, inspect, selectedForCheck, validPath };
 
 // Projection only, like parent obligation states. The caller supplies current
 // owning check states; this never authenticates a saved report or accepts a goal.
-function project(contract, checkStates = {}, findings = [], override) {
-  const entries = contract?.outcome_contract?.data_seams;
-  if (!Array.isArray(entries)) return [];
+function project(contract, checkStates = {}, findings = [], override, configurationId) {
+  const declared = contract?.outcome_contract?.data_seams;
+  if (!Array.isArray(declared)) return [];
+  const entries = declared.filter(s => !configurationId || s.obligation_ids.some(id => contract.outcome_contract.obligations.find(o => o.id === id)?.configuration_ids.includes(configurationId)));
   const state = value => require('./outcome-contract.cjs').obligationStateSchema.safeParse(value).success ? value : 'missing';
   return entries.map(seam => {
     const ids = Array.isArray(seam.check_ids) ? seam.check_ids : [], states = ids.map(id => state(checkStates[id]));

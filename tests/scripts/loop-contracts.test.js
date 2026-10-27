@@ -79,7 +79,8 @@ describe('loop YAML contracts', () => {
   test('feature-build Gate D references the Gate D checker', () => {
     const content = fs.readFileSync(path.join(ROOT, 'templates/QA/loops/feature-build.yaml'), 'utf8');
 
-    expect(content).toContain('node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/');
+    expect(content).toContain('node scripts/teardown-gate.cjs accept-gate-d gate-d/<epic>/');
+    expect(content).toContain('outcome_acceptance: not_evaluated');
   });
 
   test('feature-build contract requires continuation until HITL, CI wait, block, or done', () => {

@@ -152,23 +152,26 @@ epic_gate:
     (PRDs/<slug>-hops.md, pinned at GATE A) + the seam-derived hops (GATE B; seams
     RECOMPUTED here from final ticket state). The gate-d prompt MATERIALIZES the hop
     artifact into teardown format (each hop a "- J:" entry; findings per hop; evidence
-    per finding) so `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/`
-    validates it.
+    per finding). Reconcile every hop with the accepted parent obligation mapping;
+    recomputation cannot silently amend the protected hop/oracle inventory. Report lint
+    alone does not accept the outcome.
   evidence: >
     every hop has a findings entry referencing evidence files that exist; VALUE-BEARING
-    hops must attach the oracle re-read output itself (.txt/.json or a screenshot showing
-    the value) — a decorative screenshot does not satisfy a value hop.
+    hops must attach the oracle re-read output itself (.txt/.json) plus the current owning
+    independent comparison — a decorative screenshot does not satisfy a value hop.
   disposition: >               # closes the ungoverned-reconciliation loophole (PR #724 exhibit)
     a red hop MUST be dispositioned `bug` or `stale-oracle`. stale-oracle = an amendment to
     PRDs/<slug>-hops.md requiring the configured amendment/provenance trail. If
-    `signoff_policy.required` is true, the amendment also requires the configured human
+    `outcome_contract.acceptance.signoff_required` is true, the amendment also requires the configured human
     countersign — the build agent can never reconcile its own oracle. On `bug`: the LAST-MERGED writer of the seam
     reopens (it changed already-walked state); the failure names the seam pair + tiebreak.
     Shared-module case: the disposition names the module commit, not page blame.
   proof: >
-    `node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/` passes. Human signatures
-    are required only when the Gate D signoff policy marks them required.
-  signoff_policy:
-    required: false
-    artifacts: []
-  never_without_human: [sign when signoff_policy.required, stale-oracle amendment, closing the epic on a red GATE D]
+    `node scripts/teardown-gate.cjs accept-gate-d gate-d/<epic>/ --run-dir <accepted-verifier-run> --repo-root .`
+    returns outcome_acceptance: passed after current native checks cover every required
+    obligation/configuration/check and a final freshness sweep. A complete red report,
+    stale oracle, skipped required case or waiver never passes. check-gate-d is report
+    lint only and returns outcome_acceptance: not_evaluated. Human approval is required
+    only by protected outcome_contract.acceptance.signoff_required; use the existing
+    detached owner authority scoped to approval_scope, never a signed_by string.
+  never_without_human: [approve when protected outcome acceptance requires signoff, stale-oracle amendment, closing the epic on a red GATE D]

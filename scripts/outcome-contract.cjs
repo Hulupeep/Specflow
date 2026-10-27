@@ -21,6 +21,7 @@ const comparisons = require('./oracle-comparison.cjs').schema(z);
 const outcomeSchema = z.strictObject({
   version: z.literal(1), goal: text,
   data_seams: require('./data-seams.cjs').entriesSchema(z).optional(),
+  acceptance: require('./gate-d-acceptance.cjs').schema(z).optional(),
   configurations: z.array(z.strictObject({ id: text, environment: text })).min(1),
   assumptions: unique(text), unknowns: unique(text), non_goals: unique(text),
   obligations: z.array(z.strictObject({
@@ -89,6 +90,7 @@ function validate(contract) {
   }
   require('./oracle-comparison.cjs').validateDeclarations({ ...contract, outcome_contract: outcome }, errors);
   require('./data-seams.cjs').validateDeclarations({ ...contract, outcome_contract: outcome }, errors);
+  require('./gate-d-acceptance.cjs').validateDeclarations({ ...contract, outcome_contract: outcome }, errors);
   return { ok: !errors.length, errors };
 }
 function coverage(contract, documents) {
@@ -156,6 +158,10 @@ function bind(contract, options = {}) {
       for (const name of seams.files) files[name] = fileHash(root, name);
       if (seams.data_seams.some(s => s.required && s.compatibility === 'unsupported')) return { status: 'unsupported', errors: seams.errors };
     }
+    // Applicable checks may have additional inputs beyond the parent mappings.
+    for (const c of contract.runtime_checks.filter(c => c.configuration_ids.includes(configuration.id))) {
+      for (const name of [...c.checker_paths, ...c.input_paths, ...c.rule_paths]) files[name] = fileHash(root, name);
+    }
     const binding = { version: 1, contract_sha256: hashValue(contract), source_sha256: require('./duo-build.cjs').fingerprint(root), configuration_id: configuration.id, environment: options.environment, files };
     return { status: 'bound', binding: schemas().bindingSchema.parse(binding) };
   } catch (error) { return { status: 'blocked', errors: [error.message] }; }
@@ -178,7 +184,7 @@ function authorizeRevision(root, previousOutcomeHash, contract, amendment) {
 function projectObligations(contract, options = {}) {
   const { obligationStateSchema } = schemas();
   const override = options.state && obligationStateSchema.safeParse(options.state);
-  return contract.outcome_contract.obligations.map(o => {
+  return contract.outcome_contract.obligations.filter(o => !options.configurationId || o.configuration_ids.includes(options.configurationId)).map(o => {
     const states = o.check_ids.map(id => {
       const parsed = obligationStateSchema.safeParse(options.checkStates?.[id]);
       return parsed.success ? parsed.data : 'missing';

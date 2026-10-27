@@ -1,0 +1,52 @@
+contract_meta:
+  id: gate_d_acceptance
+  version: 1
+  created_from_spec: 'GitHub #73/#131'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: gate_d_acceptance'
+invariants:
+  - id: GD-001
+    rule: >-
+      two different answers: Distinguish evidence/report validity from outcome acceptance in machine
+      output and CLI documentation. A well-formed report may describe a failed outcome. Preserve or
+      explicitly migrate existing report-lint callers; acceptance callers must consume the outcome
+      verdict.
+  - id: GD-002
+    rule: >-
+      fail closed: Required failed/red, blocked, missing, skipped-required, stale, unsupported or invalid
+      findings prevent acceptance. A bug disposition records corrective work; it cannot make the outcome
+      pass.
+  - id: GD-003
+    rule: >-
+      actual coverage: Consume the required parent-obligation/hop set from #132 and independent executed
+      receipts from #44/#70. Do not accept status words, an existing JSON file, screenshots or narrative
+      source labels as sufficient behavioural evidence.
+  - id: GD-004
+    rule: >-
+      stale oracle: A stale-oracle finding blocks acceptance until the normal authorised amendment is
+      recorded and affected checks rerun successfully against the new revision. Merely naming an
+      amendment path or approving the amendment is not a fresh passing result.
+  - id: GD-005
+    rule: >-
+      scoped signoff: Human signoff remains optional and policy-driven, as the original issue intended.
+      When required, bind it to the exact accepted artifacts/revisions using the existing authority
+      mechanism. A freely editable signed_by string alone must not impersonate an approval. Do not invent
+      a new identity system.
+  - id: GD-006
+    rule: >-
+      honest exceptions: Existing authorised overrides/waivers remain explicit waived/overridden outcomes
+      with evidence and authority; they do not become passed tests or silently discharge the original
+      goal.
+  - id: GD-007
+    rule: >-
+      wire the consumer: Update the actual Gate D command, templates, prompts, runner/ledger/trace and
+      relevant CI consumer consistently. Gate D remains the existing authorised integration stage; no
+      implicit merge/deployment or new trigger is introduced.
+test_hooks:
+  tests:
+    - file: tests/contracts/gate-d-acceptance.test.js
+    - file: tests/contracts/teardown-gate.test.js
+    - file: tests/scripts/loop-contracts.test.js

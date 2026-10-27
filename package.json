@@ -17,6 +17,7 @@
     "agents/",
     "skills/",
     "scripts/",
+    "docs/gate-d.md",
     "setup-project.sh",
     "install-hooks.sh",
     "verify-setup.sh",

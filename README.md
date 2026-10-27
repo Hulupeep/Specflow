@@ -182,6 +182,8 @@ On **Mac/Linux** any terminal works.
 
 > **Windows:** run these in **Git Bash**, not PowerShell or WSL. The scripts target Git Bash; PowerShell's `bash` is usually WSL, which can't see your `C:\` paths and will error with "No such file or directory".
 
+Gate D distinguishes report lint from fresh integrated outcome acceptance; see [Gate D commands and proof](docs/gate-d.md).
+
 ### Commands
 
 ```bash

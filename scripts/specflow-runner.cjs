@@ -14,6 +14,7 @@ const tierPolicy = require('./specflow-tier.cjs');
 const outcomeContract = require('./outcome-contract.cjs');
 const testExecution = require('./test-execution.cjs');
 const owningRuntimeFindings = new WeakMap();
+const owningVerifierStages = new WeakMap();
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve, posix } = require('path');
@@ -117,7 +118,7 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath, 
       goal,
       input_artifact: input,
       path: resolveLoopPath(loop, repoRoot || process.cwd()),
-      current_stage_or_rail: loop === 'feature-build' ? '1_ticket' : 'discover',
+      current_stage_or_rail: loop === 'gate-d' ? 'GATE_D' : loop === 'feature-build' ? '1_ticket' : 'discover',
       next_gate: loop === 'feature-build'
         ? 'ticket + ACs + journey id confirmed'
         : 'grounding written with problem + oracle',
@@ -745,6 +746,7 @@ function fallbackLoopSequence(contract) {
 }
 
 function loopSequence(contract, options = {}) {
+  if (contract.loop === 'gate-d') return ['GATE_D'];
   if (contract.loop === 'spec-build' && contract.tier === 'thin') return ['discover', 'draft', 'tickets', 'handoff'];
   if (contract.loop === 'spec-build' && contract.tier === 'contracted') return ['discover', 'draft', 'adversary', 'tickets', 'handoff'];
   const fromDefinition = loopSequenceFromDefinition(loadLoopDefinition(contract, options));
@@ -1230,7 +1232,8 @@ function verifierGateDecision(findings = [], checks, options = {}) {
   if (options.requireOwning) {
     for (const check of (checks || []).filter(c => c.required)) {
       const finding = required.find(f => f.check_id === check.id);
-      if (!finding || !testExecution.owns(owningRuntimeFindings.get(finding), check, options.verificationContract, options)) return 'blocked';
+      const receipt = finding && owningRuntimeFindings.get(finding);
+      if (!finding || receipt?.result !== finding.verifier_result || !testExecution.owns(receipt, check, options.verificationContract, options)) return 'blocked';
     }
   }
   if (required.some((f) => !['pass', 'fail'].includes(f.verifier_result))) return 'blocked';
@@ -1285,16 +1288,19 @@ function runVerifierStage(options = {}) {
       return { status: 'blocked', required, gate: 'blocked', reason: bound.errors.join('; '), parent_outcome: parent, binding_status: bound.status };
     }
   }
-  const checks = contractGate.contract.runtime_checks;
+  const acceptedChecks = contractGate.contract.runtime_checks;
   if (options.checks !== undefined
-    && JSON.stringify(canonicalizeSemanticValue(options.checks)) !== JSON.stringify(canonicalizeSemanticValue(checks))) {
+    && JSON.stringify(canonicalizeSemanticValue(options.checks)) !== JSON.stringify(canonicalizeSemanticValue(acceptedChecks))) {
     const reason = 'runtime checks differ from the accepted verification contract; accept a revised contract before changing checks';
     record('blocked', { reason });
     return { status: 'blocked', required, gate: 'blocked', reason };
   }
+  const checks = contractGate.contract.outcome_contract
+    ? acceptedChecks.filter(c => c.configuration_ids.includes(options.configurationId)) : acceptedChecks;
+  const applicable = contractGate.contract.outcome_contract?.obligations.filter(o => o.configuration_ids.includes(options.configurationId));
   const valueBearing = options.valueBearing === true || sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t))
-    || contractGate.contract.outcome_contract?.obligations.some(o => o.required && o.value_bearing);
-  const comparisonGap = valueBearing && !contractGate.contract.outcome_contract?.obligations.some(o => o.required && o.value_bearing && o.oracle.comparisons?.length);
+    || applicable?.some(o => o.required && o.value_bearing);
+  const comparisonGap = valueBearing && !applicable?.some(o => o.required && o.value_bearing && o.oracle.comparisons?.length);
   const validation = validateRuntimeChecks(checks, { uiOrWorkflow: true, valueBearing });
   if (!validation.ok) {
     record('blocked', { reason: validation.errors.join('; ') });
@@ -1310,12 +1316,12 @@ function runVerifierStage(options = {}) {
   const nativeGate = unchangedAcceptance ? verifierGateDecision(findings, checks, { ...options, requireOwning: true, verificationContract: contractGate.contract, executionToken }) : 'blocked';
   const gate = comparisonGap && nativeGate === 'pass' ? 'blocked' : nativeGate;
   const checkResults = Object.fromEntries(findings.map(f => [f.check_id, !unchangedAcceptance ? 'stale' : f.verifier_result === 'pass' ? 'passed' : f.verifier_result === 'fail' ? 'failed' : /stale/.test(f.reason || '') ? 'stale' : /unsupported/.test(f.reason || '') ? 'unsupported' : 'missing']));
-  const seamResults = require('./data-seams.cjs').project(contractGate.contract, checkResults, findings);
+  const seamResults = require('./data-seams.cjs').project(contractGate.contract, checkResults, findings, undefined, options.configurationId);
   const proofClaims = Object.fromEntries(['behaviour', 'correctness', 'provenance', 'consistency'].map(kind => {
     const states = checks.filter(c => c.required && (c.execution?.claim_kind || 'behaviour') === kind).map(c => checkResults[c.id] || 'missing');
     return [kind, ['failed', 'stale', 'unsupported', 'waived', 'missing'].find(s => states.includes(s)) || (states.length ? 'passed' : 'missing')];
   }));
-  const parent = outcomeContract.readiness(contractGate.contract, { checkStates: checkResults });
+  const parent = outcomeContract.readiness(contractGate.contract, { checkStates: checkResults, configurationId: options.configurationId });
   const bound = contractGate.contract.outcome_contract ? outcomeContract.bind(contractGate.contract, options) : null;
   const reason = unchangedAcceptance ? findings.find(f => f.reason)?.reason
     || (comparisonGap ? 'value-bearing outcome needs an accepted independent oracle comparison matrix; migrate the verification contract before qualification'
@@ -1328,7 +1334,19 @@ function runVerifierStage(options = {}) {
     divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,
   });
   const nextCommand = ['specflow', 'run', 'verify', '--run-dir', paths.baseDir, ...(options.configurationId ? ['--configuration-id', options.configurationId] : []), ...(options.environment ? ['--environment', options.environment] : [])].map(shellQuote).join(' ');
-  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, proof_claims: proofClaims, data_seams: seamResults, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
+  const result = { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, proof_claims: proofClaims, data_seams: seamResults, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
+  owningVerifierStages.set(result, { contract: contractGate.contract, checks, executionToken, findings: [...findings], options: { root: options.root, runDir: options.runDir, contract: options.contract, ledger: options.ledger, configurationId: options.configurationId, environment: options.environment } });
+  return result;
+}
+
+// Only genuine stage handles from this invocation qualify; saved JSON cannot.
+function revalidateVerifierStage(result) {
+  const scope = owningVerifierStages.get(result);
+  if (!scope) return { status: 'missing', gate: 'blocked', reason: 'current owning verifier stage required' };
+  const latest = requireAcceptedVerificationContract(scope.options);
+  if (!latest.accepted || outcomeContract.hashValue(latest.contract) !== outcomeContract.hashValue(scope.contract)) return { status: 'stale', gate: 'blocked', reason: 'latest verifier acceptance changed' };
+  const gate = verifierGateDecision(scope.findings, scope.checks, { ...scope.options, requireOwning: true, verificationContract: scope.contract, executionToken: scope.executionToken });
+  return { status: gate === 'blocked' ? 'stale' : 'current', gate, reason: gate === 'blocked' ? 'owning native receipt, artifact or binding became stale' : null };
 }
 
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
@@ -1415,7 +1433,7 @@ function verifierTrace(options = {}) {
     if (['stale', 'unsupported'].includes(fresh.status)) parentOutcome.obligations = outcomeContract.projectObligations(contractGate.contract, { state: fresh.status });
     const latestStage = last(e => e.stage === 'verifier_stage' && ['verifier_stage', 'verifier_skip_override'].includes(e.event));
     if (latestStage?.check_results && fresh.status === 'current' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
-      parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { checkStates: latestStage.check_results }) };
+      parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { checkStates: latestStage.check_results, configurationId: previous?.configuration_id }) };
       proofClaims = latestStage.proof_claims || proofClaims;
       seamResults = latestStage.data_seams || seamResults;
     }
@@ -1426,6 +1444,22 @@ function verifierTrace(options = {}) {
     }
   }
 
+  const gateDEvent = last(e => e.event === 'gate_d_acceptance');
+  let gateD = { recorded_outcome: 'not_evaluated', scope_status: 'missing', outcome_acceptance: 'not_evaluated' };
+  if (gateDEvent) {
+    let scopeCurrent = Boolean(contractGate.accepted && gateDEvent.contract_sha256 === outcomeContract.contractHash(contractGate.contract));
+    for (const binding of contractGate.accepted ? gateDEvent.configuration_bindings || [] : []) {
+      const bound = outcomeContract.bind(contractGate.contract, { root: options.root || process.cwd(), configurationId: binding.configuration_id, environment: binding.environment });
+      if (bound.status !== 'bound' || outcomeContract.freshness(binding, bound.binding).status !== 'current') scopeCurrent = false;
+    }
+    try {
+      for (const [file, expected] of Object.entries(gateDEvent.report_files || {})) {
+        const bytes = require('./gate-d-acceptance.cjs').safeRead(resolve(options.root || process.cwd()), resolve(options.root || process.cwd(), file));
+        if (createHash('sha256').update(bytes).digest('hex') !== expected) scopeCurrent = false;
+      }
+    } catch { scopeCurrent = false; }
+    gateD = { recorded_outcome: gateDEvent.outcome_acceptance, scope_status: scopeCurrent ? 'current' : 'stale', outcome_acceptance: 'not_evaluated', obligations: gateDEvent.obligations || [], errors: gateDEvent.errors || [], reason: 'Historical audit view; rerun Gate D for fresh owning acceptance. Scope hashes alone do not reauthenticate execution receipts or approval.' };
+  }
   return {
     status: 'ok',
     run_dir: paths.baseDir,
@@ -1440,11 +1474,15 @@ function verifierTrace(options = {}) {
     parent_outcome: parentOutcome,
     proof_claims: proofClaims,
     data_seams: seamResults,
+    gate_d: gateD,
     sends_transcript_to_provider: false,
   };
 }
 
 function verifierCommandsForStage(contract, options = {}) {
+  if (contract.loop === 'gate-d' && contract.current_stage_or_rail === 'GATE_D') {
+    return [{ name: 'gate-d-outcome', command: ['node', 'scripts/teardown-gate.cjs', 'accept-gate-d', contract.gate_d_dir || options.gateDDir || contract.input_artifact, '--run-dir', contract.verification_run_dir || options.verificationRunDir || '', '--repo-root', contract.repository_root || options.repoRoot || process.cwd()].map(shellQuote).join(' ') }];
+  }
   const slug = options.slug || options.specSlug || contract.slug || 'specflow-run';
   const specDir = options.specDir || defaultSpecDir(slug);
   const stage = contract.current_stage_or_rail;
@@ -1528,6 +1566,7 @@ function materializeStagePrompt(contract, options = {}) {
   const stageSpec = [
     ...(Array.isArray(definition?.stages) ? definition.stages : []),
     ...(Array.isArray(definition?.rails) ? definition.rails : []),
+    ...(contract.loop === 'gate-d' && definition?.epic_gate ? [definition.epic_gate] : []),
   ].find((item) => item && item.id === stage);
   const statePaths = {
     ...defaultStatePaths(options.contractPath || contract.storage?.contract_path || defaultRunPaths(options.slug || 'specflow-run').contractPath, options),
@@ -2303,6 +2342,25 @@ function runLoopBody(options) {
     return { status: 'invalid_contract', errors: validation.errors, contractPath, ledgerPath };
   }
 
+  // Gate D is a mechanical owning consumer, before adapters or generic evidence.
+  if (contract.loop === 'gate-d') {
+    if (contract.current_stage_or_rail !== 'GATE_D') return { status: 'invalid_contract', errors: ['gate-d requires GATE_D; migrate the historical report-only run explicitly'], contractPath, ledgerPath };
+    contract.gate_d_dir = options.gateDDir || contract.gate_d_dir || contract.input_artifact;
+    contract.verification_run_dir = options.verificationRunDir || contract.verification_run_dir;
+    const promptPath = materializeStagePrompt(contract, { ...options, contractPath, slug }).promptPath;
+    const acceptance = contract.verification_run_dir
+      ? require('./gate-d-acceptance.cjs').accept({ ...options, root: contract.repository_root, reportDir: contract.gate_d_dir, verificationRunDir: contract.verification_run_dir })
+      : { report_validity: 'invalid', outcome_acceptance: 'blocked', errors: ['--verification-run-dir must name the existing accepted verifier run'] };
+    const passed = acceptance.outcome_acceptance === 'passed';
+    const status = passed ? 'gate_d_passed' : 'blocked_gate_d';
+    appendLedger(ledgerPath, { stage: 'GATE_D', event: 'gate_d_consumer', ...acceptance, result: passed ? 'pass' : 'fail', prompt_path: promptPath });
+    contract.terminal_status = passed ? 'handoff' : 'blocked';
+    contract.next_gate = passed ? 'required outcome accepted; normal release authority remains separate' : 'repair named outcome or evidence; rerun Gate D';
+    recordRunState(contract, { contractPath, ledgerPath, status, stopReason: passed ? 'outcome_accepted' : 'gate_d_outcome_blocked' });
+    writeYaml(contractPath, { run_contract: contract });
+    return { status, acceptance, promptPath, contractPath, ledgerPath };
+  }
+
   if (['spec-build', 'feature-build'].includes(contract.loop)) {
     let record;
     try {
@@ -2674,6 +2732,7 @@ function isTerminalStatus(status) {
     'model_confirmation_required',
     'blocked_verification_required',
     'blocked_verifier_stage',
+    'blocked_gate_d', 'gate_d_passed',
     'dry_run',
     'blocked_specification',
     'planning_complete', 'scoped_review_required',
@@ -2759,8 +2818,12 @@ function cli(argv = process.argv.slice(2)) {
       result = runVerifierStage({ ...opts, root: opts.repoRoot || process.cwd(), requiredMode: 'always', makerClaim: 'verification_requested' });
       console.log(JSON.stringify(result, null, 2));
       return result.gate === 'pass' ? 0 : 1;
+    } else if (loop === 'gate-d') {
+      result = opts.untilTerminal ? runUntilTerminal({ ...opts, loop }) : runLoop({ ...opts, loop });
+      console.log(JSON.stringify(result, null, 2));
+      return result.status === 'gate_d_passed' ? 0 : 1;
     } else if (loop === 'trace') {
-      result = verifierTrace({ runDir: opts.runDir, contract: opts.contract, ledger: opts.ledger });
+      result = verifierTrace({ ...opts, root: opts.repoRoot || process.cwd() });
     } else if (opts.setupRouting) {
       result = installDefaultAdapterRouting(opts);
     } else {
@@ -2873,6 +2936,7 @@ module.exports = {
   verifierRequiredForSlice,
   verifierGateDecision,
   runVerifierStage,
+  revalidateVerifierStage,
   assertModelHonesty,
   recordModelHonesty,
   costAccounting,

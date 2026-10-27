@@ -112,6 +112,7 @@ function fileHash(root,relative) {
 function binding(check,contract,options) {
  const root=path.resolve(options.root||process.cwd());
  if(contract.outcome_contract) {
+  if(!check.configuration_ids?.includes(options.configurationId))throw Error(`unsupported ${check.execution?.seam_ids?.length?'data seam':'native'} configuration: ${check.id} is not applicable to ${options.configurationId}`);
   const bound=outcome.bind(contract,{...options,root});
   if(bound.status!=='bound')throw Error(bound.errors.join('; '));
   // #132 binds the parent inventory; native test files are also mandatory
@@ -154,8 +155,8 @@ function execute(check,options={}) {
  const root=path.resolve(options.root||process.cwd()),contract=options.verificationContract;
  let dir,before,identity,comparisons,seams;
  try {
-  comparisons=oracleComparison.select(contract,check);
-  const selectedSeams=dataSeams.selectedForCheck(contract,check);
+  comparisons=oracleComparison.select(contract,check,options.configurationId);
+  const selectedSeams=dataSeams.selectedForCheck(contract,check,options.configurationId);
   if(selectedSeams.length) {
    seams=dataSeams.inspect(contract,root,{phase:'built',configurationId:options.configurationId});
    const missing=selectedSeams.find(s=>!seams.data_seams.some(current=>current.id===s.id));
@@ -168,7 +169,7 @@ function execute(check,options={}) {
  }catch(error){return{executable:false,result:'blocked',reason:`native execution unavailable: ${error.message}`};}
  const reportPath=path.join(dir,'native-report.json'),stdoutPath=path.join(dir,'stdout.txt'),stderrPath=path.join(dir,'stderr.txt'),observationsPath=path.join(dir,'observations.json');
  const args=check.execution.adapter==='jest'?[identity.entry,...check.execution.args,'--ci','--runInBand','--cacheDirectory',path.join(dir,'cache'),'--coverageDirectory',path.join(dir,'coverage'),'--runTestsByPath',...check.execution.test_files,'--json','--outputFile',reportPath]:[identity.entry,'test',...check.execution.test_files,...check.execution.args,'--output',path.join(dir,'artifacts'),'--reporter=json'];
- const nativeEnv={...process.env,PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never',SPECFLOW_OBSERVATIONS_PATH:comparisons.length?observationsPath:''};
+ const nativeEnv={...process.env,PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never',SPECFLOW_OBSERVATIONS_PATH:comparisons.length?observationsPath:'',SPECFLOW_CONFIGURATION_ID:before.configuration_id,SPECFLOW_ENVIRONMENT:before.environment};
  // A new Playwright CLI is not running inside its caller's Jest worker.
  if(check.execution.adapter==='playwright')delete nativeEnv.JEST_WORKER_ID;
  const startedAt=new Date().toISOString(),res=cp.spawnSync(process.execPath,args,{cwd:root,env:nativeEnv,encoding:'utf8',timeout:(check.timeout_seconds||120)*1000,maxBuffer:16*1024*1024});
