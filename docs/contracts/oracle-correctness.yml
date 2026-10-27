@@ -1,0 +1,44 @@
+contract_meta:
+  id: oracle_correctness
+  version: 1
+  created_from_spec: 'GitHub #70/#131'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: oracle_correctness'
+invariants:
+  - id: PC-001
+    rule: >-
+      independent correctness: For each required value-bearing outcome, its accepted verification contract
+      names the independent expected-result method/reference and comparison semantics. It cannot derive
+      “expected” solely by rereading the result under test or by calling the same implementation.
+  - id: PC-002
+    rule: >-
+      provenance: Runtime evidence links the permitted input/source through the actual transformation and
+      output. Persistence or a source label alone is not provenance proof.
+  - id: PC-003
+    rule: >-
+      consistency: Verify that applicable UI/API/ledger/explanation consumers use the correct produced result
+      and required record identity/version. Agreement between consumers is a separate claim from correctness.
+  - id: PC-004
+    rule: >-
+      legitimate fixtures: Explicitly labelled deterministic synthetic inputs and reviewed expected literals
+      are allowed in isolated tests. A hard-coded implementation answer or substituted dependency cannot
+      satisfy a contract that requires the real path. Static literal/mock scanning is a risk signal, not the
+      behavioural verdict.
+  - id: PC-005
+    rule: >-
+      precise results: Use an exact documented status enum; reject unknown/malformed values rather than prefix
+      matching. Consume case-level comparison results from the existing independently executed verifier
+      (#44/#102), bound to the accepted oracle and source identities, not a maker-authored result:pass field.
+  - id: PC-006
+    rule: >-
+      oracle changes: Failed comparisons cannot be repaired by silently changing expected values. Use the
+      existing amendment/authority path, record why the reference changed and rerun affected checks. Approved
+      normalisation/rounding/tolerances must be explicit before comparison; unexplained differences fail.
+test_hooks:
+  tests:
+    - file: tests/contracts/oracle-correctness.test.js
+    - file: tests/contracts/provenance-gate.test.js
+    - file: tests/contracts/outcome-assurance.test.js

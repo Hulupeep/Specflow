@@ -1292,7 +1292,9 @@ function runVerifierStage(options = {}) {
     record('blocked', { reason });
     return { status: 'blocked', required, gate: 'blocked', reason };
   }
-  const valueBearing = options.valueBearing === true || sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t));
+  const valueBearing = options.valueBearing === true || sliceTags.some((t) => VERIFIER_VALUE_BEARING_TAGS.includes(t))
+    || contractGate.contract.outcome_contract?.obligations.some(o => o.required && o.value_bearing);
+  const comparisonGap = valueBearing && !contractGate.contract.outcome_contract?.obligations.some(o => o.required && o.value_bearing && o.oracle.comparisons?.length);
   const validation = validateRuntimeChecks(checks, { uiOrWorkflow: true, valueBearing });
   if (!validation.ok) {
     record('blocked', { reason: validation.errors.join('; ') });
@@ -1305,19 +1307,27 @@ function runVerifierStage(options = {}) {
   });
   const latest = requireAcceptedVerificationContract(options);
   const unchangedAcceptance = latest.accepted && outcomeContract.hashValue(latest.contract) === outcomeContract.hashValue(contractGate.contract);
-  const gate = unchangedAcceptance ? verifierGateDecision(findings, checks, { ...options, requireOwning: true, verificationContract: contractGate.contract, executionToken }) : 'blocked';
+  const nativeGate = unchangedAcceptance ? verifierGateDecision(findings, checks, { ...options, requireOwning: true, verificationContract: contractGate.contract, executionToken }) : 'blocked';
+  const gate = comparisonGap && nativeGate === 'pass' ? 'blocked' : nativeGate;
   const checkResults = Object.fromEntries(findings.map(f => [f.check_id, !unchangedAcceptance ? 'stale' : f.verifier_result === 'pass' ? 'passed' : f.verifier_result === 'fail' ? 'failed' : /stale/.test(f.reason || '') ? 'stale' : 'missing']));
+  const proofClaims = Object.fromEntries(['behaviour', 'correctness', 'provenance', 'consistency'].map(kind => {
+    const states = checks.filter(c => c.required && (c.execution?.claim_kind || 'behaviour') === kind).map(c => checkResults[c.id] || 'missing');
+    return [kind, ['failed', 'stale', 'unsupported', 'waived', 'missing'].find(s => states.includes(s)) || (states.length ? 'passed' : 'missing')];
+  }));
   const parent = outcomeContract.readiness(contractGate.contract, { checkStates: checkResults });
   const bound = contractGate.contract.outcome_contract ? outcomeContract.bind(contractGate.contract, options) : null;
-  const reason = unchangedAcceptance ? findings.find(f => f.reason)?.reason || (gate === 'blocked' ? 'required owning evidence missing or became stale; rerun accepted checks' : null) : 'latest verification acceptance changed or was rejected during execution';
+  const reason = unchangedAcceptance ? findings.find(f => f.reason)?.reason
+    || (comparisonGap ? 'value-bearing outcome needs an accepted independent oracle comparison matrix; migrate the verification contract before qualification'
+      : gate === 'blocked' ? 'required owning evidence missing or became stale; rerun accepted checks' : null)
+    : 'latest verification acceptance changed or was rejected during execution';
   record(gate, {
-    contract_sha256: outcomeContract.contractHash(contractGate.contract), check_results: checkResults, parent_outcome: parent,
+    contract_sha256: outcomeContract.contractHash(contractGate.contract), check_results: checkResults, proof_claims: proofClaims, parent_outcome: parent,
     ...(bound?.binding ? { outcome_binding: bound.binding } : {}), reason,
     findings_count: findings.length,
     divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,
   });
   const nextCommand = ['specflow', 'run', 'verify', '--run-dir', paths.baseDir, ...(options.configurationId ? ['--configuration-id', options.configurationId] : []), ...(options.environment ? ['--environment', options.environment] : [])].map(shellQuote).join(' ');
-  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
+  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, proof_claims: proofClaims, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
 }
 
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
@@ -1384,6 +1394,7 @@ function verifierTrace(options = {}) {
 
   let retained; try { retained = JSON.parse(readFileSync(paths.contractPath, 'utf8')); } catch { retained = null; }
   let parentOutcome = outcomeContract.readiness(contractGate.contract || retained);
+  let proofClaims = Object.fromEntries(['behaviour', 'correctness', 'provenance', 'consistency'].map(kind => [kind, 'missing']));
   if (!contractGate.accepted && retained?.outcome_contract) parentOutcome = { ...parentOutcome, status: 'blocked', reason: contractGate.reason };
   if (contractGate.accepted && contractGate.contract.outcome_contract) {
     const previous = last(e => e.event === 'verifier_stage' && e.outcome_binding)?.outcome_binding;
@@ -1397,13 +1408,16 @@ function verifierTrace(options = {}) {
       : { status: current.status === 'unsupported' ? 'unsupported' : 'stale', reason: current.errors.join('; ') };
     parentOutcome.binding_status = fresh.status;
     parentOutcome.reason = fresh.reason || null;
+    if (['stale', 'unsupported'].includes(fresh.status)) proofClaims = Object.fromEntries(Object.keys(proofClaims).map(kind => [kind, fresh.status]));
     if (['stale', 'unsupported'].includes(fresh.status)) parentOutcome.obligations = outcomeContract.projectObligations(contractGate.contract, { state: fresh.status });
     const latestStage = last(e => e.stage === 'verifier_stage' && ['verifier_stage', 'verifier_skip_override'].includes(e.event));
     if (latestStage?.check_results && fresh.status === 'current' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
       parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { checkStates: latestStage.check_results }) };
+      proofClaims = latestStage.proof_claims || proofClaims;
     }
     if (latestStage?.event === 'verifier_skip_override' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
       parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { state: 'waived' }) };
+      proofClaims = Object.fromEntries(Object.keys(proofClaims).map(kind => [kind, 'waived']));
     }
   }
 
@@ -1419,6 +1433,7 @@ function verifierTrace(options = {}) {
     divergence,
     missing_evidence: missingEvidence,
     parent_outcome: parentOutcome,
+    proof_claims: proofClaims,
     sends_transcript_to_provider: false,
   };
 }

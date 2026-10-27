@@ -2,9 +2,8 @@
 /**
  * provenance-gate.cjs — reusable source-provenance gate for feature-build.
  *
- * The gate rejects empty "trust me" evidence and obvious mock/literal laundering
- * in provenance notes. It is intentionally structural: feature-specific truth is
- * carried by source_provenance rows that name source and verification.
+ * Declaration lint rejects missing fields/statuses. Text scans are advisory
+ * review signals; current owning native checks establish feature-specific truth.
  */
 
 const { readFileSync, existsSync } = require('fs');
@@ -16,6 +15,7 @@ function loadJson(path) {
 
 function auditProvenance(doc) {
   const violations = [];
+  const signals = [];
   const rows = doc && Array.isArray(doc.source_provenance) ? doc.source_provenance : [];
   if (!rows.length) violations.push('source_provenance must contain at least one row');
   rows.forEach((row, index) => {
@@ -25,15 +25,16 @@ function auditProvenance(doc) {
     if (!row.verification) violations.push(`${prefix}.verification is required`);
     const text = `${row.claim || ''} ${row.source || ''} ${row.verification || ''}`;
     if (/\b(mock|fake|stub|fixture)\b/i.test(text) && !/fake provider|fixture.*default|contract-allowed|opt-in/i.test(text)) {
-      violations.push(`${prefix} appears to rely on mock/fake/stub evidence without an explicit allowance`);
+      signals.push(`${prefix} mentions mock/fake/stub evidence without an explicit allowance; review the accepted runtime boundary`);
     }
   });
-  if (doc.result && !/^pass|passed$/i.test(doc.result)) violations.push(`result is not pass: ${doc.result}`);
-  return { ok: violations.length === 0, violations };
+  if (!['pass', 'passed'].includes(doc?.result)) violations.push(`result must be exact pass|passed: ${String(doc?.result)}`);
+  return { ok: violations.length === 0, violations, signals, scope: 'declaration-lint', behaviour: 'unverified' };
 }
 
 function auditDiffText(diffText, options = {}) {
   const violations = [];
+  const signals = [];
   const allowPattern = /specflow-provenance-allow|contract-allowed|fake provider|fixture default|opt-in smoke/i;
   const suspiciousLiteral = /(region_code|price|amount|total|rate|email|phone|postal|zipcode|zip|address|apiKey|token)\s*[:=]\s*['"`][^'"`]+['"`]/i;
   let currentFile = null;
@@ -47,14 +48,14 @@ function auditDiffText(diffText, options = {}) {
     if (currentFile && /(^docs\/|^evidence\/|\.md$|\.mdx$)/i.test(currentFile)) return;
     if (allowPattern.test(line)) return;
     if (/\b(mock|fake|stub)\b/i.test(line)) { // specflow-provenance-allow: scanner owns banned term matching
-      violations.push(`diff line ${index + 1} adds mock/fake/stub path without explicit allowance`); // specflow-provenance-allow: scanner diagnostic
+      signals.push(`diff line ${index + 1} adds mock/fake/stub path without explicit allowance`); // specflow-provenance-allow: scanner diagnostic
     }
     if (suspiciousLiteral.test(line) && !/source_provenance|provenance|test|fixture/i.test(line)) {
-      violations.push(`diff line ${index + 1} adds a value-bearing literal without source provenance`);
+      signals.push(`diff line ${index + 1} adds a value-bearing literal; review its purpose and accepted runtime proof`);
     }
   });
   if (options.requireDiff && !String(diffText || '').trim()) violations.push('diff audit requested but diff is empty');
-  return { ok: violations.length === 0, violations };
+  return { ok: violations.length === 0, violations, signals, scope: 'source-scan', behaviour: 'unverified' };
 }
 
 function gitDiffText({ staged = false } = {}) {
@@ -91,18 +92,19 @@ function main(argv = process.argv.slice(2)) {
       return 2;
     }
     const diffResult = auditDiffText(readFileSync(diffPath, 'utf8'), { requireDiff: true });
-    result = { ok: result.ok && diffResult.ok, violations: [...result.violations, ...diffResult.violations] };
+    result = { ...result, ok: result.ok && diffResult.ok, violations: [...result.violations, ...diffResult.violations], signals: [...result.signals, ...diffResult.signals] };
   }
   if (argv.includes('--git-diff') || argv.includes('--staged-diff')) {
     try {
       const diffResult = auditDiffText(gitDiffText({ staged: argv.includes('--staged-diff') }), { requireDiff: false });
-      result = { ok: result.ok && diffResult.ok, violations: [...result.violations, ...diffResult.violations] };
+      result = { ...result, ok: result.ok && diffResult.ok, violations: [...result.violations, ...diffResult.violations], signals: [...result.signals, ...diffResult.signals] };
     } catch (e) {
       result = { ok: false, violations: [...result.violations, e.message] };
     }
   }
   if (result.ok) {
-    console.error('✓ provenance gate passed');
+    console.error('✓ provenance declarations valid; correctness remains unverified without owning runtime comparisons');
+    for (const signal of result.signals || []) console.error(`Review signal: ${signal}`);
     return 0;
   }
   console.error('✗ provenance gate failed:');

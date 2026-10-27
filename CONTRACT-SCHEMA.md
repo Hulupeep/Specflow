@@ -1641,3 +1641,103 @@ Native suite integration into the private holdout path is tracked by #178 and
 is required before claiming that protection for Improve product qualification.
 Existing scientific/custom atomic oracles remain supported at their declared
 evidence strength; their numeric Improve levels are not native boundary levels.
+
+## Independent value comparisons (#70)
+
+Native execution alone does not establish that a business result is correct.
+For each required value-bearing outcome, declare `value_bearing: true`, an
+independently reviewed expected-reference method, and a comparison matrix inside
+its existing `outcome_contract.obligations[].oracle`. This location binds the
+pointer, operator, tolerance and native case mapping to the same protected oracle
+amendment as its bytes. Changing execution plumbing still uses normal independent
+verifier acceptance; lowering the expected rule requires the existing authority.
+
+This is an excerpt of the existing outcome/check shapes; all named companion
+checks must also be supplied with their native inventory and ordinary bindings:
+
+```json
+{
+  "obligation": {
+    "id": "O-AMOUNT", "required": true, "value_bearing": true,
+    "required_claims": ["correctness", "provenance", "consistency"],
+    "check_ids": ["C-correctness", "C-provenance", "C-consistency"],
+    "level": "process", "configuration_ids": ["local"],
+    "oracle": {
+      "path": "fixtures/expected.json", "sha256": "<accepted file SHA-256>",
+      "method": {"kind": "independent_fixture", "reference": "Reviewed independent derivation and its source"},
+      "comparisons": [{
+        "id": "CV-AMOUNT", "check_id": "C-correctness",
+        "case_id": "tests/amount.test.js::computes the accepted input",
+        "expected_pointer": "/amount", "operator": "exact"
+      }]
+    }
+  },
+  "correctness_check_execution": {
+    "adapter": "jest", "test_files": ["tests/amount.test.js"],
+    "required_case_ids": ["tests/amount.test.js::computes the accepted input"],
+    "optional_case_ids": [], "args": [],
+    "claim_kind": "correctness", "comparison_ids": ["CV-AMOUNT"]
+  }
+}
+```
+
+Required claims include correctness and provenance. Include consistency when
+there are applicable consumers/persisted counterparts; otherwise record an
+accepted `consistency_not_applicable_reason`. Each required claim maps to its own
+required executed check with `execution.claim_kind`. Correctness checks select
+an exact `execution.comparison_ids` subset of the protected matrix. IDs must join
+accepted required native cases. Unknown, duplicated, dropped or unused mappings
+block. Older strict runtimes reject the capability rather than ignoring it.
+Declared value-bearing work without this mapping cannot qualify through legacy
+provenance declarations or an otherwise passing native test.
+
+The executor supplies a fresh private `SPECFLOW_OBSERVATIONS_PATH`. A reviewed
+native test runs the real contracted boundary and writes an observation array:
+
+```json
+[{"comparison_id":"CV-AMOUNT","actual":900}]
+```
+
+The executor reads the already hash-bound expected artifact and compares actual
+values itself. Observations cannot supply a pass verdict or alternate expected
+value. Missing/unknown/duplicate observations, unsafe files, a skipped required
+native case or an ambiguous retry cannot pass. The raw observation hash and
+expected/actual comparison results are part of the existing execution receipt;
+editing a saved observation invalidates ownership. An independently supplied
+observation file or parser result has no execution authority.
+
+The first expected-reference adapter is JSON with strict JSON Pointer escaping.
+Missing is distinct from present `null`; object order is irrelevant, array order
+and JSON types are significant, and values are never coerced. `exact` forbids a
+tolerance. `numeric` requires finite numeric operands and an explicit finite,
+nonnegative `absolute_tolerance`, with an inclusive bound. No default epsilon,
+relative tolerance, decimal library or undeclared normalisation is implied.
+
+Comparison cases currently require one unambiguous native invocation. Multiple
+Jest invocations or Playwright result attempts block the comparison with the
+specific ambiguity, while retaining native history. A fresh outer verification
+attempt remains supported. Native checks without comparisons retain #44's
+accepted retry accounting. These are evidence-correlation limits, separate from
+subscription effort or monetary policy.
+
+`proof_claims` reports correctness, provenance and consistency separately in the
+runner/trace. A wrong answer can have passing provenance and consistency; that
+still fails correctness. Provenance checks exercise the permitted input through
+the actual transformation/output; consistency checks include applicable record
+identity/version as well as the value. Stale bindings and explicit waivers stay
+visible. This projection does not grant the final parent acceptance owned by #73.
+
+`provenance-gate.cjs` remains structural declaration/diff lint. Its exact legacy
+success statuses are `pass` and `passed`; prefixes, suffixes and uppercase aliases
+are invalid. Valid declarations do not authenticate runtime correctness. Reviewed
+synthetic inputs and independent expected literals are legitimate isolated
+oracles. Static literal/mock scans identify review risks; they cannot certify or
+reject actual boundary coverage by themselves. Prohibited substitutions remain
+insufficient for a required real integration path.
+
+An accepted method/reference and immutable file hash do not mechanically prove
+that the author derived an oracle independently. The independent verifier must
+review that derivation and challenge circular references and constant-answer
+counterexamples. An authorised amendment alone does not refresh old evidence:
+rerun the affected current native comparisons. Improve's private native-holdout
+bridge remains tracked by #178; this schema does not silently enable it.

@@ -17,12 +17,16 @@ const localPath = text.refine(p => !path.isAbsolute(p) && !p.split(/[\\/]/).some
 const unique = schema => z.array(schema).refine(a => new Set(a).size === a.length, 'duplicate entry');
 const level = z.enum(['unit', 'process', 'integration', 'journey']);
 const obligationStateSchema = z.enum(['missing', 'failed', 'stale', 'unsupported', 'waived', 'passed']);
+const comparisons = require('./oracle-comparison.cjs').schema(z);
 const outcomeSchema = z.strictObject({
   version: z.literal(1), goal: text,
   configurations: z.array(z.strictObject({ id: text, environment: text })).min(1),
   assumptions: unique(text), unknowns: unique(text), non_goals: unique(text),
   obligations: z.array(z.strictObject({
-    id: text, required: z.boolean(), oracle: z.strictObject({ path: localPath, sha256: digest }),
+    id: text, required: z.boolean(), oracle: z.strictObject({ path: localPath, sha256: digest,
+      method: comparisons.method.optional(), comparisons: comparisons.comparisons.optional() }),
+    value_bearing: z.boolean().optional(), required_claims: comparisons.claims.optional(),
+    consistency_not_applicable_reason: text.optional(),
     check_ids: unique(text).refine(a => a.length > 0, 'check IDs required'),
     level, configuration_ids: unique(text).refine(a => a.length > 0, 'configuration IDs required'),
   })).min(1),
@@ -82,6 +86,7 @@ function validate(contract) {
       }
     }
   }
+  require('./oracle-comparison.cjs').validateDeclarations({ ...contract, outcome_contract: outcome }, errors);
   return { ok: !errors.length, errors };
 }
 function coverage(contract, documents) {

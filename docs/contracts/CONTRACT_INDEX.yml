@@ -29,3 +29,5 @@ contracts:
     path: docs/contracts/feature_specflow_project.yml
   - id: feature_typesafe_advisory
     path: docs/contracts/feature_typesafe_advisory.yml
+  - id: oracle_correctness
+    path: docs/contracts/oracle-correctness.yml

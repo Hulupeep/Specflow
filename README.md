@@ -6,6 +6,8 @@ LLMs drift. You write a rule; three iterations later the model "helpfully" ignor
 
 ---
 
+Current source also consumes independently reviewed JSON expectations through the owning native verifier, reporting correctness separately from provenance and consistency; see [the comparison schema](CONTRACT-SCHEMA.md#independent-value-comparisons-70). Released-install qualification remains separate.
+
 ## The Problem
 
 ```typescript

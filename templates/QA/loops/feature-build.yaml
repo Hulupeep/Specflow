@@ -63,16 +63,22 @@ rails:                        # advance all unblocked rails in order
     gate: smallest mergeable slice (<1000 lines) makes it pass
   - id: 6_provenance
     gate: >
-      every value-bearing output/assertion is source-proven after implementation:
-      no hard-coded business literals, no mock/fake/stub source in the production or e2e
-      path, and every asserted value has runtime provenance showing:
-      source -> transform -> API/input -> UI/API output -> assertion.
+      value-bearing outcomes have independent correctness comparisons plus separate
+      runtime provenance and applicable consumer consistency checks. Reviewed synthetic
+      inputs and independently expected literals are valid isolated oracles; hard-coded
+      implementation answers and prohibited substituted paths cannot prove real behaviour.
+      Trace permitted source -> actual transform -> output -> assertion, including
+      record identity/version across applicable consumers. Agreement is not correctness.
     do: >
       run data-provenance audit on the diff + e2e run:
       scan changed code/tests for asserted literals copied into implementation/API payloads;
       reject mock/fake/stub adapters on the tested path unless explicitly contract-allowed;
       capture runtime evidence from the real seeded backend/API/query/log; compare the
-      rendered/API value to the source re-read, not to a test literal.
+      rendered/API value to the permitted source re-read for provenance/consistency,
+      and separately compare actual values against the accepted independently reviewed
+      expected reference using the owning native verifier. Bind case IDs, oracle bytes,
+      expected pointers and comparison/tolerance semantics; a required missing comparison
+      blocks. Static literal/mock scans are review signals, never behavioural verdicts.
     evidence: evidence/provenance-${issue}.json
   - id: 7_ci_handoff
     gate: >
@@ -91,8 +97,11 @@ GATE_C:                       # HARD, unfakeable — the only trust gate
   type: hard
   gate: >
     contract + journey tests green on branch-protected CI vs real seeded backend
-    AND provenance audit passes: value-bearing outputs are traced to allowed sources,
-    not literals, mocks, generated fixtures, or hand-written API inputs.
+    AND owning required independent correctness comparisons, source provenance and
+    applicable record/version consistency checks pass with current bound evidence.
+    Explicitly labelled isolated fixtures are allowed at their declared level; prohibited
+    substitutes cannot satisfy a required real backend path. Declaration lint or matching
+    consumers cannot override a failed, missing, skipped or stale comparison.
   read: green → ready-for-review; red → repair (inline if fast, next tick if slow)
 
 repair:
