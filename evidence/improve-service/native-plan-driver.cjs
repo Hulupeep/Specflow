@@ -10,6 +10,7 @@ async function run({service,request,plan,runtimeRoot,host,generation}){
  let current=service.status(request).runs[0],cycle=current.cycles.find(c=>c.id===current.active_cycle);
  if(current.terminal_cycles)return;
  const workerBinding={job_id:'service-'+request.run_id,operation_id:'worker-core-once',core_run_id:'worker-core-once'};
+ if(!cycle&&host.memory&&!current.memory_selection){if(!prepared.memory_selection)fail('memory_selection_required');const selection=read(prepared.memory_selection),receipt=service.selectMemory({...request,request_id:'prepared-memory-selection',expected_revision:service.decisionPack({repo_id:request.repo_id}).revision,selection});if(!receipt.allowed)fail(receipt.reason_code);current=service.status(request).runs[0];}
  if(!cycle){const reserved=service.reserveCycle({...request,binding:workerBinding});if(!reserved.allowed)fail(reserved.run.reason_code||'cycle_denied');cycle=reserved.cycle;}
  const binding={...request,cycle_id:cycle.id,worker_binding:workerBinding},configFile=path.join(root,'bin/job.json');
  if(!fs.existsSync(path.join(root,'bound-configuration.json'))){

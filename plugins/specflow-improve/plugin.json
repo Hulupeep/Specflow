@@ -1,0 +1,21 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "specflow-improve",
+  "version": "0.1.2",
+  "description": "Use one authenticated Improve service and recover evidence-backed tasks across agent roles.",
+  "author": {
+    "name": "Specflow"
+  },
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Specflow Improve",
+        "shortDescription": "Trusted repo improvement",
+        "longDescription": "Thin local caller for the existing qualified Improve service. Execution and publication authority remain separately configured.",
+        "developerName": "Specflow",
+        "category": "Productivity",
+        "defaultPrompt": "Recover the configured Improve task and report its evidence and next action."
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "name": "specflow-repo",
+  "owner": {
+    "name": "Specflow"
+  },
+  "plugins": [
+    {
+      "name": "specflow-improve",
+      "source": "./plugins/specflow-improve",
+      "version": "0.1.2",
+      "description": "Thin authenticated Improve caller"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+  "mcpServers": {
+    "improve": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "${PLUGIN_ROOT}/lib/bridge.cjs"
+      ],
+      "cwd": "${PLUGIN_ROOT}",
+      "env": {
+        "SPECFLOW_IMPROVE_CLIENT_CONFIG": "${PLUGIN_DATA}/connection/client.json"
+      }
+    }
+  }
+}

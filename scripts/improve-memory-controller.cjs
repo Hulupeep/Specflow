@@ -80,7 +80,10 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
       m.need(data.consumed_observations.every(id=>all.some(e=>e.hash===id)),'memory_citation_unavailable');
       const prior=all.filter(e=>group.has(e.data.family_key)&&((e.kind==='command'&&e.data.type==='selection'&&e.data.result.allowed)||e.kind==='outcome'));
       const pending=prior.find(e=>e.kind==='outcome'&&e.data.decision==='KEEP'&&!all.some(x=>x.data.type==='resolution'&&x.data.outcome_id===e.hash&&['reject_idea','retry_with_new_evidence','accept_baseline'].includes(x.data.action)));
-      let evidence=[],reason=pending?'pending_review':prior.length?'memory_equivalent_attempt':null;
+      let evidence=[],reason=pending?'pending_review':prior.length?'memory_equivalent_attempt':null;let proposalBlocked=false;
+      // Delivered proposals require a fresh, single-use authenticated adapter observation.
+      const delivered=prior.filter(e=>e.kind==='outcome'&&s.runs[e.run_id]?.service?.delivery&&Object.values(s.runs[e.run_id].service.delivery.operations).some(o=>o.purpose==='draft_pr'&&['issued','unknown','confirmed'].includes(o.state)));
+      for(const old of delivered){const d=s.runs[old.run_id].service.delivery,p=d.proposal;if(!p||p.availability!=='confirmed'||!p.fresh_for_selection||now()-p.observed_at_ms>60000){reason='memory_proposal_reconciliation_required';proposalBlocked=true;}else p.fresh_for_selection=false;}
       if(req.selection.retry!==null){
         m.shape(req.selection.retry,['reason','evidence']);m.need(m.text(req.selection.retry.reason),'invalid_memory_retry');
         evidence=m.resolveEvidence(memory,req.selection.retry.evidence,{repoId:r.repo_id,familyKey:data.family_key,paths:data.family.affected_paths,observable:data.family.observable});
@@ -89,13 +92,13 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
         m.need(previous.every(e=>m.sha(e.observation_key)),'memory_legacy_observation_reconciliation_required');
         const previousKeys=new Set(previous.map(e=>e.observation_key));
         m.need(evidence.some(e=>!previousKeys.has(e.observation_key)),'memory_no_new_relevant_evidence');
-        if(!pending)reason=null;
+        if(!pending&&!proposalBlocked)reason=null;
       }
       const lastResolution=all.filter(e=>e.data.type==='resolution'&&group.has(e.data.family_key)&&e.data.action!=='alias_family').at(-1);
       if(lastResolution?.data.action==='reject_idea')reason='memory_owner_rejected';
       if(lastResolution?.data.action==='retry_with_new_evidence'&&
         !lastResolution.data.evidence.some(a=>evidence.some(b=>a.observation_key===b.observation_key)))reason='memory_owner_retry_evidence_required';
-      if(r.reasons.includes('pending_review'))reason='pending_review';
+      if(r.reasons.includes('pending_review')&&!proposalBlocked)reason='pending_review';
       const result={allowed:reason===null,reason_code:reason,evidence_ids:evidence.map(e=>e.id)};
       const receipt=m.finishCommand(s,r.canonical_repo,r.id,actor,req,'selection',{...data,evidence,retry_reason:req.selection.retry?.reason||null},result,now());
       if(result.allowed)r.memory_selection={...data,receipt_id:receipt.id,revision:receipt.revision,actor};
@@ -192,7 +195,7 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
     const all=rows(s,r),outcomes=all.filter(e=>e.run_id===r.id&&e.kind==='outcome');
     return {version:1,support:'structural_family_guard_and_cited_selection',revision:m.revision(s,r.canonical_repo),
       outcomes:outcomes.map(e=>({id:e.hash,code_decision:e.data.decision,verification:e.data.verification,
-        experiment_verdict:all.filter(x=>x.data.outcome_id===e.hash&&x.data.observation?.kind==='experiment').at(-1)?.data.observation.verdict||e.data.experiment_verdict})),
+        experiment_verdict:all.filter(x=>x.data.outcome_id===e.hash&&x.data.observation?.kind==='experiment').at(-1)?.data.observation.verdict||e.data.experiment_verdict,proposal:all.filter(x=>x.kind==='proposal_observation'&&x.data.outcome_id===e.hash).at(-1)?.data.observation||null})),
       limitations:['advisory_untrusted','no_general_semantic_similarity_or_autonomous_learning_claim','KEEP_is_not_demand_or_revenue_proof']};
   }
   return {public:{decisionPack,selectMemory,resolveMemory,observeMemory,validateMemoryStage},beforeCycle,bindCycle,beforeStage,terminal,summary};
