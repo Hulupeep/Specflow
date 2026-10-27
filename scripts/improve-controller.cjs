@@ -185,7 +185,7 @@ class ControllerStore {
       fs.fsyncSync(fd);
       return this.commit(fn, afterCommit);
     } catch (e) {
-      if (e instanceof ControllerError || e instanceof require('./improve-memory.cjs').MemoryError || e instanceof require('./improve-recovery-controller.cjs').RecoveryError) throw e;
+      if (e instanceof require('./improve-service-errors.cjs').ServiceError || e instanceof ControllerError || e instanceof require('./improve-memory.cjs').MemoryError || e instanceof require('./improve-recovery-controller.cjs').RecoveryError) throw e;
       throw new ControllerError('storage_commit_unconfirmed', 'Read the committed request and preserve any uncertain intent; do not replay unknown work.');
     } finally {
       fs.closeSync(fd);
@@ -218,7 +218,7 @@ class ControllerStore {
       const started = afterCommit ? afterCommit(result, s) : undefined;
       return afterCommit ? { result, started } : result;
     } catch (e) {
-      if (e instanceof ControllerError || e instanceof require('./improve-memory.cjs').MemoryError || e instanceof require('./improve-recovery-controller.cjs').RecoveryError) throw e;
+      if (e instanceof require('./improve-service-errors.cjs').ServiceError || e instanceof ControllerError || e instanceof require('./improve-memory.cjs').MemoryError || e instanceof require('./improve-recovery-controller.cjs').RecoveryError) throw e;
       throw new ControllerError(
         'storage_commit_unconfirmed',
         'Read the last committed request using the same ID; preserve any uncertain intent and original limits for #183.'
@@ -303,7 +303,8 @@ function createControllerService({
   simulation = false,
   fault,
   memory,
-  recovery
+  recovery,
+  serviceBinding
 } = {}) {
   need(
     typeof resolvePrincipal === 'function' && typeof hostCapabilities === 'function' && id(ownerPrincipal),
@@ -1007,30 +1008,17 @@ function createControllerService({
       return view(r, now());
     }, null, false, true);
   }
+  function cancelIn(s,r,ctx){
+    recoveryService.guard(r,ctx,{control:true,historical:true});
+    r.cancel_requested=true;r.stopped_at_ms??=now();r.reasons=[...new Set(['operator_cancelled',...r.reasons])];r.state=r.active_cycle?'cancelling':'stopped';
+    if(!r.active_cycle&&!r.operations.some(o=>o.state==='reserved')&&!r.reasons.includes('pending_review')&&s.owners[r.canonical_repo]===r.id)delete s.owners[r.canonical_repo];
+    event(s,'cancel_requested',r.id);return view(r,now());
+  }
   function cancel(req) {
-    shape(req, ['repo_id', 'run_id']);
-    return access(req.repo_id, false, null, (ctx) => {
-      need(
-        profileService.inspect({ repo_id: req.repo_id }).operations.includes('execute'),
-        'authority_revoked'
-      );
-      return store.change((s) => {
-        const r = run(s, req.repo_id, req.run_id, ctx.principal);
-        recoveryService.guard(r, ctx, { control: true, historical: true });
-        r.cancel_requested = true;
-        r.stopped_at_ms ??= now();
-        r.reasons = [...new Set(['operator_cancelled', ...r.reasons])];
-        r.state = r.active_cycle ? 'cancelling' : 'stopped';
-        if (
-          !r.active_cycle &&
-          !r.operations.some((o) => o.state === 'reserved') &&
-          !r.reasons.includes('pending_review') &&
-          s.owners[r.canonical_repo] === r.id
-        )
-          delete s.owners[r.canonical_repo];
-        event(s, 'cancel_requested', r.id);
-        return view(r, now());
-      });
+    shape(req,['repo_id','run_id']);
+    return access(req.repo_id,false,null,ctx=>{
+      need(profileService.inspect({repo_id:req.repo_id}).operations.includes('execute'),'authority_revoked');
+      return store.change(s=>cancelIn(s,run(s,req.repo_id,req.run_id,ctx.principal),ctx));
     });
   }
   function controlSchedule(req) {
@@ -1121,7 +1109,9 @@ function createControllerService({
   const memoryService = require('./improve-memory-controller.cjs').attach({
     store, access, ownerPrincipal, now, memory, guardWrite: recoveryService.guard
   });
+  const serviceExtension = require('./improve-service-controller.cjs').attach({store,access,admitIn,cancelIn,now,need,serviceBinding,ownerPrincipal,scoped:Boolean(recovery?.scope),canControl:repo=>profileService.inspect({repo_id:repo}).operations?.includes('execute')});
   return {
+    ...serviceExtension,
     migrate,
     registerPolicy,
     report,

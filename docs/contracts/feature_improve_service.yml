@@ -1,0 +1,34 @@
+contract_meta:
+  id: feature_improve_service
+  version: 1
+  created_from_spec: "GitHub #218; docs/specs/improve-service/preparation.md"
+  covers_reqs: [REQ-SERVICE-01, REQ-SERVICE-02, REQ-SERVICE-03, REQ-SERVICE-04, REQ-SERVICE-05, REQ-SERVICE-06, REQ-SERVICE-07, REQ-SERVICE-08, REQ-SERVICE-09, REQ-SERVICE-10, REQ-SERVICE-11, REQ-SERVICE-12, REQ-SERVICE-13, REQ-SERVICE-14, REQ-SERVICE-15, REQ-SERVICE-16, REQ-SERVICE-17, REQ-SERVICE-18, REQ-SERVICE-19, REQ-SERVICE-20]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_improve_service"
+invariants:
+  - id: I-SERVICE-001
+    rule: "Trusted request-scoped credential principal/role/holder/revision must match current assignment and repo/action grants before private lookup or control. Old credentials are never relabelled; inaccessible known/unknown resources share denial. Creator-only v1 never proxies noncreator authorship."
+    tests: [SERVICE-AUTH, SERVICE-ROLE, SERVICE-SCHEMA]
+  - id: I-SERVICE-002
+    rule: "Original canonical retry reservation, stable task/experiment/source/contract claim and pending dispatch commit atomically with existing controller admission before acknowledgement. Duplicate/changed/default/racing requests cannot create another worker or change immutable blocked receipts."
+    tests: [SERVICE-CLAIM, SERVICE-COMMIT, SERVICE-RETRY, SERVICE-ASYNC]
+  - id: I-SERVICE-003
+    rule: "Accepted host execution authority is distinct from client credentials. Dispatch and restart reuse original assignment/generation/paused release and exact receipts, never queue timeout or a second recovery truth. Every control retry reuses its durably bound original generation/command; no replay of uncertainty or consumed holdout."
+    tests: [SERVICE-CRASH, SERVICE-RECOVER, SERVICE-ROLE, SERVICE-RETRY]
+  - id: I-SERVICE-004
+    rule: "CLI/API/MCP share authenticated report identity/revision, original limits/consumption, actual blocker/failed check and one next actor. Historical code decision, current retained improvement, experiment validity and delivery are distinct. Known failed complete work never requests uncertain-receipt reconciliation, including after cancel/deadline."
+    tests: [SERVICE-REPORT, SERVICE-JOURNEY, SERVICE-LOOKUP]
+  - id: I-SERVICE-005
+    rule: "Caller data identifies an owner-registered prepared qualified plan, never commands, filesystem paths, provider/billing overrides or authority. Actual worker/backend/native isolation evidence is required for claimed support. Unsupported combinations block with agent-owned preparation action and zero substitute execution."
+    tests: [SERVICE-PREFLIGHT, SERVICE-SCHEMA, SERVICE-JOURNEY]
+  - id: I-SERVICE-006
+    rule: "Strict versioned bounded authenticated loopback API/MCP rejects unsafe Host/Origin/payloads. Disconnect does not cancel. Explicit cancellation/horizon stop fresh work/publication but retain finalized results and issued reconciliation. Queue/restart/role replacement never extends original window or resets explicit ceilings/consumption."
+    tests: [SERVICE-CANCEL, SERVICE-WINDOW, SERVICE-SCHEMA, SERVICE-JOURNEY]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-service.test.js
+    - file: tests/integration/improve-mcp.test.js
+    - file: tests/contracts/improve-report.test.js
