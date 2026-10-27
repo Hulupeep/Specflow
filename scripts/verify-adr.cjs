@@ -19,6 +19,7 @@
 
 const { readFileSync, existsSync, readdirSync, statSync } = require('fs');
 const { join } = require('path');
+const { parseTicketDocument } = require('./ticket-document.cjs');
 
 const KNOWN_ADR_DIRS = ['docs/adr', 'docs/adrs', 'docs/ard', 'docs/architecture/decisions', 'docs/architecture', 'adr', 'architecture/decisions'];
 
@@ -90,7 +91,7 @@ function main(argv) {
   if (!dir) { console.error('verify-adr: no ADR folder detected — skipping (this repo does not use ADRs)'); process.exit(0); }
 
   let tickets;
-  try { tickets = JSON.parse(readFileSync(path, 'utf8')); } catch (e) { console.error(`✗ ${e.message}`); process.exit(2); }
+  try { tickets = parseTicketDocument(JSON.parse(readFileSync(path, 'utf8'))).tickets; } catch (e) { console.error(`✗ ${e.message}`); process.exit(2); }
   const adrIds = adrIdsInDir(dir);
   const { ok, violations } = auditAdrCompliance(adrIds, tickets);
   console.error(`verify-adr: ${adrIds.size} ADR(s) in ${dir}, ${tickets.length} ticket(s) checked`);

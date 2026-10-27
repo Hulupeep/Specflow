@@ -79,6 +79,11 @@ rails:                        # advance all unblocked rails in order
       expected reference using the owning native verifier. Bind case IDs, oracle bytes,
       expected pointers and comparison/tolerance semantics; a required missing comparison
       blocks. Static literal/mock scans are review signals, never behavioural verdicts.
+      Required typed data seams resolve their actual built schema facts and protected
+      expected interface through the same accepted parent before native execution.
+      Run the mapped real producer-to-consumer integration check; compatible files
+      alone are not execution. Review changed contracts for undeclared dependencies;
+      unsupported required adapters or missing owners/checks block explicitly.
     evidence: evidence/provenance-${issue}.json
   - id: 7_ci_handoff
     gate: >

@@ -1,0 +1,50 @@
+contract_meta:
+  id: data_seams
+  version: 1
+  created_from_spec: 'GitHub #133/#131'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: data_seams'
+invariants:
+  - id: DS-001
+    rule: >-
+      one seam vocabulary: Extend current writes/reads declarations with stable interface references and
+      producer/consumer ownership for relevant RPCs, API schemas, persisted fields and calculation/evidence
+      records. Reference existing schema/type artifacts rather than copying whole application schemas into
+      Specflow.
+  - id: DS-002
+    rule: >-
+      semantic compatibility: For a declared value-bearing seam, compare the project-supplied schema facts
+      relevant to that contract: type, units, nullability, identity/reference requirements, effective/version
+      semantics and supported revisions. Do not infer semantic equality from matching field names or total
+      numbers.
+  - id: DS-003
+    rule: >-
+      stage-appropriate validation: At Gate B, planned interfaces may name the owning slice and future
+      verification check. At post-code verification, required references must resolve against the actual built
+      schema/contract; unresolved or conflicting required facts block, not warn-green.
+  - id: DS-004
+    rule: >-
+      exercise the connection: A producer/consumer seam touching a required parent obligation derives an
+      integration check/hop with an independent oracle. Two isolated tests against incompatible substitutes do
+      not satisfy it. Use the existing verifier/run registry, not a language-specific new orchestration
+      engine.
+  - id: DS-005
+    rule: >-
+      honest detection boundary: Declare supported artifact formats/adapters and blind spots. An unknown or
+      undeclared required dependency requires review/evidence; the tool must not claim whole-program
+      dependency discovery from regexes. Use changed-file/contract references as review triggers, not proof
+      that no undeclared seam exists.
+  - id: DS-006
+    rule: >-
+      repair without scope theft: A mismatch identifies producer, consumer, actual contract versions and
+      affected parent obligations. It does not silently rewrite schemas, change units, make fields optional or
+      amend the oracle. Integration ownership stays in the existing issue/runtime workflow.
+test_hooks:
+  tests:
+    - file: tests/contracts/data-seams.test.js
+    - file: tests/contracts/verify-seams.test.js
+    - file: tests/contracts/verify-adr.test.js
+    - file: tests/contracts/outcome-assurance.test.js

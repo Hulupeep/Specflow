@@ -25,7 +25,8 @@
  */
 
 const { readFileSync, existsSync, readdirSync, statSync } = require('fs');
-const { join } = require('path');
+const { join, resolve, relative } = require('path');
+const { parseTicketDocument, legacySurfaces } = require('./ticket-document.cjs');
 
 /**
  * Pure seam computation. No IO.
@@ -33,6 +34,10 @@ const { join } = require('path');
  * @returns {{seams: Array<{surface, writers:string[], readers:string[], pairs:string[][], kind}>, derivedHops: object[]}}
  */
 function computeSeams(tickets) {
+  if (!Array.isArray(tickets)) throw Error('legacy seam computation needs a ticket array; use version:2 reader for typed interfaces');
+  for (const ticket of tickets) for (const key of ['writes', 'reads']) {
+    if (ticket?.[key] !== undefined && (!Array.isArray(ticket[key]) || ticket[key].some(surface => typeof surface !== 'string'))) throw Error('typed endpoints require a version:2 tickets envelope; legacy seam computation supports string surfaces only');
+  }
   const bySurface = new Map(); // surface → { writers:Set, readers:Set }
   for (const t of tickets) {
     for (const s of t.writes || []) {
@@ -94,14 +99,14 @@ function main(argv) {
   const args = argv.slice(2);
   const path = args.find(a => !a.startsWith('--'));
   if (!path) { console.error('Usage: node scripts/verify-seams.cjs <tickets.json> [--repo-root .] [--no-resolve]'); process.exit(2); }
-  let tickets;
-  try { tickets = JSON.parse(readFileSync(path, 'utf8')); } catch (e) { console.error(`✗ ${e.message}`); process.exit(2); }
+  let document, tickets;
+  try { document = parseTicketDocument(JSON.parse(readFileSync(path, 'utf8'))); tickets = legacySurfaces(document); } catch (e) { console.error(`✗ ${e.message}`); process.exit(2); }
 
-  const resolve = !args.includes('--no-resolve');
+  const resolveSurfaces = !args.includes('--no-resolve');
   const rootIdx = args.indexOf('--repo-root');
   const root = rootIdx !== -1 ? args[rootIdx + 1] : '.';
 
-  if (resolve) {
+  if (resolveSurfaces) {
     const declared = new Set();
     for (const t of tickets) { (t.writes || []).forEach(s => declared.add(s)); (t.reads || []).forEach(s => declared.add(s)); }
     const unresolved = [...declared].filter(s => !surfaceResolves(s, root));
@@ -112,10 +117,24 @@ function main(argv) {
     }
   }
 
+  let data = null;
+  if (document.version === 2) {
+    try {
+      const at = args.indexOf('--verification-contract'), phaseAt = args.indexOf('--phase');
+      if (at < 0 || !args[at + 1]) throw Error('typed data seams need --verification-contract with protected parent inventory');
+      const contract = JSON.parse(readFileSync(args[at + 1], 'utf8'));
+      const valid = require('./outcome-contract.cjs').validate(contract);
+      if (!valid.ok) throw Error(valid.errors.join('; '));
+      const manifest = relative(resolve(root), resolve(path)).split(require('path').sep).join('/');
+      if (!contract.outcome_contract.data_seams?.some(s => s.manifest_path === manifest)) throw Error('typed manifest is absent from the accepted data seam inventory');
+      data = require('./data-seams.cjs').inspect(contract, resolve(root), { phase: phaseAt < 0 ? 'built' : args[phaseAt + 1] });
+      if (!data.ok) { process.stdout.write(JSON.stringify(data, null, 2) + '\n'); process.exit(1); }
+    } catch (error) { console.error(`✗ ${error.message}`); process.exit(2); }
+  }
   const { seams, derivedHops } = computeSeams(tickets);
   console.error(`seam-lite: ${seams.length} seam(s) across ${tickets.length} tickets`);
   for (const s of seams) console.error(`  ⚠ ${s.surface} — ${s.kind}: ${s.pairs.map(p => p.join('↔')).join(', ')}`);
-  process.stdout.write(JSON.stringify({ seams, derivedHops }, null, 2) + '\n');
+  process.stdout.write(JSON.stringify({ seams, derivedHops: [...derivedHops, ...(data?.derivedHops || [])], ...(data ? { data_seams: data.data_seams, scope: data.scope, phase: data.phase, runtime_status: 'unverified' } : {}) }, null, 2) + '\n');
   process.exit(0);
 }
 

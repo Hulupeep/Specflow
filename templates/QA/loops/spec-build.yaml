@@ -107,6 +107,11 @@ stages:
     do: >
       board-auditor + specflow-uplifter — wire the selected build-ready slice to applicable journey + test + contract references; keep future tickets thin.
       PLUS seam-lite: `node scripts/verify-seams.cjs <tickets.json> --repo-root .` computes the seam graph
+      For version-2 typed data manifests, forward --phase planned and the existing
+      --verification-contract parent/proposal path. Known incompatible facts block;
+      unresolved future built references stay explicitly planned with owners/checks.
+      Review changed schema/type/consumer contracts for undeclared required connections:
+      this is declared coverage, and zero seams is not proof of whole-program safety.
       (writer×writer AND writer×reader pairs on shared surfaces) and ERRORS on any declared
       surface not found in the repo (no silent zero-seam runs). Derived hops are appended to
       ${hops_artifact} — the integration walk is DERIVED from seams, not remembered.

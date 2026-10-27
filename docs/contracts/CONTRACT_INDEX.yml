@@ -31,3 +31,5 @@ contracts:
     path: docs/contracts/feature_typesafe_advisory.yml
   - id: oracle_correctness
     path: docs/contracts/oracle-correctness.yml
+  - id: data_seams
+    path: docs/contracts/data-seams.yml

@@ -5,6 +5,7 @@
 const fs=require('fs'),path=require('path'),cp=require('child_process'),crypto=require('crypto');
 const outcome=require('./outcome-contract.cjs');
 const oracleComparison=require('./oracle-comparison.cjs');
+const dataSeams=require('./data-seams.cjs');
 const issued=new WeakMap();
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const unique=list=>Array.isArray(list)&&list.every(s=>typeof s==='string'&&s.trim())&&new Set(list).size===list.length;
@@ -13,7 +14,8 @@ function validate(check) {
  const e=check?.execution,errors=[];
  if(typeof check?.id!=='string'||!check.id.trim())errors.push('stable runtime check id required');
  if(!e||typeof e!=='object'||Array.isArray(e))return{ok:false,errors:['native execution adapter and accepted case inventory required; revise the verification contract']};
- for(const key of Object.keys(e))if(!['adapter','test_files','required_case_ids','optional_case_ids','args','claim_kind','comparison_ids'].includes(key))errors.push(`unknown execution field: ${key}`);
+ for(const key of Object.keys(e))if(!['adapter','test_files','required_case_ids','optional_case_ids','args','claim_kind','comparison_ids','seam_ids'].includes(key))errors.push(`unknown execution field: ${key}`);
+ if(e.seam_ids!==undefined&&!unique(e.seam_ids))errors.push('seam_ids must be unique accepted data seam IDs');
  if(e.claim_kind!==undefined&&!oracleComparison.KINDS.includes(e.claim_kind))errors.push('unsupported native claim_kind');
  if(e.comparison_ids!==undefined&&!unique(e.comparison_ids))errors.push('comparison_ids must be unique IDs');
  if(e.claim_kind==='correctness'&&!e.comparison_ids?.length)errors.push('correctness requires accepted parent comparison_ids');
@@ -150,9 +152,15 @@ function execute(check,options={}) {
  if(!validation.ok)return{executable:false,result:'blocked',reason:validation.errors.join('; ')};
  if(!options.verificationContract)return{executable:false,result:'blocked',reason:'accepted verification contract required for owning execution'};
  const root=path.resolve(options.root||process.cwd()),contract=options.verificationContract;
- let dir,before,identity,comparisons;
+ let dir,before,identity,comparisons,seams;
  try {
   comparisons=oracleComparison.select(contract,check);
+  const selectedSeams=dataSeams.selectedForCheck(contract,check);
+  if(selectedSeams.length) {
+   seams=dataSeams.inspect(contract,root,{phase:'built',configurationId:options.configurationId});
+   const unproven=seams.data_seams.filter(s=>selectedSeams.some(selected=>selected.id===s.id)&&s.compatibility!=='compatible');
+   if(!seams.ok||unproven.length)throw Error(`data seam compatibility blocked: ${[...seams.errors,...unproven.flatMap(s=>s.errors)].join('; ')}`);
+  }
   before=binding(check,contract,options);identity=framework(root,check.execution.adapter);
   dir=privateDirectory(root,options.runDir||path.join(root,'.specflow/runs/native'));
  }catch(error){return{executable:false,result:'blocked',reason:`native execution unavailable: ${error.message}`};}
@@ -186,6 +194,7 @@ function execute(check,options={}) {
  const receipt={version:1,attempt_id:path.basename(dir),executable:true,...result,reason:result.errors.join('; ')||null,check_id:check.id,verification_level:check.verification_level,boundaries:[...check.boundaries],command:[process.execPath,...args],root,
   started_at:startedAt,finished_at:new Date().toISOString(),exit_code:res.status,framework:identity,host:{platform:process.platform,arch:process.arch,node:process.version},binding_before:before,binding_after:after||null,
   claim_kind:check.execution.claim_kind||'behaviour',
+  ...(seams?{data_seams:seams.data_seams,interface_scope:seams.scope}:{}),
   artifacts:{report:{path:reportPath,sha256:reportBytes?hash(reportBytes):null},stdout:{path:stdoutPath,sha256:hash(res.stdout||'')},stderr:{path:stderrPath,sha256:hash(res.stderr||'')},...(comparisons.length?{observations:{path:observationsPath,sha256:observationBytes?hash(observationBytes):null}}:{})}};
  receipt.evidence_path=path.join(dir,'execution.json');fs.writeFileSync(receipt.evidence_path,JSON.stringify(receipt,null,2),{mode:0o600});
  freeze(receipt);issued.set(receipt,{check:outcome.hashValue(check),contract:outcome.hashValue(contract),root,token:options.executionToken||null,receipt_sha256:hash(fs.readFileSync(receipt.evidence_path))});return receipt;

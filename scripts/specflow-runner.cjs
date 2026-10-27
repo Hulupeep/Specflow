@@ -1309,7 +1309,8 @@ function runVerifierStage(options = {}) {
   const unchangedAcceptance = latest.accepted && outcomeContract.hashValue(latest.contract) === outcomeContract.hashValue(contractGate.contract);
   const nativeGate = unchangedAcceptance ? verifierGateDecision(findings, checks, { ...options, requireOwning: true, verificationContract: contractGate.contract, executionToken }) : 'blocked';
   const gate = comparisonGap && nativeGate === 'pass' ? 'blocked' : nativeGate;
-  const checkResults = Object.fromEntries(findings.map(f => [f.check_id, !unchangedAcceptance ? 'stale' : f.verifier_result === 'pass' ? 'passed' : f.verifier_result === 'fail' ? 'failed' : /stale/.test(f.reason || '') ? 'stale' : 'missing']));
+  const checkResults = Object.fromEntries(findings.map(f => [f.check_id, !unchangedAcceptance ? 'stale' : f.verifier_result === 'pass' ? 'passed' : f.verifier_result === 'fail' ? 'failed' : /stale/.test(f.reason || '') ? 'stale' : /unsupported/.test(f.reason || '') ? 'unsupported' : 'missing']));
+  const seamResults = require('./data-seams.cjs').project(contractGate.contract, checkResults, findings);
   const proofClaims = Object.fromEntries(['behaviour', 'correctness', 'provenance', 'consistency'].map(kind => {
     const states = checks.filter(c => c.required && (c.execution?.claim_kind || 'behaviour') === kind).map(c => checkResults[c.id] || 'missing');
     return [kind, ['failed', 'stale', 'unsupported', 'waived', 'missing'].find(s => states.includes(s)) || (states.length ? 'passed' : 'missing')];
@@ -1321,13 +1322,13 @@ function runVerifierStage(options = {}) {
       : gate === 'blocked' ? 'required owning evidence missing or became stale; rerun accepted checks' : null)
     : 'latest verification acceptance changed or was rejected during execution';
   record(gate, {
-    contract_sha256: outcomeContract.contractHash(contractGate.contract), check_results: checkResults, proof_claims: proofClaims, parent_outcome: parent,
+    contract_sha256: outcomeContract.contractHash(contractGate.contract), check_results: checkResults, proof_claims: proofClaims, data_seams: seamResults, parent_outcome: parent,
     ...(bound?.binding ? { outcome_binding: bound.binding } : {}), reason,
     findings_count: findings.length,
     divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,
   });
   const nextCommand = ['specflow', 'run', 'verify', '--run-dir', paths.baseDir, ...(options.configurationId ? ['--configuration-id', options.configurationId] : []), ...(options.environment ? ['--environment', options.environment] : [])].map(shellQuote).join(' ');
-  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, proof_claims: proofClaims, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
+  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, proof_claims: proofClaims, data_seams: seamResults, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
 }
 
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
@@ -1395,6 +1396,7 @@ function verifierTrace(options = {}) {
   let retained; try { retained = JSON.parse(readFileSync(paths.contractPath, 'utf8')); } catch { retained = null; }
   let parentOutcome = outcomeContract.readiness(contractGate.contract || retained);
   let proofClaims = Object.fromEntries(['behaviour', 'correctness', 'provenance', 'consistency'].map(kind => [kind, 'missing']));
+  let seamResults = require('./data-seams.cjs').project(contractGate.contract || retained);
   if (!contractGate.accepted && retained?.outcome_contract) parentOutcome = { ...parentOutcome, status: 'blocked', reason: contractGate.reason };
   if (contractGate.accepted && contractGate.contract.outcome_contract) {
     const previous = last(e => e.event === 'verifier_stage' && e.outcome_binding)?.outcome_binding;
@@ -1409,15 +1411,18 @@ function verifierTrace(options = {}) {
     parentOutcome.binding_status = fresh.status;
     parentOutcome.reason = fresh.reason || null;
     if (['stale', 'unsupported'].includes(fresh.status)) proofClaims = Object.fromEntries(Object.keys(proofClaims).map(kind => [kind, fresh.status]));
+    if (['stale', 'unsupported'].includes(fresh.status)) seamResults = require('./data-seams.cjs').project(contractGate.contract, {}, [], fresh.status);
     if (['stale', 'unsupported'].includes(fresh.status)) parentOutcome.obligations = outcomeContract.projectObligations(contractGate.contract, { state: fresh.status });
     const latestStage = last(e => e.stage === 'verifier_stage' && ['verifier_stage', 'verifier_skip_override'].includes(e.event));
     if (latestStage?.check_results && fresh.status === 'current' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
       parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { checkStates: latestStage.check_results }) };
       proofClaims = latestStage.proof_claims || proofClaims;
+      seamResults = latestStage.data_seams || seamResults;
     }
     if (latestStage?.event === 'verifier_skip_override' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
       parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { state: 'waived' }) };
       proofClaims = Object.fromEntries(Object.keys(proofClaims).map(kind => [kind, 'waived']));
+      seamResults = require('./data-seams.cjs').project(contractGate.contract, {}, [], 'waived');
     }
   }
 
@@ -1434,6 +1439,7 @@ function verifierTrace(options = {}) {
     missing_evidence: missingEvidence,
     parent_outcome: parentOutcome,
     proof_claims: proofClaims,
+    data_seams: seamResults,
     sends_transcript_to_provider: false,
   };
 }
@@ -1450,7 +1456,7 @@ function verifierCommandsForStage(contract, options = {}) {
   }
   if (contract.loop === 'spec-build' && stage === 'GATE_B') {
     return [
-      { name: 'verify-seams', command: `node scripts/verify-seams.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root .` },
+      { name: 'verify-seams', command: `node scripts/verify-seams.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root . --phase planned${contract.verification_contract_path ? ` --verification-contract ${shellQuote(contract.verification_contract_path)}` : ''}` },
       { name: 'verify-adr', command: `node scripts/verify-adr.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root .` },
       { name: 'verify-ticket-journey', command: `node scripts/verify-ticket-journey.cjs ${shellQuote(specDir)} --issues ${shellQuote(join(specDir, 'issues.json'))}` },
       ...(contract.verification_contract_path ? [{ name: 'verify-outcome-coverage', command: `node scripts/verify-graph.cjs ${shellQuote(specDir)} --verification-contract ${shellQuote(contract.verification_contract_path)}` }] : []),
