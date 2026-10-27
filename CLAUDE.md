@@ -83,6 +83,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 
 | Contract | Protects | Rules |
 |----------|----------|-------|
+| `feature_adapter_effort` | Billing-aware adapter/peer guards and honest cost telemetry | I-ADAPTER-EFFORT-001 through I-ADAPTER-EFFORT-005 |
 | `feature_preflight` | Board-auditor compliance | ARCH-001 through ARCH-008 |
 | `feature_spec_density` | Shared tier applicability and evidence-based readiness | I-DENSITY-001 through I-DENSITY-009 |
 | `feature_improve_core` | `specflow improve --once` contract freeze, evidence strength, isolation, Duo rounds, hidden holdout and decision | I-IMPROVE-001 through I-IMPROVE-012 |

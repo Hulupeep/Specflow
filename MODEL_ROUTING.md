@@ -164,35 +164,48 @@ Effort is policy metadata, not a gate. A high-effort model output still has to
 pass Specflow gates, CI, and any human approvals. Provider effort labels can
 change over time, so keep them thin and easy to edit.
 
-## Budget Caps, Quota, And Codex Auth
+## Billing-aware limits and usage
 
-`max_budget_usd` is a **policy cap / quota guard**, not a prediction and not a
-guaranteed charge. It exists so a routed adapter has a ceiling when the provider
-supports budget enforcement or reports metered usage.
+The operator-selected policy may declare `billing: subscription_cli | api | unknown`
+and `cost: ordinary | low_cost | expensive | unknown`. These are declarations,
+not proof of authentication, price or permission to spend. A model name does not
+establish either classification. Unknown stays unknown and grants no paid fallback.
 
-For Codex specifically, billing depends on how the Codex CLI is authenticated:
+Shipped templates have no dollar cap. Ordinary subscription and inexpensive routes
+receive no invented monetary or review-count ceiling. Explicit owner limits remain
+binding. Finite execution windows, stalled progress, provider quota and authentication
+failures are separate causes, not financial exhaustion.
 
-- **Signed in with ChatGPT:** Codex usage counts against your Codex plan
-  quota/credits for that ChatGPT plan or workspace.
-- **Signed in with an API key:** Codex uses normal OpenAI API billing for that
-  Platform organization.
+An expensive API route requires a positive explicit `max_budget_usd` before it can
+start. Claude print supports the native `--max-budget-usd` guard. The Codex adapter
+does not implement an equivalent monetary guard and rejects a configured dollar
+ceiling before invocation; it never claims a metadata value enforces spend. No API
+worker or paid fallback authority is granted by adding classification fields.
 
-So an option like `gpt55-coder, max_budget_usd: 8` should be described as:
+For Improve critique/build, `--peer-policy FILE` accepts a local JSON/YAML object
+containing only `billing`, `cost`, and optional `max_budget_usd`. It cannot select a
+model, transport, tools or permissions. For example, an explicitly bounded operator
+policy can contain:
 
-```text
-gpt55-coder via codex-exec, effort medium, budget cap/quota guard $8.
-If Codex CLI is signed in with ChatGPT, this consumes Codex plan quota/credits,
-not OpenAI API billing.
+```json
+{"billing":"subscription_cli","cost":"ordinary","max_budget_usd":0.5}
 ```
 
-Do not present the cap as "`$8` cost" unless the adapter has actually reported
-metered usage.
+Omit the cap when no owner ceiling is intended; this example is not a default.
+Peer and builder/oracle/judge provenance records declared classification, configured
+cap and enforcement support. Failed, timed-out or error-result peers provide no
+recommendation even when their response includes structured output.
+
+Provider-reported cost is an estimate, never a verified subscription charge or
+invoice. Missing usage remains unknown. Historical journals and pinned runtimes
+retain their original policy. This change does not remove the legacy Improve core's
+four-round limit; that separately tracked #178 work precedes product qualification.
 
 ## Why Confirmation Is Mandatory
 
-Fable/frontier routes are expensive and easy to trigger accidentally in a resumed
-automation. Specflow therefore treats routed provider execution as a human
-spend/quota decision:
+Route confirmation binds the selected execution policy and permission scope.
+It does not infer expense from a model brand. Existing confirmation authority
+continues to apply:
 
 1. Resolve the current loop stage from the durable run contract.
 2. Look up the matching route in `.specflow/adapter-routing.yml`.

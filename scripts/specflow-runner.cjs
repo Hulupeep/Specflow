@@ -9,6 +9,7 @@
 
 const { spawnSync } = require('child_process');
 const routingShadow = require('./typesafe-routing-bridge.cjs');
+const adapterSpend = require('./adapter-spend.cjs');
 const tierPolicy = require('./specflow-tier.cjs');
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
@@ -1678,8 +1679,8 @@ function recordModelConfirmationInvalidation(ledgerPath, contract, fields, statu
 function modelConfirmationPlan(resolved, options = {}) {
   const policy = resolved.policy || {};
   const budgetNote = policy.provider === 'codex-exec'
-    ? 'max_budget_usd is a policy cap/quota guard. If Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing.'
-    : 'max_budget_usd is a policy cap/quota guard, not a guaranteed charge.';
+    ? 'Billing depends on authentication: ChatGPT uses Codex plan quota/credits rather than OpenAI API billing. This adapter has no supported USD guard; an explicit monetary cap blocks invocation. No monetary default is invented.'
+    : 'No default monetary cap. Explicit owner caps are enforced where supported; expensive API routes require one. A provider estimate is not a guaranteed charge or verified invoice.';
   return {
     status: 'model_confirmation_required',
     routing_path: resolved.routingPath,
@@ -1705,8 +1706,8 @@ function modelRoutingBriefing(options = {}, contract = null) {
   if (resolved.status === 'resolved') {
     const policy = resolved.policy || {};
     const budgetNote = policy.provider === 'codex-exec'
-      ? 'max_budget_usd is a policy cap/quota guard. If Codex CLI is signed in with ChatGPT, usage consumes Codex plan quota/credits rather than OpenAI API billing.'
-      : 'max_budget_usd is a policy cap/quota guard, not a guaranteed charge.';
+      ? 'Billing depends on authentication: ChatGPT uses Codex plan quota/credits rather than OpenAI API billing. This adapter has no supported USD guard; an explicit monetary cap blocks invocation. No monetary default is invented.'
+      : 'No default monetary cap. Explicit owner caps are enforced where supported; expensive API routes require one. A provider estimate is not a guaranteed charge or verified invoice.';
     return {
       active: true,
       status: 'active',
@@ -1753,6 +1754,7 @@ function modelRoutingBriefing(options = {}, contract = null) {
 }
 
 function buildAdapterCommand(policy, promptPath) {
+  const spend = adapterSpend.resolve(policy);
   const allowedTools = policy.allowed_tools || [];
   const deniedTools = policy.denied_tools || [];
   if (policy.provider === 'claude-print') {
@@ -1766,9 +1768,7 @@ function buildAdapterCommand(policy, promptPath) {
     const requestedModel = policy.requested_model || policy.model;
     if (requestedModel && !args.includes('--model')) args.push('--model', String(requestedModel));
     if (policy.fallback_model && !args.includes('--fallback-model')) args.push('--fallback-model', String(policy.fallback_model));
-    if (policy.max_budget_usd !== undefined && !args.includes('--max-budget-usd')) {
-      args.push('--max-budget-usd', String(policy.max_budget_usd));
-    }
+    adapterSpend.apply(args, spend);
     if (allowedTools.length && !args.includes('--allowedTools') && !args.includes('--allowed-tools')) {
       args.push('--allowedTools', allowedTools.join(','));
     }
@@ -1993,7 +1993,7 @@ function runAdapter(policy, options = {}) {
     effective_model: policy.effective_model || UNKNOWN,
     fallback_model: policy.fallback_model || null,
     fallback_refusal_reason: policy.fallback_refusal_reason || null,
-    max_budget_usd: policy.max_budget_usd ?? null,
+    ...adapterSpend.resolve(policy),
     argv: [planned.command, ...planned.args],
     transcript_path: policy.transcript_path,
     output_path: policy.output_path,

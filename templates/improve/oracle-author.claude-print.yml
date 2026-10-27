@@ -10,7 +10,8 @@ adapter_policy:
   args: [-p, --output-format, stream-json, --verbose, --permission-mode, acceptEdits]
   model: opus
   requested_model: opus
-  max_budget_usd: 4
+  billing: unknown
+  cost: unknown
   timeout_seconds: 1200
   max_iterations: 1
   allowed_tools: [Read, Glob, Grep, Write, Edit, "Bash(node --check *)"]

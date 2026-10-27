@@ -24,7 +24,8 @@ policies:
       model: claude-fable-5
       requested_model: claude-fable-5
       fallback_model: claude-opus-4-8
-      max_budget_usd: 20
+      billing: unknown
+      cost: unknown
       timeout_seconds: 1800
       max_iterations: 1
       allowed_tools:
@@ -63,7 +64,8 @@ policies:
       model: claude-fable-5
       requested_model: claude-fable-5
       fallback_model: claude-opus-4-8
-      max_budget_usd: 12
+      billing: unknown
+      cost: unknown
       timeout_seconds: 1800
       max_iterations: 1
       allowed_tools:
@@ -105,7 +107,8 @@ policies:
         - sandbox_workspace_write.network_access=false
       model: gpt-5.5
       requested_model: gpt-5.5
-      max_budget_usd: 8
+      billing: unknown
+      cost: unknown
       timeout_seconds: 1800
       max_iterations: 1
       allowed_tools: []

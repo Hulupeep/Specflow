@@ -1,0 +1,30 @@
+contract_meta:
+  id: feature_adapter_effort
+  version: 1
+  created_from_spec: "GitHub #232 owner-directed amendment"
+  covers_reqs: [AC-SPEND-1, AC-SPEND-2, AC-SPEND-3, AC-SPEND-4, AC-SPEND-5]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_adapter_effort"
+invariants:
+  - id: I-ADAPTER-EFFORT-001
+    rule: "Trusted route classification is separate from model brand and telemetry. Ordinary subscription/cheap routes receive no invented dollar or review-count ceiling; unknown classification grants no paid fallback."
+    tests: [EFFORT-1, EFFORT-3]
+  - id: I-ADAPTER-EFFORT-002
+    rule: "Explicit positive owner caps remain binding; expensive API starts require a supported monetary guard before invocation. Peer and other adapter roles use the same policy decision without expanding permissions."
+    tests: [EFFORT-2, EFFORT-3, EFFORT-PEER-POLICY]
+  - id: I-ADAPTER-EFFORT-003
+    rule: "A failed/error/cap-exhausted peer cannot supply a recommendation even with structured output. Preserve the specific cause and reject invalid or unsupported policy before calling a provider."
+    tests: [EFFORT-PEER-ERROR, EFFORT-PEER-POLICY]
+  - id: I-ADAPTER-EFFORT-004
+    rule: "Historical journals and pinned runtime limits are not rewritten; explicit caps survive re-entry. Shipped new-policy defaults may remove invented ceilings without silently extending owner limits."
+    tests: [EFFORT-LEGACY-CAP, EFFORT-1]
+  - id: I-ADAPTER-EFFORT-005
+    rule: "Reported provider estimates are not verified charges; missing values stay unknown. Reports retain declared billing/cost class, applied cap and supported enforcement for each current role."
+    tests: [EFFORT-REPORT]
+test_hooks:
+  tests:
+    - file: tests/contracts/adapter-spend.test.js
+    - file: tests/contracts/improve-core.test.js
