@@ -143,12 +143,11 @@ const COMMANDS = {
     },
   },
   graph: {
-    usage: 'specflow graph [contracts-dir]',
+    usage: 'specflow graph [contracts-dir] [--verification-contract file]',
     desc: 'Validate contract graph integrity',
     run: (args) => {
-      const dir = args[0] || 'docs/contracts';
       const script = resolve(SPECFLOW_ROOT, 'scripts', 'verify-graph.cjs');
-      exec(`node "${script}" "${dir}"`);
+      execFile(process.execPath, [script, ...(args.length ? args : ['docs/contracts'])]);
     },
   },
   run: {

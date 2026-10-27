@@ -1,0 +1,6 @@
+{
+  "fixture_version": 1,
+  "scope": "synthetic harness oracle, not product financial rules",
+  "balance": 900,
+  "transformed": "HELLO\n"
+}

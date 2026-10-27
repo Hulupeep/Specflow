@@ -1,0 +1,28 @@
+contract_meta:
+  id: outcome_assurance
+  version: 1
+  created_from_spec: "GitHub #131/#132"
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: outcome_assurance"
+invariants:
+  - id: OC-001
+    rule: Required parent obligations retain stable identities, declared support, independent reference identities, required checks and their verification level.
+  - id: OC-002
+    rule: Decomposition preserves owned coverage of every required parent check; planned coverage is distinct from executed satisfaction.
+  - id: OC-003
+    rule: Independent preflight executes a counterexample where green children conceal a failed parent; a reference hash alone does not establish semantic independence.
+  - id: OC-004
+    rule: Evidence binds accepted contract, source including dirty state, relevant input, rules, environment and checker identities; unchanged values do not excuse changed relevant inputs.
+  - id: OC-005
+    rule: Rejection invalidates acceptance and normative revision follows existing amendment authority; a maker cannot change expectations or requiredness to make failure pass.
+  - id: OC-006
+    rule: Parent acceptance requires current required evidence; missing, failed, stale, unsupported and waived evidence is never passed and child completion does not establish parent completion.
+test_hooks:
+  tests:
+    - file: tests/contracts/outcome-assurance.test.js
+    - file: tests/contracts/verifier-contract-lifecycle.test.js
+    - file: tests/contracts/verifier-rail.test.js
+    - file: tests/contracts/verifier-trace-divergence.test.js

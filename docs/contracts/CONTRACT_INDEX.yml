@@ -1,4 +1,6 @@
 contracts:
+  - id: outcome_assurance
+    path: docs/contracts/outcome-assurance.yml
   - id: feature_adapter_effort
     path: docs/contracts/feature_adapter_effort.yml
   - id: feature_duo_actions

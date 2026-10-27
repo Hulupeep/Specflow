@@ -11,6 +11,7 @@ const { spawnSync } = require('child_process');
 const routingShadow = require('./typesafe-routing-bridge.cjs');
 const adapterSpend = require('./adapter-spend.cjs');
 const tierPolicy = require('./specflow-tier.cjs');
+const outcomeContract = require('./outcome-contract.cjs');
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve, posix } = require('path');
@@ -318,6 +319,7 @@ function validateRunContract(contract) {
   });
   if (missing.length) return { ok: false, errors: missing.map((field) => `run_contract.${field} is required`) };
   if (!LOOP_PATHS[contract.loop]) return { ok: false, errors: [`run_contract.loop is unsupported: ${contract.loop}`] };
+  if (contract.verification_contract_path !== undefined && !outcomeContract.pathSchema.safeParse(contract.verification_contract_path).success) return { ok: false, errors: ['run_contract.verification_contract_path must be a repository-relative file'] };
   return { ok: true, errors: [] };
 }
 
@@ -857,6 +859,12 @@ function decideVerification(options = {}) {
   if (missing.length) {
     throw new Error(`accepted verification contract missing field(s): ${missing.join(', ')}`);
   }
+  if (vc.outcome_contract) {
+    const validation = outcomeContract.validate(vc);
+    if (!validation.ok) throw new Error(`invalid outcome contract: ${validation.errors.join('; ')}`);
+  }
+  const prior = readLedger(paths.ledgerPath).filter(e => e.event === 'verifier_decision' && e.verifier_decision === 'accepted').at(-1);
+  outcomeContract.authorizeRevision(resolve(options.root || process.cwd()), prior?.outcome_sha256, vc, options.amendment);
   const acceptedAt = options.acceptedAt || vc.accepted_at || new Date().toISOString();
   const contract = { ...vc, accepted_at: acceptedAt };
   ensureDir(paths.contractPath);
@@ -868,6 +876,8 @@ function decideVerification(options = {}) {
     proposal_path: paths.proposalPath,
     verification_contract_path: paths.contractPath,
     journey_id: contract.journey_id,
+    contract_sha256: outcomeContract.contractHash(contract),
+    outcome_sha256: outcomeContract.outcomeHash(contract),
     mechanical_gate_state: 'pending',
   });
   return { ok: true, decision: 'accepted', contractPath: paths.contractPath, contract };
@@ -890,6 +900,13 @@ function requireAcceptedVerificationContract(options = {}) {
   const missing = VERIFICATION_CONTRACT_FIELDS.filter((f) => data[f] === undefined || data[f] === null);
   if (missing.length) {
     return { accepted: false, contractPath: paths.contractPath, reason: `verification contract missing: ${missing.join(', ')}` };
+  }
+  const decision = readLedger(paths.ledgerPath).filter(e => e.event === 'verifier_decision').at(-1);
+  if (decision && decision.verifier_decision !== 'accepted') return { accepted: false, contractPath: paths.contractPath, reason: 'latest verifier decision rejected the contract' };
+  if (decision?.contract_sha256 && decision.contract_sha256 !== outcomeContract.contractHash(data)) return { accepted: false, contractPath: paths.contractPath, reason: 'accepted contract binding changed; a fresh authorised decision is required' };
+  if (data.outcome_contract) {
+    const valid = outcomeContract.validate(data);
+    if (!decision?.contract_sha256 || !valid.ok) return { accepted: false, contractPath: paths.contractPath, reason: 'outcome binding migration_required or invalid contract' };
   }
   return { accepted: true, contractPath: paths.contractPath, contract: data, reason: null };
 }
@@ -1200,7 +1217,10 @@ function verifierGateDecision(findings = [], checks) {
 function runVerifierStage(options = {}) {
   const paths = verificationPaths(options);
   const sliceTags = Array.isArray(options.sliceTags) ? options.sliceTags : [];
-  const required = verifierRequiredForSlice(sliceTags, { mode: options.requiredMode, requiredWhen: options.requiredWhen });
+  const accepted = requireAcceptedVerificationContract(options);
+  const candidate = accepted.contract || (() => { try { return JSON.parse(readFileSync(paths.contractPath, 'utf8')); } catch { return null; } })();
+  const hasRequiredOutcome = Boolean(candidate?.outcome_contract && (!outcomeContract.validate(candidate).ok || candidate.outcome_contract.obligations.some(o => o.required)));
+  const required = hasRequiredOutcome || verifierRequiredForSlice(sliceTags, { mode: options.requiredMode, requiredWhen: options.requiredWhen });
   const makerClaim = options.makerClaim || UNKNOWN;
 
   // Human-only escape hatch — never silent.
@@ -1231,6 +1251,15 @@ function runVerifierStage(options = {}) {
     return { status: 'blocked', required, gate: 'blocked', reason: contractGate.reason };
   }
 
+  if (contractGate.contract.outcome_contract) {
+    const bound = outcomeContract.bind(contractGate.contract, options);
+    const parent = outcomeContract.readiness(contractGate.contract);
+    // #44 will consume owning case-level execution; an exit code alone must
+    // never create parent acceptance while that consumer is unavailable.
+    const reason = bound.status === 'bound' ? 'owning case-level execution receipt required (#44)' : bound.errors.join('; ');
+    record('blocked', { reason, parent_outcome: parent, outcome_binding: bound.binding || null });
+    return { status: 'blocked', required, gate: 'blocked', reason, parent_outcome: parent, binding_status: bound.status };
+  }
   const checks = contractGate.contract.runtime_checks;
   if (options.checks !== undefined
     && JSON.stringify(canonicalizeSemanticValue(options.checks)) !== JSON.stringify(canonicalizeSemanticValue(checks))) {
@@ -1318,6 +1347,21 @@ function verifierTrace(options = {}) {
   else if (mechanicalGate.result === 'fail') disposition = 'gate_failed';
   else if (mechanicalGate.result === 'pass' && contractGate.accepted) disposition = 'passed';
 
+  const parentOutcome = outcomeContract.readiness(contractGate.contract);
+  if (contractGate.accepted && contractGate.contract.outcome_contract) {
+    const previous = last(e => e.event === 'verifier_stage' && e.outcome_binding)?.outcome_binding;
+    const current = outcomeContract.bind(contractGate.contract, {
+      root: options.root || process.cwd(),
+      configurationId: options.configurationId || previous?.configuration_id,
+      environment: options.environment || previous?.environment,
+    });
+    const fresh = current.status === 'bound'
+      ? outcomeContract.freshness(previous, current.binding)
+      : { status: current.status === 'unsupported' ? 'unsupported' : 'stale', reason: current.errors.join('; ') };
+    parentOutcome.binding_status = fresh.status;
+    parentOutcome.reason = fresh.reason || null;
+  }
+
   return {
     status: 'ok',
     run_dir: paths.baseDir,
@@ -1329,6 +1373,7 @@ function verifierTrace(options = {}) {
     disposition,
     divergence,
     missing_evidence: missingEvidence,
+    parent_outcome: parentOutcome,
     sends_transcript_to_provider: false,
   };
 }
@@ -1348,6 +1393,7 @@ function verifierCommandsForStage(contract, options = {}) {
       { name: 'verify-seams', command: `node scripts/verify-seams.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root .` },
       { name: 'verify-adr', command: `node scripts/verify-adr.cjs ${shellQuote(join(specDir, 'tickets.json'))} --repo-root .` },
       { name: 'verify-ticket-journey', command: `node scripts/verify-ticket-journey.cjs ${shellQuote(specDir)} --issues ${shellQuote(join(specDir, 'issues.json'))}` },
+      ...(contract.verification_contract_path ? [{ name: 'verify-outcome-coverage', command: `node scripts/verify-graph.cjs ${shellQuote(specDir)} --verification-contract ${shellQuote(contract.verification_contract_path)}` }] : []),
     ];
   }
   if (contract.loop === 'feature-build' && stage === '1_ticket') {
@@ -2395,7 +2441,7 @@ function runLoopBody(options) {
   // verifier finding (or a missing accepted contract) blocks gate advancement.
   if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '6_provenance') {
     const sliceTags = contract.slice_tags || [];
-    if (verifierRequiredForSlice(sliceTags, { mode: contract.verifier_required_mode })) {
+    { // The stage also enforces explicitly required parent obligations on CLI slices.
       const stage = runVerifierStage({
         contract: contractPath,
         ledger: ledgerPath,
@@ -2404,6 +2450,9 @@ function runLoopBody(options) {
         makerClaim: contract.maker_claim || 'complete',
         humanSkip: options.verifierHumanSkip || contract.verifier_human_skip,
         runner: options.runtimeRunner,
+        root: options.repoRoot || process.cwd(),
+        configurationId: options.configurationId,
+        environment: options.environment,
       });
       if (stage.status !== 'passed' && stage.status !== 'skipped_human_override' && stage.status !== 'not_required') {
         contract.terminal_status = 'blocked';
