@@ -83,6 +83,41 @@ function privatePath(file, directory = false) {
   );
   return file;
 }
+function readPrivateSnapshot(file) {
+  need(path.isAbsolute(file), 'private_store_required');
+  // A valid atomic rename can detach an inode between lookup and inspection.
+  // Retry its current path; never accept nlink0 or read a different pathname
+  // after checking privacy. The descriptor binds validation, size and bytes.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let fd;
+    try {
+      for (let p = file; p !== path.dirname(p); p = path.dirname(p))
+        if (fs.existsSync(p)) need(!fs.lstatSync(p).isSymbolicLink(), 'unsafe_store_path');
+      const before = fs.lstatSync(file);
+      need(!before.isSymbolicLink(), 'unsafe_store_path');
+      need(before.uid === process.getuid() && !(before.mode & 0o077) && before.isFile(), 'private_store_required');
+      if (before.nlink === 0) continue;
+      need(before.nlink === 1, 'private_store_required');
+      fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+      const stat = fs.fstatSync(fd);
+      need(stat.uid === process.getuid() && !(stat.mode & 0o077) && stat.isFile(), 'private_store_required');
+      if (stat.nlink === 0) continue;
+      need(stat.nlink === 1, 'private_store_required');
+      need(stat.size <= 16 * 1024 * 1024, 'store_limit');
+      const text = fs.readFileSync(fd, 'utf8');
+      need(Buffer.byteLength(text) <= 16 * 1024 * 1024, 'store_limit');
+      return text;
+    } catch (error) {
+      if (error instanceof ControllerError) throw error;
+      if (['ENOENT', 'ESTALE'].includes(error.code)) continue;
+      if (error.code === 'ELOOP') throw new ControllerError('unsafe_store_path');
+      throw new ControllerError('store_corrupt');
+    } finally {
+      if (fd !== undefined) fs.closeSync(fd);
+    }
+  }
+  throw new ControllerError('store_snapshot_busy', 'Retry read-only status after concurrent replacement; no execution authority or limits changed.');
+}
 function directory(dir) {
   dir = path.resolve(dir);
   for (let p = dir; p !== path.dirname(p); p = path.dirname(p))
@@ -124,12 +159,17 @@ class ControllerStore {
     this.lock = path.join(this.root, 'writer.lock');
   }
   read() {
-    if (!fs.existsSync(this.file)) return empty(this.simulation, this.format);
-    privatePath(this.file);
-    need(fs.statSync(this.file).size <= 16 * 1024 * 1024, 'store_limit');
+    try {
+      fs.lstatSync(this.file);
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+      privatePath(this.root, true);
+      return empty(this.simulation, this.format);
+    }
+    const snapshot = readPrivateSnapshot(this.file);
     let s;
     try {
-      s = JSON.parse(fs.readFileSync(this.file, 'utf8'));
+      s = JSON.parse(snapshot);
     } catch {
       throw new ControllerError('store_corrupt');
     }
