@@ -1406,3 +1406,113 @@ These extensions are proven to save 3-4 hours per 9-issue wave by catching commo
 ---
 
 **Next:** See `LLM-MASTER-PROMPT.md` to learn how LLMs use these contracts.
+
+### Parent outcome extension (OC-001..006, #132)
+
+The existing `verification-contract.json` may contain `outcome_contract` v1.
+The executable strict schemas are `outcomeSchema` and `bindingSchema` in
+`scripts/outcome-contract.cjs`; unknown outcome fields are rejected. The same
+accepted verifier decision ledger binds normative content. Old bounded slice
+contracts remain usable; their parent readiness is explicitly `migration_required`.
+Do not claim those old contracts cover a parent goal.
+
+```yaml
+# Inside the existing accepted verification contract (JSON at runtime).
+outcome_contract:
+  version: 1
+  goal: Transform an agreed input file exactly
+  configurations: [{id: local-node, environment: isolated-node}]
+  assumptions: []
+  unknowns: []
+  non_goals: [Product financial calculations]
+  obligations:
+    - id: O-CLI
+      required: true
+      oracle: {path: tests/expected.json, sha256: "<64 lowercase hexadecimal characters>"}
+      check_ids: [C-CLI]
+      level: process
+      configuration_ids: [local-node]
+runtime_checks:
+  - id: C-CLI
+    type: custom-script
+    required: true
+    command: node tests/verify-transform.cjs
+    verification_level: process
+    configuration_ids: [local-node]
+    checker_paths: [tests/verify-transform.cjs]
+    input_paths: [tests/input.txt]
+    rule_paths: []
+```
+
+IDs and path lists are unique and nonempty where required. Each referenced check
+must exist, retain requiredness and match the obligation's level and supported
+configurations. Levels are `unit`, `process`, `integration`, `journey`; local unit
+checks cannot replace an integrated check. File references are repository-relative
+regular files; bindings reject traversal, missing files and symlinks. An oracle
+hash identifies reviewed bytes, not semantic independence. Execute a deliberately
+wrong-result counterexample against independently reviewed fixed expectations.
+
+Use existing YAML coverage references, adding only their check join:
+
+```yaml
+contract_meta: # journey_meta may use the same fields
+  id: transform
+  owner: cli-team
+  covers_reqs: [O-CLI]
+  check_ids: [C-CLI]
+```
+
+`node scripts/verify-graph.cjs docs/contracts --verification-contract FILE`
+(or `specflow graph ...`) validates this coverage alongside the existing graph.
+A run contract's optional `verification_contract_path: FILE` makes the existing
+spec-build Gate B registry invoke that same consumer. Planned owned checks need
+not have implementation files before coding. Graph coverage is planning proof.
+
+A current evidence binding contains version 1, `contract_sha256`, `source_sha256`,
+`configuration_id`, `environment` and a `files` map of relevant path/SHA-256 pairs.
+The source identity reuses the current snapshot fingerprint (HEAD, dirty tree,
+index, unignored source). Explicit oracle/input/rule/checker hashes also cover
+relevant ignored files. A binding consumer compares every field against a newly
+computed binding; unsupported environment/configuration, absent and stale evidence
+stay non-passing. Equal output does not excuse a changed input. Supply the selected
+configuration/environment when running the verifier. Routine source/input reruns
+under unchanged accepted expectations do not need another owner decision.
+
+Acceptance records `contract_sha256` and `outcome_sha256` in the existing ledger.
+The latest verifier decision must still be acceptance; editing the accepted file
+while retaining its timestamp cannot restore readiness. Revisions of an accepted
+outcome use the existing detached owner authorization: pass `amendment` with
+`record`, `commentId`, `signatureFile` to `decideVerification`. The verified
+scope-bound owner reason must also contain
+`outcome-amendment:<old outcome hash>:<new outcome hash or none>`. A name, boolean
+or maker-written GitHub comment is insufficient. Rejected attempts retain history.
+
+The shared extension establishes declarations, coverage and freshness. Owning
+case-level runtime collection (#44), independent comparison semantics (#70),
+data seams (#133), final Gate D acceptance (#73) and installed proof (#124) remain
+separate consumers. Until the owning execution consumer is installed, a required
+outcome contract blocks with the required check IDs instead of treating exit zero
+as parent acceptance. `specflow run trace` exposes this distinction. Do not equate
+planned, bound, executed, accepted, merged, published and installed statuses.
+
+The existing trace recomputes the last stored binding and exposes `binding_status`
+(`current`, `stale`, `missing`, `unsupported`) alongside the still-unverified parent
+status. This does not label the binding as execution evidence. Changing only the
+execution command or relevant input/checker files can receive fresh independent
+verifier acceptance without a new owner checkpoint when obligations, references
+and support scope remain unchanged; the full accepted-contract identity still
+invalidates old evidence.
+
+Shared per-obligation states are strictly `missing`, `failed`, `stale`,
+`unsupported`, `waived`, `passed`. Coverage separately reports
+`coverage_status: planned|missing`; planned coverage has no executed pass.
+`projectObligations` only aggregates owning-consumer states and cannot grant
+parent acceptance. The runner and trace record a human skip as `waived`, retain
+stale/unsupported bindings, and leave parent acceptance unverified. Owning check
+provenance remains #44's responsibility and final acceptance remains #73's.
+
+The published package supplies the schema dependency. A copied legacy project
+loads it only when selecting an outcome contract; if it is unavailable, parent
+readiness blocks with the exact dependency repair. Existing legacy helpers do
+not gain a new unconditional dependency. Complete installed-host setup remains
+part of #124's qualification.

@@ -35,7 +35,9 @@ try {
 // Config
 // ---------------------------------------------------------------------------
 
-const contractsDir = process.argv[2] || 'docs/contracts';
+const graphArgs = process.argv.slice(2);
+const contractFlag = graphArgs.indexOf('--verification-contract');
+const contractsDir = graphArgs.find((arg, index) => !arg.startsWith('--') && (contractFlag < 0 || index !== contractFlag + 1)) || 'docs/contracts';
 const projectRoot = process.cwd();
 
 const ERRORS = [];
@@ -473,6 +475,22 @@ if (files.length > 0) {
   checkWaivers(files);
 }
 checkAdrFrontmatter();
+
+// Parent coverage is opt-in, through the same accepted verification contract.
+// Planned references are checked here; execution remains the runtime verifier's job.
+const outcomeFlag = process.argv.indexOf('--verification-contract');
+if (outcomeFlag !== -1) {
+  try {
+    const file = process.argv[outcomeFlag + 1];
+    if (!file || file.startsWith('--')) throw Error('--verification-contract requires a file');
+    const contract = JSON.parse(readFileSync(resolve(projectRoot, file), 'utf8'));
+    const documents = files.filter(f => !/^CONTRACT_INDEX\.ya?ml$/.test(basename(f)))
+      .map(file => ({ file, document: parseYaml(file) }));
+    const result = require('./outcome-contract.cjs').coverage(contract, documents);
+    for (const message of result.errors) error(message);
+    if (result.ok) pass('All required parent obligations have owned planned check coverage (not execution proof)');
+  } catch (cause) { error(`Parent coverage unavailable: ${cause.message}`); }
+}
 
 // Summary
 console.error('\n========================');

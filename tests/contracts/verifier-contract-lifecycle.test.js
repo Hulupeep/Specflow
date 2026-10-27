@@ -32,6 +32,29 @@ function sampleContract(overrides = {}) {
 }
 
 describe('VERIFIER-CONTRACT-01 — verification contract lifecycle (J-VERIFIER-CONTRACT-LIFECYCLE)', () => {
+  test('#132: a later rejection invalidates the retained accepted contract', () => {
+    const runDir = tempRun();
+    writeVerificationProposal({ runDir, journeyId: 'J' });
+    decideVerification({ runDir, decision: 'accept', verificationContract: sampleContract() });
+    decideVerification({ runDir, decision: 'reject', missingCheck: 'parent integration is missing' });
+    expect(requireAcceptedVerificationContract({ runDir })).toMatchObject({ accepted: false, reason: expect.stringMatching(/reject/) });
+    // Retain historical bytes; a fresh independent decision can restore readiness.
+    expect(fs.existsSync(verificationPaths({ runDir }).contractPath)).toBe(true);
+    decideVerification({ runDir, decision: 'accept', verificationContract: sampleContract() });
+    expect(requireAcceptedVerificationContract({ runDir }).accepted).toBe(true);
+  });
+
+  test('#132: keeping accepted_at cannot conceal edits to accepted normative content', () => {
+    const runDir = tempRun();
+    writeVerificationProposal({ runDir, journeyId: 'J' });
+    decideVerification({ runDir, decision: 'accept', verificationContract: sampleContract() });
+    const file = verificationPaths({ runDir }).contractPath;
+    const edited = JSON.parse(fs.readFileSync(file));
+    edited.runtime_checks[0].required = false;
+    fs.writeFileSync(file, JSON.stringify(edited));
+    expect(requireAcceptedVerificationContract({ runDir })).toMatchObject({ accepted: false, reason: expect.stringMatching(/binding|changed/) });
+  });
+
   test('writes verification-proposal.md before implementation and blocks until accepted', () => {
     const runDir = tempRun();
     const { proposalPath } = writeVerificationProposal({
