@@ -646,7 +646,7 @@ async function persist(root) {
     worker.close();
   }
 }
-Object.assign(module.exports, { beginCore, phase, persist, contract });
+Object.assign(module.exports, { beginCore, phase, persist, contract, candidateDocument:candidates });
 async function all(o, root) {
   await transport(o, root);
   configure(o, root);
