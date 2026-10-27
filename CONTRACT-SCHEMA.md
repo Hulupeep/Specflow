@@ -1849,3 +1849,38 @@ were never declared; a path scan or an empty seam list cannot prove their absenc
 The checker names the conflicting producer, consumer, interface/revisions,
 field semantics and affected checks, and never repairs an application schema or
 oracle itself. Additional adapters need their own real integration qualification.
+
+## Gate D final outcome (#73)
+
+The optional strict `outcome_contract.acceptance` extension contains nonempty
+`hops: [{id, obligation_ids}]` and optional boolean `signoff_required` (default
+false). Hop IDs are unique, reference existing obligations and cover every
+required obligation. Without the extension, the accepted journey ID is the sole
+hop mapped to all required obligations. These semantics are inside the existing
+protected outcome hash; normal authorised amendment and rerun rules apply.
+
+`check-gate-d` is report lint and reports `outcome_acceptance: not_evaluated`.
+`accept-gate-d` and `specflow run gate-d` consume the same current owning verifier
+journal. They derive required configuration/check coverage mechanically, execute
+applicable checks and reconcile every required tuple. Native children receive
+selected configuration/environment labels; actual route selection remains the
+accepted check's responsibility. Shared comparison and seam declarations are
+filtered only after validating the complete accepted mapping.
+
+Required red/failed/blocked/missing/skipped/stale/unsupported/waived reports never
+pass. Report IDs/statuses are strict; files are bounded regular, repository-local
+and cannot follow symlinks. A final sweep revalidates earlier genuine stage
+handles and native artifacts after all configurations execute, plus current
+source/input/oracle/schema/report bindings and latest contract acceptance.
+Copied JSON, edited verdicts, file existence and generic stage evidence cannot
+supply this authority. The runner records a separate Gate D outcome event; trace
+is explicitly a historical audit view, never a new acceptance invocation.
+
+Required signoff reuses ownerException's verified GitHub owner and detached
+Ed25519 signature, naming `gate-d:<approval_scope>` in the signed reason.
+The stable digest binds normative contract/configuration/source/artifact inputs,
+not new timestamped execution receipts. Fresh checks must still run unchanged.
+Default optional policy introduces no signature checkpoint. Mutable local policy,
+signed_by and legacy hash attribution cannot impersonate or disable required
+owner authority. A waiver remains explicit, attributed honestly and non-passing.
+See [the command and evidence semantics](docs/gate-d.md).

@@ -128,7 +128,8 @@ describe('Gate D checks', () => {
     const result = runNode(TEARDOWN_GATE, ['check-gate-d', dir]);
 
     expect(result.status).toBe(0);
-    expect(result.stderr).toContain('Gate D checks pass');
+    expect(result.stderr).toContain('Gate D report lint valid');
+    expect(JSON.parse(result.stdout)).toMatchObject({ report_validity: 'valid', outcome_acceptance: 'not_evaluated' });
   });
 
   test('rejects decorative-only evidence for value-bearing hops', () => {

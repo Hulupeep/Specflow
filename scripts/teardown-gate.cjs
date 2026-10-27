@@ -4,7 +4,7 @@
  *
  * Closes the loop's two self-attestation holes (adversary findings F1/S1):
  *
- * 1. SIGN-OFF (the HITL gate, un-forgeable-by-edit):
+ * 1. LEGACY SIGN-OFF (hash-bound attribution, not authenticated human identity):
  *      node scripts/teardown-gate.cjs sign <file> --by "<name>"
  *    Writes <file>.signoff.json containing the SHA-256 of <file> AT CONFIRMATION TIME.
  *    The agent must never run `sign` (never_without_human) — but even if discipline slips,
@@ -31,10 +31,12 @@
  *    Used by GATE_A for the falsification PASS binding and by GATE D for hop-table
  *    amendments — same sign/check pattern, any artifact. Exit 0 = valid, 1 = invalid.
  *
- * 4. CHECK-GATE-D (epic integration gate, optional sign-off policy):
+ * 4. CHECK-GATE-D (report lint, optional legacy attribution policy):
  *      node scripts/teardown-gate.cjs check-gate-d <gate-d-dir>
  *    Validates hop findings, evidence, value-bearing evidence, red-hop dispositions, and
- *    only enforces sign-offs when signoff-policy.json says they are required.
+ *    only enforces legacy attribution when signoff-policy.json says it is required.
+ *    Zero exit is NOT outcome acceptance. accept-gate-d uses fresh owning proof
+ *    and any protected detached owner approval; see docs/gate-d.md.
  */
 
 const { createHash } = require('crypto');
@@ -122,7 +124,7 @@ function evidenceRefs(body) {
   return [...body.matchAll(/evidence\/[\w./-]+\.(?:png|jpg|jpeg|webp|txt|json|md)/g)].map(m => m[0]);
 }
 
-function checkGateD(dir) {
+function lintGateD(dir, options = {}) {
   const map = join(dir, 'journey-map.md');
   const findings = join(dir, 'findings.md');
   const errs = [];
@@ -130,7 +132,7 @@ function checkGateD(dir) {
   if (!existsSync(map)) errs.push('journey-map.md missing');
   if (!existsSync(findings)) errs.push('findings.md missing');
 
-  const policy = loadGateDPolicy(dir);
+  const policy = options.signoff === false ? { signoff_policy: { required: false } } : loadGateDPolicy(dir);
   if (policy.error) errs.push(policy.error);
 
   if (policy.signoff_policy?.required) {
@@ -179,10 +181,15 @@ function checkGateD(dir) {
     }
   }
 
-  if (errs.length === 0) { console.error('✓ Gate D checks pass: hops complete, evidence resolves, value evidence and dispositions valid'); process.exit(0); }
-  console.error('✗ Gate D check FAILED:');
-  for (const e of errs) console.error(`  - ${e}`);
-  process.exit(1);
+  return { report_validity: errs.length ? 'invalid' : 'valid', outcome_acceptance: 'not_evaluated', errors: errs };
+}
+
+function checkGateD(dir) {
+  const result = lintGateD(dir);
+  console.log(JSON.stringify(result));
+  console.error(result.errors.length ? '✗ Gate D report lint FAILED' : '✓ Gate D report lint valid; outcome acceptance NOT evaluated');
+  for (const e of result.errors) console.error(`  - ${e}`);
+  process.exit(result.errors.length ? 1 : 0);
 }
 
 function check(dir) {
@@ -224,7 +231,7 @@ function check(dir) {
   process.exit(1);
 }
 
-module.exports = { sha256, extractJourneys, extractJourneyDetails, checkSignoff, loadGateDPolicy, splitFindingSections, evidenceRefs };
+module.exports = { sha256, extractJourneys, extractJourneyDetails, checkSignoff, loadGateDPolicy, splitFindingSections, evidenceRefs, lintGateD };
 
 if (require.main === module) {
   const [, , cmd, target, ...rest] = process.argv;
@@ -237,13 +244,18 @@ if (require.main === module) {
     check(target);
   } else if (cmd === 'check-gate-d' && target) {
     checkGateD(target);
+  } else if (cmd === 'accept-gate-d' && target) {
+    const options = require('./specflow-runner.cjs').parseKeyValueArgs(rest);
+    const result = require('./gate-d-acceptance.cjs').accept({ ...options, root: options.repoRoot || process.cwd(), reportDir: target });
+    console.log(JSON.stringify(result, null, 2));
+    process.exit(result.outcome_acceptance === 'passed' ? 0 : 1);
   } else if (cmd === 'check-sign' && target) {
     const err = checkSignoff(target);
     if (err) { console.error(`✗ ${err}`); process.exit(1); }
     console.error(`✓ valid sign-off for ${basename(target)} (hash matches current content)`);
     process.exit(0);
   } else {
-    console.error('Usage: teardown-gate.cjs sign <file> --by "<name>" | check <teardown-dir> | check-gate-d <gate-d-dir> | check-sign <file>');
+    console.error('Usage: teardown-gate.cjs sign <file> --by "<name>" | check <teardown-dir> | check-gate-d <report-dir> (report lint only) | accept-gate-d <report-dir> --run-dir <accepted-verifier-run> --repo-root <root> | check-sign <file>');
     process.exit(2);
   }
 }

@@ -310,13 +310,13 @@ run_contract:
   loop: gate-d
   goal: Gate D green for epic #<epic>
   input_artifact: epic #<epic> + PRDs/<slug>-hops.md
-  path: QA/loops/feature-build.yaml -> epic_gate
+  path: QA/loops/feature-build.yaml
   current_stage_or_rail: GATE_D
-  next_gate: node scripts/teardown-gate.cjs check-gate-d gate-d/<epic>/
+  next_gate: node scripts/teardown-gate.cjs accept-gate-d gate-d/<epic>/ --run-dir <accepted-verifier-run> --repo-root .
   durable_evidence: gate-d/<epic>/
-  stop_condition: evidence/disposition gate passes; signatures only if policy requires them
+  stop_condition: every required outcome/configuration has current owning proof; signoff only if protected policy requires it
   never_without_human:
-    - sign when signoff_policy.required
+    - approve when protected outcome acceptance requires signoff
     - stale-oracle amendment
     - closing the epic on a red GATE D
 ```
@@ -338,3 +338,5 @@ run_contract:
     - starting deep dive before map signoff
     - creating tickets directly
 ```
+
+For Gate D use `specflow run gate-d --input gate-d/<epic>/ --run-dir .specflow/runs/gate-d-<epic> --verification-run-dir <accepted-verifier-run> --repo-root .`. `check-gate-d` validates report structure only; its zero exit never accepts an outcome. Required red/stale/skipped/waived outcomes block. Do not introduce signoff when protected acceptance policy leaves it optional.

@@ -68,11 +68,11 @@ function validateDeclarations(contract, errors) {
     for (const id of ids) if (!all.some(c => c.id === id && c.check_id === check.id)) errors.push(`${check.id}: unbound comparison ${id}`);
   }
 }
-function select(contract, check) {
+function select(contract, check, configurationId) {
   const ids = check.execution?.comparison_ids || [];
   const all = definitions(contract), selected = all.filter(c => c.check_id === check.id);
   if (selected.length !== ids.length || ids.some(id => !selected.some(c => c.id === id))) throw Error(`${check.id}: exact accepted parent comparison mapping required`);
-  return selected;
+  return configurationId ? selected.filter(c => contract.outcome_contract.obligations.find(o => o.id === c.obligation_id).configuration_ids.includes(configurationId)) : selected;
 }
 function canonical(value) {
   if (typeof value === 'number' && !Number.isFinite(value)) throw Error('non-finite JSON operand unsupported');
