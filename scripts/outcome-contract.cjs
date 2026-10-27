@@ -20,6 +20,7 @@ const obligationStateSchema = z.enum(['missing', 'failed', 'stale', 'unsupported
 const comparisons = require('./oracle-comparison.cjs').schema(z);
 const outcomeSchema = z.strictObject({
   version: z.literal(1), goal: text,
+  data_seams: require('./data-seams.cjs').entriesSchema(z).optional(),
   configurations: z.array(z.strictObject({ id: text, environment: text })).min(1),
   assumptions: unique(text), unknowns: unique(text), non_goals: unique(text),
   obligations: z.array(z.strictObject({
@@ -87,6 +88,7 @@ function validate(contract) {
     }
   }
   require('./oracle-comparison.cjs').validateDeclarations({ ...contract, outcome_contract: outcome }, errors);
+  require('./data-seams.cjs').validateDeclarations({ ...contract, outcome_contract: outcome }, errors);
   return { ok: !errors.length, errors };
 }
 function coverage(contract, documents) {
@@ -146,6 +148,13 @@ function bind(contract, options = {}) {
         const c = contract.runtime_checks.find(check => check.id === id);
         for (const name of [...c.checker_paths, ...c.input_paths, ...c.rule_paths]) files[name] = fileHash(root, name);
       }
+    }
+    if (contract.outcome_contract.data_seams) {
+      const seams = require('./data-seams.cjs').inspect(contract, root, { phase: 'built', configurationId: configuration.id });
+      // Bind all declared bytes even when compatibility itself is false. The
+      // owning execution stage reports that separate structural verdict.
+      for (const name of seams.files) files[name] = fileHash(root, name);
+      if (seams.data_seams.some(s => s.required && s.compatibility === 'unsupported')) return { status: 'unsupported', errors: seams.errors };
     }
     const binding = { version: 1, contract_sha256: hashValue(contract), source_sha256: require('./duo-build.cjs').fingerprint(root), configuration_id: configuration.id, environment: options.environment, files };
     return { status: 'bound', binding: schemas().bindingSchema.parse(binding) };

@@ -1741,3 +1741,111 @@ review that derivation and challenge circular references and constant-answer
 counterexamples. An authorised amendment alone does not refresh old evidence:
 rerun the affected current native comparisons. Improve's private native-holdout
 bridge remains tracked by #178; this schema does not silently enable it.
+
+## Declared data seams (#133)
+
+Legacy ticket arrays with string `writes`/`reads` keep their route/test-id meaning.
+Data interfaces opt into a versioned envelope shared by the seam and ADR readers:
+
+```json
+{
+  "version": 2,
+  "tickets": [
+    {"id":"producer","writes":[{"interface_id":"calculation","schema_ref":{"adapter":"json-interface-v1","path":"schemas/producer.json","pointer":""}}],"reads":[]},
+    {"id":"consumer","writes":[],"reads":[{"interface_id":"calculation","schema_ref":{"adapter":"json-interface-v1","path":"schemas/consumer.json","pointer":""}}]}
+  ]
+}
+```
+
+Ticket IDs are owning slices, not agent identities. ADR/reuse fields keep their
+existing purpose, and `verify-adr` reads this same envelope when ADRs apply. A
+legacy checker cannot silently interpret the versioned object as a clean array.
+New typed endpoint shapes and adapters are validated explicitly.
+
+The first adapter reads a strict, bounded project-owned JSON interface artifact,
+or project-generated relevant facts from its actual type/schema source:
+
+```json
+{
+  "interface_id":"calculation","revision":"1","supported_revisions":["1"],
+  "fields":{
+    "amount":{"type":"number","required":true,"nullable":false,"unit":"minutes","reference":null,"effective":"record-version"},
+    "calculation_result_id":{"type":"string","required":true,"nullable":false,"unit":null,"reference":"calculation-result","effective":"record-version"}
+  }
+}
+```
+
+Supported scalar types are string, boolean, integer and number. An integer
+producer can satisfy a number consumer. Presence and nullability are distinct;
+every consumer-required field must be guaranteed by its producer. Relevant
+units, identity/reference and effective semantics must agree with the protected
+expectation; `null` explicitly means not applicable, not an inferred meaning.
+The emitted revision must match the accepted expectation and appear in the
+consumer's explicit supported revisions. No semver inference or unit conversion
+is performed. Unknown facts, `$ref`, unions and arbitrary SQL/TypeScript/JSON
+Schema constructs are unsupported rather than silently treated as compatible.
+This does not duplicate a whole application schema into Specflow.
+
+The accepted parent extends its existing protected `outcome_contract` with:
+
+```json
+{
+  "data_seams":[{
+    "id":"S-calculation","required":true,"manifest_path":"tickets.json",
+    "producer_ids":["producer"],"consumer_ids":["consumer"],
+    "obligation_ids":["O-values"],"check_ids":["C-correctness"],
+    "expected_ref":{"path":"expected-interface.json","sha256":"<accepted SHA-256>","pointer":""}
+  }]
+}
+```
+
+The normative expected facts are independently reviewed relevant project facts.
+This stable required inventory prevents removal of an endpoint or a change of
+units/nullability/version from silently redefining the goal. Existing outcome
+hash/amendment authority protects it. Actual implementation reference plumbing
+still follows normal independent verification. Manifest and expected/actual
+artifact bytes join existing bindings, including ignored files. References are
+repository-relative regular files with no symlink/hardlink traversal and the
+existing 16 MiB native artifact bound.
+
+Every required seam joins existing required obligation and integration/journey
+check IDs. Its correctness check has independent #70 comparison IDs and strict
+`execution.seam_ids: ["S-calculation"]`. Missing owners, duplicate endpoints,
+dangling obligations/checks or unconsumed seam IDs block. Nothing automatically
+adds or upgrades an accepted check. A required typed reader cannot disappear as
+zero seams merely because its producer is absent. Unknown typed interfaces must
+be reconciled with the protected inventory.
+
+Gate B invokes `verify-seams` with `--phase planned` and the existing
+`--verification-contract` path when supplied. Typed data requires that parent
+mapping; legacy string-only arrays do not. The planning file may be the current
+reviewed proposal; parsing it grants no verifier acceptance. Future actual
+schema artifacts may be absent during planning if ownership/checks are named,
+but known contradictory facts still block. `--phase built` (the typed CLI
+default) requires actual referenced fields and compatibility. Changing a label
+cannot create a built artifact. `--no-resolve` affects legacy string searches,
+never typed schema resolution.
+
+The existing owning native executor enforces built compatibility before running
+the mapped connection. Compatible metadata does not establish runtime use: the
+real producer-to-consumer check must exercise the actual connection and #70's
+independent expected result, including relevant unit/record/version fields. The
+qualified fixture uses a real local HTTP producer, a separate consumer process
+and its persisted output; matching metadata with a wrong runtime unit fails.
+It establishes this adapter/harness, not production or general database proof.
+
+CLI compatibility output always reports `runtime_status: unverified`. Current
+runner/trace `data_seams` projections show owners, obligations, checks and
+separate compatibility/runtime states. Only current owning checks can supply a
+passing runtime state; stale bindings, unsupported capability and waivers remain
+visible. Saved metadata is not self-authenticating acceptance, and #73 composes
+final parent acceptance. An explicitly optional unsupported seam remains visible
+through its separately optional check; required proof is never made optional as
+a missing-environment workaround.
+
+Detection covers declared interfaces and the independently accepted required
+inventory. Review changed schema/type/consumer contracts for dependencies that
+were never declared; a path scan or an empty seam list cannot prove their absence.
+The checker names the conflicting producer, consumer, interface/revisions,
+field semantics and affected checks, and never repairs an application schema or
+oracle itself. Additional adapters need their own real integration qualification.
