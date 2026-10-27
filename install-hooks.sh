@@ -88,6 +88,11 @@ if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
   fi
 fi
 
+# Native runtime reports are local evidence, not product source.
+if ! grep -qxF '.specflow/runs/' "$TARGET_DIR/.gitignore" 2>/dev/null; then
+  printf '\n# Private native runtime evidence\n.specflow/runs/\n' >> "$TARGET_DIR/.gitignore"
+fi
+
 HOOKS_DIR="$SCRIPT_DIR/hooks"
 
 # Check if running from Specflow repo or via curl

@@ -1,4 +1,6 @@
 contracts:
+  - id: test_execution
+    path: docs/contracts/test-execution.yml
   - id: outcome_assurance
     path: docs/contracts/outcome-assurance.yml
   - id: feature_adapter_effort

@@ -24,7 +24,7 @@ describe('agent instruction upgrades', () => {
   test.each([
     '# Project rules\n\nUse pnpm and preserve accessibility.\n',
     '# Project rules\n\n## Specflow Loop Routing\nLegacy loop instructions.\n\n## Custom checks\nRun the billing tests.\n',
-  ])('upgrades existing instructions without losing custom text and is idempotent', (original) => {
+  ])('upgrades existing instructions without losing custom text and is idempotent (case %#)', (original) => {
     fs.writeFileSync(target, original);
     installAgentInstructions(template, target);
     const upgraded = fs.readFileSync(target, 'utf8');

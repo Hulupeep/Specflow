@@ -4,7 +4,7 @@ const path = require('path');
 const yaml = require('js-yaml');
 
 const {
-  runVerifierStage,
+  runVerifierStage: actualRunVerifierStage,
   runRuntimeChecks,
   verifierRequiredForSlice,
   verifierGateDecision,
@@ -22,6 +22,13 @@ function tempRun() {
 }
 const PASS = 'node -e "process.exit(0)"';
 const FAIL = 'node -e "process.exit(1)"';
+
+
+// Genuine synthetic CLI fixtures, not browser/backend product proof.
+const nativeFixtures = new Map();
+afterEach(() => { for (const env of nativeFixtures.values()) env.remove(); nativeFixtures.clear(); });
+function native(options = {}) { const env = require('../helpers/native-execution').fixture(options); nativeFixtures.set(env.runDir, env); return env; }
+function runVerifierStage(options) { const env = nativeFixtures.get(options.runDir); return actualRunVerifierStage({ ...(env ? { root: env.root, configurationId: 'local', environment: 'isolated-node' } : {}), ...options }); }
 
 function acceptContract(runDir, checks) {
   writeVerificationProposal({ runDir, journeyId: 'J-VERIFIER-RAIL', makerPolicyId: 'm', verifierPolicyId: 'v', runtimeChecks: checks });
@@ -102,7 +109,7 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
       expect(runVerifierStage({ runDir, sliceTags: ['api_behavior'], checks: replacement, runner })).toMatchObject({ gate: 'blocked', reason: expect.stringContaining('accepted verification contract') });
     }
     expect(runner).not.toHaveBeenCalled();
-    expect(runVerifierStage({ runDir, sliceTags: ['api_behavior'], checks }).gate).toBe('fail');
+    expect(runVerifierStage({ runDir, sliceTags: ['api_behavior'], checks })).toMatchObject({ gate: 'blocked', reason: expect.stringContaining('adapter') });
   });
 
   test('#190: value-bearing tag cannot be downgraded and an optional reread cannot decide completion', () => {
@@ -125,17 +132,17 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
   });
 
   test('AC2/AC3: runs checks and passes; findings written to verifier-findings.jsonl', () => {
-    const runDir = tempRun();
-    acceptContract(runDir, [{ type: 'api', command: PASS, assertion: 'reread', required: true }]);
-    const r = runVerifierStage({ runDir, sliceTags: ['api_behavior'], makerClaim: 'complete' });
+    const env = native(); const runDir = env.runDir;
+    acceptContract(runDir, [env.check]);
+    const r = runVerifierStage({ runDir, sliceTags: ['integration'], makerClaim: 'complete' });
     expect(r.status).toBe('passed');
     expect(fs.existsSync(verificationPaths({ runDir }).findingsPath)).toBe(true);
   });
 
   test('AC5: blocks when a required runtime check fails', () => {
-    const runDir = tempRun();
-    acceptContract(runDir, [{ type: 'playwright', command: FAIL, assertion: 'space moves player', required: true }]);
-    const r = runVerifierStage({ runDir, sliceTags: ['ui'], makerClaim: 'complete' });
+    const env = native({ broken: true }); const runDir = env.runDir;
+    acceptContract(runDir, [env.check]);
+    const r = runVerifierStage({ runDir, sliceTags: ['integration'], makerClaim: 'complete' });
     expect(r.gate).toBe('fail');
     expect(r.status).toBe('blocked');
   });
@@ -156,14 +163,11 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
     expect(fs.readFileSync(verificationPaths({ runDir }).ledgerPath, 'utf8')).toMatch(/verifier_skip_override/);
   });
 
-  test('AC8: the rail catches a real behavior bug (looks done, space does nothing)', () => {
-    const broken = tempRun();
-    acceptContract(broken, [{ type: 'playwright', command: 'BEHAVIOR_BUG=1 node examples/verifier-rail-proof/journey.js', assertion: 'space moves player', required: true }]);
-    expect(runVerifierStage({ runDir: broken, sliceTags: ['ui'], makerClaim: 'complete' }).status).toBe('blocked');
-
-    const fixed = tempRun();
-    acceptContract(fixed, [{ type: 'playwright', command: 'node examples/verifier-rail-proof/journey.js', assertion: 'space moves player', required: true }]);
-    expect(runVerifierStage({ runDir: fixed, sliceTags: ['ui'], makerClaim: 'complete' }).status).toBe('passed');
+  test('AC8: native process evidence catches an actual CLI behaviour defect, not a rendered-UI claim', () => {
+    const broken = native({ broken: true }); acceptContract(broken.runDir, [broken.check]);
+    expect(runVerifierStage({ runDir: broken.runDir, sliceTags: ['integration'], makerClaim: 'complete' }).gate).toBe('fail');
+    const fixed = native(); acceptContract(fixed.runDir, [fixed.check]);
+    expect(runVerifierStage({ runDir: fixed.runDir, sliceTags: ['integration'], makerClaim: 'complete' }).gate).toBe('pass');
   });
 
   test('AC1/AC5/AC7: wired into runLoop — blocked_verifier_stage at 6_provenance + trace divergence', () => {
@@ -182,9 +186,10 @@ describe('VERIFIER-RAIL-01 — enforced runtime verifier stage (#102)', () => {
         storage: { contract_path: contractPath, ledger_path: ledgerPath },
       },
     }));
-    acceptContract(runDir, [{ type: 'playwright', command: FAIL, assertion: 'space moves player', required: true }]);
+    const env = native({ broken: true });
+    acceptContract(runDir, [env.check]);
 
-    const res = runLoop({ slug: 'slice', contract: contractPath, ledger: ledgerPath });
+    const res = runLoop({ slug: 'slice', contract: contractPath, ledger: ledgerPath, repoRoot: env.root, configurationId: 'local', environment: 'isolated-node' });
     expect(res.status).toBe('blocked_verifier_stage');
     expect(verifierTrace({ runDir }).divergence).toContain('maker_claimed_done_but_verifier_failed');
   });

@@ -1,0 +1,47 @@
+contract_meta:
+  id: test_execution
+  version: 1
+  created_from_spec: 'GitHub #44/#131'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: test_execution'
+invariants:
+  - id: TE-001
+    rule: >-
+      Reconcile the accepted contract's required check IDs with executed case-level results. Missing, skipped,
+      disabled, blocked, zero-collected and unknown outcomes cannot satisfy required behaviour, even when the
+      test process exits zero.
+  - id: TE-002
+    rule: >-
+      Record static, unit/substituted, integration and end-to-end evidence honestly. The verification contract
+      defines the required level and exercised boundaries. A source scan is not a runtime journey; a fully
+      substituted path is not real integration.
+  - id: TE-003
+    rule: >-
+      Adapt existing runner/verifier evidence collection (#81/#102), including the journey hook and relevant
+      CI reporting. Capture runner/check identity, exact source/contract/input/environment identities,
+      execution time, required IDs, status, expected/actual where applicable, and durable log/artifact
+      references. Reuse existing fields rather than parallel receipts.
+  - id: TE-004
+    rule: >-
+      The owning verifier executes or obtains an identifiable existing CI run for the exact revision and
+      validates its structured report. A maker-written JSON file or provider exit status is not sufficient.
+      Missing/corrupt reports fail closed; stale/replayed reports fail freshness. Preserve current permission
+      boundaries: no automatic CI rerun is implied.
+  - id: TE-005
+    rule: >-
+      Optional checks may be skipped only under the accepted contract's policy; display the skip separately.
+      Changing required to optional is a contract amendment, not a runtime fallback for missing environment
+      access.
+  - id: TE-006
+    rule: >-
+      Gate/trace names which required behaviour was not exercised and the precise command, fixture or
+      environment requirement needed next. Aggregate test counts cannot override a missing obligation.
+test_hooks:
+  tests:
+    - file: tests/contracts/test-execution.test.js
+    - file: tests/hooks/journey-native.test.js
+    - file: tests/contracts/verifier-rail.test.js
+    - file: tests/contracts/verifier-runtime-evidence.test.js
