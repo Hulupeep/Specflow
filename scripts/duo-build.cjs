@@ -602,6 +602,14 @@ function reviewLocked(root, dir, state, batch, invoke) {
       reviewSchema.properties.specification_findings = { type: 'array', items: { type: 'object', additionalProperties: false, required: ['id', 'severity', 'origin', 'repair_evidence'], properties: { id: { type: 'string' }, severity: { type: 'string', enum: ['FATAL', 'SERIOUS'] }, origin: { type: 'string', enum: ['original', 'repair_induced', 'unknown'] }, repair_evidence: { type: ['string', 'null'] } } } };
       reviewSchema.required.push('specification_nonblocking');
       reviewSchema.properties.specification_nonblocking = records({id:{type:'string'},kind:{type:'string',enum:['P2','deferred']},basis:{type:'string'},action:{type:'string'},impact:{type:'string',enum:['future','current','unknown']},evidence:textList,nonimpact:{type:'string'},owner_issue:{type:'string'},trigger:{type:'string'}});
+      const nonblockingRow = reviewSchema.properties.specification_nonblocking.items;
+      const commonRow = { ...nonblockingRow };
+      // Keep legacy P2 metadata free-form; only a deferral requires an issue URL.
+      // Both alternatives retain the complete strict native response shape.
+      nonblockingRow.anyOf = [
+        { ...commonRow, properties: { ...nonblockingRow.properties, kind: { type: 'string', enum: ['P2'] } } },
+        { ...commonRow, properties: { ...nonblockingRow.properties, kind: { type: 'string', enum: ['deferred'] }, owner_issue: { type: 'string', pattern: '^https://github\\.com/[^/\\s]+/[^/\\s]+/issues/[1-9][0-9]*$' } } },
+      ];
       const nonblockingEvidence = reviewSchema.properties.specification_nonblocking.items.properties.evidence;
       nonblockingEvidence.minItems = 1;
       nonblockingEvidence.uniqueItems = true;
@@ -712,7 +720,9 @@ function reviewLocked(root, dir, state, batch, invoke) {
       }
       for (const closure of result.resolutions.filter(r => r.status === 'closed')) {
         const previous = prior?.findings?.find(f => f.id === closure.id);
-        if (previous) findings.push({ ...previous, status: 'resolved', evidence: closure.evidence.map(ref) });
+        // An explicit same-round disposition must be classified once. In
+        // particular, a valid re-deferral must not also become a resolved copy.
+        if (previous && !findings.some(f => f.id === closure.id)) findings.push({ ...previous, status: 'resolved', evidence: closure.evidence.map(ref) });
       }
       const readinessComplete = candidate.indexComplete && Object.values(candidate.criteria).every(c => c.status === 'verified') && !progress.openFindings(candidate).length && !actions.pending(candidate).length;
       const scoped = scopedReviews.complete(root, record.scopedReservation, { nativeOutcome: result.outcome, readinessComplete, verifiedCriteria:Object.values(candidate.criteria).filter(c=>c.status==='verified').map(c=>c.id), findings, gates: request.specification_review.gates, evidence: [ref(path.relative(root, path.join(round, 'stdout.txt')))], identity: { provider: spec.exe, model, family, modelEvidence: identityModel ? 'native-metadata' : requestedModel ? 'explicit-cli-selection (provider did not report served model)' : 'simulated-provider', mode: invoke === command ? 'live' : 'simulated' } });

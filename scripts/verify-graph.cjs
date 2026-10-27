@@ -205,6 +205,7 @@ function checkJourneyIds(files) {
   for (const filePath of files) {
     const content = readFileSync(filePath, 'utf8');
     const name = basename(filePath);
+    if (name === 'CONTRACT_INDEX.yml' || name === 'CONTRACT_INDEX.yaml') continue;
 
     // Look for journey_meta.id or id: J-*
     const idMatches = content.match(/id:\s*(J-[A-Z0-9-]+)/g) || [];

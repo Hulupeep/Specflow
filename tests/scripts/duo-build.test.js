@@ -394,3 +394,73 @@ test('#206: inheritance is limited to open blocking scoped findings of preparati
  const plain=duo.load(root,duo.start(root,'#207 unscoped','codex',context).id).state;
  expect(Object.keys(plain.findings)).toEqual([]);
 });
+
+function legacyInvalidDeferral210() {
+  const reviews=require('../../scripts/specflow-reviews.cjs'), policy=require('../../scripts/specflow-tier.cjs');
+  const record={issue:{number:210,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}};
+  // Labelled simulated legacy provider boundary. Real scoped journal/classifier
+  // and linked-run inheritance execute; no live model acceptance is claimed.
+  put('legacy-raw.txt','Legacy future-only detail; invalid short owner reference');
+  const evidence={path:'legacy-raw.txt',sha256:policy.sha(fs.readFileSync(path.join(root,'legacy-raw.txt')))};
+  const reservation=reviews.begin(root,record,'contracted','codex');
+  reviews.complete(root,reservation,{nativeOutcome:'accepted',readinessComplete:true,identity:{provider:'claude',family:'claude',model:'legacy-fixture',mode:'simulated'},evidence:[evidence],gates:[],findings:[{
+    id:'RISK',basis:'Future adapter spelling does not change current result',action:'Track the future spelling',severity:'SERIOUS',status:'deferred',impact:'future',origin:'original',evidence:[evidence],
+    deferral:{nonimpact:'Current result/interface unaffected',ownerIssue:'example/repo#9',trigger:'Future adapter build',evidence:[evidence]},
+  }]});
+  expect(reviews.load(root,210).reviews.contracted.at(-1).findings[0].status).toBe('open');
+  record.profile.revision='owner-reference repair';put('tier.json',JSON.stringify(record));put('code.js','module.exports = 42;');put('raw.txt','Current result42; future adapter spelling unchanged; owner reference corrected');
+  const run=duo.start(root,'#210 linked legacy repair','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+  expect(duo.load(root,run.id).state.findings.RISK).toMatchObject({status:'open',inherited:{issue:210,tier:'contracted'}});
+  return {reviews,record,run};
+}
+function redefer210(overrides={}) {
+  return {id:'RISK',kind:'deferred',impact:'future',basis:'Future adapter spelling with current behavior unchanged',action:'Track spelling in future issue',evidence:['raw.txt'],nonimpact:'Current result and interface remain unchanged',owner_issue:'https://github.com/example/repo/issues/9',trigger:'Future adapter build',...overrides};
+}
+function repairBatch210() {
+  return {...batch(),resolutions:[{id:'RISK',change:'Replace invalid owner reference with evidenced future-only deferral',evidence:['raw.txt']}]};
+}
+test('#210 a closed inherited invalid deferral can be re-deferred once in the same scoped review',()=>{
+  const {reviews,run}=legacyInvalidDeferral210();
+  const accepted=reviewOwned(root,run.id,repairBatch210(),fakePeer('accepted',(_,result)=>{result.specification_nonblocking=[redefer210()];}));
+  expect({outcome:accepted.outcome,reason:accepted.blocker}).toEqual({outcome:'accepted',reason:null});
+  const round=reviews.load(root,210).reviews.contracted.at(-1);
+  expect(round.status).toBe('complete');expect(round.outcome).toBe('passed');expect(round.findings).toHaveLength(1);
+  expect(round.findings[0]).toMatchObject({id:'RISK',status:'deferred',deferral:{ownerIssue:'https://github.com/example/repo/issues/9'}});
+  expect(duo.load(root,run.id).state.findings.RISK.status).toBe('closed');
+});
+test.each([
+  ['invalid owner',{owner_issue:'example/repo#9'}],
+  ['current impact',{impact:'current'}],
+  ['unknown impact',{impact:'unknown'}],
+])('#210 closing plus re-filing %s cannot hide a blocking scoped finding',(_name,overrides)=>{
+  const {reviews,run}=legacyInvalidDeferral210();
+  const rejected=reviewOwned(root,run.id,repairBatch210(),fakePeer('accepted',(_,result)=>{result.specification_nonblocking=[redefer210(overrides)];}));
+  expect(rejected.outcome).toBe('blocked');expect(rejected.history.at(-1).stage).toBe('scoped_blocked');
+  const round=reviews.load(root,210).reviews.contracted.at(-1);expect(round.findings).toHaveLength(1);expect(round.findings[0]).toMatchObject({id:'RISK',status:'open'});
+  expect(duo.load(root,run.id).state.findings.RISK.status).toBe('open');expect(duo.load(root,run.id).state.criteria['AC-1'].status).not.toBe('verified');
+});
+test('#210 native response schema rejects short deferred owners without narrowing P2 metadata',()=>{
+  put('tier.json',JSON.stringify({issue:{number:210,body:'AC-1: returns 42',labels:['spec:contracted']},profile:{ui:false,materialSeams:[]}}));
+  const run=duo.start(root,'#210 response-schema','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+  const result=reviewOwned(root,run.id,batch(),fakePeer('accepted',(opts)=>{
+    const item=JSON.parse(fs.readFileSync(path.join(opts.cwd,'schema.json'))).properties.specification_nonblocking.items;
+    const deferred=item.anyOf?.find(b=>b.properties.kind.enum.includes('deferred')),p2=item.anyOf?.find(b=>b.properties.kind.enum.includes('P2'));
+    expect(deferred).toBeDefined();expect(p2).toBeDefined();
+    const valid=new RegExp(deferred.properties.owner_issue.pattern);
+    expect(valid.test('https://github.com/example/repo/issues/9')).toBe(true);
+    for(const bad of ['example/repo#9','#9','', 'https://github.com/example/repo/pull/9'])expect(valid.test(bad)).toBe(false);
+    expect(item.properties.owner_issue).toEqual({type:'string'});expect(p2.properties.owner_issue).toEqual({type:'string'});
+  }));
+  expect(result.outcome).toBe('accepted');
+});
+test('#210 rejected P2 downgrade preserves the material obligation for a linked successor',()=>{
+  const {reviews,run}=legacyInvalidDeferral210();
+  const rejected=reviewOwned(root,run.id,repairBatch210(),fakePeer('accepted',(_,result)=>{result.specification_nonblocking=[redefer210({kind:'P2'})];}));
+  expect(rejected.outcome).toBe('blocked');
+  const severity=reviews.load(root,210).reviews.contracted.at(-1).findings.find(f=>f.id==='RISK').severity;
+  // Labelled owner transfer in an isolated fixture, preserving the same scoped
+  // history. No provider call or new review allowance is started here.
+  duo.cease(root,run.id,run.owner.session,'Fixture owner transfers after rejected downgrade');
+  const successor=duo.start(root,'#210 successor after invalid disposition','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+  expect({severity,inherited:duo.load(root,successor.id).state.findings.RISK?.status||'missing'}).toEqual({severity:'SERIOUS',inherited:'open'});
+});
