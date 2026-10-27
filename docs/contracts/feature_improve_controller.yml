@@ -1,8 +1,8 @@
 contract_meta:
   id: feature_improve_controller
-  version: 1
+  version: 2
   created_from_spec: "GitHub #181; docs/specs/improve-controller/preparation.md"
-  covers_reqs: [AC-09-1, AC-09-2, AC-09-3, AC-09-4, AC-09-5, AC-LIMITS-01, AC-LIMITS-02, AC-LIMITS-03, AC-LIMITS-04, AC-LIMITS-05, AC-LIMITS-06, AC-LIMITS-07, AC-LIMITS-08, AC-LIMITS-09, AC-LIMITS-10, AC-LIMITS-11, AC-LIMITS-12, AC-LIMITS-13]
+  covers_reqs: [AC-STORE-1, AC-STORE-2, AC-STORE-3, AC-STORE-4, AC-09-1, AC-09-2, AC-09-3, AC-09-4, AC-09-5, AC-LIMITS-01, AC-LIMITS-02, AC-LIMITS-03, AC-LIMITS-04, AC-LIMITS-05, AC-LIMITS-06, AC-LIMITS-07, AC-LIMITS-08, AC-LIMITS-09, AC-LIMITS-10, AC-LIMITS-11, AC-LIMITS-12, AC-LIMITS-13]
   owner: specflow-core
 llm_policy:
   enforce: true
@@ -32,8 +32,9 @@ invariants:
     tests: [CTRL-NOWORK, CTRL-TERMINAL]
   - id: I-CONTROLLER-008
     rule: "Atomic durable ordering acknowledges only committed state. Storage/lock/process uncertainty fails closed and preserves original limits, evidence and ownership for #183 reconciliation; no automatic takeover/resume or live scheduler is implemented here."
-    tests: [CTRL-RACE, CTRL-INTERRUPT]
+    tests: [CTRL-RACE, CTRL-INTERRUPT, STORE-READ]
 test_hooks:
   tests:
+    - file: tests/contracts/controller-store-read.test.js
     - file: tests/contracts/improve-limits.test.js
     - file: tests/integration/improve-controller.test.js
