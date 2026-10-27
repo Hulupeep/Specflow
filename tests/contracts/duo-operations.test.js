@@ -44,6 +44,31 @@ beforeEach(()=>{
 });
 afterEach(()=>{delete process.env.SPECFLOW_DUO_REVIEWER;fs.rmSync(root,{recursive:true,force:true});});
 describe('portable: REQ-P1..P4',()=>{
+  test('review requires only instructions applicable to its source paths',()=>{
+    put('AGENTS.md','Root guidance.');
+    put('src/AGENTS.md','Source guidance.');
+    put('src/thing.js','module.exports = true;');
+    put('docs/archive/extension-legacy/AGENTS.md','Archived guidance.');
+    put('docs/archive/extension-legacy/old.js','module.exports = false;');
+    const run=duo.start(root,'#247','claude-code',{...context(),references:['src/thing.js']});
+    let required;
+    expect(review(run,batch(),peer({change:(_result,request)=>{required=request.requiredReads;}})).outcome).toBe('accepted');
+    expect(required).toContain('tree/AGENTS.md');
+    expect(required).toContain('tree/CLAUDE.md');
+    expect(required).toContain('tree/src/AGENTS.md');
+    expect(required).not.toContain('tree/docs/archive/extension-legacy/AGENTS.md');
+    expect(fs.existsSync(path.join(root,'.specflow/duo',run.id,'round-001/tree/docs/archive/extension-legacy/AGENTS.md'))).toBe(true);
+
+    const archived=duo.start(root,'#247-archive','claude-code',{...context(),references:['docs/archive/extension-legacy/old.js']});
+    let archiveReads;
+    expect(review(archived,batch(),peer({change:(_result,request)=>{archiveReads=request.requiredReads;}})).outcome).toBe('accepted');
+    expect(archiveReads).toContain('tree/docs/archive/extension-legacy/AGENTS.md');
+    expect(()=>duo.validateReview({
+      outcome:'accepted',summary:'checked',findings:[],unrelated:[],
+      inspected:['tree/AGENTS.md'],
+    },{requiredReads:['tree/AGENTS.md','tree/docs/archive/extension-legacy/AGENTS.md']}))
+      .toThrow(/Peer did not inspect required artifact/);
+  });
   test('J-DUO-HANDOFF: change host, preserve goal/findings/budget, and flip peer',()=>{
     const run=start(), initialGoal=fs.readFileSync(path.join(root,'.specflow/duo',run.id,'goal.md'),'utf8'), calls=[];
     expect(review(run,batch(),peer({outcome:'changes_required',invokeLog:calls})).outcome).toBe('changes_required');
