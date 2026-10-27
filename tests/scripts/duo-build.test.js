@@ -453,3 +453,14 @@ test('#210 native response schema rejects short deferred owners without narrowin
   }));
   expect(result.outcome).toBe('accepted');
 });
+test('#210 rejected P2 downgrade preserves the material obligation for a linked successor',()=>{
+  const {reviews,run}=legacyInvalidDeferral210();
+  const rejected=reviewOwned(root,run.id,repairBatch210(),fakePeer('accepted',(_,result)=>{result.specification_nonblocking=[redefer210({kind:'P2'})];}));
+  expect(rejected.outcome).toBe('blocked');
+  const severity=reviews.load(root,210).reviews.contracted.at(-1).findings.find(f=>f.id==='RISK').severity;
+  // Labelled owner transfer in an isolated fixture, preserving the same scoped
+  // history. No provider call or new review allowance is started here.
+  duo.cease(root,run.id,run.owner.session,'Fixture owner transfers after rejected downgrade');
+  const successor=duo.start(root,'#210 successor after invalid disposition','codex',{...context,specification:{record:'tier.json',targetTier:'contracted'}});
+  expect({severity,inherited:duo.load(root,successor.id).state.findings.RISK?.status||'missing'}).toEqual({severity:'SERIOUS',inherited:'open'});
+});
