@@ -4,6 +4,7 @@
 // persisted JSON remains historical evidence until an owning verifier checks it.
 const fs=require('fs'),path=require('path'),cp=require('child_process'),crypto=require('crypto');
 const outcome=require('./outcome-contract.cjs');
+const oracleComparison=require('./oracle-comparison.cjs');
 const issued=new WeakMap();
 const hash=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const unique=list=>Array.isArray(list)&&list.every(s=>typeof s==='string'&&s.trim())&&new Set(list).size===list.length;
@@ -12,7 +13,11 @@ function validate(check) {
  const e=check?.execution,errors=[];
  if(typeof check?.id!=='string'||!check.id.trim())errors.push('stable runtime check id required');
  if(!e||typeof e!=='object'||Array.isArray(e))return{ok:false,errors:['native execution adapter and accepted case inventory required; revise the verification contract']};
- for(const key of Object.keys(e))if(!['adapter','test_files','required_case_ids','optional_case_ids','args'].includes(key))errors.push(`unknown execution field: ${key}`);
+ for(const key of Object.keys(e))if(!['adapter','test_files','required_case_ids','optional_case_ids','args','claim_kind','comparison_ids'].includes(key))errors.push(`unknown execution field: ${key}`);
+ if(e.claim_kind!==undefined&&!oracleComparison.KINDS.includes(e.claim_kind))errors.push('unsupported native claim_kind');
+ if(e.comparison_ids!==undefined&&!unique(e.comparison_ids))errors.push('comparison_ids must be unique IDs');
+ if(e.claim_kind==='correctness'&&!e.comparison_ids?.length)errors.push('correctness requires accepted parent comparison_ids');
+ if(e.comparison_ids?.length&&e.claim_kind!=='correctness')errors.push('comparison_ids require correctness claim_kind');
  if(!['jest','playwright'].includes(e.adapter))errors.push('unsupported native report adapter');
  if(!unique(e.test_files)||!e.test_files.length||e.test_files.some(p=>!outcome.validLocalPath(p)))errors.push('execution.test_files must name unique repository-relative files');
  for(const key of ['required_case_ids','optional_case_ids'])if(!unique(e[key]))errors.push(`execution.${key} must be a unique case-ID array`);
@@ -45,7 +50,7 @@ function parse(report,adapter,root) {
      if(typeof item.fullName!=='string'||!item.fullName)throw Error('missing Jest full case name');
      const status={passed:'passed',failed:'failed',pending:'skipped',todo:'skipped',skipped:'skipped',disabled:'skipped'}[item.status];
      if(!status)throw Error(`unknown native Jest case status: ${String(item.status)}`);
-     cases.push({id:`${file}::${item.fullName}`,file,status,native_status:item.status});
+     cases.push({id:`${file}::${item.fullName}`,file,status,native_status:item.status,...(item.invocations!==undefined?{invocations:item.invocations}:{})});
     }
    }
    if(report.numTotalTests!==cases.length||report.numPassedTests!==cases.filter(c=>c.status==='passed').length||report.numFailedTests!==cases.filter(c=>c.status==='failed').length)throw Error('native Jest aggregate/case counts disagree');
@@ -145,23 +150,32 @@ function execute(check,options={}) {
  if(!validation.ok)return{executable:false,result:'blocked',reason:validation.errors.join('; ')};
  if(!options.verificationContract)return{executable:false,result:'blocked',reason:'accepted verification contract required for owning execution'};
  const root=path.resolve(options.root||process.cwd()),contract=options.verificationContract;
- let dir,before,identity;
+ let dir,before,identity,comparisons;
  try {
+  comparisons=oracleComparison.select(contract,check);
   before=binding(check,contract,options);identity=framework(root,check.execution.adapter);
   dir=privateDirectory(root,options.runDir||path.join(root,'.specflow/runs/native'));
  }catch(error){return{executable:false,result:'blocked',reason:`native execution unavailable: ${error.message}`};}
- const reportPath=path.join(dir,'native-report.json'),stdoutPath=path.join(dir,'stdout.txt'),stderrPath=path.join(dir,'stderr.txt');
+ const reportPath=path.join(dir,'native-report.json'),stdoutPath=path.join(dir,'stdout.txt'),stderrPath=path.join(dir,'stderr.txt'),observationsPath=path.join(dir,'observations.json');
  const args=check.execution.adapter==='jest'?[identity.entry,...check.execution.args,'--ci','--runInBand','--cacheDirectory',path.join(dir,'cache'),'--coverageDirectory',path.join(dir,'coverage'),'--runTestsByPath',...check.execution.test_files,'--json','--outputFile',reportPath]:[identity.entry,'test',...check.execution.test_files,...check.execution.args,'--output',path.join(dir,'artifacts'),'--reporter=json'];
- const nativeEnv={...process.env,PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never'};
+ const nativeEnv={...process.env,PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never',SPECFLOW_OBSERVATIONS_PATH:comparisons.length?observationsPath:''};
  // A new Playwright CLI is not running inside its caller's Jest worker.
  if(check.execution.adapter==='playwright')delete nativeEnv.JEST_WORKER_ID;
  const startedAt=new Date().toISOString(),res=cp.spawnSync(process.execPath,args,{cwd:root,env:nativeEnv,encoding:'utf8',timeout:(check.timeout_seconds||120)*1000,maxBuffer:16*1024*1024});
  fs.writeFileSync(stdoutPath,res.stdout||'',{mode:0o600});fs.writeFileSync(stderrPath,res.stderr||'',{mode:0o600});
- let result,reportBytes,after;
+ let result,reportBytes,after,observationBytes;
  try {
   reportBytes=artifactBytes(reportPath);
   result=reconcile(parse(JSON.parse(reportBytes.toString('utf8')),check.execution.adapter,root),check.execution);
  }catch(error){result={result:'blocked',cases:[],errors:[`native_report_missing_or_corrupt: ${error.code||error.message}`],summary:{collected:0,passed:0,failed:0,skipped:0}};}
+ if(comparisons.length) {
+  try {
+   observationBytes=artifactBytes(observationsPath);fs.chmodSync(observationsPath,0o600);
+   const compared=oracleComparison.evaluate(root,comparisons,result.cases,observationBytes);
+   result.comparisons=compared.comparisons;result.errors.push(...compared.errors);
+   if(compared.result==='fail'||(compared.result==='blocked'&&result.result!=='fail'))result.result=compared.result;
+  }catch(error){if(result.result!=='fail')result.result='blocked';result.errors.push(`comparison_unproven: ${error.code||error.message}`);}
+ }
  try {
   after=binding(check,contract,options);
   const nextFramework=framework(root,check.execution.adapter);
@@ -171,7 +185,8 @@ function execute(check,options={}) {
  else if(res.status!==0&&result.result==='pass'){result.result='fail';result.errors.push(`native_process_failed: exit ${res.status}`);}
  const receipt={version:1,attempt_id:path.basename(dir),executable:true,...result,reason:result.errors.join('; ')||null,check_id:check.id,verification_level:check.verification_level,boundaries:[...check.boundaries],command:[process.execPath,...args],root,
   started_at:startedAt,finished_at:new Date().toISOString(),exit_code:res.status,framework:identity,host:{platform:process.platform,arch:process.arch,node:process.version},binding_before:before,binding_after:after||null,
-  artifacts:{report:{path:reportPath,sha256:reportBytes?hash(reportBytes):null},stdout:{path:stdoutPath,sha256:hash(res.stdout||'')},stderr:{path:stderrPath,sha256:hash(res.stderr||'')}}};
+  claim_kind:check.execution.claim_kind||'behaviour',
+  artifacts:{report:{path:reportPath,sha256:reportBytes?hash(reportBytes):null},stdout:{path:stdoutPath,sha256:hash(res.stdout||'')},stderr:{path:stderrPath,sha256:hash(res.stderr||'')},...(comparisons.length?{observations:{path:observationsPath,sha256:observationBytes?hash(observationBytes):null}}:{})}};
  receipt.evidence_path=path.join(dir,'execution.json');fs.writeFileSync(receipt.evidence_path,JSON.stringify(receipt,null,2),{mode:0o600});
  freeze(receipt);issued.set(receipt,{check:outcome.hashValue(check),contract:outcome.hashValue(contract),root,token:options.executionToken||null,receipt_sha256:hash(fs.readFileSync(receipt.evidence_path))});return receipt;
 }

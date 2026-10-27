@@ -83,6 +83,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 
 | Contract | Protects | Rules |
 |----------|----------|-------|
+| `oracle_correctness` | Independent value comparison and distinct provenance/consistency | PC-001 through PC-006 |
 | `test_execution` | Owning native case accounting, current attempts and hook/CI consumers | TE-001 through TE-006 |
 | `outcome_assurance` | Shared parent obligation/coverage/freshness and accepted verifier lifecycle | OC-001 through OC-006 |
 | `feature_adapter_effort` | Billing-aware adapter/peer guards and honest cost telemetry | I-ADAPTER-EFFORT-001 through I-ADAPTER-EFFORT-005 |
