@@ -76,3 +76,95 @@ test('normalization retains explicit invalid claims for rejection and leaves mal
  expect(result.instruction_assessments[0].inspected).toContain('invented');
  expect(result.instruction_assessments[1].inspected).toBeNull();expect(result.instruction_assessments[2].evidence).toBeNull();
 });
+
+// Deterministic synthetic 16x16 codec fixtures, not product or native-run evidence.
+const receiptImages={"png": {"mime": "image/png", "base64": "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAIAAACQkWg2AAAAGUlEQVR4nGPUiFrAQApgIkn1qIZRDUNKAwCpoQFCcQgOjQAAAABJRU5ErkJggg=="}, "jpg": {"mime": "image/jpeg", "base64": "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAAQABADASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwDkqKKK+mPDP//Z"}, "gif": {"mime": "image/gif", "base64": "R0lGODdhEAAQAIEAAChaoAAAAAAAAAAAACwAAAAAEAAQAEAIHQABCBxIsKDBgwgTKlzIsKHDhxAjSpxIsaLFgQEBADs="}, "webp": {"mime": "image/webp", "base64": "UklGRjgAAABXRUJQVlA4ICwAAADwAQCdASoQABAAAUAmJaACdLoB+AAF9AAA/vFNr/zNExzH7V//hV8bkLCgAA=="}};
+function imageRead({ ext = 'png', content, data, mime, sourceType = 'base64', text, is_error = false, file = `pixel.${ext}` } = {}) {
+  const sample = receiptImages[ext];
+  fs.writeFileSync(path.join(dir, `pixel.${ext}`), Buffer.from(sample.base64, 'base64'));
+  const blocks = content === undefined ? [{type:'image',source:{type:sourceType,media_type:mime || sample.mime,data:data === undefined ? sample.base64 : data}}] : content;
+  if (text && Array.isArray(blocks)) blocks.push({type:'text',text});
+  return [
+    {type:'assistant',message:{content:[{type:'tool_use',id:'image-read',name:'Read',input:{file_path:file}}]}},
+    {type:'user',message:{content:[{type:'tool_result',tool_use_id:'image-read',content:blocks,is_error}]}},
+  ];
+}
+
+test.each(Object.keys(receiptImages))('IMAGE-225 native-shaped %s image-only content earns exact binary receipt', ext => {
+  const events = imageRead({ext});
+  const result = access.collect(events, dir, [`pixel.${ext}`]);
+  expect(result.inspected).toEqual([`pixel.${ext}`]);
+  expect(result.receipts).toEqual([expect.objectContaining({
+    path:`pixel.${ext}`,tool:'Read',callId:'image-read',extent:'full',
+    outputHash:require('crypto').createHash('sha256').update(Buffer.from(receiptImages[ext].base64,'base64')).digest('hex'),
+  })]);
+});
+
+test('IMAGE-225 explanatory text alongside exact image does not replace binary identity', () => {
+  const result = access.collect(imageRead({text:'Rendered image follows'}),dir,['pixel.png']);
+  expect(result.inspected).toEqual(['pixel.png']);
+  expect(result.receipts[0]).toMatchObject({extent:'full',outputHash:require('crypto').createHash('sha256').update(Buffer.from(receiptImages.png.base64,'base64')).digest('hex')});
+});
+
+test.each([
+  ['different bytes', {data:receiptImages.gif.base64}],
+  ['malformed base64', {data:'%%%not-base64%%%'}],
+  ['noncanonical whitespace', {data:receiptImages.png.base64+'\n'}],
+  ['empty bytes', {data:''}],
+  ['non-string bytes', {data:{claim:'read'}}],
+  ['wrong media type', {mime:'image/jpeg'}],
+  ['unknown media type', {mime:'image/not-real'}],
+  ['non-base64 source', {sourceType:'url'}],
+  ['missing image source', {content:[{type:'image'}]}],
+  ['null content part', {content:[null]}],
+  ['non-array image claim', {content:{type:'image',source:{type:'base64',media_type:'image/png',data:receiptImages.png.base64}}}],
+  ['no image payload', {content:[]}],
+])('IMAGE-225 %s cannot earn inspection via an appended text claim', (_name, overrides) => {
+  expect(access.collect(imageRead({...overrides,text:'I read pixel.png'}),dir,['pixel.png']).inspected).toEqual([]);
+});
+
+test('IMAGE-225 multiple image payloads are not an exact single-artifact receipt', () => {
+  const events=imageRead({text:'Both images were read'});
+  events[1].message.content[0].content.push({type:'image',source:{type:'base64',media_type:'image/gif',data:receiptImages.gif.base64}});
+  expect(access.collect(events,dir,['pixel.png']).inspected).toEqual([]);
+});
+
+test.each(['failed','wrong-path','unallowed','discovery'])('IMAGE-225 %s image access earns no receipt', kind => {
+  const events=imageRead({is_error:kind==='failed',file:kind==='wrong-path'?'wrong.png':'pixel.png'});
+  if(kind==='discovery')events[0].message.content[0].name='Glob';
+  expect(access.collect(events,dir,kind==='unallowed'?[]:['pixel.png']).inspected).toEqual([]);
+});
+
+test('IMAGE-225 caller cannot credit an image outside its frozen round', () => {
+  const outside=fs.mkdtempSync(path.join(os.tmpdir(),'outside-image-'));
+  try {
+    const file=path.join(outside,'pixel.png');fs.writeFileSync(file,Buffer.from(receiptImages.png.base64,'base64'));
+    expect(access.collect(imageRead({file}),dir,[path.relative(dir,file)]).inspected).toEqual([]);
+  } finally { fs.rmSync(outside,{recursive:true,force:true}); }
+});
+
+test('IMAGE-225 image-shaped output cannot masquerade as text-file access', () => {
+  const events=imageRead({file:'proof.txt',text:'line one\nline two\n'});
+  expect(access.collect(events,dir,['proof.txt']).inspected).toEqual([]);
+});
+
+test('IMAGE-225 actual image receipt satisfies citation checks; substitute bytes do not', () => {
+  fs.mkdirSync(path.join(dir,'tree'));
+  fs.writeFileSync(path.join(dir,'tree/pixel.png'),Buffer.from(receiptImages.png.base64,'base64'));
+  const request={batch:{evidence:['pixel.png']}};
+  const valid=access.collect(imageRead({file:'tree/pixel.png'}),dir,['tree/pixel.png']);
+  expect(access.apply({assessments:[{status:'verified',evidence:['pixel.png']}]},valid,request).inspected).toEqual(['tree/pixel.png']);
+  const invalid=access.collect(imageRead({file:'tree/pixel.png',data:receiptImages.gif.base64,text:'read it'}),dir,['tree/pixel.png']);
+  expect(()=>access.apply({assessments:[{status:'verified',evidence:['pixel.png']}]},invalid,request)).toThrow(/receipt/);
+});
+
+test.each([
+  ['png',Buffer.from('89504e470d0a1a0a','hex')],
+  ['jpg',Buffer.from('ffd8ffd9','hex')],
+  ['gif',Buffer.from('GIF89a;')],
+  ['webp',Buffer.from('RIFF\x04\x00\x00\x00WEBP','binary')],
+])('IMAGE-225 truncated %s container cannot gain credit even when the bytes match', (ext,bytes) => {
+  const events=imageRead({ext,data:bytes.toString('base64'),text:'Image read'});
+  fs.writeFileSync(path.join(dir,`pixel.${ext}`),bytes);
+  expect(access.collect(events,dir,[`pixel.${ext}`]).inspected).toEqual([]);
+});
