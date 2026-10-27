@@ -12,6 +12,8 @@ const routingShadow = require('./typesafe-routing-bridge.cjs');
 const adapterSpend = require('./adapter-spend.cjs');
 const tierPolicy = require('./specflow-tier.cjs');
 const outcomeContract = require('./outcome-contract.cjs');
+const testExecution = require('./test-execution.cjs');
+const owningRuntimeFindings = new WeakMap();
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve, posix } = require('path');
@@ -1006,10 +1008,8 @@ function validateRuntimeChecks(checks, options = {}) {
   return { ok: errors.length === 0, errors };
 }
 
-function defaultRuntimeRunner(check) {
-  if (!check.command) return { executable: false };
-  const res = runCommand(check.command, { timeoutSeconds: check.timeout_seconds });
-  return { executable: true, result: res.exit_code === 0 ? 'pass' : 'fail', exit_code: res.exit_code, stderr: res.stderr };
+function defaultRuntimeRunner(check, options) {
+  return testExecution.execute(check, options);
 }
 
 function runRuntimeChecks(options = {}) {
@@ -1023,12 +1023,16 @@ function runRuntimeChecks(options = {}) {
     let outcome;
     try {
       // A runner may inspect a check, but cannot change the accepted inventory.
-      outcome = runner(JSON.parse(JSON.stringify(check))) || {};
+      outcome = runner(JSON.parse(JSON.stringify(check)), { ...options, runDir: paths.baseDir }) || {};
     } catch (error) {
       outcome = { executable: false, reason: `runtime runner threw: ${error.message}` };
     }
+    const owning = Boolean(options.verificationContract && testExecution.owns(outcome, check, options.verificationContract, options));
+    const suppliedState = !options.verificationContract && Boolean(options.runner);
+    const admissible = owning || suppliedState;
     let finding;
-    if (outcome.executable !== true || !['pass', 'fail'].includes(outcome.result)) {
+    if (!admissible || outcome.executable !== true || !['pass', 'fail', 'blocked', 'skipped'].includes(outcome.result)
+      || (check.required && outcome.result === 'skipped')) {
       finding = {
         severity: 'blocked',
         check_type: check.type,
@@ -1039,14 +1043,14 @@ function runRuntimeChecks(options = {}) {
         result: 'blocked',
         gate_result: 'pending',
         evidence_path: null,
-        reason: outcome.reason || (outcome.executable !== true
+        reason: outcome.reason || (!admissible ? 'owning native execution receipt required; a submitted pass or exit code is not verification' : outcome.executable !== true
           ? `missing executable surface for ${check.type} check`
           : `invalid runtime result: ${String(outcome.result)}`),
       };
     } else {
       const failed = outcome.result === 'fail';
       finding = {
-        severity: failed ? (check.required ? 'critical' : 'warn') : 'info',
+        severity: outcome.result === 'blocked' ? 'blocked' : failed ? (check.required ? 'critical' : 'warn') : 'info',
         check_type: check.type,
         required: Boolean(check.required),
         assertion: check.assertion || null,
@@ -1054,11 +1058,24 @@ function runRuntimeChecks(options = {}) {
         verifier_result: outcome.result,
         result: outcome.result,
         gate_result: 'pending', // evidence only — the mechanical gate still decides
-        evidence_path: outcome.evidence_path || check.evidence_path || null,
+        evidence_path: owning ? outcome.evidence_path : outcome.evidence_path || check.evidence_path || null,
+        ...(outcome.reason ? { reason: outcome.reason } : {}),
       };
     }
-    Object.assign(finding, identity);
+    Object.assign(finding, identity, { evidence_kind: owning ? `native-${check.execution.adapter}` : suppliedState ? 'supplied_state' : 'unverified' });
+    if (owning) {
+      finding.execution = outcome;
+      owningRuntimeFindings.set(finding, outcome);
+    }
     findings.push(finding);
+  }
+  // A later check may invalidate an earlier check's input. Evaluate one current
+  // coherent attempt before writing final findings, not a union of old passes.
+  for (const finding of findings) {
+    const check = checks.find((c, i) => runtimeCheckIdentity(c, i).check_id === finding.check_id);
+    if (options.verificationContract && finding.execution && !testExecution.owns(owningRuntimeFindings.get(finding), check, options.verificationContract, options)) {
+      Object.assign(finding, { severity: 'blocked', verifier_result: 'blocked', result: 'blocked', reason: `stale owning receipt: ${finding.check_id}; rerun the accepted check with current inputs` });
+    }
     appendLedger(paths.findingsPath, finding);
   }
   return {
@@ -1069,6 +1086,7 @@ function runRuntimeChecks(options = {}) {
       pass: findings.filter((f) => f.verifier_result === 'pass').length,
       fail: findings.filter((f) => f.verifier_result === 'fail').length,
       blocked: findings.filter((f) => f.verifier_result === 'blocked').length,
+      skipped: findings.filter((f) => f.verifier_result === 'skipped').length,
     },
   };
 }
@@ -1194,7 +1212,7 @@ function verifierRequiredForSlice(sliceTags = [], options = {}) {
   return tags.some((t) => requiredWhen.includes(t));
 }
 
-function verifierGateDecision(findings = [], checks) {
+function verifierGateDecision(findings = [], checks, options = {}) {
   if (!Array.isArray(findings) || findings.some((f) => !f || typeof f !== 'object'
     || (f.required !== undefined && typeof f.required !== 'boolean'))) return 'blocked';
   const required = findings.filter((f) => f.required === true);
@@ -1207,6 +1225,12 @@ function verifierGateDecision(findings = [], checks) {
     for (const check of expected) {
       const matches = findings.filter((f) => f.check_id === check.check_id);
       if (matches.length !== 1 || matches[0].required !== true || matches[0].check_sha256 !== check.check_sha256) return 'blocked';
+    }
+  }
+  if (options.requireOwning) {
+    for (const check of (checks || []).filter(c => c.required)) {
+      const finding = required.find(f => f.check_id === check.id);
+      if (!finding || !testExecution.owns(owningRuntimeFindings.get(finding), check, options.verificationContract, options)) return 'blocked';
     }
   }
   if (required.some((f) => !['pass', 'fail'].includes(f.verifier_result))) return 'blocked';
@@ -1250,17 +1274,16 @@ function runVerifierStage(options = {}) {
   const contractGate = requireAcceptedVerificationContract(options);
   if (!contractGate.accepted) {
     record('blocked', { reason: contractGate.reason });
-    return { status: 'blocked', required, gate: 'blocked', reason: contractGate.reason };
+    return { status: 'blocked', required, gate: 'blocked', reason: contractGate.reason, parent_outcome: outcomeContract.readiness(candidate, { state: 'missing' }) };
   }
 
   if (contractGate.contract.outcome_contract) {
     const bound = outcomeContract.bind(contractGate.contract, options);
-    const parent = outcomeContract.readiness(contractGate.contract, { state: bound.status === 'unsupported' ? 'unsupported' : 'missing' });
-    // #44 will consume owning case-level execution; an exit code alone must
-    // never create parent acceptance while that consumer is unavailable.
-    const reason = bound.status === 'bound' ? 'owning case-level execution receipt required (#44)' : bound.errors.join('; ');
-    record('blocked', { reason, parent_outcome: parent, outcome_binding: bound.binding || null });
-    return { status: 'blocked', required, gate: 'blocked', reason, parent_outcome: parent, binding_status: bound.status };
+    if (bound.status !== 'bound') {
+      const parent = outcomeContract.readiness(contractGate.contract, { state: bound.status === 'unsupported' ? 'unsupported' : 'missing' });
+      record('blocked', { reason: bound.errors.join('; '), parent_outcome: parent });
+      return { status: 'blocked', required, gate: 'blocked', reason: bound.errors.join('; '), parent_outcome: parent, binding_status: bound.status };
+    }
   }
   const checks = contractGate.contract.runtime_checks;
   if (options.checks !== undefined
@@ -1276,15 +1299,25 @@ function runVerifierStage(options = {}) {
     return { status: 'blocked', required, gate: 'blocked', errors: validation.errors };
   }
 
+  const executionToken = Object.freeze({});
   const { findings, summary } = runRuntimeChecks({
-    runDir: options.runDir, contract: options.contract, ledger: options.ledger, checks, makerClaim, runner: options.runner,
+    ...options, runDir: options.runDir, contract: options.contract, ledger: options.ledger, checks, makerClaim, runner: options.runner, verificationContract: contractGate.contract, executionToken,
   });
-  const gate = verifierGateDecision(findings, checks);
+  const latest = requireAcceptedVerificationContract(options);
+  const unchangedAcceptance = latest.accepted && outcomeContract.hashValue(latest.contract) === outcomeContract.hashValue(contractGate.contract);
+  const gate = unchangedAcceptance ? verifierGateDecision(findings, checks, { ...options, requireOwning: true, verificationContract: contractGate.contract, executionToken }) : 'blocked';
+  const checkResults = Object.fromEntries(findings.map(f => [f.check_id, !unchangedAcceptance ? 'stale' : f.verifier_result === 'pass' ? 'passed' : f.verifier_result === 'fail' ? 'failed' : /stale/.test(f.reason || '') ? 'stale' : 'missing']));
+  const parent = outcomeContract.readiness(contractGate.contract, { checkStates: checkResults });
+  const bound = contractGate.contract.outcome_contract ? outcomeContract.bind(contractGate.contract, options) : null;
+  const reason = unchangedAcceptance ? findings.find(f => f.reason)?.reason || (gate === 'blocked' ? 'required owning evidence missing or became stale; rerun accepted checks' : null) : 'latest verification acceptance changed or was rejected during execution';
   record(gate, {
+    contract_sha256: outcomeContract.contractHash(contractGate.contract), check_results: checkResults, parent_outcome: parent,
+    ...(bound?.binding ? { outcome_binding: bound.binding } : {}), reason,
     findings_count: findings.length,
     divergence: makerClaim === 'complete' && gate !== 'pass' ? 'maker_claimed_complete_but_gate_blocked' : null,
   });
-  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary };
+  const nextCommand = ['specflow', 'run', 'verify', '--run-dir', paths.baseDir, ...(options.configurationId ? ['--configuration-id', options.configurationId] : []), ...(options.environment ? ['--environment', options.environment] : [])].map(shellQuote).join(' ');
+  return { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
 }
 
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----
@@ -1349,7 +1382,9 @@ function verifierTrace(options = {}) {
   else if (mechanicalGate.result === 'fail') disposition = 'gate_failed';
   else if (mechanicalGate.result === 'pass' && contractGate.accepted) disposition = 'passed';
 
-  let parentOutcome = outcomeContract.readiness(contractGate.contract);
+  let retained; try { retained = JSON.parse(readFileSync(paths.contractPath, 'utf8')); } catch { retained = null; }
+  let parentOutcome = outcomeContract.readiness(contractGate.contract || retained);
+  if (!contractGate.accepted && retained?.outcome_contract) parentOutcome = { ...parentOutcome, status: 'blocked', reason: contractGate.reason };
   if (contractGate.accepted && contractGate.contract.outcome_contract) {
     const previous = last(e => e.event === 'verifier_stage' && e.outcome_binding)?.outcome_binding;
     const current = outcomeContract.bind(contractGate.contract, {
@@ -1364,6 +1399,9 @@ function verifierTrace(options = {}) {
     parentOutcome.reason = fresh.reason || null;
     if (['stale', 'unsupported'].includes(fresh.status)) parentOutcome.obligations = outcomeContract.projectObligations(contractGate.contract, { state: fresh.status });
     const latestStage = last(e => e.stage === 'verifier_stage' && ['verifier_stage', 'verifier_skip_override'].includes(e.event));
+    if (latestStage?.check_results && fresh.status === 'current' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
+      parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { checkStates: latestStage.check_results }) };
+    }
     if (latestStage?.event === 'verifier_skip_override' && latestStage.contract_sha256 === outcomeContract.contractHash(contractGate.contract)) {
       parentOutcome = { ...parentOutcome, ...outcomeContract.readiness(contractGate.contract, { state: 'waived' }) };
     }
@@ -2696,6 +2734,10 @@ function cli(argv = process.argv.slice(2)) {
     let result;
     if (loop === 'status') {
       result = runStatus(opts);
+    } else if (loop === 'verify') {
+      result = runVerifierStage({ ...opts, root: opts.repoRoot || process.cwd(), requiredMode: 'always', makerClaim: 'verification_requested' });
+      console.log(JSON.stringify(result, null, 2));
+      return result.gate === 'pass' ? 0 : 1;
     } else if (loop === 'trace') {
       result = verifierTrace({ runDir: opts.runDir, contract: opts.contract, ledger: opts.ledger });
     } else if (opts.setupRouting) {

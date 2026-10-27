@@ -24,13 +24,19 @@ jobs:
           cache: npm
       - name: Install locked dependencies
         run: npm ci --ignore-scripts
+      - name: Allocate fresh native report
+        run: |
+          specflow_report_dir="$(mktemp -d "$RUNNER_TEMP/specflow-native.XXXXXX")"
+          printf '%s\n' "SPECFLOW_CANONICAL_REPORT=$specflow_report_dir/canonical-tests.json" >> "$GITHUB_ENV"
       - name: Execute canonical suites
-        run: npm test -- --maxWorkers=2 --roots tests --json --outputFile canonical-tests.json
+        run: node node_modules/jest/bin/jest.js --no-coverage --maxWorkers=2 --roots tests --json --outputFile "$SPECFLOW_CANONICAL_REPORT"
+      - name: Reconcile native case results
+        run: node scripts/test-execution.cjs validate-report jest "$SPECFLOW_CANONICAL_REPORT" .
       - name: Reject missing, failed or skipped checks
         run: |
           node - <<'JS'
           const fs=require('fs'),assert=require('assert');
-          const r=JSON.parse(fs.readFileSync('canonical-tests.json'));
+          const r=JSON.parse(fs.readFileSync(process.env.SPECFLOW_CANONICAL_REPORT));
           assert(r.success && r.numTotalTests>0 && r.numPassedTests===r.numTotalTests);
           assert(r.numFailedTests===0 && r.numPendingTests===0 && r.numTodoTests===0 && !r.wasInterrupted);
           console.log(JSON.stringify({passed:r.numPassedTests,suites:r.numPassedTestSuites,failed:0,skipped:0}));
@@ -39,6 +45,6 @@ jobs:
         if: always()
         with:
           name: canonical-tests-${{ github.sha }}
-          path: canonical-tests.json
+          path: ${{ env.SPECFLOW_CANONICAL_REPORT }}
           if-no-files-found: error
           retention-days: 14

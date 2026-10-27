@@ -1490,9 +1490,8 @@ or maker-written GitHub comment is insufficient. Rejected attempts retain histor
 The shared extension establishes declarations, coverage and freshness. Owning
 case-level runtime collection (#44), independent comparison semantics (#70),
 data seams (#133), final Gate D acceptance (#73) and installed proof (#124) remain
-separate consumers. Until the owning execution consumer is installed, a required
-outcome contract blocks with the required check IDs instead of treating exit zero
-as parent acceptance. `specflow run trace` exposes this distinction. Do not equate
+separate consumers. The owning execution consumer requires native case inventory and current receipts;
+a missing consumer or inventory blocks with the required check IDs. `specflow run trace` exposes this distinction. Do not equate
 planned, bound, executed, accepted, merged, published and installed statuses.
 
 The existing trace recomputes the last stored binding and exposes `binding_status`
@@ -1516,3 +1515,129 @@ loads it only when selecting an outcome contract; if it is unavailable, parent
 readiness blocks with the exact dependency repair. Existing legacy helpers do
 not gain a new unconditional dependency. Complete installed-host setup remains
 part of #124's qualification.
+
+### Owning native case execution (TE-001..006, #44)
+
+The accepted verification contract now supplies the native case inventory for
+each runtime check. `scripts/test-execution.cjs:validate` is the executable
+schema and semantic validator. Its strict `execution` object has exactly these
+fields:
+
+```yaml
+runtime_checks:
+  - id: C-CLI
+    type: custom-script
+    required: true
+    verification_level: process
+    boundaries: [process, filesystem]
+    configuration_ids: [local-node]
+    checker_paths: [tests/cli.test.js]
+    input_paths: [tests/input.txt]
+    rule_paths: []
+    execution:
+      adapter: jest
+      test_files: [tests/cli.test.js]
+      required_case_ids: ["tests/cli.test.js::CLI transforms the fixture"]
+      optional_case_ids: []
+      args: []
+```
+
+Adapters are `jest` and `playwright`; the project supplies that native framework.
+Test files are unique, existing repository-relative files included in
+`checker_paths`. Required and optional case inventories are unique and disjoint;
+required checks need at least one required case. Accepted levels are `static`,
+`unit`, `process`, `integration`, `journey`; parent obligations retain #132's
+level/configuration requirements. `boundaries` is a nonempty unique list of
+reviewed exercised boundaries. The native report cannot upgrade these declarations.
+Actual boundary coverage and independent assertions require review and relevant
+real-environment checks; case accounting alone does not establish them.
+
+Jest IDs are `relative-file::native fullName`. Playwright IDs are
+`project-name-or-default::relative-file::describe > test title`. Duplicate full
+identities block; parameterized tests need distinct names (include parameters or
+an index). Pending/todo/disabled/skipped required cases, unknown statuses, zero
+collection, missing IDs, unaccounted cases or inconsistent native counts block.
+An assertion failure fails. Accepted optional skips remain `skipped` while the
+required scope can pass. Native retries retain every attempt status and the `flaky` classification; a
+final passing case can satisfy the accepted native retry configuration. An
+expected-failure annotation cannot fabricate passing required behaviour.
+
+The owning adapter resolves the actual native framework, uses fresh private
+report/cache/artifact locations, controls reporting arguments and executes it.
+The legacy `command` field cannot replace that native invocation. Listing,
+watching, snapshot-update and report-output overrides are unavailable as native
+execution arguments. Native entry/version/digest, actual command, times, exit,
+host identity, before/after bindings, raw report/log hashes and case results are
+retained in existing `runtime-evidence`, findings and ledger artifacts. Native
+assertion expected/actual details remain in the private raw report where present.
+Generated runtime evidence must be ignored by Git; the installers add
+`.specflow/runs/`. No browser binary is needed for a process-level CLI journey.
+
+A process-local owning receipt is bound to its invocation. Submitting JSON or
+replaying an old receipt does not create a new execution. Changed durable
+artifacts, relevant source/inputs/checkers/environment, changed acceptance or a
+later rejection blocks consumption. Findings are reconciled after the whole
+attempt so a later check cannot silently invalidate an earlier input. Persisted
+receipts remain historical evidence; they do not authenticate themselves after
+process restart. Existing CI uses the shared native report validator within its
+owning workflow and retains raw report artifacts. The validator alone grants no
+runtime or parent acceptance, and this change adds no CI dispatch permission.
+
+Use the existing runner for a fresh authorised verification:
+
+```bash
+specflow run verify --run-dir .specflow/runs/my-slice \
+  --configuration-id local-node --environment isolated-node
+```
+
+It uses the accepted verification contract, returns nonzero for unproven required
+behaviour and records a fresh attempt. Its rerun command never overwrites a prior
+native report. A legacy check without native adapter/case metadata gets an
+explicit migration blocker; accept revised execution metadata through the
+existing lifecycle. Unchanged obligations/oracles/support scope add no new owner
+checkpoint. Low-level supplied-state unit fixtures are labelled `supplied_state`
+and cannot qualify the actual owning verifier stage.
+
+For the existing journey hook, declare the same mapping in its YAML:
+
+```yaml
+journey_meta:
+  id: J-CLI
+  verification_level: process
+  boundaries: [process, filesystem]
+test_hooks:
+  e2e_test_file: tests/cli.test.js
+  execution:
+    adapter: jest
+    required_case_ids: ["tests/cli.test.js::CLI transforms the fixture"]
+    optional_case_ids: []
+    args: []
+```
+
+The hook adds the contract and test files to checker bindings. Optional
+`test_hooks.checker_paths`, `input_paths`, `rule_paths` use the same validated path
+arrays. Failed issue discovery, missing/ambiguous contracts or tests, missing
+native inventory and required deferrals block. Legacy global deferral emits
+`deferred/not_run` and permits hook continuation without passing verification.
+Explicit required/forbidden source patterns remain labelled static checks;
+navigation/mock syntax scans no longer certify runtime behaviour. The installed
+helper and source hook consume the same native accounting. Full released and
+supported-host installation qualification remains #124.
+
+Native checks default to a 120-second process bound; an explicit positive
+`timeout_seconds` selects a different bound. Timeouts report that exact guard
+and retain the partial artifacts. This runtime bound is separate from monetary
+or review policy.
+
+Improve currently has a separate **frozen atomic checker** boundary: an
+independently authored private oracle is executed before and after the change,
+and its command, artifact, workspace and results are bound by the existing
+Improve receipts. Its low-level `supplied_state` findings are projections,
+reconciled against that frozen inventory and selected receipt before deciding.
+They are not native suite case receipts and do not establish that every case
+inside a wrapped test suite ran. Improve rejects `check.execution` and
+`dev_check.execution` rather than ignoring a requested native inventory.
+Native suite integration into the private holdout path is tracked by #178 and
+is required before claiming that protection for Improve product qualification.
+Existing scientific/custom atomic oracles remain supported at their declared
+evidence strength; their numeric Improve levels are not native boundary levels.

@@ -145,7 +145,7 @@ test('OC005/006: unbound legacy parent readiness is explicit, existing bounded s
 test('OC006: required CLI obligations trigger verification without UI tags; identity is not owning execution', () => {
   accept();
   const result = runner.runVerifierStage({ runDir, root, configurationId: 'local', environment: 'isolated-node', sliceTags: ['cli'], requiredMode: 'never', runner: () => ({ executable: true, result: 'pass' }) });
-  expect(result).toMatchObject({ required: true, gate: 'blocked', binding_status: 'bound', reason: expect.stringContaining('#44') });
+  expect(result).toMatchObject({ required: true, gate: 'blocked', binding_status: 'bound', reason: expect.stringContaining('native') });
   expect(result.parent_outcome.obligations[0]).toMatchObject({ id: 'O-CLI', status: 'missing', check_ids: ['C-CLI'] });
 });
 test('OC006: contract JSON alone cannot manufacture parent acceptance without its owning lifecycle binding', () => {
@@ -188,7 +188,7 @@ test('OC006: real feature-build rail cannot bypass a required CLI parent with mo
     durable_evidence: [runContractPath], stop_condition: 'handoff', never_without_human: ['git push'], slice_tags: ['cli'], verifier_required_mode: 'never',
   } }));
   const result = runner.runLoop({ contract: runContractPath, noAdapterRouting: true, repoRoot: root, configurationId: 'local', environment: 'isolated-node' });
-  expect(result).toMatchObject({ status: 'blocked_verifier_stage', verifier_stage: { required: true, binding_status: 'bound', reason: expect.stringContaining('#44') } });
+  expect(result).toMatchObject({ status: 'blocked_verifier_stage', verifier_stage: { required: true, binding_status: 'bound', reason: expect.stringContaining('native') } });
 });
 test('OC002: Gate B contract reference is schema-validated as well as consumed', () => {
   const base = { loop: 'spec-build', goal: 'goal', input_artifact: '#132', path: 'loop.yml', current_stage_or_rail: 'GATE_B', next_gate: 'graph', durable_evidence: ['artifact'], stop_condition: 'handoff', never_without_human: ['git push'] };

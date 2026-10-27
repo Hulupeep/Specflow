@@ -425,3 +425,5 @@ the workflow does not search for keys. TypeSafe checks focused evidence and flag
 uncertainty; it cannot replace peer review or pass a required gate. Shadow mode
 records a comparison without influencing the review. The Python SDK is not needed.
 See [duo-build configuration, invocation and evidence](docs/duo-build.md).
+
+Runtime verification uses accepted native case inventories and owning Jest/Playwright reports. `specflow run verify --run-dir .specflow/runs/<slice>` executes the existing verifier without a provider call. Required skips, missing cases and stale reports block; see [the execution schema](CONTRACT-SCHEMA.md#owning-native-case-execution-te-001006-44). This source-kit capability must be present in the installed package/helpers before use.

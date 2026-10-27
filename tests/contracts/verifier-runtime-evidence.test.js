@@ -32,17 +32,19 @@ describe('VERIFIER-RUNTIME-01 — runtime evidence (J-VERIFIER-RUNTIME-EVIDENCE)
     expect(validateRuntimeChecks([{ type: 'api', required: true }], { valueBearing: true }).ok).toBe(true);
   });
 
-  test('executes checks and records findings with the required fields (verdict is evidence only)', () => {
+  test('normalizes supplied-state metadata only; actual native execution has separate TE tests', () => {
     const runDir = tempRun();
     const { findings, summary } = runRuntimeChecks({
       runDir,
       makerClaim: 'done',
+      runner: check => ({ executable: true, result: check.command === PASS ? 'pass' : 'fail' }), // explicit unit input, not owning evidence
       checks: [
         { type: 'api', command: PASS, assertion: 'reread returns 200', required: true },
         { type: 'playwright', command: FAIL, assertion: 'space bar moves player', required: true },
       ],
     });
     expect(summary).toMatchObject({ total: 2, pass: 1, fail: 1 });
+    expect(findings.every(f => f.evidence_kind === 'supplied_state')).toBe(true);
 
     const written = readJsonl(verificationPaths({ runDir }).findingsPath);
     for (const f of written) {
@@ -62,7 +64,7 @@ describe('VERIFIER-RUNTIME-01 — runtime evidence (J-VERIFIER-RUNTIME-EVIDENCE)
     });
     expect(findings[0].verifier_result).toBe('blocked');
     expect(findings[0].severity).toBe('blocked');
-    expect(findings[0].reason).toMatch(/missing executable surface/);
+    expect(findings[0].reason).toMatch(/native execution adapter/);
     expect(findings[0].evidence_path).toBeNull();
   });
 
@@ -76,11 +78,11 @@ describe('VERIFIER-RUNTIME-01 — runtime evidence (J-VERIFIER-RUNTIME-EVIDENCE)
     expect(findings[0].evidence_path).toMatch(/screenshot\.png/);
   });
 
-  test('findings feed the trace surface as verifier evidence', () => {
+  test('supplied historical findings feed trace metadata without claiming native proof', () => {
     const runDir = tempRun();
     fs.appendFileSync(verificationPaths({ runDir }).ledgerPath,
       `${JSON.stringify({ event: 'maker_claim', claim: 'done' })}\n`);
-    runRuntimeChecks({ runDir, makerClaim: 'done', checks: [{ type: 'api', command: FAIL, assertion: 'reread', required: true }] });
+    runRuntimeChecks({ runDir, makerClaim: 'done', runner: () => ({ executable: true, result: 'fail' }), checks: [{ type: 'api', command: FAIL, assertion: 'reread', required: true }] });
 
     const t = verifierTrace({ runDir });
     expect(t.verifier.findings_count).toBe(1);

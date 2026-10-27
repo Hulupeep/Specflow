@@ -138,6 +138,36 @@ function writeTmp(f, name, data) {
 }
 const setSteps = (ws, steps) => fs.writeFileSync(path.join(ws, 'src', 'journey.json'), JSON.stringify({ steps }));
 
+describe('TEST-EXECUTION Improve atomic checker boundary (#44/#178)', () => {
+  test('native inventory cannot be silently ignored by the atomic checker path', async () => {
+    const f = fixture();
+    try {
+      const doc = contract();
+      doc.acceptance[0].check.execution = { adapter: 'jest', required_case_ids: ['required'] };
+      const result = await prepare(f, { contractDoc: doc });
+      expect(result.frozen.status).toBe('rejected');
+      expect(result.frozen.errors.join('\n')).toMatch(/execution is unsupported.*#178/);
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  });
+  test.each(['missing', 'duplicate', 'result', 'identity'])('%s projected finding cannot replace the bound frozen checker', quiet(async kind => {
+    const f = fixture();
+    try {
+      const { runDir } = await runToImplementation(f, { edits: { 1: ws => setSteps(ws, 2) } });
+      await improve.verifyPhase(runDir, 'after');
+      const file = runner.verificationPaths({ runDir: path.join(runDir, 'verification', 'after', 'holdout') }).findingsPath;
+      const rows = fs.readFileSync(file, 'utf8').trim().split('\n').map(JSON.parse);
+      if (kind === 'missing') rows.length = 0;
+      if (kind === 'duplicate') rows.push({ ...rows[0] });
+      if (kind === 'result') rows[0].verifier_result = 'fail';
+      if (kind === 'identity') rows[0].check_sha256 = '0'.repeat(64);
+      fs.writeFileSync(file, rows.map(JSON.stringify).join('\n') + '\n');
+      const decision = improve.evaluate(runDir);
+      expect(decision.decision).not.toBe('KEEP');
+      expect(decision.rail_gate).toBe('blocked');
+    } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+  }));
+});
+
 // Everything up to a recorded baseline: candidates, Duo critique, evaluator-authored holdout, frozen contract.
 async function prepare(f, { checkInput = 'src/journey.json', contractDoc = contract(), runId = 'improve-test', critique = PURSUE, holdoutPrefix = '' } = {}) {
   const { runDir } = improve.startRun({ target: f.repo, mission: f.mission, runId, stateDir: f.state, worktreeRoot: f.worktrees });

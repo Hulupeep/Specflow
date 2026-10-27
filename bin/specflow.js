@@ -151,7 +151,7 @@ const COMMANDS = {
     },
   },
   run: {
-    usage: 'specflow run <loop> [--slug <slug>] [--goal <goal>] [--input <path>] [--stage-evidence <path>] [--adapter-routing <path>] | specflow run --check-routing-models | specflow run --update-routing-models',
+    usage: 'specflow run <loop|verify> [--run-dir <path>] [--configuration-id <id>] [--environment <id>] [--slug <slug>] [--goal <goal>] [--input <path>] [--stage-evidence <path>] [--adapter-routing <path>] | specflow run --check-routing-models | specflow run --update-routing-models',
     desc: 'Run or resume a local contracted Specflow loop',
     run: (args) => {
       const code = runSpecflowLoop(args);

@@ -411,6 +411,11 @@ function validateContract(runDir, contract, selected) {
       else if (!fs.existsSync(path.join(runDir, a.dev_check.artifact))) errors.push(`${where}: dev_check artifact ${a.dev_check.artifact} does not exist in the run directory`);
       if (a.check && a.dev_check.artifact === a.check.artifact) errors.push(`${where}: dev_check must differ from the holdout check`);
     }
+    // This path executes a frozen atomic oracle, not the native-suite adapter.
+    // Do not silently ignore an inventory that the caller expects us to enforce.
+    for (const key of ['check', 'dev_check']) {
+      if (a?.[key]?.execution !== undefined) errors.push(`${where}: ${key}.execution is unsupported by Improve; native suite receipt integration is pending #178. Use a reviewed atomic frozen checker, not an aggregate suite exit code`);
+    }
   }
   if (!acceptance.some((a) => a.mandatory && a.required_level <= 2)) {
     errors.push('at least one mandatory criterion must require level 1 or 2 evidence; otherwise the change is unevaluable');
@@ -1462,6 +1467,23 @@ function evaluate(runDir) {
   const findingsPath = runner.verificationPaths({ runDir: path.join(runPaths(runDir).phaseDir('after'), 'holdout') }).findingsPath;
   const findings = fs.existsSync(findingsPath) ? runner.readLedger(findingsPath) : [];
   const finished = lastEvent(evs, 'implementation_finished');
+  const railChecks = gov.contract.acceptance.filter(a => a.check).map(a => ({
+    id: a.id, type: a.check.type || 'custom-script', assertion: a.statement,
+    required: a.mandatory,
+    evidence_path: path.join(runPaths(runDir).phaseDir('after'), `${a.id}.out.txt`),
+  }));
+  // Persisted callback findings are only a projection. The selected current
+  // receipt and frozen inventory supply authority; neither arbitrary rows nor
+  // an aggregate callback pass may replace a mandatory atomic checker result.
+  const railMatchesBoundEvidence = railChecks.every(check => {
+    const rows = findings.filter(f => f.check_id === check.id);
+    const bound = boundEvidence.filter(e => e.phase === 'after' && e.set === 'holdout'
+      && e.criterion === check.id && e.kind === 'executable-check'
+      && e.producer_role === MECHANICAL_PRODUCER && !e.self_review);
+    return rows.length === 1 && bound.length === 1
+      && rows[0].verifier_result === bound[0].result
+      && rows[0].evidence_path === bound[0].evidence_path;
+  });
   const state = {
     integrity_failed: gov.tampered || gov.artifactErrors.length > 0 || evidenceTampered || !verifyLedger(runDir).ok,
     side_effects_attempted: evs.filter((e) => e.event === 'side_effect_attempted').length + (finished?.forbidden_action_detected ? 1 : 0),
@@ -1481,7 +1503,7 @@ function evaluate(runDir) {
     disputes: evs.filter((e) => e.event === 'oracle_disputed').map((e) => ({ criterion: e.criterion, reason: e.reason, role: e.role })),
     peer_recommendation: finished?.peer_recommendation || null,
     peer_rounds: evs.filter((e) => e.event === 'peer_review').map((e) => ({ round: e.round, recommendation: e.recommendation, assessment: e.assessment, invalid: e.invalid, independence: e.provenance?.independence })),
-    rail_gate: runner.verifierGateDecision(findings),
+    rail_gate: railMatchesBoundEvidence ? runner.verifierGateDecision(findings, railChecks) : 'blocked',
   };
   const { decision, reasons } = decide(state);
   const record = {
