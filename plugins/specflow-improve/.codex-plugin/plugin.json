@@ -1,0 +1,7 @@
+{
+  "name": "specflow-improve",
+  "version": "0.1.2",
+  "description": "Thin authenticated Improve caller",
+  "skills": "./skills/",
+  "mcpServers": "./mcp.json"
+}

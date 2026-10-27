@@ -1,0 +1,16 @@
+{
+  "name": "specflow-improve",
+  "version": "0.1.2",
+  "description": "Thin authenticated Improve caller",
+  "author": {
+    "name": "Specflow"
+  },
+  "mcpServers": {
+    "improve": {
+      "command": "node",
+      "args": [
+        "${CLAUDE_PLUGIN_ROOT}/lib/bridge.cjs"
+      ]
+    }
+  }
+}

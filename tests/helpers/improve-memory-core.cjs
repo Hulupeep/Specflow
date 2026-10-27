@@ -9,7 +9,7 @@ function coreFixture({configure=null}={}){return memoryFixture({configure,affect
 }});}
 const peer=output=>()=>({status:0,stderr:'',stdout:[JSON.stringify({type:'system',subtype:'init',model:'fixture-peer'}),JSON.stringify({type:'result',subtype:'success',structured_output:output,total_cost_usd:0})].join('\n')});
 const write=(file,doc)=>{fs.writeFileSync(file,JSON.stringify(doc,null,2)+'\n',{mode:0o600});return file;};
-async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,consumed=[],afterVerified=null}={}){
+async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,consumed=[],afterVerified=null,implementationData=null}={}){
   const selection=f.selection({id,retry,consumed});
   const selected=f.service().selectMemory(f.command({selection}));if(!selected.allowed)throw Error(selected.reason_code);
   const binding={job_id:'memory-job-'+number,operation_id:'memory-operation-'+number,core_run_id:'memory-core-'+number};
@@ -34,7 +34,7 @@ async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,
   const builder=write(path.join(f.root,'builder-'+number+'.json'),{id:'fixture-builder',provider:'fake',command:'fake',timeout_seconds:10,max_iterations:1,transcript_path:'unused',output_path:'unused',never_without_human:['git push'],fake_stdout:'Fixture implementation'});
   await core.build(runDir,{policy:builder,acceptBaselineBlocker:invalid?CANARY:undefined,
     invokePeer:peer({direction:{assessment:'complete',goal_connection:'Controlled step reduction',next_steps:[],preserve:['input shape']},recommendation:'keep',reason:'Practice check observed'}),
-    afterBuilderRound:workspace=>fs.writeFileSync(path.join(workspace,'journey.json'),JSON.stringify({steps}))});
+    afterBuilderRound:workspace=>fs.writeFileSync(path.join(workspace,'journey.json'),JSON.stringify({steps,...(implementationData||{})}))});
   const after=await core.verifyPhase(runDir,'after');if(after.status!=='verified')throw Error(JSON.stringify(after));
   if(afterVerified)await afterVerified({cycle,binding,runDir});
   // Separate successful measurement over the actual candidate bytes, not a

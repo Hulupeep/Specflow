@@ -1,0 +1,1 @@
+{"name":"specflow-repo","plugins":[{"name":"specflow-improve","source":{"source":"local","path":"./plugins/specflow-improve"},"policy":{"installation":"AVAILABLE","authentication":"ON_INSTALL"},"category":"Productivity"}]}

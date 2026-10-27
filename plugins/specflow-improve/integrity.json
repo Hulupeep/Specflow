@@ -1,0 +1,33 @@
+{
+  "version": "0.1.2",
+  "files": [
+    {
+      "path": ".claude-plugin/plugin.json",
+      "sha256": "13e2f8f6f5cccf7aecc4c6207bbda6c859a624334dc12feb0779c6a5a927731b"
+    },
+    {
+      "path": ".codex-plugin/plugin.json",
+      "sha256": "2ba4ed2ef4d64921917f9d3245c1d3da2893383311d3a56c553bcaffff0815d2"
+    },
+    {
+      "path": "lib/bridge.cjs",
+      "sha256": "7b4d4b3348ff3de171ef2c13c8b48ccf852a07f48e03ecd15a8e9b5e22794fef"
+    },
+    {
+      "path": "lib/schemas.cjs",
+      "sha256": "7298b2de745f0b3661fe2dc6966e0bb2af22b1d952076c5a415ac134905923de"
+    },
+    {
+      "path": "mcp.json",
+      "sha256": "4a8b5e9596ab3157a07c39764150330a4e0b3db307eb60c2bc2e360cc84c9c1e"
+    },
+    {
+      "path": "plugin.json",
+      "sha256": "70b894d6f8066906602bb18e43f0ea6685c9bb75da6d12d519b5b55aad49ff85"
+    },
+    {
+      "path": "skills/improve/SKILL.md",
+      "sha256": "3fdc4e1411b8ee1c030c308473f9dedfa4c07bc16b805d75a7c75f1a8cd08dd6"
+    }
+  ]
+}

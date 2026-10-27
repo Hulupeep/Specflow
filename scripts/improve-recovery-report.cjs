@@ -53,6 +53,7 @@ function report({r,ctx,now,host,memory,view,verifyTerminalArchive,ownsRepo}){
   consumed:{cycles:r.consumed_cycles,terminal_cycles:r.terminal_cycles,attempts:r.consumed_attempts,consecutive_no_progress:r.no_progress},
   usage:{mode:'subscription_cli',attempts:r.consumed_attempts,estimates_usd:r.estimates.length?r.estimates.reduce((n,e)=>n+e.usd,0):null,actual_charges_usd:null},
   reason_code:reason,reasons:view.reasons,next_action:next,activation:'recovery_required'};
- return {...facts,revision:m.digest(facts),remaining:view.remaining};
+ const delivery=require('./improve-delivery-projection.cjs').project(r.service?.delivery);if(!delivery)return {...facts,revision:m.digest(facts),remaining:view.remaining};
+ const execution_revision=m.digest(facts),next_action=delivery.blocker&&facts.operations_complete&&!r.active_cycle?delivery.blocker.next_action:facts.next_action;return {...facts,execution_revision,execution_next_action:facts.next_action,next_action,delivery,revision:m.digest({...facts,delivery}),remaining:view.remaining};
 }
 module.exports={report};

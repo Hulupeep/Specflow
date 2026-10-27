@@ -1,0 +1,33 @@
+contract_meta:
+  id: feature_improve_integration
+  version: 1
+  owner: specflow-core
+  created_from_spec: 'GitHub #219; original and supplemental acceptance'
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_improve_integration'
+invariants:
+  - id: I-INTEGRATION-001
+    rule: 'Thin callers transport data to the existing service; they own no execution, permission or scheduling authority.'
+    tests: [INTEGRATION-01, INTEGRATION-10, INTEGRATION-17]
+  - id: I-INTEGRATION-002
+    rule: 'Core remains unable to push or merge; separately granted publisher exports only the exact authenticated retained commit to the configured destination, never merges or deploys.'
+    tests: [INTEGRATION-02, INTEGRATION-07, INTEGRATION-12]
+  - id: I-INTEGRATION-003
+    rule: 'Durable controller delivery identity and current grant/cancel fencing precede each new issued write; uncertain operations require reconciliation and cannot authorise duplicate effects.'
+    tests: [INTEGRATION-03, INTEGRATION-11, INTEGRATION-13]
+  - id: I-INTEGRATION-004
+    rule: 'HeyStax projections preserve configured destination, human content, original task/result and truthful unknown/conflict states; no remote CAS or dispatch capability is inferred.'
+    tests: [INTEGRATION-04, INTEGRATION-09, INTEGRATION-14, INTEGRATION-18]
+  - id: I-INTEGRATION-005
+    rule: 'External lifecycle observations retain authenticated original identities and provenance; newer evidence and current actor authority cannot be replaced by notification text or stale holders.'
+    tests: [INTEGRATION-06, INTEGRATION-08, INTEGRATION-15, INTEGRATION-16]
+  - id: I-INTEGRATION-006
+    rule: 'Exact outgoing payload passes privacy before external publication; delivery failure never changes core decision, grants or consumed work.'
+    tests: [INTEGRATION-05, INTEGRATION-12]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-publication.test.js
+    - file: tests/integration/improve-handoff.test.js
+    - file: tests/integration/improve-plugin-callers.test.js
