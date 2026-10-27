@@ -113,7 +113,7 @@ function createRunContract({ loop, slug, goal, input, contractPath, ledgerPath, 
       run_id: modelConfirmationRunId(slug, contractPath),
       goal,
       input_artifact: input,
-      path: LOOP_PATHS[loop],
+      path: resolveLoopPath(loop, repoRoot || process.cwd()),
       current_stage_or_rail: loop === 'feature-build' ? '1_ticket' : 'discover',
       next_gate: loop === 'feature-build'
         ? 'ticket + ACs + journey id confirmed'
@@ -702,11 +702,22 @@ function isSimulationFresh({ simulationPath, inputPaths = [] }) {
   return { ok: true, reason: null };
 }
 
+function resolveLoopPath(loop, root, configured = LOOP_PATHS[loop]) {
+  if (!configured || existsSync(resolve(root, configured))) return configured;
+  // Only the historical default has known installation aliases. A missing
+  // custom path must not silently select a different workflow.
+  if (configured !== LOOP_PATHS[loop]) return configured;
+  const installed = configured.replace(/^templates\//, '');
+  if (existsSync(resolve(root, installed))) return installed;
+  const packaged = resolve(__dirname, '..', configured);
+  return existsSync(packaged) ? packaged : configured;
+}
+
 function loadLoopDefinition(contractOrLoop, options = {}) {
   const loop = typeof contractOrLoop === 'string' ? contractOrLoop : contractOrLoop.loop;
-  const definitionPath = (typeof contractOrLoop === 'object' && contractOrLoop.path) || LOOP_PATHS[loop];
+  const root = options.root || contractOrLoop.repository_root || process.cwd();
+  const definitionPath = resolveLoopPath(loop, root, (typeof contractOrLoop === 'object' && contractOrLoop.path) || LOOP_PATHS[loop]);
   if (!definitionPath) return null;
-  const root = options.root || process.cwd();
   const absolute = resolve(root, definitionPath);
   if (!existsSync(absolute)) return null;
   return loadDataFile(absolute);
@@ -1438,12 +1449,31 @@ function materializeStagePrompt(contract, options = {}) {
     '- Do not mark the gate passed yourself; rerun the owning Specflow verifier after work.',
     '- Stop immediately if a never_without_human action would be required.',
     '',
+    '## Gate Re-entry',
+    `Write hash-bound stage evidence to: ${stageReentry(contract, options).stage_evidence_path}`,
+    'Use schema_version: 1, the current stage, artifacts with path/sha256, and checks with name/command. The owning verifier reruns the checks; a model claim is not a pass.',
+    stageReentry(contract, options).owning_gate_command,
+    '',
     `Sequence: ${sequence.join(' -> ')}`,
     '',
   ].join('\n');
   ensureDir(promptPath);
   writeFileSync(promptPath, content, 'utf8');
   return { promptPath, content };
+}
+
+function stageReentry(contract, options = {}) {
+  const contractPath = resolve(options.contractPath || contract.storage?.contract_path || defaultRunPaths(options.slug || 'specflow-run').contractPath);
+  const stage = String(contract.current_stage_or_rail || 'stage').replace(/[^a-z0-9._-]+/gi, '-');
+  const evidence = resolve(options.stageEvidence || join(dirname(contractPath), `${stage}-stage-evidence.json`));
+  const args = [process.execPath, __filename, contract.loop, '--contract', contractPath,
+    '--ledger', resolve(options.ledgerPath || contract.storage?.ledger_path || join(dirname(contractPath), 'ledger.jsonl')),
+    '--slug', options.slug || 'specflow-run', '--stage-evidence', evidence, '--no-adapter-routing'];
+  for (const [key, flag] of [['specDir', '--spec-dir'], ['provenance', '--provenance'], ['issue', '--issue'], ['simulationPath', '--simulation-path']]) {
+    if (options[key]) args.push(flag, String(options[key]));
+  }
+  if (options.owningGateCommand) return { stage_evidence_path: evidence, owning_gate_command: options.owningGateCommand };
+  return { stage_evidence_path: evidence, owning_gate_argv: args, owning_gate_command: args.map(shellQuote).join(' ') };
 }
 
 function resolveTemplate(value, context) {
@@ -2093,6 +2123,7 @@ function runAdapter(policy, options = {}) {
       stop_reason: 'gate_rerun_required',
       forbidden_action_detected: false,
       owning_gate_command: options.owningGateCommand || null,
+      ...(options.reentry || {}),
     },
   };
 }
@@ -2134,6 +2165,7 @@ function runLoopBody(options) {
   }
 
   const contract = wrapper.run_contract;
+  if (contract.path) contract.path = resolveLoopPath(contract.loop, options.root || contract.repository_root || process.cwd(), contract.path);
 
   // STATE-REENTRY-01 (#85): on resume the durable position is authoritative; a
   // caller-assumed stage that conflicts is overridden and ledgered, not silent.
@@ -2325,6 +2357,7 @@ function runLoopBody(options) {
       promptPath: prompt.promptPath,
       stage: contract.current_stage_or_rail,
       owningGateCommand: options.owningGateCommand,
+      reentry: stageReentry(contract, { ...options, contractPath, ledgerPath }),
     });
     if(discoveryBatch) {
       require('./specflow-reviews.cjs').change(contract.repository_root || process.cwd(),loadDataFile(contract.tier_record).issue.number,journal=>{journal.batches[discoveryBatch].outcome=adapterResult.status==='gate_rerun_required'?'success':'blocked';journal.batches[discoveryBatch].evidence=policy.transcript_path;});
