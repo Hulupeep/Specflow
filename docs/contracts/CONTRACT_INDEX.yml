@@ -1,4 +1,6 @@
 contracts:
+  - id: feature_native_hooks
+    path: docs/contracts/feature_native_hooks.yml
   - id: feature_native_commands
     path: docs/contracts/feature_native_commands.yml
   - id: feature_native_plugin
