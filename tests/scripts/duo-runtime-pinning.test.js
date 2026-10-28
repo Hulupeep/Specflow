@@ -26,7 +26,7 @@ test('an eligible new run pins the staged installation and reports its exact act
  const next=installed.start(f.root,'#153 explicitly requested new fixture run','codex',f.context);
  const manifest=JSON.parse(fs.readFileSync(path.join(f.root,'.specflow/duo',next.id,'runtime/manifest.json')));
  const digest=bytes=>require('crypto').createHash('sha256').update(bytes).digest('hex');
- const expected={};const walk=(dir,rel)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,e.name),next=rel+'/'+e.name;if(e.isDirectory())walk(file,next);else expected[next]=digest(fs.readFileSync(file));}};
+ const expected={};const walk=(dir,rel)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,e.name),next=rel+'/'+e.name;if(e.isDirectory()){if(next!=='scripts/agents')walk(file,next);}else expected[next]=digest(fs.readFileSync(file));}};
  for(const rel of ['scripts','templates','skills','bin'])walk(path.join(source,rel),rel);
  expected['package.json']=digest(fs.readFileSync(path.join(source,'package.json')));
  expected['skills/duo-build/SKILL.md']=digest(fs.readFileSync(path.join(source,'skills/duo-build/SKILL.md')));

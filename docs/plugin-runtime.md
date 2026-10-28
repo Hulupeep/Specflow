@@ -16,7 +16,9 @@ New Duo pins include first-party scripts, vendor files, package metadata, templa
 skills and CLI resources in the existing hash-bound manifest (`closureVersion: 2`).
 Installed project scripts receive these read-only source resources below
 `scripts/runtime-resources/`; this does not replace the project's package.json.
-The existing installer owns the bytes, lock, rollback and staging. Doctor restore
+The existing installer owns the bytes, lock, rollback and staging. The legacy
+`scripts/agents` source mirror stays excluded: setup already owns that project
+path from canonical `agents/`, which the resource inventory preserves. Doctor restore
 resolves each embedded resource to its canonical source bytes. No bundle-time
 source rewriting or alternative updater is involved.
 

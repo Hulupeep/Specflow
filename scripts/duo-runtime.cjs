@@ -48,7 +48,9 @@ function scriptFiles(source,visit) {
   for(const name of roots)visit('scripts/'+name,path.join(dir,name));
   for(const entry of fs.readdirSync(dir,{withFileTypes:true})) {
     if(entry.isSymbolicLink())throw Error('Runtime path must not follow symlinks');
-    if(entry.isDirectory()&&entry.name!=='runtime-resources')walkFiles(path.join(dir,entry.name),(rel,file)=>visit('scripts/'+entry.name+'/'+rel,file));
+    // scripts/agents is a legacy project overlay; setup owns that path from
+    // canonical agents/. Copying its older source mirror would claim two owners.
+    if(entry.isDirectory()&&!['runtime-resources','agents'].includes(entry.name))walkFiles(path.join(dir,entry.name),(rel,file)=>visit('scripts/'+entry.name+'/'+rel,file));
   }
 }
 function resourceFiles(source,visit) {
