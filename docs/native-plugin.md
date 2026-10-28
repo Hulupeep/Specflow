@@ -75,3 +75,7 @@ with the actual blocker; progressing subscription repairs have no invented
 financial/count brake. This is not a general arbitrary-program sandbox.
 Duo retains its existing owner/pinned cadence. Owning native integration and final
 release qualification must be evidenced separately from manifest/transport checks.
+
+Within owned native scope, dynamic/compound shell syntax and leading global
+git/gh options are explicitly unsupported. Use the selected project and an
+explicit operation; ordinary nonplugin CLI behavior is unchanged.
