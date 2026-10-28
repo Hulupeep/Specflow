@@ -1,0 +1,28 @@
+contract_meta:
+  id: runtime_bindings
+  version: 1
+  created_from_spec: 'GitHub #56'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: runtime_bindings'
+invariants:
+  - id: I-RUNTIME-001
+    rule: Loop paths name roles and gates, never mandatory provider commands.
+  - id: I-RUNTIME-002
+    rule: >-
+      A selected runtime can complete the full pipeline without the other runtime CLI; explicit Duo remains
+      cross-family without fallback.
+  - id: I-RUNTIME-003
+    rule: >-
+      Runtime bindings cannot weaken gates or human boundaries. Fresh-native scope uses the existing owning
+      native content receipts, current gates, selected managed assignment and pinned purpose; simulated or
+      caller-provided identity cannot grant readiness.
+  - id: I-RUNTIME-004
+    rule: >-
+      Every shipped route resolves to an executable generative stage or rail before provider invocation;
+      missing required roles and orphan routes block.
+test_hooks:
+  tests:
+    - file: tests/contracts/runtime-bindings.test.js

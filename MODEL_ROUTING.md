@@ -3,8 +3,8 @@
 Specflow model routing lets a project choose which local agent runtime handles
 each stage of a larger initiative. The default pattern is:
 
-- expensive thinking and review: Claude/Fable through `claude -p`
-- bounded coding, tests, and release prep: Codex CLI through `codex exec`
+- selected Claude host: planning, authoring, coding and fresh critics through `claude -p`
+- selected Codex host: every generative role through `codex exec`
 - thinking level: the policy `effort` field, recorded per route
 - approval: Specflow gates, CI, and humans
 
@@ -90,7 +90,7 @@ defines three policies:
 |---|---|---|---|---|---|---|
 | `fable-planner` | `claude -p` | `planner` | `claude-fable-5` | `xhigh` | `claude-opus-4-8` | discovery and PRD shaping |
 | `fable-reviewer` | `claude -p` | `verifier` | `claude-fable-5` | `xhigh` | `claude-opus-4-8` | adversarial review and high-value review |
-| `gpt55-coder` | `codex exec` | `implementer` | `gpt-5.5` | `medium` | none | contracts, E2E, oracle wiring, implementation |
+| `claude-coder` | `claude -p` | `implementer` | `claude-fable-5` | `medium` | none | contracts, E2E, oracle wiring, implementation |
 
 The default route map is:
 
@@ -100,14 +100,13 @@ routes:
     discover: fable-planner
     draft: fable-planner
     adversary: fable-reviewer
-    tickets: gpt55-coder
+    tickets: claude-coder
 
   feature-build:
-    2_contract: gpt55-coder
-    3_e2e: gpt55-coder
-    4_oracle: gpt55-coder
-    5_impl: gpt55-coder
-    review: fable-reviewer
+    2_contract: claude-coder
+    3_e2e: claude-coder
+    4_oracle: claude-coder
+    5_impl: claude-coder
 ```
 
 The exact file uses expanded YAML objects so each route can carry a reason and
@@ -311,7 +310,7 @@ To make Codex use a different model for implementation:
 
 ```yaml
 policies:
-  gpt55-coder:
+  claude-coder:
     adapter_policy:
       requested_model: gpt-5.5
       model: gpt-5.5
@@ -324,7 +323,7 @@ To add a route for a new stage:
 routes:
   feature-build:
     6_provenance:
-      policy: gpt55-coder
+      policy: claude-coder
       reason: provenance evidence assembly
 ```
 
@@ -343,7 +342,7 @@ To make a low-cost stage run without confirmation, override that route only:
 routes:
   spec-build:
     tickets:
-      policy: gpt55-coder
+      policy: claude-coder
       confirm_models: false
 ```
 
@@ -372,3 +371,24 @@ also retained as routing and ledger metadata.
   selected provider/model before invoking it.
 - Do not treat provider output as a gate result. Provider output is work product;
   Specflow gates, CI, and human sign-offs decide whether work advances.
+
+
+## Normal fresh role review and explicit Duo
+
+`specflow review bind RECORD.json` derives the normal critic from the verified
+managed installed profile. Bind before current specification gates; then use
+`specflow review start/review/resume/finish` with the same context and batch schema
+as Duo. The public command shares the frozen engine and `.specflow/duo/` journal.
+Fresh-native means same-host fresh read-only context; status never calls it Duo.
+Copied identity fields and simulated transcripts cannot establish live readiness.
+
+`specflow duo-build` remains explicitly cross-family and blocks when its opposite
+CLI is unavailable. Existing unspecified runs remain Duo. Project policy
+`profile.requiredReviewMethod: duo` preserves that stronger requirement. A changed
+method or installed profile requires fresh binding, gates and review; it cannot
+convert old history. Takeover preserves the selected host and review method.
+
+Role coverage and route integrity are validated against the actual loop stages
+before a managed provider is invoked. Mechanical gates need no model route. The
+critic policy exists independently of an implementation review rail; #54 adds the
+actual `5_review` rail. No dead `feature-build.review` route is shipped.

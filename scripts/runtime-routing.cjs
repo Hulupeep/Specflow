@@ -11,6 +11,32 @@ const RUNTIMES = {
 };
 const STATE_SCHEMA_VERSION = 1;
 
+// Mechanical gates deliberately have no model assignment. Read the real path,
+// rather than accepting a route merely because a policy with that name exists.
+function validateRoleRoutes(profile, sourceRoot, { requireComplete = true } = {}) {
+  const required = { 'spec-build': ['discover','draft','adversary','tickets'], 'feature-build': ['2_contract','3_e2e','4_oracle','5_impl'] };
+  for(const loop of Object.keys(profile.routes||{}))if(!Object.hasOwn(required,loop))throw Error(`Orphan routing loop: ${loop}`);
+  for (const [loop, stages] of Object.entries(required)) {
+    const canonical=path.join(sourceRoot,'templates/loops',loop+'.yaml');
+    const file=fs.existsSync(canonical)?canonical:path.join(sourceRoot,'QA/loops',loop+'.yaml');
+    const definition = readYaml(file), real = new Set((definition.stages || definition.rails || []).map(s => s.id));
+    const routes = profile.routes?.[loop] || {};
+    for (const stage of Object.keys(routes)) {
+      if (!real.has(stage) || /^GATE_/.test(stage)) throw Error(`Orphan or mechanical route: ${loop}.${stage}`);
+      const id = typeof routes[stage] === 'string' ? routes[stage] : routes[stage]?.policy;
+      if (!profile.policies?.[id]?.adapter_policy) throw Error(`Missing policy for ${loop}.${stage}: ${id}`);
+    }
+    if (requireComplete) for (const stage of stages) if (!routes[stage]) throw Error(`Missing generative role: ${loop}.${stage}`);
+  }
+  if (requireComplete) {
+    const review = profile.routing_profile?.normal_review;
+    if (review?.method !== 'fresh-native' || !profile.policies?.[review.policy]?.adapter_policy) throw Error('Missing fresh-native critic assignment');
+    const expected = profile.routing_profile.runtime === 'codex' ? 'codex-exec' : 'claude-print';
+    for (const entry of Object.values(profile.policies)) if (entry.adapter_policy?.provider !== expected) throw Error('Host profile requires another runtime provider');
+  }
+  return { ok: true };
+}
+
 function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
@@ -190,6 +216,7 @@ function installRuntimeRouting(options = {}) {
   const template = RUNTIMES[runtime];
   const templatePath = path.join(targetRoot, '.specflow', 'adapter-policies', template);
   const templateBytes = fs.readFileSync(templatePath);
+  validateRoleRoutes(yaml.load(templateBytes.toString('utf8')), sourceRoot);
   const templateHash = sha256(templateBytes);
   const activeExists = fs.existsSync(activePath);
   const activeHash = activeExists ? sha256(fs.readFileSync(activePath)) : null;
@@ -250,8 +277,9 @@ function verifyRuntimeRouting(options = {}) {
       if (!active.routing_profile || active.routing_profile.runtime !== routing.runtime) {
         return routingRequired('runtime_mismatch', routing.runtime, 'active routing runtime differs from install state');
       }
-    } catch (_) {
-      return routingRequired('stale_routing', routing.runtime, 'managed adapter routing is invalid YAML', { replaceRouting: true });
+      validateRoleRoutes(active, sourceRoot);
+    } catch (error) {
+      return routingRequired('stale_routing', routing.runtime, `managed adapter routing is invalid: ${error.message}`, { replaceRouting: true });
     }
   }
   const installedTemplate = path.join(targetRoot, '.specflow', 'adapter-policies', routing.template);
@@ -305,6 +333,7 @@ function cli(argv = process.argv.slice(2)) {
 }
 
 module.exports = {
+  validateRoleRoutes,
   RUNTIMES,
   sha256,
   semanticFingerprint,

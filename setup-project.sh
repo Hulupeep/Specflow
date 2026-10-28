@@ -162,7 +162,7 @@ echo -e "${BLUE}[4/10]${NC} Copying scripts, examples, and QA loops kit..."
 # teardown-gate, verify-seed, adversary-spawn, verify-ticket-journey, verify-falsification,
 # verify-seams, verify-adr, verify-graph, specflow-compile).
 for script in "$SCRIPT_DIR/scripts/"*.cjs; do
-    case "$(basename "$script")" in duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
+    case "$(basename "$script")" in review-assignment.cjs|specflow-review.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
   if [ -f "$script" ]; then
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"

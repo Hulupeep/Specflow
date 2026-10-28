@@ -1716,6 +1716,7 @@ function resolveAdapterRouting(options = {}, contract = null) {
   if (!routingPath || !contract) return { status: 'not_configured', routingPath: null };
   const routing = loadDataFile(routingPath);
   if (!routing || typeof routing !== 'object') throw new Error('adapter routing file must be an object');
+  if(routing.routing_profile?.normal_review) require('./runtime-routing.cjs').validateRoleRoutes(routing, resolve(__dirname,'..'));
   const route = routeValueForStage(routing, contract);
   if (!route) {
     return {
