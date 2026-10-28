@@ -9,7 +9,8 @@ test('J-DUO-RUNTIME-STABLE: stage while unfinished; pinned CLI status survives a
 });
 test('an eligible new run pins the staged installation and reports its exact active version',()=>{
  const kit=path.resolve(__dirname,'../..');
- for(const name of runtime.helpers)fs.copyFileSync(path.join(kit,'scripts',name),path.join(source,'scripts',name));
+ fs.cpSync(path.join(kit,'scripts'),path.join(source,'scripts'),{recursive:true});
+ for(const rel of ['templates','skills','bin'])fs.cpSync(path.join(kit,rel),path.join(source,rel),{recursive:true});
  fs.appendFileSync(path.join(source,'scripts/duo-build.cjs'),'\n// Distinct next-version fixture bytes.\n');
  fs.mkdirSync(path.join(source,'skills/duo-build'),{recursive:true});
  fs.copyFileSync(path.join(kit,'skills/duo-build/SKILL.md'),path.join(source,'skills/duo-build/SKILL.md'));
@@ -25,7 +26,11 @@ test('an eligible new run pins the staged installation and reports its exact act
  const next=installed.start(f.root,'#153 explicitly requested new fixture run','codex',f.context);
  const manifest=JSON.parse(fs.readFileSync(path.join(f.root,'.specflow/duo',next.id,'runtime/manifest.json')));
  const digest=bytes=>require('crypto').createHash('sha256').update(bytes).digest('hex');
- const expected=Object.fromEntries(runtime.helpers.map(name=>['scripts/'+name,digest(fs.readFileSync(path.join(f.root,'scripts',name)))]));
+ const expected={};const walk=(dir,rel)=>{for(const e of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,e.name),next=rel+'/'+e.name;if(e.isDirectory()){if(next!=='scripts/agents')walk(file,next);}else expected[next]=digest(fs.readFileSync(file));}};
+ for(const rel of ['scripts','templates','skills','bin'])walk(path.join(source,rel),rel);
+ expected['package.json']=digest(fs.readFileSync(path.join(source,'package.json')));
+ expected['skills/duo-build/SKILL.md']=digest(fs.readFileSync(path.join(source,'skills/duo-build/SKILL.md')));
+ expect(manifest.closureVersion).toBe(2);
  expect(manifest.protocolVersion).toBe('duo-actions-1');
  expect(manifest.helperHashes).toEqual(expected);
  expect(manifest.identity).toBe(next.runtime.identity);

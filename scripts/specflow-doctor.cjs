@@ -1,8 +1,8 @@
 'use strict';
 // Read-only installation identity inspection. No provider calls or repairs.
-const fs=require('fs'),path=require('path'),crypto=require('crypto'),yaml=require('js-yaml');
+const fs=require('fs'),path=require('path'),crypto=require('crypto'),yaml=require('./vendor/js-yaml/js-yaml.cjs');
 const routing=require('./runtime-routing.cjs'),runtime=require('./duo-runtime.cjs');
-const z=require('zod'),text=z.string().min(1),digest=z.string().regex(/^[a-f0-9]{64}$/),host=z.enum(['codex','claude-code']);
+const z=require('./vendor/zod/index.cjs'),text=z.string().min(1),digest=z.string().regex(/^[a-f0-9]{64}$/),host=z.enum(['codex','claude-code']);
 const DoctorResult=z.object({
  status:z.enum(['healthy','repair_required','runtime_ambiguous']),specflowVersion:text,detectedRuntime:host.nullable(),activeRoutingProfile:text.nullable(),routingOwnership:z.enum(['managed','custom','missing']),
  findings:z.array(z.object({code:text,severity:z.enum(['error','warning','info']),message:text,repairCommand:text.optional()}).strict()),
@@ -65,7 +65,7 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
   const hash=bytes?sha(bytes):null,wantedHash=sha(wanted);
   const ownership=!bytes?'missing':hash===wantedHash?'managed':owned?.hashes?.[rel]===hash?'unverifiable':'custom';
   artifacts.push({path:rel,ownership,actualSha256:hash,expectedSha256:wantedHash});
-  if(ownership!=='managed')add('gate_artifact_'+ownership,rel+': '+ownership+'. Bytes are preserved. Review the executing package before using the explicit backup/restore procedure; then rerun '+repair+'.',bytes?reviewedRestore(path.join(sourceRoot,rel),path.join(target,rel),wantedHash,hash,backupDir,target,path.join(sourceRoot,'scripts/duo-runtime.cjs')):repair);
+  if(ownership!=='managed')add('gate_artifact_'+ownership,rel+': '+ownership+'. Bytes are preserved. Review the executing package before using the explicit backup/restore procedure; then rerun '+repair+'.',bytes?reviewedRestore(runtime.sourceFile(sourceRoot,rel),path.join(target,rel),wantedHash,hash,backupDir,target,path.join(sourceRoot,'scripts/duo-runtime.cjs')):repair);
  }
  const routingPath=path.join(target,'.specflow/adapter-routing.yml');
  let routingOwnership=!fs.existsSync(routingPath)?'missing':state?.routing?.managed===false?'custom':'managed';

@@ -250,5 +250,5 @@ test('OC001 migration: an actual isolated copy without the new schema dependency
   expect(result.status).toBe(0);
   const report = JSON.parse(result.stdout);
   expect(report.legacy.status).toBe('migration_required'); expect(report.hash).toMatch(/^[a-f0-9]{64}$/);
-  expect(report.parent).toMatchObject({ ok: false, errors: [expect.stringContaining('install zod@4.6.7')] });
+  expect(report.parent).toMatchObject({ ok: false, errors: [expect.stringContaining('bundled Zod runtime is missing or corrupt; restore the complete Specflow package')] });
 });

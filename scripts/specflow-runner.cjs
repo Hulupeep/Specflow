@@ -18,7 +18,7 @@ const owningVerifierStages = new WeakMap();
 const { createHash } = require('crypto');
 const { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync, appendFileSync, statSync } = require('fs');
 const { basename, dirname, join, resolve, posix } = require('path');
-const yaml = require('js-yaml');
+const yaml = require('./vendor/js-yaml/js-yaml.cjs');
 const {
   installRuntimeRouting,
   routingRequired,

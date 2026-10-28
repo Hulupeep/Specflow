@@ -1,6 +1,6 @@
 'use strict';
 // Versioned caller data only. Host identity, paths and commands never enter this schema.
-const {z}=require('zod');
+const {z}=require('./vendor/zod/index.cjs');
 const id=z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/),revision=z.string().regex(/^[a-f0-9]{40,64}$/);
 const task=z.object({task_id:id,experiment_id:id,source_revision:revision,contract_revision:revision}).strict();
 const base={api_version:z.literal(1),repo_id:id};

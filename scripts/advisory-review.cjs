@@ -2,7 +2,7 @@
 // Advisory evidence only. This module never reserves a preparation review,
 // issues a readiness handle, accepts verification, or changes a Gate C verdict.
 const fs=require('fs'),path=require('path'),cp=require('child_process'),crypto=require('crypto');
-const z=require('zod'),snapshot=require('./duo-snapshot.cjs'),receipts=require('./duo-review-receipts.cjs');
+const z=require('./vendor/zod/index.cjs'),snapshot=require('./duo-snapshot.cjs'),receipts=require('./duo-review-receipts.cjs');
 const identity=require('./improve-process-identity.cjs'),kernel=require('./improve-kernel-lock.cjs');
 const transport=require('./readonly-review.cjs'),privateFiles=require('./review-input.cjs');
 const spendPolicy=require('./adapter-spend.cjs');

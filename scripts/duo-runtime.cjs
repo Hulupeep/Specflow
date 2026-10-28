@@ -16,18 +16,70 @@ function lock(root, fn) {
   fs.writeFileSync(path.join(file,'pid'),String(process.pid));
   try { return fn(); } finally { fs.rmSync(file,{recursive:true}); }
 }
-function pin(root,dir,builder) {
-  const helperHashes={}, skillHashes={}, destination=path.join(dir,'runtime');
-  for(const name of helpers) {
-    const file=path.join(__dirname,name); if(!fs.existsSync(file)) continue;
-    const bytes=fs.readFileSync(noLinks(file)), rel='scripts/'+name;
-    fs.mkdirSync(path.join(destination,'scripts'),{recursive:true}); fs.writeFileSync(path.join(destination,rel),bytes); helperHashes[rel]=hash(bytes);
+// Source resources are copied without rewriting canonical bytes. Installed
+// project scripts carry them below scripts/ so project package.json is untouched.
+const resourcePrefix='scripts/runtime-resources/';
+function resourceRoot(source) {
+  const embedded=path.join(source,resourcePrefix);
+  return fs.existsSync(path.join(embedded,'package.json'))?embedded:source;
+}
+function sourceFile(source,rel) {
+  return rel.startsWith(resourcePrefix)?path.join(resourceRoot(source),rel.slice(resourcePrefix.length)):path.join(source,rel);
+}
+function walkFiles(dir,visit,rel='') {
+  if(!fs.existsSync(dir))return;
+  noLinks(dir);
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true}).sort((a,b)=>a.name.localeCompare(b.name))) {
+    const name=rel?rel+'/'+entry.name:entry.name,file=path.join(dir,entry.name);
+    if(entry.isSymbolicLink())throw Error('Runtime path must not follow symlinks');
+    if(entry.isDirectory())walkFiles(file,visit,name);else if(entry.isFile())visit(name,file);
   }
-  const candidates = [path.resolve(__dirname,'../skills/duo-build/SKILL.md'),path.join(root,builder==='claude-code'?'.claude/skills/duo-build/SKILL.md':'.agents/skills/duo-build/SKILL.md')];
+}
+function scriptFiles(source,visit) {
+  const dir=path.join(source,'scripts'),vendor=path.join(dir,'vendor'),manifest=path.join(vendor,'manifest.json');
+  const roots=fs.readdirSync(noLinks(dir)).filter(n=>fs.lstatSync(path.join(dir,n)).isFile()).sort();
+  if(!fs.existsSync(manifest)&&roots.some(n=>n.endsWith('.cjs')&&/require\(['"]\.\/vendor\//.test(fs.readFileSync(path.join(dir,n),'utf8'))))throw Error('Bundled vendor inventory missing');
+  if(fs.existsSync(manifest)) {
+    const inventory=read(manifest),actual=[];
+    if(inventory.version!==1||!inventory.files||typeof inventory.files!=='object')throw Error('Invalid bundled vendor inventory');
+    walkFiles(vendor,(rel,file)=>{if(rel==='manifest.json')return;actual.push(rel);if(inventory.files[rel]!==hash(fs.readFileSync(noLinks(file))))throw Error('Bundled vendor bytes missing or corrupt: '+rel);});
+    if(JSON.stringify(actual.sort())!==JSON.stringify(Object.keys(inventory.files).sort()))throw Error('Bundled vendor closure is incomplete');
+  }
+  for(const name of roots)visit('scripts/'+name,path.join(dir,name));
+  for(const entry of fs.readdirSync(dir,{withFileTypes:true})) {
+    if(entry.isSymbolicLink())throw Error('Runtime path must not follow symlinks');
+    // scripts/agents is a legacy project overlay; setup owns that path from
+    // canonical agents/. Copying its older source mirror would claim two owners.
+    if(entry.isDirectory()&&!['runtime-resources','agents'].includes(entry.name))walkFiles(path.join(dir,entry.name),(rel,file)=>visit('scripts/'+entry.name+'/'+rel,file));
+  }
+}
+function resourceFiles(source,visit) {
+  const root=resourceRoot(source);
+  const manifest=path.join(root,'package.json');
+  const metadata=fs.existsSync(manifest)?read(manifest):{};
+  if(fs.existsSync(manifest))visit('package.json',manifest);
+  // Reuse the package's existing shipped-resource inventory. Scripts have their
+  // own canonical location; host overlays are distribution adapters, not core.
+  for(const name of metadata.files||['templates/','skills/','bin/']) {
+    if(typeof name!=='string'||path.isAbsolute(name)||name.split('/').includes('..'))throw Error('Invalid shipped runtime resource');
+    if(/^(scripts|plugins)\//.test(name))continue;
+    const rel=name.replace(/\/$/,''),file=path.join(root,rel);
+    if(!fs.existsSync(file))continue;
+    noLinks(file);
+    if(fs.statSync(file).isDirectory())walkFiles(file,(child,from)=>visit(rel+'/'+child,from));else visit(rel,file);
+  }
+}
+function pin(root,dir,builder) {
+  const helperHashes={},skillHashes={},destination=path.join(dir,'runtime');
+  const put=(rel,file,hashes=helperHashes)=>{const bytes=fs.readFileSync(noLinks(file));fs.mkdirSync(path.dirname(path.join(destination,rel)),{recursive:true});fs.writeFileSync(path.join(destination,rel),bytes);hashes[rel]=hash(bytes);};
+  const source=path.resolve(__dirname,'..');
+  scriptFiles(source,(rel,file)=>put(rel,file));
+  resourceFiles(source,(rel,file)=>put(rel,file));
+  const candidates=[path.join(resourceRoot(source),'skills/duo-build/SKILL.md'),path.join(root,builder==='claude-code'?'.claude/skills/duo-build/SKILL.md':'.agents/skills/duo-build/SKILL.md')];
   const skill=candidates.find(f=>fs.existsSync(f));
-  if(skill && fs.existsSync(path.join(path.dirname(skill),'references/routing-study.md'))) { const bytes=fs.readFileSync(path.join(path.dirname(skill),'references/routing-study.md')); fs.mkdirSync(path.join(destination,'references'),{recursive:true}); fs.writeFileSync(path.join(destination,'references/routing-study.md'),bytes); skillHashes['references/routing-study.md']=hash(bytes); }
-  if(skill) { const bytes=fs.readFileSync(noLinks(skill)); fs.writeFileSync(path.join(destination,'SKILL.md'),bytes); skillHashes['SKILL.md']=hash(bytes); }
-  const result={protocolVersion:'duo-actions-1',helperHashes,skillHashes,provenance:'recorded',identity:hash(JSON.stringify({helperHashes,skillHashes}))};
+  if(skill&&fs.existsSync(path.join(path.dirname(skill),'references/routing-study.md')))put('references/routing-study.md',path.join(path.dirname(skill),'references/routing-study.md'),skillHashes);
+  if(skill)put('SKILL.md',skill,skillHashes);
+  const result={protocolVersion:'duo-actions-1',closureVersion:fs.existsSync(path.join(source,'scripts/vendor/manifest.json'))?2:1,helperHashes,skillHashes,provenance:'recorded',identity:hash(JSON.stringify({helperHashes,skillHashes}))};
   write(path.join(destination,'manifest.json'),result);return result;
 }
 function selected(dir, runtime) {
@@ -53,9 +105,8 @@ function bundle(source) {
   const result={};
   const put=(rel,file)=>{if(fs.existsSync(file)) result[rel]=fs.readFileSync(noLinks(file),'utf8');};
   for(const name of helpers)put('scripts/'+name,path.join(source,'scripts',name));
-  // Gate helpers use the same ownership transaction as the frozen review runtime.
-  // Keep the pin list unchanged: only installation ownership is broadened.
-  for(const name of fs.readdirSync(path.join(source,'scripts')).filter(n=>n.endsWith('.cjs')).sort())put('scripts/'+name,path.join(source,'scripts',name));
+  scriptFiles(source,(rel,file)=>put(rel,file));
+  resourceFiles(source,(rel,file)=>put(resourcePrefix+rel,file));
   for(const target of ['.claude','.codex','.agents']) { put(`${target}/skills/duo-build/SKILL.md`,path.join(source,'skills/duo-build/SKILL.md')); put(`${target}/skills/duo-build/references/routing-study.md`,path.join(source,'skills/duo-build/references/routing-study.md')); }
   for(const target of ['.claude','.codex','.agents'])put(`${target}/skills/specflow-loop-selector/SKILL.md`,path.join(source,'skills/specflow-loop-selector/SKILL.md'));
   put('.claude/hooks/duo-review-check.sh',path.join(source,'hooks/duo-review-check.sh'));
@@ -111,7 +162,7 @@ function describe(root,state) {
   }
   return {active:state.runtime?.identity||'legacy_unknown',installed:fs.existsSync(installed)?read(installed).version:'unrecorded',staged:fs.existsSync(staged)?read(staged).stagedVersion:null,staleGuide};
 }
-module.exports={selected,helpers,lock,pin,verify,dispatch,unfinished,install,describe,bundle};
+module.exports={selected,helpers,lock,pin,verify,dispatch,unfinished,install,describe,bundle,sourceFile};
 if(require.main===module) {
   try { const [command,source,root,...args]=process.argv.slice(2);if(command!=='install')throw Error('Use install <source> <target> [--lock-held] [--runtime HOST]');const at=args.indexOf('--runtime'),requested=at>=0?args[at+1]:null;const requestedRuntime=requested?require('./runtime-routing.cjs').resolveRuntime({runtime:requested,interactive:!!(process.stdin.isTTY&&process.stdout.isTTY)}):null;const result=install(path.resolve(source),path.resolve(root),{held:args.includes('--lock-held'),requestedRuntime});console.log(JSON.stringify(result));process.exitCode=result.state==='staged'?10:0; }
   catch(e){console.error(e.message);process.exitCode=2;}

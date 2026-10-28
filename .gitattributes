@@ -5,3 +5,6 @@
 *.bash         text eol=lf
 hooks/commit-msg text eol=lf
 hooks/pre-push   text eol=lf
+
+# Preserve exact upstream bytes bound by the vendored runtime inventory.
+scripts/vendor/** -text -whitespace
