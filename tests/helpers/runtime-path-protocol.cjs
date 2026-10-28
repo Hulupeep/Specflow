@@ -55,6 +55,7 @@ for(const [loop,routes] of Object.entries(profile.routes))for(const [stage,route
  const gate=runner.runLoop({...options,stageEvidence:evidence});assert.equal(gate.status,'gate_passed');
  rows.push({loop,stage,provider:policyProvider,transition:yaml.load(fs.readFileSync(options.contract,'utf8')).run_contract.current_stage_or_rail,simulated:true});
 }
+require(path.join(source,'tests/helpers/pr-description.cjs')).write(root);
 const handoff=runner.runLoop(saved('feature-build','7_ci_handoff'));assert.equal(handoff.status,'human_ci_handoff_required');
 const b5=runner.runLoop(saved('spec-build','GATE_B5'));assert.equal(b5.status,'scoped_review_required');
 assert(rows.every(r=>r.provider===policyProvider));

@@ -49,3 +49,5 @@ contracts:
     path: docs/contracts/runtime-bindings.yml
   - id: feature_review
     path: docs/contracts/feature-review.yml
+  - id: feature_pr_handoff
+    path: docs/contracts/feature_pr_handoff.yml

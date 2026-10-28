@@ -30,7 +30,7 @@
     "skills/specflow-audit/SKILL.md": "afe3060e60d983cc596f805fdc52e58bb2614a0a1cf615962f7bbc6aeb33a4d6",
     "skills/specflow-simulate/SKILL.md": "a58e60f2870c0b6f3c33bfd574d933c46acca28b023590937334177d3cceeea2",
     "skills/duo-build/SKILL.md": "ca055407e169a5e8f69eeed8d20f19ecb7e0cac9adafca8dd4b1ec334e468750",
-    "skills/specflow-loop-selector/SKILL.md": "2b969de0980713611b6fbe290b385e09547a1669b530742b34c3cf36eb3f5f06"
+    "skills/specflow-loop-selector/SKILL.md": "fe446a171c473f0bedac51253bde51e04d3a630aa4b61bbcd7f0f205e9f9b635"
   },
   "semanticRevisions": [
     {
@@ -41,6 +41,16 @@
       ],
       "previousHashes": {
         "skills/specflow-audit/SKILL.md": "eb7de938347ee3d55a2a6b0b781748b0d7d8394298daa9589bb733eb4c105954"
+      }
+    },
+    {
+      "issue": 79,
+      "reason": "Add required PR description durable path and stop condition to feature-build example.",
+      "files": [
+        "skills/specflow-loop-selector/SKILL.md"
+      ],
+      "previousHashes": {
+        "skills/specflow-loop-selector/SKILL.md": "2b969de0980713611b6fbe290b385e09547a1669b530742b34c3cf36eb3f5f06"
       }
     }
   ]

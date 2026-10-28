@@ -71,6 +71,10 @@ test.each(['codex', 'claude-code'])('%s installed label setup is idempotent and 
       if(rel==='SKILL.md')expect(installed).toContain('## Loop boundary (#97)');
     }
   }
+  expect(fs.readFileSync(path.join(root,'target/scripts/pr-description.cjs'),'utf8')).toBe(fs.readFileSync(path.join(source,'scripts/pr-description.cjs'),'utf8'));
+  const installedDraft=require(path.join(root,'target/scripts/pr-description.cjs'));
+  expect(installedDraft.inspect(require('../helpers/pr-description.cjs').body(122),122)).toEqual([]);
+  expect(fs.readFileSync(path.join(root,'target/QA/loops/feature-build.yaml'),'utf8')).toContain('pr_description: evidence/pr-description-${issue}.md');
   const duo = fs.readFileSync(path.join(root, 'target', skillRoot, 'skills/duo-build/SKILL.md'), 'utf8');
   expect(duo).toContain('specflow-tier.cjs inspect <record.json> duo-build build');
   const feature = fs.readFileSync(path.join(root, 'target/QA/loops/feature-build.yaml'), 'utf8');
