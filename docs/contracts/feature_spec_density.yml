@@ -1,6 +1,6 @@
 contract_meta:
   id: feature_spec_density
-  version: 4
+  version: 5
   created_from_spec: "GitHub #162–167; #189; #235 slice A owner effort policy"
   covers_reqs: [AC-163-1, AC-163-2, AC-163-3, AC-163-4, AC-163-5, AC-163-6, AC-163-7, AC-165-2, AC-164-1, AC-164-5, AC-164-7, AC-166-1, AC-166-3, AC-167-1, AC-167-5]
   owner: specflow-core
@@ -27,6 +27,8 @@ invariants:
     rule: "Specification volume includes linked maintained content and historical evidence separately. Size cannot establish readiness; existing identifiers cannot silently disappear or change meaning."
   - id: I-DENSITY-009
     rule: "Publication requires the project mechanical privacy gate and applicable real baseline canary; model-written overrides cannot supply owner authority."
+  - id: I-DENSITY-010
+    rule: "One execution-brief rubric counts full bodies as Unicode code points: thin 3000, contracted 6000, build-ready 10000 targets warn only above; 12000 ceiling blocks only above. Create and explicit update validation preserve canonical acceptance and references before remote effects. Unsupported atomic body replacement never falls through to blind writes; discussion proposals do not replace scope."
 test_hooks:
   tests:
     - file: tests/contracts/review-continuation.test.js

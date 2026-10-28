@@ -177,6 +177,10 @@ const r=spawnSync(process.execPath,[path.join(process.env.TIER_SOURCE,'node_modu
   expect(fs.existsSync(path.join(target, '.specflow/duo/installer.lock'))).toBe(false);
   expect(fs.existsSync(path.join(target, '.claude/settings.json'))).toBe(true);
   expect(fs.readFileSync(path.join(target, 'SPECIFICATION.md'), 'utf8')).toBe(fs.readFileSync(path.join(source, 'templates/SPECIFICATION.md'), 'utf8'));
+  const installedVolume = require(path.join(target, 'scripts/specflow-volume.cjs'));
+  expect(installedVolume.TARGETS).toEqual({thin:3000,contracted:6000,'build-ready':10000});
+  expect(installedVolume.brief({body:'😀'.repeat(12001),labels:['spec:build-ready']}).errors.join()).toContain('12000');
+  for(const name of ['specflow-writer','board-auditor','specflow-uplifter'])expect(fs.readFileSync(path.join(target,'scripts/agents',name+'.md'),'utf8')).toContain('## Concise execution briefs (#170)');
   expect(result.stdout).toContain('passed');
   expect(fs.readFileSync(path.join(root, 'setup-calls.jsonl'), 'utf8').trim().split('\n').map(JSON.parse)).toEqual([['install', '--quiet'], ['test']]);
   const violations = [];
