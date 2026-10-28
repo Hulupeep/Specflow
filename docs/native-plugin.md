@@ -43,7 +43,9 @@ Raw traces remain private. Monetary cost is unmeasured subscription usage.
 Actual `--plugin-dir` execution is labelled inline, including when it loads bytes
 previously registered in an isolated fixture. It is not proof of startup under the
 marketplace's registered id, immutable version-cache update, npm publication or
-customer validity. Local marketplace sources load in place. Final published npm
+customer validity. This Claude Code 2.1.285 qualification copied the local
+marketplace payload into its cache; local source handling depends on the host
+and source type. That observation does not prove versioned updates. Final published npm
 source/cache proof belongs to #115/#116; a Git root with a supported lockfile can
 trigger host-managed dependency installation, despite runtime independence.
 

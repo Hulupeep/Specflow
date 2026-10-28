@@ -20,7 +20,11 @@ function prepare(destination,builder,variant='complete', options={}) {
  put('AGENTS.md',fs.readFileSync(path.join(root,'CLAUDE.md'),'utf8'));
  put('core.cjs','module.exports = () => 6 * 7;\n');put('display.cjs',"console.log('Total:', require('./core.cjs')() - 1);\n");put('component-test.cjs',"require('node:assert/strict').equal(require('./core.cjs')(),42); console.log('component: 1 passed; 0 skipped');\n");
  put('.claude/settings.json',{hooks:{Stop:[{hooks:[{type:'command',command:'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/duo-review-check.sh"',timeout:30}]}]}});
- git('init');git('config','user.email','fixture@example.test');git('config','user.name','Duo proof');git('add','.');git('commit','-m','Synthetic instruction accountability fixture (#155)');
+ git('init');
+ // This disposable repository is removed immediately after qualification. Keep
+ // Git from starting maintenance that can race recursive fixture cleanup.
+ git('config','maintenance.auto','false');git('config','gc.auto','0');
+ git('config','user.email','fixture@example.test');git('config','user.name','Duo proof');git('add','.');git('commit','-m','Synthetic instruction accountability fixture (#155)');
  const duo=require(path.join(root,'scripts/duo-build.cjs')),hostSession=crypto.randomUUID();
  const criteria=fs.readFileSync(path.join(root,'task.md'),'utf8').split('\n').filter(l=>/^(AC-|GATE-|OWNER-)/.test(l)).map(anchor=>({id:anchor.split(':')[0],source:'task.md',anchor,kind:anchor.startsWith('AC-')?'acceptance':'gate'}));
  const run=duo.start(root,'#155 synthetic CLI proof',builder,{workKind:'preparation',goal:'goal.md',task:'task.md',objective:'Prove the actual customer total and its command test',finish:'All indexed criteria and outstanding instructions independently verified',criteria,typesafe:{mode:typesafeMode,maxCalls:10}},builder==='claude-code'?hostSession:undefined);
