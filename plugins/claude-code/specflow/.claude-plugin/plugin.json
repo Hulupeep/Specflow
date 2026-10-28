@@ -1,6 +1,6 @@
 {
   "name": "specflow",
-  "version": "0.11.1",
+  "version": "0.12.0",
   "description": "Host-aware Specflow setup and explicit installed Gate D qualification",
   "author": {
     "name": "Colm Byrne"
