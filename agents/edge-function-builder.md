@@ -1,3 +1,11 @@
+---
+name: edge-function-builder
+description: "You are a Supabase Edge Function developer for your project. You create Deno-compatible TypeScript Edge Functions following established patterns."
+---
+
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
 # Agent: edge-function-builder
 
 ## Role

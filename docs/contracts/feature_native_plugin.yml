@@ -1,0 +1,28 @@
+contract_meta:
+  id: feature_native_plugin
+  version: 1
+  created_from_spec: GitHub #110 and #114 native root layout/catalog
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_native_plugin'
+invariants:
+  - id: I-NATIVE-001
+    rule: The native manifest is deterministically bound to the canonical package version and explicit component inventory. Drift or missing declared metadata/assets blocks qualification; validation never silently repairs.
+  - id: I-NATIVE-002
+    rule: Native roles retain original instructions, meaningful names/descriptions and approved host routing. Utility documents are not invocable agents; native metadata does not grant tool or model overrides.
+  - id: I-NATIVE-003
+    rule: Framework assets resolve from the installed native plugin root, project state from the selected project. Native use does not require PATH Specflow or copied project scripts; nonplugin context and existing human/gate boundaries remain preserved.
+  - id: I-NATIVE-004
+    rule: Native validation, actual loaded component/access receipts, inline installed bytes, cached immutable distribution and published/customer evidence remain distinct. Model prose alone, missing native access or skipped journeys cannot establish completion. Qualifiers preserve user global setup and never copy credentials or select a paid fallback.
+capability_boundary:
+  native_journeys: [J-PLUGIN-INSTALL, J-PLUGIN-AGENTS]
+  actual_host_evidence: registered native components and successful installed-root content access
+  diagnostic: about is read-only identity, never a gate verdict
+  remaining: [112-workflow-commands, 113-owning-hooks, 115-marketplace, 116-integrated-release]
+test_hooks:
+  tests:
+    - file: tests/contracts/native-plugin-layout.test.js
+    - file: tests/contracts/plugin-runtime.test.js
+    - file: tests/contracts/runtime-bindings.test.js

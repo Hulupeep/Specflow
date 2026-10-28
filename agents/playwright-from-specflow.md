@@ -1,3 +1,11 @@
+---
+name: playwright-from-specflow
+description: "You are a Playwright test generator for your project. You read full-stack specflow tickets (Gherkin scenarios, data contracts, acceptance criteria, invariants) from GitHub issues and generate executable Playwright e2e tests with p"
+---
+
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
 # Agent: playwright-from-specflow
 
 ## Role

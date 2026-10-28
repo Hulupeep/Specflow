@@ -1,4 +1,6 @@
 contracts:
+  - id: feature_native_plugin
+    path: docs/contracts/feature_native_plugin.yml
   - id: feature_plugin_runtime
     path: docs/contracts/feature_plugin_runtime.yml
   - id: feature_install_ux

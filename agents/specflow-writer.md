@@ -1,3 +1,11 @@
+---
+name: specflow-writer
+description: "You are a full-stack specflow architect. You produce production-grade ticket specs that combine BDD scenarios, data contracts, UI behaviour, and acceptance criteria into a single source of truth — so that migration-builder, edge-f"
+---
+
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
 # Agent: specflow-writer
 
 ## Tier applicability before this procedure

@@ -1,0 +1,54 @@
+# Native root layout and catalog
+
+The full Claude plugin lives at the repository/npm package root. Its generated
+`.claude-plugin/plugin.json` uses the canonical package version, explicit command
+and agent files, and the shipped skills directory. `node scripts/native-plugin.cjs
+--check` rejects drift; run it without `--check` to regenerate intentionally.
+No duplicated core, installer or permission engine is involved.
+
+The catalog contains 24 invocable role documents. Nine utility/skill documents
+remain outside the agent list. Native frontmatter supplies names/descriptions and
+inherits host model/tool policy. Original instructions remain byte-bound to the
+pre-port baseline. Audit, simulate, Duo and loop-selector skills keep their original
+frontmatter, routing rules and references. Native context resolves framework assets
+from the host-expanded plugin root and project state from the selected project.
+Ordinary npm/Codex context remains supported.
+
+`/specflow:about` is a read-only identity command. It reads the actual installed
+package, native manifest and dependency inventory. It does not pass gates or grant
+release authority. Full workflow commands (#112), owning hooks (#113), marketplace
+publication (#115) and final integrated/cache proof (#116) remain separate work;
+the overall plugin (#109) is still under qualification.
+
+Run deterministic payload tests with:
+
+```sh
+node node_modules/jest/bin/jest.js tests/contracts/native-plugin-layout.test.js --runInBand
+```
+
+Maintainers qualify real native behavior explicitly, using an existing Claude
+subscription session and a task-owned output directory:
+
+```sh
+node tests/helpers/native-plugin-host.cjs /absolute/plugin/root /private/output
+```
+
+The driver uses supported non-bare native execution with Read/Glob/Grep/Skill
+only, separate project/asset roots, and actual registered-component and successful
+content-access receipts. It exercises about, a native role, audit and simulation.
+It compares global settings/registration/hook artifacts, leaves credentials with
+the official CLI, and never copies a credential or falls back to an API key.
+Raw traces remain private. Monetary cost is unmeasured subscription usage.
+
+Actual `--plugin-dir` execution is labelled inline, including when it loads bytes
+previously registered in an isolated fixture. It is not proof of startup under the
+marketplace's registered id, immutable version-cache update, npm publication or
+customer validity. Local marketplace sources load in place. Final published npm
+source/cache proof belongs to #115/#116; a Git root with a supported lockfile can
+trigger host-managed dependency installation, despite runtime independence.
+
+Validate the native manifest and marketplace files individually on Claude2.1.285,
+whose directory validator prefers the marketplace when both are present. The root
+CLAUDE.md warning is expected: it is not loaded as plugin context. Native roles and
+skills supply their own context. Schema validation alone never substitutes for a
+real native journey.

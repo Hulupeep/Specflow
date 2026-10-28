@@ -3,6 +3,10 @@ name: duo-build
 description: Build an issue or feature interactively toward an indexed shared goal, with automatic read-only peer review; resume the same run across Claude Code and Codex.
 ---
 
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Use this skill's shipped references at `${CLAUDE_PLUGIN_ROOT}/skills/duo-build/references` before any user-scope fallback. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
+
 # Duo build
 
 ## Tier applicability before this procedure

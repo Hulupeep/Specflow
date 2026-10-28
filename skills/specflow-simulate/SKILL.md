@@ -3,6 +3,10 @@ name: specflow-simulate
 description: Simulates end-to-end usage of a Specflow story across multiple personas and divergent routes to discover gaps, edge cases, and unhandled branches BEFORE the story is built — then proposes each finding as a concrete story addition (new REQ, negative-path AC, Gherkin branch, or journey step). This is the high-value exploratory step run right after a story is created, distinct from the pre-flight compliance gate. This skill should be used when the user asks to "simulate this story", "simulate usage end to end", "find gaps and edges", "run personas through this", "stress-test this story", or invokes /specflow-simulate on a story file or GitHub issue. Scope is Specflow story exploration — it is generative (surfaces and proposes), not a build or a verification gate.
 ---
 
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Use this skill's shipped references at `${CLAUDE_PLUGIN_ROOT}/skills/specflow-simulate/references` before any user-scope fallback. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
+
 # Specflow Simulate
 
 ## Tier applicability before this procedure
