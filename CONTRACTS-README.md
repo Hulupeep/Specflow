@@ -1,6 +1,6 @@
 # Specflow System Overview
 
-Turn your product spec into executable rules that enforce themselves.
+Pattern contracts are one part of the [Specflow trust harness](README.md). They check declared source rules; behavioral changes still require their applicable independent/runtime evidence. See [how it works](docs/how-it-works.md).
 
 ## Just Tell Your LLM
 

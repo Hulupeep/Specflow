@@ -17,6 +17,10 @@ Required privacy, permission, executable journey and release gates still apply.
 
 Specs that enforce themselves. Turn requirements into contracts that break the build when violated.
 
+## Current trust boundary
+
+The legacy `/specflow` guidance below is not an acceptance authority. For contracted work use the current loop selector, run contract and owning verifier/gates; provider prose, exit codes and self-review cannot establish a pass. Required current native/journey/backend evidence and existing publication/release permissions remain mandatory. See [how it works](docs/how-it-works.md) and [progressive specification](templates/SPECIFICATION.md).
+
 ## Core Loop
 
 ```

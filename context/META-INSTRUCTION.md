@@ -715,7 +715,7 @@ jobs:
 
 **Note on enforcement:**
 - Contract tests → **hard gate** (always block PR)
-- Journey tests → **flexible** (hard gate OR manual review, your choice)
+- Required journey tests → **executed gates**; missing, failed or skipped evidence blocks acceptance. Manual review adds evidence and cannot replace the journey.
 
 See [../CI-INTEGRATION.md](../CI-INTEGRATION.md) for full CI configuration including Playwright setup.
 

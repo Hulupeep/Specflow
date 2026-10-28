@@ -1,212 +1,39 @@
-# How Specflow Works
+# How Specflow works
 
-The mechanics behind contract enforcement, the core loop, and what happens when things break.
+[Start with the product](../README.md) or [choose the work weight](should-i-use-specflow.md). Pattern contracts are useful, but they do not replace runtime verification of behavior.
 
-[← Back to README](../README.md)
+## From intent to evidence
 
----
+1. An owner or another agent supplies intent, boundaries and existing research. Reuse that work rather than starting discovery again by default.
+2. The loop selector chooses the lightest checks that cover the change's risk. Work weight and thin/contracted/build-ready planning depth are separate.
+3. For formal specification work, `spec-build` identifies the next justified slice, applicable contracts, failure routes and acceptance. Required simulation precedes audit and pre-flight; future siblings remain thin.
+4. Promotion binds current scope, direct dependency capability and required evidence. A passing audit or label alone cannot authorize a build.
+5. The maker proposes the slice-local verification contract. An independent verifier accepts or strengthens the checks and expected references before they govern execution.
+6. The builder implements the selected slice. Accepted criteria and oracles do not move merely to make the build pass.
+7. Required native checks exercise the actual built behavior. UI/server-state work uses the required real seeded backend path, with case-level execution accounting.
+8. Correctness compares actual values against accepted independent expectations. Source provenance and record/version consistency are checked separately where applicable.
+9. The gate consumes current owning evidence. Provider success, a saved report, a screenshot or a required skip cannot grant acceptance.
+10. Findings, attempts, ownership, unknown cost and decisions survive in the run contract and ledger. Repeated non-progress calls for diagnosis; it is not a fictional subscription bill.
+11. Existing privacy, permission, CI and release boundaries control publication and advancement. A human-authorized exception remains distinct from a pass.
+12. Trace and the evidence packet explain the result. Integrated outcomes require [Gate D](gate-d.md); shipping and customer benefit still need their own proof.
 
-## The Core Loop
+## What a reviewer should receive
 
-```
-Write spec with IDs → Generate contract → Auto-create test → Violation = Build fails
-```
+The selected issue and contract, exact revision and non-secret environment identity, commands and individual executed/failed/skipped results, oracle/provenance where applicable, current findings, gate state and explicit limitations. A model's reasoning transcript is not independent verification input.
 
-### Step by step
+Fresh same-host advisory review helps find defects. [Duo](duo-build.md) requests an explicit cross-family peer review. Neither substitutes for the owning mechanical checks. [Advisory review](advisory-review.md) preserves serious concerns at handoff instead of laundering an unavailable critic into a clean result.
 
-**1. Write a spec with requirement IDs**
+## What the primitive checks can and cannot prove
 
-```markdown
-### AUTH-001 (MUST)
-Auth tokens must be stored in httpOnly cookies, never localStorage.
-```
+| Evidence | Establishes | Does not establish |
+|---|---|---|
+| Source pattern contract | Declared patterns in scanned scope | Complete runtime behavior or security |
+| Unit/contract execution | Mapped assertions on declared inputs | An unexecuted browser/backend journey |
+| Native journey/checker | The bound cases actually exercised | Uncovered cases or customer value |
+| Provenance | Source-to-output support | Independent numerical correctness by itself |
+| Screenshot | Visible state | Persistence, authorization or a value-bearing result by itself |
+| Report lint | Report structure | Integrated outcome acceptance |
 
-**2. Generate a contract**
+## Durable re-entry
 
-```yaml
-rules:
-  non_negotiable:
-    - id: AUTH-001
-      forbidden_patterns:
-        - pattern: /localStorage\.setItem.*token/i
-          message: "Tokens must use httpOnly cookies, not localStorage"
-```
-
-**3. Generate a test**
-
-```typescript
-it('AUTH-001: No localStorage for tokens', () => {
-  // Scans source code for violations
-  // Fails with: CONTRACT VIOLATION: AUTH-001
-})
-```
-
-**4. Someone (or an LLM) adds a violation**
-
-```typescript
-localStorage.setItem('token', jwt) // Added in iteration 3
-```
-
-**5. Test fails → Build fails → PR blocked**
-
-```
-❌ CONTRACT VIOLATION: AUTH-001
-   File: src/auth.ts:42
-   Pattern: localStorage.setItem
-   Message: "Tokens must use httpOnly cookies, not localStorage"
-```
-
----
-
-## Two Enforcement Layers
-
-### Contract Tests (fast gate)
-
-Pattern scans run on source code before build. They check:
-- **forbidden_patterns**: Must NOT appear in any file in scope
-- **required_patterns**: Must appear in at least one file in scope
-
-Violations block CI immediately. No build needed. These are hard gates — always fail, never bypass.
-
-### Journey Tests (authoritative gate)
-
-Playwright runs against your running application after a successful build. Journey tests verify users can accomplish their goals end to end.
-
-```yaml
-# Journey contract
-journey_id: J-CHECKOUT-FLOW
-steps:
-  - user_does: "Adds item to cart"
-    system_shows: "Cart updates with item"
-  - user_does: "Clicks checkout"
-    system_shows: "Payment form"
-```
-
-Journey tests can be hard-gated in CI or reviewed manually — your choice. See [CI-INTEGRATION.md](../CI-INTEGRATION.md).
-
-### What Each Layer Catches
-
-| Scenario | Unit Tests | Contract Tests | Journey Tests |
-|----------|------------|----------------|---------------|
-| Function returns correct value | ✅ | — | — |
-| Refactor breaks architecture | ❌ | ✅ | — |
-| LLM uses wrong API | ❌ | ✅ | — |
-| Security pattern violated | ❌ | ✅ | — |
-| User journey still works end to end | ❌ | — | ✅ |
-
----
-
-## Default Gates (Out of the Box)
-
-Copy these into any project for immediate protection:
-
-```bash
-cp Specflow/templates/contracts/*.yml docs/contracts/
-```
-
-| Template | Rules | What It Catches |
-|----------|-------|-----------------|
-| `security_defaults.yml` | SEC-001..005 | Hardcoded secrets, SQL injection, XSS via innerHTML, eval(), path traversal |
-| `accessibility_defaults.yml` | A11Y-001..004 | Missing alt text, icon buttons without aria-label, unlabelled inputs, broken tab order |
-| `production_readiness_defaults.yml` | PROD-001..003 | Demo/mock data in production, placeholder domains, hardcoded UUIDs |
-| `test_integrity_defaults.yml` | TEST-001..005 | Mocking in E2E tests, swallowed errors, placeholder tests, suspicious assertions |
-
-All 17 rules are `non_negotiable` by default.
-
----
-
-## How Builds Are Stopped
-
-Contract tests are regular tests that scan source code. When they find a violation:
-
-```
-❌ CONTRACT VIOLATION: AUTH-001
-   File: src/auth.ts:42
-   Pattern: localStorage.setItem
-   Message: "Sessions must use Redis, not localStorage"
-```
-
-The test fails → the build fails → the PR is blocked.
-
-### CI integration options
-
-| Approach | How It Works |
-|----------|--------------|
-| **npm test** | Contract tests run with your regular tests |
-| **Separate job** | `npm test -- contracts` as dedicated CI step |
-| **Pre-commit hook** | Run contract tests before commits |
-| **GitHub Action** | Block PRs on contract violations |
-
-See [CI-INTEGRATION.md](../CI-INTEGRATION.md) for GitHub Actions, GitLab, Azure, and CircleCI examples.
-
----
-
-## Self-Healing Fix Loops
-
-When contract tests fail during wave execution, the `heal-loop` agent attempts automated fixes before escalating.
-
-**What it can fix:**
-- Missing `required_patterns` (e.g. add a missing import)
-- `forbidden_patterns` with an `auto_fix` hint in the contract YAML
-
-**What it escalates:**
-- Journey test failures, build errors, forbidden patterns without `auto_fix` hints
-
-The heal-loop respects a retry budget (default: 3 attempts). After exhaustion it reverts changes and reports all strategies tried.
-
-Contracts can provide `auto_fix` hints to guide it:
-
-```yaml
-auto_fix:
-  strategy: "wrap_with"
-  wrap_pattern: "router.use(authMiddleware)"
-```
-
-Fix patterns are scored by historical success rate and stored in `.specflow/fix-patterns.json`:
-
-| Tier | Confidence | Behaviour |
-|------|------------|-----------|
-| Platinum | >= 0.95 | Auto-apply immediately |
-| Gold | >= 0.85 | Auto-apply, flag in commit for review |
-| Silver | >= 0.75 | Suggest only |
-| Bronze | < 0.70 | Learning only |
-
-Initialise the fix pattern store:
-
-```bash
-mkdir -p .specflow
-cp Specflow/templates/fix-patterns.json .specflow/fix-patterns.json
-```
-
-See [agents/heal-loop.md](../agents/heal-loop.md) for the full agent specification.
-
----
-
-## Contract YAML Format
-
-```yaml
-contract_meta:
-  id: auth_feature
-  version: 1
-  covers_reqs: [AUTH-001, AUTH-002]
-
-rules:
-  non_negotiable:
-    - id: AUTH-001
-      title: "API endpoints require authMiddleware"
-      scope: ["src/routes/**/*.ts"]
-      behavior:
-        forbidden_patterns:
-          - pattern: /router\.(get|post).*\/api\//
-            message: "Route missing authMiddleware"
-        required_patterns:
-          - pattern: /authMiddleware/
-            message: "Must use authMiddleware"
-```
-
-See [CONTRACT-SCHEMA.md](../CONTRACT-SCHEMA.md) for the full schema.
-
----
-
-→ **Setting up for a team?** See [Team Workflows](team-workflows.md)
-→ **Commands and config reference?** See [Reference](reference.md)
+Use the existing run contract and ledger; do not start a renamed run to reset findings or limits. [Progressive specification](../templates/SPECIFICATION.md) describes freshness, discoveries, scoped review and promotion. [The reference](reference.md) lists runner commands. Missing required input or adapter support is an explicit nonpassing capability gap.
