@@ -1,5 +1,7 @@
 # Specflow Skill for Claude Code
 
+This is a legacy contract-only recipe. Prefer the current [onboarding](../docs/onboarding.md) and installed project-local skills for the contracted loop. This tutorial does not establish runtime acceptance or replace required independent checks; required journeys must execute, and manual review is additional evidence.
+
 Create a `/specflow` slash command that sets up contract enforcement for any project.
 
 ## Quick Setup
@@ -411,4 +413,4 @@ Your project now has Specflow protection.
 2. **Architecture first** - ARCH before FEAT contracts
 3. **Freeze what works** - Use `/specflow freeze` for existing projects
 4. **Journey = DOD** - Features aren't done until journeys pass
-5. **Hard gate contracts, flexible gate journeys** - Contracts always block; journeys can be manual review
+5. **Required journeys are executed gates** - Manual review is additional evidence and cannot replace a required journey.

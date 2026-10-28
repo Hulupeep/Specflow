@@ -8,7 +8,7 @@
 contract_meta:
   id: feature_preflight
   version: 2
-  created_from_spec: "docs/preflightprd.md"
+  created_from_spec: "docs/old-do-not-use/preflightprd.md"
   covers_reqs:
     - ARCH-001
     - ARCH-002

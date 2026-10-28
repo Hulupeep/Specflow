@@ -849,9 +849,9 @@ npx playwright test tests/e2e/journey_[name].spec.ts
 
 **Note:** Journey tests require a running app. They verify the complete user experience, not just code patterns.
 
-> **Journey enforcement options:**
-> - **Hard gate:** Journey failures block PR merge
-> - **Manual gate:** Journey failures require human review (for flaky tests or aspirational DOD)
+> **Required journey enforcement:**
+> - Execute required journeys against their seeded backend; failures, skips and missing evidence block acceptance.
+> - Diagnose flaky tests and unavailable environments. Human review is additional evidence and cannot waive the required journey; a linked deferral records a gap.
 
 **✅ Checkpoint 6.4:** All journeys verified.
 

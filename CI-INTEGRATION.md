@@ -1,5 +1,7 @@
 # Specflow CI/CD Integration Guide
 
+For contracted work, the current [trust boundaries](docs/how-it-works.md) and [Gate D rules](docs/gate-d.md) govern these integration examples. Required native/journey/backend checks must actually execute with current evidence; manual review, optional-check configuration or a provider exit code cannot replace them. Pattern-only examples do not establish runtime or outcome acceptance.
+
 > Integrate contract verification into your CI/CD pipeline
 
 ## Overview
@@ -856,40 +858,36 @@ export default defineConfig({
 
 ### Branch Protection for Journeys
 
-**Option A: Hard gate (strict)**
+Required journeys belong in branch protection alongside the relevant contracts:
+
 ```
 Settings → Branches → Branch protection rules → main
 
 Required status checks:
 ✅ contracts
-✅ journeys    ← PRs blocked until E2E passes
+✅ journeys    ← required cases actually executed and passing
 ```
 
-**Option B: Manual gate (flexible)**
-```
-Settings → Branches → Branch protection rules → main
+A required journey that fails, skips, cannot reach its seeded backend or has not
+been implemented blocks its acceptance. Diagnose flaky timing or unavailable
+infrastructure and repair the test/environment; record a linked deferral as an
+explicit gap. Manual inspection cannot turn that gap into a pass.
 
-Required status checks:
-✅ contracts    ← Hard gate
+Supplementary exploratory journeys may report in a separate, non-required job.
+Label them supplementary and keep them separate from the accepted required case
+inventory. Their status cannot satisfy a required journey or waive its failure.
+Human review adds judgment after the executed gates; it does not replace them.
 
-NOT required (but visible):
-◻️ journeys    ← Runs, reports, but doesn't block
-```
+| Situation | Required journey outcome | Next action |
+|-----------|--------------------------|-------------|
+| Stable journey passes | Passing evidence | Continue applicable gates/review |
+| Flaky or failed journey | Non-passing | Diagnose and repair; preserve results |
+| Missing journey/backend | Verification blocked | Implement/provision or record linked deferral |
+| Supplementary exploration | Supporting evidence only | Review findings; do not claim required acceptance |
 
-With manual gating, journey tests still run and report results, but a human decides whether to merge despite failures.
-
-### When to Use Manual Gating for Journeys
-
-| Situation | Hard Gate | Manual Gate |
-|-----------|-----------|-------------|
-| Stable E2E suite | ✅ | |
-| Flaky browser tests | | ✅ |
-| Aspirational DOD (not yet implemented) | | ✅ |
-| Known issues being fixed | | ✅ |
-| Strict release process | ✅ | |
-| Fast iteration / MVP | | ✅ |
-
-**Key insight:** Contract tests are deterministic (pattern matching). Journey tests involve browsers, networks, timing—more judgment needed.
+Pattern matching and source scans check only their declared static properties.
+Native execution, real backend state and independent expected results supply the
+stronger evidence required by the applicable contract.
 
 ---
 
