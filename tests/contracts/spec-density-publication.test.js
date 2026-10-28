@@ -69,3 +69,6 @@ test('auto-discovered execution links pass privacy and content-stability checks 
 test('blocked pre-scan size results never echo raw acceptance definitions',()=>{
  const r={...fixture(),action:'create',title:'Safe'},run=jest.fn();delete r.issue;fs.writeFileSync(path.join(root,'body.md'),'AC-1: owner-archive-private.pst\n'+'x'.repeat(12001));const out=publish(root,r,{run});expect(out.status).toBe('blocked');expect(JSON.stringify(out)).not.toContain('owner-archive-private.pst');expect(out.volume).not.toHaveProperty('identifiers');expect(run).not.toHaveBeenCalled();
 });
+test.each(['update','propose-update'])('%s rejects a relocated AC whose same ID has changed meaning',action=>{
+ const r=updateFixture('AC-1: retain the observed behaviour'),before=fs.readFileSync(path.join(root,'expected.md'),'utf8'),run=jest.fn((cmd,args)=>args[1]==='view'?current(before):{status:0});r.action=action;fs.writeFileSync(path.join(root,'linked.md'),'AC-1: silently accept a different behaviour');fs.writeFileSync(path.join(root,'body.md'),'[Acceptance](linked.md)');const result=publish(root,r,{run});expect(result.status).toBe('blocked');expect(result.volume.errors.join()).toContain('Changed meaning of AC-1');expect(run.mock.calls.every(c=>c[1][1]==='view')).toBe(true);
+});

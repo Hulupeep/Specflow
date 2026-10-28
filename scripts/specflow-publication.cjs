@@ -36,7 +36,7 @@ function publish(root, request, options={}) {
     const artifacts=(request.linkedFiles||[]).map((file,i)=>({id:file,path:file,sha256:policy.sha(contents[i+1]),reuse:true}));
     const labels=updating?current.labels:request.labels|| (request.tier?['spec:'+request.tier]:[]);
     const record={issue:{body:contents[0],labels},profile:{artifacts}};
-    const baseline=updating?volume.report(root,{issue:{body:current.body,labels},profile:{artifacts}}):undefined;
+    const baseline=updating?volume.report(root,{issue:{body:current.body,labels},profile:{artifacts:[]}}):undefined;
     const fullReport=volume.report(root,record,baseline);
     // Keep acceptance definitions private even when size/reference validation blocks before scanning.
     measured={status:fullReport.status,counts:fullReport.counts,brief:fullReport.brief,errors:fullReport.errors,warnings:fullReport.warnings};
