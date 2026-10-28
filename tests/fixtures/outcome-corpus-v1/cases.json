@@ -1,0 +1,424 @@
+{
+  "version": 1,
+  "scope": "Synthetic harness acceptance only; not jurisdiction or product calculation approval",
+  "oracle_method": "Fixed independently reviewed examples: 15*60=900, 1.5*60=90; uppercase hello newline is HELLO newline. No implementation invocation to obtain expected values.",
+  "ledger_expected": [
+    {
+      "id": "record-A",
+      "version": 1,
+      "amount": 900,
+      "unit": "synthetic-credit",
+      "period": "fixture-period-A",
+      "events": [
+        "event-A"
+      ]
+    },
+    {
+      "id": "record-B",
+      "version": 1,
+      "amount": 90,
+      "unit": "synthetic-credit",
+      "period": "fixture-period-B",
+      "events": [
+        "event-B"
+      ]
+    }
+  ],
+  "cli_expected": "HELLO\n",
+  "cases": [
+    {
+      "id": "ledger-good",
+      "fixture": "ledger",
+      "mutation": "none",
+      "accepted": true,
+      "cause": "current required obligations passed",
+      "fixed_actual": [
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 900,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-A",
+          "events": [
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 90,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "accepted_obligation",
+        "id": "O-values",
+        "status": "passed"
+      }
+    },
+    {
+      "id": "ledger-wrong",
+      "fixture": "ledger",
+      "mutation": "wrong",
+      "accepted": false,
+      "cause": "independent value mismatch",
+      "fixed_actual": [
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 2400,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-A",
+          "events": [
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 2400,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "comparison",
+        "id": "CV-A-amount",
+        "status": "failed",
+        "actual": 2400
+      }
+    },
+    {
+      "id": "ledger-offsetting",
+      "fixture": "ledger",
+      "mutation": "offsetting",
+      "accepted": false,
+      "cause": "per-record mismatch despite equal total",
+      "fixed_actual": [
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 910,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-A",
+          "events": [
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 80,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "comparison",
+        "id": "CV-A-amount",
+        "status": "failed",
+        "actual": 910,
+        "total": 990
+      }
+    },
+    {
+      "id": "ledger-identity",
+      "fixture": "ledger",
+      "mutation": "identity",
+      "accepted": false,
+      "cause": "record identity mismatch",
+      "fixed_actual": [
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 900,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-A",
+          "events": [
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 90,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "native_case",
+        "id": "cli.test.js::C-provenance",
+        "status": "failed",
+        "actual_ids": [
+          "record-B",
+          "record-A"
+        ]
+      }
+    },
+    {
+      "id": "ledger-unit",
+      "fixture": "ledger",
+      "mutation": "unit",
+      "accepted": false,
+      "cause": "per-record unit mismatch",
+      "fixed_actual": [
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 900,
+          "unit": "wrong-unit",
+          "period": "fixture-period-A",
+          "events": [
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 90,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "comparison",
+        "id": "CV-A-unit",
+        "status": "failed",
+        "actual": "wrong-unit"
+      }
+    },
+    {
+      "id": "ledger-period",
+      "fixture": "ledger",
+      "mutation": "period",
+      "accepted": false,
+      "cause": "per-record period mismatch",
+      "fixed_actual": [
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 900,
+          "unit": "synthetic-credit",
+          "period": "wrong-period",
+          "events": [
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 90,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "comparison",
+        "id": "CV-A-period",
+        "status": "failed",
+        "actual": "wrong-period"
+      }
+    },
+    {
+      "id": "ledger-event",
+      "fixture": "ledger",
+      "mutation": "event",
+      "accepted": false,
+      "cause": "per-record event mismatch",
+      "fixed_actual": [
+        {
+          "id": "record-A",
+          "version": 1,
+          "amount": 900,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-A",
+          "events": [
+            "event-A",
+            "event-A"
+          ]
+        },
+        {
+          "id": "record-B",
+          "version": 1,
+          "amount": 90,
+          "unit": "synthetic-credit",
+          "period": "fixture-period-B",
+          "events": [
+            "event-B"
+          ]
+        }
+      ],
+      "expected_signal": {
+        "kind": "comparison",
+        "id": "CV-A-events",
+        "status": "failed",
+        "actual": [
+          "event-A",
+          "event-A"
+        ]
+      }
+    },
+    {
+      "id": "cli-good",
+      "fixture": "cli",
+      "mutation": "none",
+      "accepted": true,
+      "cause": "current required obligations passed",
+      "expected_signal": {
+        "kind": "accepted_obligation",
+        "id": "O-cli",
+        "status": "passed"
+      }
+    },
+    {
+      "id": "cli-wrong",
+      "fixture": "cli",
+      "mutation": "wrong",
+      "accepted": false,
+      "cause": "native required behaviour failed",
+      "expected_signal": {
+        "kind": "native_case",
+        "id": "cli.test.js::C-CLI-transform",
+        "status": "failed"
+      },
+      "fixed_actual": "hello\n"
+    },
+    {
+      "id": "cli-optional",
+      "fixture": "cli",
+      "mutation": "optional-skip",
+      "accepted": true,
+      "cause": "only declared optional native case skipped",
+      "expected_signal": {
+        "kind": "accepted_obligation",
+        "id": "O-cli",
+        "status": "passed",
+        "optional_case_id": "cli.test.js::C-optional",
+        "native_status": "pending"
+      }
+    },
+    {
+      "id": "ledger-required-skip",
+      "fixture": "ledger",
+      "mutation": "required-skip",
+      "accepted": false,
+      "cause": "required_case_skipped",
+      "expected_signal": {
+        "kind": "native_required_skip",
+        "id": "cli.test.js::C-values",
+        "status": "pending",
+        "reason": "required_case_skipped"
+      }
+    },
+    {
+      "id": "ledger-forged",
+      "fixture": "ledger",
+      "mutation": "forged",
+      "accepted": false,
+      "cause": "required_case_skipped despite submitted pass receipt",
+      "expected_signal": {
+        "kind": "native_required_skip",
+        "id": "cli.test.js::C-values",
+        "status": "pending",
+        "reason": "required_case_skipped",
+        "submitted_receipt": "pass"
+      }
+    },
+    {
+      "id": "ledger-missing-observation",
+      "fixture": "ledger",
+      "mutation": "missing-observation",
+      "accepted": false,
+      "cause": "required observation missing",
+      "expected_signal": {
+        "kind": "comparison_error",
+        "id": "CV-A-amount",
+        "reason": "required observation missing"
+      }
+    },
+    {
+      "id": "ledger-stale-oracle",
+      "fixture": "ledger",
+      "mutation": "stale-oracle",
+      "accepted": false,
+      "cause": "accepted oracle binding stale",
+      "expected_signal": {
+        "kind": "gate_error",
+        "outcome_acceptance": "unsupported",
+        "reason": "O-values: accepted oracle bytes changed"
+      }
+    },
+    {
+      "id": "ledger-missing-reference",
+      "fixture": "ledger",
+      "mutation": "missing-reference",
+      "accepted": false,
+      "cause": "accepted oracle reference unavailable",
+      "expected_signal": {
+        "kind": "gate_error",
+        "outcome_acceptance": "unsupported",
+        "reason": "ENOENT",
+        "reference": "oracle.json"
+      }
+    },
+    {
+      "id": "ledger-parent-loss",
+      "fixture": "ledger",
+      "mutation": "parent-loss",
+      "accepted": false,
+      "cause": "accepted parent obligation removed",
+      "expected_signal": {
+        "kind": "gate_error",
+        "outcome_acceptance": "blocked",
+        "reason": "accepted contract binding changed"
+      }
+    },
+    {
+      "id": "ledger-stale-input",
+      "fixture": "ledger",
+      "mutation": "stale-input",
+      "accepted": false,
+      "cause": "relevant input changed after acceptance",
+      "mutation_timing": "after native required assertions before owning stage revalidation",
+      "expected_signal": {
+        "kind": "gate_error",
+        "outcome_acceptance": "stale",
+        "reason": "owning native receipt, artifact or binding became stale"
+      }
+    }
+  ],
+  "comparison_plan": {
+    "oracle_path": "oracle.json",
+    "expected_pointer_prefix": "/records",
+    "per_record_fields": [
+      "id",
+      "version",
+      "amount",
+      "unit",
+      "period",
+      "events"
+    ],
+    "comparison_ids": "CV-A-<field>, CV-B-<field>; actual native observation writer emits each independently fixed expected-pointer comparison",
+    "provenance": "Existing C-provenance still validates input identity/version/source; identity defect fails that native case. Fixed oracle fields are not regenerated from producer output."
+  }
+}
