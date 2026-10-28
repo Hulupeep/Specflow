@@ -480,6 +480,10 @@ function recoverReview(root, id, session, input, extend = false) {
     save(dir,state);return state;
   });
 }
+function validateEvidenceList(evidence) {
+  if (!Array.isArray(evidence) || !evidence.length) throw Error('Missing raw execution evidence');
+  if (new Set(evidence).size !== evidence.length) throw Error('Duplicate evidence paths: submit each raw artifact once before requesting review');
+}
 function eligibility(root, id, session, batch) {
   const {dir,state} = load(root,id), blockers = [], responseWarnings = [];
   const check = (kind, fn) => { try { fn(); } catch(e) { blockers.push({kind,reason:e.message}); } };
@@ -503,7 +507,7 @@ function eligibility(root, id, session, batch) {
   }
   if (batch) {
     check('evidence', () => {
-      if (!Array.isArray(batch.evidence) || !batch.evidence.length) throw Error('Missing raw execution evidence');
+      validateEvidenceList(batch.evidence);
       const source = fingerprint(root,sourceExtras(state));
       for (const f of batch.evidence) {
         const contents = read(safe(root,f)); if (!contents.trim()) throw Error(`Empty evidence: ${f}`);
@@ -527,7 +531,7 @@ function reviewLocked(root, dir, state, batch, invoke) {
     validatePins(root, dir, state);
     requireSpecification(root, state.context, 'build');
     if (!/^[a-zA-Z0-9-]+$/.test(batch.id || '') || !batch.scope?.trim() || !Array.isArray(batch.claims) || !batch.claims.length || !Array.isArray(batch.assumptions) || !Array.isArray(batch.resolutions)) throw Error('Batch requires id, scope, claims, assumptions and resolutions');
-    if (!Array.isArray(batch.evidence) || !batch.evidence.length) throw Error('Missing raw execution evidence');
+    validateEvidenceList(batch.evidence);
     for (const f of batch.evidence) if (!read(safe(root, f)).trim()) throw Error(`Empty evidence: ${f}`);
     const source = refresh(root, state);
     const evidenceHashes = Object.fromEntries(batch.evidence.map(f => [f, hash(fs.readFileSync(safe(root, f)))]));
@@ -581,9 +585,9 @@ function reviewLocked(root, dir, state, batch, invoke) {
       ...(specRecord ? (json(safe(root,specRecord)).profile?.artifacts || []).map(artifact => artifact.path) : []),
       ...git(root,'diff','--name-only','-z','HEAD').split('\0').filter(Boolean)];
     const instructions = applicableInstructions(entries, reviewedPaths);
-    const requiredReads = [...new Set(['goal.md', `tree/${state.context.task}`, ...batch.evidence.map(f => `tree/${f}`), ...recoveryRefs.map(f=>`tree/${f}`), ...sourceExtras(state).map(f => `tree/${f}`), ...Object.keys(state.pinned).map(f => `tree/${f}`), ...instructions.map(f => `tree/${f}`)])];
+    const requiredReads = [...new Set(['request.json', 'goal.md', 'manifest.json', 'diff.patch', 'index.patch', 'commits.txt', `tree/${state.context.task}`, ...batch.evidence.map(f => `tree/${f}`), ...recoveryRefs.map(f=>`tree/${f}`), ...sourceExtras(state).map(f => `tree/${f}`), ...Object.keys(state.pinned).map(f => `tree/${f}`), ...instructions.map(f => `tree/${f}`)])];
     const submodules = snapshot.submodules(entries);
-    requiredReads.push(...submodules.map(s => `tree/${s.evidence}`));
+    for (const item of submodules) { const ref = `tree/${item.evidence}`; if (!requiredReads.includes(ref)) requiredReads.push(ref); }
     const request = { submodules, recovery:recoveries, github, omittedPaths, acceptance: state.criteria, open_findings: progress.openFindings(state), progress: state.progress || null, direction_memory: direction.memory(state), target: state.target, snapshot: before, batch, instructions: instructions.map(f => `tree/${f}`), requiredReads, prior: state.history.slice(0, recordIndex).map((r, i) => ({ round: i + 1, batch: r.batch, outcome: r.outcome, snapshot: r.snapshot, progress: r.progress || null })), context: Object.fromEntries(Object.entries(state.context).filter(([key]) => key !== 'typesafe')) };
     request.instruction_review = actions.packet(state,batch,before,Object.fromEntries([...Object.entries(entries).map(([f,m]) => [`tree/${f}`,m.sha256]), ...['diff.patch','index.patch','commits.txt','manifest.json'].map(f => [f,hash(fs.readFileSync(path.join(round,f)))]) ]));
     const advice = typesafe.run({ state, batch, tree, round, dir, snapshot: before, save: () => save(dir, state) });
@@ -625,7 +629,7 @@ function reviewLocked(root, dir, state, batch, invoke) {
       });
     }
     for (const field of ['assessments', 'resolutions', 'typesafe_dispositions']) if (reviewSchema.properties[field]) reviewSchema.properties[field].items.properties.evidence.items.enum = batch.evidence;
-    reviewSchema.properties.diagnostics.items.properties.evidence.items.enum = [...batch.evidence, 'diff.patch', 'index.patch', 'commits.txt', 'manifest.json'];
+    reviewSchema.properties.diagnostics.items.properties.evidence.items.enum = [...new Set([...batch.evidence, 'diff.patch', 'index.patch', 'commits.txt', 'manifest.json'])];
     write(path.join(round, 'schema.json'), reviewSchema);
     request.review_method=assignment?'fresh-native':'duo';request.review_purpose='preparation';
     write(path.join(round, 'request.json'), request);

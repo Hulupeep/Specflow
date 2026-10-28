@@ -258,3 +258,19 @@ test('J-DUO-CHECKPOINT: configured call ceiling prevents invocation and explicit
  expect(readRun(run.id).criteria['AC-1'].status).toBe('verified');
  expect(duo.eligibility(root,run.id).eligible).toBe(true);
 });
+describe('REVIEW-PREFLIGHT (#269)',()=>{
+ test('duplicate evidence blocks eligibility and review before provider invocation without charging product repair',()=>{
+  const run=start(),b=batch({evidence:['raw.txt','raw.txt']}),calls=[];const eligible=duo.eligibility(root,run.id,token(run.id),b);expect(eligible.eligible).toBe(false);expect(eligible.blockers.map(x=>x.reason).join()).toMatch(/duplicate evidence/i);
+  const result=review(run,b,peer({invokeLog:calls}));expect(result.outcome).toBe('blocked');expect(calls).toEqual([]);expect(result.history.at(-1).attempted).not.toBe(true);expect(result.repairCycle?.attempts||0).toBe(0);expect(result.blocker).toMatch(/duplicate evidence/i);
+ });
+ test('all six mandatory root artifacts are explicit unique checklist entries, including empty patches',()=>{
+  const run=start();let required;const result=review(run,batch(),peer({change:(_r,request)=>{required=request.requiredReads;}}));expect(result.outcome).toBe('accepted');expect(required).toEqual(expect.arrayContaining(['request.json','goal.md','manifest.json','diff.patch','index.patch','commits.txt']));expect(new Set(required).size).toBe(required.length);expect(fs.readFileSync(path.join(root,'.specflow/duo',run.id,'round-001/index.patch'),'utf8')).toBe('');
+ });
+ test('omitted mandatory root receipt never becomes acceptance',()=>{
+  const run=start(),result=review(run,batch(),peer({change:r=>{r.inspected=r.inspected.filter(p=>p!=='manifest.json');}}));expect(result.outcome).toBe('blocked');expect(result.blocker).toMatch(/manifest.json|inspect/i);
+ });
+});
+
+test('REVIEW-PREFLIGHT diagnostic root-name collisions keep the native schema enum valid',()=>{
+ put('diff.patch','Existing repository execution evidence, distinct from root review patch.');const run=start();const out=review(run,batch({evidence:['raw.txt','diff.patch']}));expect(out.outcome).toBe('accepted');const schema=JSON.parse(fs.readFileSync(path.join(root,'.specflow/duo',run.id,'round-001/schema.json')));const values=schema.properties.diagnostics.items.properties.evidence.items.enum;expect(new Set(values).size).toBe(values.length);
+});
