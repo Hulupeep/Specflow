@@ -64,6 +64,7 @@ function simulatedHost(host='codex'){
  for(const tool of ['git','sh','bash','cat','sed'])fs.symlinkSync('/usr/bin/'+tool,path.join(bin,tool));
  process.env.PATH=bin;fixtureExecutable={path:script,sha256:sha(fs.readFileSync(script))};
  process.env.ADVISORY_TEST_COUNT=path.join(root,'.specflow/native-count.txt');
+ process.env.ADVISORY_TEST_DESCENDANT=path.join(root,'.specflow/descendant-identity.json');
  return bin;
 }
 function nativeCustody(o){const p=advice.paths(o),until=Date.now()+5000;while(Date.now()<until){try{const pointer=JSON.parse(fs.readFileSync(p.current)),op=JSON.parse(fs.readFileSync(path.join(p.dir,pointer.attempt,'custody.json')));if(op.invoked)return {pointer,op,p};}catch{}Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);}throw Error('Simulated native operation never reached actual launch');}
@@ -95,8 +96,8 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
  test('the worker is importable for tests without launching a provider',()=>{
   const bin=simulatedHost();try{expect(require('../../scripts/advisory-review-worker.cjs')).toMatchObject({native:expect.any(Function),run:expect.any(Function)});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);}finally{fs.rmSync(bin,{recursive:true,force:true});}
  });
- test.each(['stubborn','descendant_pipe'])('configured timeout terminates the proven-owned %s session, including inherited pipes',mode=>{
-  const bin=simulatedHost(),o={...options(),timeoutMs:mode==='stubborn'?150:650,waitMs:3500};try{process.env.ADVISORY_TEST_CASE=mode;const r=advice.run(o);expect(r).toMatchObject({status:'unavailable',invoked:true,mode:'simulated',clean:false});expect(r.cause).toMatch(/timed out/i);}finally{try{const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),dir=path.join(p.dir,pointer.attempt),op=JSON.parse(fs.readFileSync(path.join(dir,'custody.json'))),id=require('../../scripts/improve-process-identity.cjs');if(op.native_identity&&(op.native_members||[]).some(i=>i.group===op.native_identity.group&&id.state(i)==='live'))process.kill(-op.native_identity.group,'SIGKILL');if(id.state(op.owner)==='live')process.kill(-op.owner.group,'SIGKILL');}catch{}fs.rmSync(bin,{recursive:true,force:true});}
+ test.each(['stubborn','descendant_pipe','descendant_immediate'])('configured timeout terminates the proven-owned %s session, including inherited pipes',mode=>{
+  const bin=simulatedHost(),o={...options(),timeoutMs:mode==='stubborn'?150:650,waitMs:3500};try{process.env.ADVISORY_TEST_CASE=mode;const r=advice.run(o);expect(r).toMatchObject({status:'unavailable',invoked:true,mode:'simulated',clean:false});expect(r.cause).toMatch(/timed out/i);}finally{try{const id=require('../../scripts/improve-process-identity.cjs');if(fs.existsSync(process.env.ADVISORY_TEST_DESCENDANT)){const child=JSON.parse(fs.readFileSync(process.env.ADVISORY_TEST_DESCENDANT));if(id.state(child)==='live')process.kill(child.pid,'SIGKILL');}const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),dir=path.join(p.dir,pointer.attempt),op=JSON.parse(fs.readFileSync(path.join(dir,'custody.json')));if(op.native_identity&&(op.native_members||[]).some(i=>i.group===op.native_identity.group&&id.state(i)==='live'))process.kill(-op.native_identity.group,'SIGKILL');if(id.state(op.owner)==='live')process.kill(-op.owner.group,'SIGKILL');}catch{}fs.rmSync(bin,{recursive:true,force:true});}
  },10000);
  test('new setup projects declare the actual advisory schema dependency',()=>{
   const setup=fs.readFileSync(path.join(SOURCE,'setup-project.sh'),'utf8'),text=setup.split('<<PKGJSON\n')[1].split('\nPKGJSON')[0],p=JSON.parse(text);expect(p.dependencies?.zod||p.devDependencies?.zod).toBe(require(path.join(SOURCE,'package.json')).dependencies.zod);
@@ -126,13 +127,16 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
    const handoff=advice.handoffText(next,'Hulupeep/Specflow');expect(handoff).toContain('F1');expect(handoff).toContain('Gate C decision remains pending');
   }finally{fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
+ test('a schema-valid canonical rewrite or deleted result cannot erase observed serious findings',()=>{
+  const bin=simulatedHost();try{process.env.ADVISORY_TEST_FINDINGS=JSON.stringify([{id:'F1',severity:'p1',location:'app.js:1',summary:'Must remain visible',disposition:'open',tracking_issue:null,rationale:null,evidence:[]}]);const o=options();expect(advice.run(o).findings).toHaveLength(1);const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),file=path.join(p.dir,pointer.attempt,'result.json'),bytes=fs.readFileSync(file),forged=JSON.parse(bytes);forged.review.findings=[];fs.writeFileSync(file,JSON.stringify(forged));expect(advice.handoff(o)).toMatchObject({status:'invalid',clean:false,findings:[{id:'F1'}]});fs.writeFileSync(file,bytes);fs.unlinkSync(file);expect(advice.handoff(o)).toMatchObject({status:'invalid',clean:false,findings:[{id:'F1'}]});fs.writeFileSync(file,bytes);}finally{fs.rmSync(bin,{recursive:true,force:true});}
+ },15000);
  test('a historical protocol-rejected response retains its valid observed concerns without upgrading that old execution',()=>{
   const bin=simulatedHost();try{const o=options(),finding={id:'F1',severity:'p1',location:'tree/app.js:1',summary:'Concern from earlier invalid protocol',disposition:'open',tracking_issue:null,rationale:null,evidence:[{path:'tree/app.js',sha256:sha(fs.readFileSync(path.join(root,'app.js')))}]};
    put('app.js','module.exports=2;\n');finding.evidence[0].sha256=sha(fs.readFileSync(path.join(root,'app.js')));process.env.ADVISORY_TEST_FINDINGS=JSON.stringify([finding]);const first=advice.run(o);expect(first.status).toBe('completed');
    const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),file=path.join(p.dir,pointer.attempt,'result.json'),record=JSON.parse(fs.readFileSync(file));
    // Explicit supplied historical state: retain the actual simulated native raw
    // reads/output, but reproduce the former tree-prefix validation rejection.
-   record.review.execution_status='invalid';record.review.findings=[];record.review.cause='Historical tree-prefix protocol rejection';fs.writeFileSync(file,JSON.stringify(record));delete process.env.ADVISORY_TEST_FINDINGS;
+   record.review.execution_status='invalid';record.review.findings=[];record.review.cause='Historical tree-prefix protocol rejection';fs.writeFileSync(file,JSON.stringify(record));delete pointer.completion_sha256;fs.writeFileSync(p.current,JSON.stringify(pointer));fs.rmSync(path.join(p.dir,pointer.attempt,'completion.json'),{force:true});delete process.env.ADVISORY_TEST_FINDINGS;
    const next=advice.run(o);expect(next.status).toBe('completed');expect(next.findings[0]).toMatchObject({id:'F1',severity:'p1',disposition:'open'});expect(JSON.parse(fs.readFileSync(file)).review.execution_status).toBe('invalid');
   }finally{fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
@@ -145,7 +149,7 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
  test('a killed worker retains custody of its live native child and later retries without overwrite',()=>{
   const bin=simulatedHost();try{process.env.ADVISORY_TEST_CASE='hold';const o={...options(),waitMs:100};advice.run(o);const p=advice.paths(o),until=Date.now()+4000;let pointer,op;
    while(Date.now()<until){try{pointer=JSON.parse(fs.readFileSync(p.current));op=JSON.parse(fs.readFileSync(path.join(p.dir,pointer.attempt,'custody.json')));if(op.invoked)break;}catch{}Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);}
-   expect(op.invoked).toBe(true);process.kill(-op.owner.group,'SIGKILL');expect(advice.run({...o,waitMs:500}).status).toBe('pending');
+   expect(op.invoked).toBe(true);process.kill(op.native_identity.pid,'SIGKILL');process.kill(-op.owner.group,'SIGKILL');expect(advice.run({...o,waitMs:500}).status).toBe('pending');
    const deadBy=Date.now()+6000;while(advice.groupState(op.native_identity)!=='dead'&&Date.now()<deadBy)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
    expect(advice.groupState(op.native_identity)).toBe('dead');delete process.env.ADVISORY_TEST_CASE;
    const next=advice.run({...o,waitMs:10000});expect(next.status).toBe('completed');expect(next.attempt_id).not.toBe(pointer.attempt);
@@ -170,6 +174,9 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
    expect(runner.readLedger(ledger).some(x=>x.event==='gate_passed'&&x.stage==='5_review')).toBe(false);
    const p=advice.paths(saved.advisory_context),pointer=JSON.parse(fs.readFileSync(p.current)),canonical=path.join(p.dir,pointer.attempt,'result.json'),bytes=fs.readFileSync(canonical);fs.writeFileSync(canonical,'corrupt canonical control');
    const corrupt=runner.runLoop(opts);expect(corrupt.entry.advisory_review).toMatchObject({status:'invalid',clean:false,findings:[{id:'F1'}]});fs.writeFileSync(canonical,bytes);
+   const completion=path.join(p.dir,pointer.attempt,'completion.json'),completionBytes=fs.readFileSync(completion),pointerBytes=fs.readFileSync(p.current),forged=JSON.parse(bytes),receipt=JSON.parse(completionBytes);forged.review.findings=[];fs.writeFileSync(canonical,JSON.stringify(forged));receipt.review.findings=[];receipt.result_sha256=sha(fs.readFileSync(canonical));fs.writeFileSync(completion,JSON.stringify(receipt));fs.writeFileSync(p.current,JSON.stringify({...pointer,completion_sha256:sha(fs.readFileSync(completion))}));
+   const rewritten=runner.runLoop(opts);expect(rewritten.entry.advisory_review).toMatchObject({status:'invalid',clean:false,findings:[{id:'F1'}]});fs.writeFileSync(canonical,bytes);fs.writeFileSync(completion,completionBytes);fs.writeFileSync(p.current,pointerBytes);
+   fs.writeFileSync(completion,'corrupt completion receipt');const retryState=yaml.load(fs.readFileSync(contract)).run_contract;retryState.current_stage_or_rail='5_review';fs.writeFileSync(contract,yaml.dump({run_contract:retryState}));const unavailable=runner.runLoop(opts);expect(unavailable.entry.advisory_review).toMatchObject({status:'unavailable',clean:false,findings:[{id:'F1'}]});expect(yaml.load(fs.readFileSync(contract)).run_contract.advisory_last_result.findings[0].id).toBe('F1');fs.writeFileSync(completion,completionBytes);
    put('app.js','changed before retry');process.env.ADVISORY_TEST_CASE='hold';expect(advice.run({...saved.advisory_context,waitMs:100}).status).toBe('pending');nativeCustody(saved.advisory_context);
    saved.current_stage_or_rail='5_review';fs.writeFileSync(contract,yaml.dump({run_contract:saved}));const pending=runner.runUntilTerminal(opts);expect(pending.status).toBe('advisory_review_pending');expect(pending.iterations).toBe(1);expect(yaml.load(fs.readFileSync(contract)).run_contract.advisory_last_result.findings[0].id).toBe('F1');
    const until=Date.now()+6000;while(advice.handoff(saved.advisory_context).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);expect(advice.handoff(saved.advisory_context).status).toBe('completed');

@@ -27,5 +27,5 @@ function finish(){
  for(const e of events)console.log(JSON.stringify(e));
 }
 if(mode==='stubborn'){process.on('SIGTERM',()=>{});setInterval(()=>{},1000);}
-else if(mode==='descendant_pipe'){require('child_process').spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000);"],{stdio:['ignore',1,2]});setTimeout(()=>process.exit(0),300);}
+else if(mode==='descendant_pipe'||mode==='descendant_immediate'){const child=require('child_process').spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000);"],{stdio:['ignore',1,2]});if(process.env.ADVISORY_TEST_DESCENDANT)fs.writeFileSync(process.env.ADVISORY_TEST_DESCENDANT,JSON.stringify(require('../../scripts/improve-process-identity.cjs').identity(child.pid)));if(mode==='descendant_immediate')process.exit(0);else setTimeout(()=>process.exit(0),300);}
 else if(mode==='timeout'||mode==='hold')setTimeout(finish,mode==='timeout'?10000:1200);else finish();

@@ -43,11 +43,17 @@ advisory check does not relabel historical Duo receipts or their pinned policy.
 
 ## Attempts and findings
 
-Private immutable attempt files live under
+Private attempt files are written once by the executor under
 `.specflow/runs/<slug>/advisory/<attempt>/`. They retain the actual invocation,
 raw output, frozen input hashes, content receipts and structured result. The
 public Markdown is a projection. It names requested and actually observed model
 identities separately; absent served-model metadata stays unknown.
+
+Terminal receipts hash-pin the result and native artifacts. The runner retains
+the completion anchor and its last observed finding history separately. A
+schema-valid canonical rewrite, deletion, or replaced pointer cannot silently
+erase earlier concerns at the actual handoff. Historical unanchored records
+remain historical evidence; they cannot establish current clean assurance.
 
 Execution is completed, unavailable, invalid or interrupted. Scope is current,
 stale or unknown. A missing earlier review is `not_reviewed`, including historical
@@ -77,10 +83,14 @@ The worker retains the selected timeout and any explicit owner limits. There is
 no invented fixed subscription review allowance and no paid/opposite-host
 fallback. A configured fallback is never passed to the native invocation.
 
-Timeout first requests termination of the actual detached native session, then
-escalates after a short grace period using birth-checked ownership. Surviving
-members retain custody; uncertain termination cannot become a clean review or
-permission to duplicate the call.
+A detached session keeper stays alive until cleanup finishes, including when
+the direct critic forks and exits immediately. It records custody before
+launch and anchors termination of its own session through a short TERM/KILL
+grace period, on timeout and on normal completion. The outer executor verifies
+the group has ended before publishing a terminal result. Surviving members
+retain custody; uncertain termination cannot become a clean review or permission
+to duplicate the call. No polling interval is used as proof that descendants
+were discovered.
 
 Simulation fixtures must supply a byte-pinned fixture executable in an isolated
 PATH. A missing or mismatched fixture blocks before provider authentication or

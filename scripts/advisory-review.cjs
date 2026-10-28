@@ -82,7 +82,7 @@ function validateResponse(value,entries,inspected=null){
 }
 function recoveredFindings(o,previous){
  const findings=previous?.review.findings||[];
- if(previous?.review.execution_status!=='invalid'||!previous.review.invoked)return findings;
+ if(!['invalid','interrupted'].includes(previous?.review.execution_status)||!previous.review.invoked)return findings;
  // Recover actual concerns from complete native reads and valid frozen hashes,
  // without changing an old invalid execution or granting readiness credit.
  try{const dir=path.join(paths(o).dir,previous.attempt),request=json(path.join(dir,'request.json')),access=json(path.join(dir,'access-receipts.json'));
@@ -92,23 +92,34 @@ function recoveredFindings(o,previous){
   return mergeFindings(findings,validateResponse(value,manifest,access.inspected).findings);
  }catch{return findings;}
 }
-function operationState(active){const states=[groupState(active.owner),...(active.invoked?[groupState(active.native_identity)]:[])];return states.includes('live')?'live':states.includes('unknown')?'unknown':'dead';}
+function operationState(active){const states=[groupState(active.owner),...(active.native_identity?[groupState(active.native_identity)]:[])];return states.includes('live')?'live':states.includes('unknown')?'unknown':'dead';}
 function groupState(owner){
  const own=identity.state(owner);if(own==='live'||own==='unknown')return own;
  if(!owner||owner.group!==owner.pid||identity.boot()!==owner.boot_id)return 'unknown';
  try{for(const pid of fs.readdirSync('/proc').filter(x=>/^\d+$/.test(x))){try{const raw=fs.readFileSync('/proc/'+pid+'/stat','utf8'),s=raw.slice(raw.lastIndexOf(')')+2).split(' ');if(Number(s[2])===owner.group&&!['Z','X'].includes(s[0]))return 'live';}catch(e){if(e.code!=='ENOENT'&&e.code!=='ESRCH')return 'unknown';}}return 'dead';}catch{return 'unknown';}
 }
-function current(o){const p=paths(o);try{const pointer=json(p.current);let id=pointer.attempt;if(!fs.existsSync(path.join(p.dir,id,'result.json')))id=pointer.previous;if(!id)return null;const attempt=json(path.join(p.dir,id,'result.json'));Review.parse(attempt.review);return {...attempt,attempt:id};}catch(e){if(e.code==='ENOENT')return null;throw e;}}
+function current(o){
+ const p=paths(o);let pointer;try{pointer=json(p.current);}catch(e){if(e.code==='ENOENT')return null;throw e;}
+ let id=pointer.attempt,expected=pointer.completion_sha256;
+ if(!expected&&!fs.existsSync(path.join(p.dir,id,'result.json'))){id=pointer.previous;expected=pointer.previous_completion_sha256;}
+ if(!id)return null;if(!/^[a-f0-9-]{36}$/.test(id))throw Error('Invalid advisory attempt identity');
+ const dir=path.join(p.dir,id),file=path.join(dir,'result.json');
+ if(!expected){const old=json(file);Review.parse(old.review);return {...old,attempt:id,integrity:'Historical completion has no pinned receipt; it cannot establish current clean assurance',anchor:null};}
+ const bytes=fs.readFileSync(path.join(dir,'completion.json'));if(hash(bytes)!==expected)throw Error('Pinned advisory completion receipt changed');
+ const receipt=JSON.parse(bytes);Review.parse(receipt.review);if(receipt.attempt_id!==id)throw Error('Completion receipt belongs to another attempt');
+ let integrity=null;try{if(hash(fs.readFileSync(file))!==receipt.result_sha256)integrity='Canonical result hash mismatch';for(const [f,h]of Object.entries(receipt.artifact_hashes||{}))if(hash(fs.readFileSync(path.join(dir,f)))!==h)integrity='Pinned native completion artifact changed: '+f;}catch(e){if(e.code!=='ENOENT')throw e;integrity='Canonical completion artifact deleted';}
+ return {review:receipt.review,summary:receipt.summary,projection:receipt.projection,attempt:id,integrity,anchor:{attempt_id:id,completion_sha256:expected}};
+}
 function view(o,record){
  const p=paths(o);if(!record)return {status:'not_reviewed',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending'};
  const r=structuredClone(record.review);let scope='unknown';try{scope=subject({...o,ownedProjection:true}).input_snapshot_sha256===r.input_snapshot_sha256?'current':'stale';}catch{}
  let projection='missing';try{projection=hash(fs.readFileSync(safe(o.root,p.report)))===record.projection?.sha256?'current':'tampered';}catch{}
- return {status:r.execution_status,scope_status:scope,clean:r.execution_status==='completed'&&scope==='current'&&r.findings.length===0,findings:r.findings,gate_decision:'pending',attempt_id:r.attempt_id,input_snapshot_sha256:r.input_snapshot_sha256,projection,cause:r.cause,mode:r.mode,invoked:r.invoked};
+ return {status:record.integrity?'invalid':r.execution_status,scope_status:scope,clean:!record.integrity&&r.execution_status==='completed'&&scope==='current'&&r.findings.length===0,findings:r.findings,gate_decision:'pending',attempt_id:r.attempt_id,input_snapshot_sha256:r.input_snapshot_sha256,projection,cause:record.integrity||r.cause,mode:r.mode,invoked:r.invoked,anchor:record.anchor};
 }
-function handoff(o){try{const old=view(o,current(o)),active=pending(o);return active?{...old,status:'pending',clean:false,liveness:operationState(active),attempt_id:active.attempt}:old;}catch(e){return {status:'invalid',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending',cause:'Canonical review unavailable: '+e.message};}}
+function handoff(o,expectedAnchor=null){try{const record=current(o);if(expectedAnchor&&(record?.anchor?.attempt_id!==expectedAnchor.attempt_id||record?.anchor?.completion_sha256!==expectedAnchor.completion_sha256))throw Error('Completion differs from the owning runner’s pinned observation');const old=view(o,record),active=pending(o);return active?{...old,status:'pending',clean:false,liveness:operationState(active),attempt_id:active.attempt}:old;}catch(e){return {status:'invalid',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending',cause:'Canonical review unavailable: '+e.message};}}
 function markdown(r){return `# Advisory review #${r.issue}\n\nPurpose: advisory; Gate C decision: pending.\nExecution: ${r.execution_status}; scope at execution: ${r.scope_status}; mode: ${r.mode}; invoked: ${r.invoked}.\nAttempt: ${r.attempt_id}\nInput snapshot: ${r.input_snapshot_sha256||'unavailable'}\nDiff: ${r.input_diff_sha256||'unavailable'}\nBase: ${r.base_commit||'unavailable'}\nReviewer: ${r.reviewer_policy}; requested: ${r.requested_model||'unknown'}; served: ${r.served_model||'unknown'}\n${r.cause?'\nCause: '+r.cause+'\n':''}\n${r.findings.map(f=>`- **${f.severity} ${f.id}** ${f.location}: ${f.summary}\n  Disposition: ${f.disposition==='fixed'?'reported fixed':f.disposition}${f.tracking_issue?'; tracking issue #'+f.tracking_issue:''}. ${f.rationale||''}\n${f.evidence.map(e=>'  Evidence: '+e.path+' sha256:'+e.sha256).join('\n')}`).join('\n')||'No findings recorded. This means clean only for a completed, current review.'}\n\nThis report is a projection; canonical attempts and the current handoff retain findings and freshness. It grants no preparation, Duo or merge approval.\n`;}
 function blank(o,id,previous=[]){return {schema_version:1,issue:o.issue,rail:'5_review',purpose:'advisory',attempt_id:id,reviewer_policy:o.policy?.id||'unavailable',execution_status:'unavailable',scope_status:'unknown',base_commit:null,input_diff_sha256:null,input_snapshot_sha256:null,input_refs:[],provider:o.policy?.command||'unavailable',requested_model:o.policy?.requested_model||o.policy?.model||null,served_model:null,invoked:false,mode:'not_invoked',findings:previous,cause:null,gate_decision:'pending'};}
-function pending(o){const p=paths(o);try{const pointer=json(p.current),dir=path.join(p.dir,pointer.attempt);if(fs.existsSync(path.join(dir,'result.json')))return null;return {...json(path.join(dir,'pending.json')),...(fs.existsSync(path.join(dir,'custody.json'))?json(path.join(dir,'custody.json')):{}),attempt:pointer.attempt};}catch(e){if(e.code==='ENOENT')return null;throw e;}}
+function pending(o){const p=paths(o);try{const pointer=json(p.current),dir=path.join(p.dir,pointer.attempt);if(pointer.completion_sha256||fs.existsSync(path.join(dir,'result.json')))return null;return {...json(path.join(dir,'pending.json')),...(fs.existsSync(path.join(dir,'custody.json'))?json(path.join(dir,'custody.json')):{}),attempt:pointer.attempt};}catch(e){if(e.code==='ENOENT')return null;throw e;}}
 function publish(o,dir,r,summary){
  Review.parse(r);const p=paths(o),reportFile=safe(o.root,p.report),prev=current(o);let projection=null;
  // Preserve an unowned file or a user-edited projection; never use its text to
@@ -116,7 +127,11 @@ function publish(o,dir,r,summary){
  if(!fs.existsSync(reportFile)||prev?.projection?.sha256===hash(fs.readFileSync(reportFile))){
   fs.mkdirSync(path.dirname(reportFile),{recursive:true});const body=markdown(r);fs.writeFileSync(reportFile,body);projection={path:p.report,sha256:hash(body)};
  }else projection=prev?.projection||{path:p.report,sha256:null};
- immutable(path.join(dir,'result.json'),{review:r,summary,projection});
+ const value={review:r,summary,projection};immutable(path.join(dir,'result.json'),value);
+ const artifact_hashes=Object.fromEntries(['request.json','manifest.json','diff.patch','index.patch','accepted-ticket.json','schema.json','invocation.json','stdout.txt','stderr.txt','response.json','native-observation.json','native-result.json','keeper-result.json','keeper-stderr.txt','access-receipts.json'].filter(f=>fs.existsSync(path.join(dir,f))).map(f=>[f,hash(fs.readFileSync(path.join(dir,f)))]));
+ immutable(path.join(dir,'completion.json'),{attempt_id:r.attempt_id,result_sha256:hash(fs.readFileSync(path.join(dir,'result.json'))),artifact_hashes,...value});
+ const pointer=json(p.current);if(pointer.attempt!==r.attempt_id)throw Error('Fenced advisory completion cannot replace its successor');
+ atomic(p.current,{...pointer,completion_sha256:hash(fs.readFileSync(path.join(dir,'completion.json')))});
 }
 function worker(o){
  const p=paths(o);fs.mkdirSync(p.dir,{recursive:true,mode:0o700});
@@ -128,11 +143,12 @@ function worker(o){
    const old=active.reviewBase||blank(o,active.attempt,active.previousFindings||[]);Object.assign(old,active.subject||{},{execution_status:'interrupted',cause:'Owning worker and process group terminated before completion',invoked:active.invoked===true,mode:active.invoked?(active.simulation?'simulated':'live'):'not_invoked'});
    publish(o,path.join(p.dir,active.attempt),old,'Interrupted attempt retained before fresh retry');previous=current(o);
   }
-  const existing=view(o,previous);if(existing.status==='completed'&&existing.scope_status==='current')return existing;
-  const id=crypto.randomUUID(),dir=path.join(p.dir,id);fs.mkdirSync(dir,{mode:0o700});const r=blank(o,id,recoveredFindings(o,previous));
+  const known=(o.previousFindings||[]).map(f=>Finding.parse(f)),inherited=mergeFindings(known,recoveredFindings(o,previous));
+  const existing=view(o,previous);if(existing.status==='completed'&&existing.scope_status==='current'&&digest(inherited)===digest(previous.review.findings))return existing;
+  const id=crypto.randomUUID(),dir=path.join(p.dir,id);fs.mkdirSync(dir,{mode:0o700});const r=blank(o,id,inherited);
   const op={owner:identity.identity(),previousFindings:r.findings,invoked:false,subject:null,reviewBase:structuredClone(r),simulation:o.simulation===true};
   if(!op.owner||op.owner.group!==op.owner.pid)throw Error('Detached process identity unavailable');
-  immutable(path.join(dir,'pending.json'),op);atomic(p.current,{attempt:id,previous:previous?.attempt||null});
+  immutable(path.join(dir,'pending.json'),op);atomic(p.current,{attempt:id,previous:previous?.attempt||null,previous_completion_sha256:previous?.anchor?.completion_sha256||null});
   let frozen=null,summary='Advisory unavailable';
   try{
    policy(o.policy);simulationPin(o);if(!previous&&fs.existsSync(safe(o.root,p.report)))throw Error('Unowned review projection exists; retain it and resolve ownership explicitly');
@@ -161,9 +177,12 @@ function worker(o){
    const custody={...op,subject:{base_commit:r.base_commit,input_diff_sha256:r.input_diff_sha256,input_snapshot_sha256:r.input_snapshot_sha256,input_refs:r.input_refs,scope_status:'current'},invoked:false};
    atomic(path.join(dir,'custody.json'),custody);
    immutable(path.join(dir,'native-request.json'),{spec,prompt,timeoutMs:o.timeoutMs||o.policy.timeout_seconds*1000||600000,custody});
-   const relay=cp.spawnSync(process.execPath,[path.join(__dirname,'advisory-review-worker.cjs'),'--native',dir],{env:{...privateFiles.peerEnv(process.env),...spec.env,SPECFLOW_DUO_REVIEWER:'1'},encoding:'utf8',maxBuffer:65536});
-   if(relay.status!==0||!fs.existsSync(path.join(dir,'native-result.json')))return {status:'pending',liveness:'unknown',gate_decision:'pending',cause:'Native launch relay interrupted; process-group custody retained'};
-   const out=json(path.join(dir,'native-result.json'));r.invoked=out.invoked;r.mode=r.invoked?(o.simulation?'simulated':'live'):'not_invoked';
+   const relay=cp.spawnSync(process.execPath,[path.join(__dirname,'advisory-review-worker.cjs'),'--native',dir],{detached:true,env:{...privateFiles.peerEnv(process.env),...spec.env,SPECFLOW_DUO_REVIEWER:'1'},encoding:'utf8',maxBuffer:65536});
+   immutable(path.join(dir,'keeper-result.json'),{status:relay.status,signal:relay.signal,error:relay.error?.code||null,pid:relay.pid});immutable(path.join(dir,'keeper-stderr.txt'),relay.stderr||'');
+   if(!fs.existsSync(path.join(dir,'native-observation.json')))return {status:'pending',liveness:'unknown',gate_decision:'pending',cause:'Native session keeper interrupted; process-group custody retained'};
+   const observation=json(path.join(dir,'native-observation.json')),returnedCustody=json(path.join(dir,'custody.json')),out={...observation,keeper_exit:relay.status,keeper_signal:relay.signal,group_state:groupState(returnedCustody.native_identity)};
+   if(observation.keeper?.pid!==relay.pid||['boot_id','pid','start','group'].some(k=>observation.keeper?.[k]!==returnedCustody.native_identity?.[k]))throw Error('Native session keeper observation identity mismatch');
+   immutable(path.join(dir,'native-result.json'),out);r.invoked=out.invoked;r.mode=r.invoked?(o.simulation?'simulated':'live'):'not_invoked';
    if(out.group_state&&out.group_state!=='dead')return {status:'pending',liveness:out.group_state,gate_decision:'pending',cause:'Native process-group termination is not yet proven; retained custody prevents duplicate work'};
    if(out.error||out.status!==0)throw Error(out.error==='ETIMEDOUT'?'Native critic timed out':`Native critic unavailable (${out.error||'exit '+out.status}); raw stderr retained privately`);
    r.execution_status='invalid';
