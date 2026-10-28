@@ -1,6 +1,6 @@
 contract_meta:
   id: feature_duo_actions
-  version: 1
+  version: 2
   created_from_spec: "GitHub #149–#155"
   owner: specflow-core
 llm_policy:
@@ -16,8 +16,11 @@ invariants:
     rule: Active runs retain exact helper/skill bytes; installation cannot overwrite an unfinished run's managed runtime or weaken product freshness.
   - id: I-DUOACT-004
     rule: Instruction advice uses explicit bounded relevant evidence and cannot grant acceptance, permission or budget; missing and wrong outcomes remain visible.
+  - id: I-DUOACT-005
+    rule: Native instruction schemas distinguish snapshot inspection paths from repository-relative evidence paths before generation. Exact frozen membership and successful native reads remain mandatory; schema validity alone grants no acceptance.
 test_hooks:
   tests:
+    - file: tests/scripts/duo-instruction-schema.test.js
     - file: tests/scripts/duo-actions.test.js
     - file: tests/scripts/duo-action-assessment.test.js
     - file: tests/scripts/duo-action-accounting.test.js

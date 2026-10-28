@@ -6,9 +6,12 @@ const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const text = value => typeof value === 'string' && value.trim().length > 0;
 const outcomes = ['satisfied', 'attempted_failed', 'not_attempted', 'unproven', 'externally_blocked', 'replaced_with_justification'];
 const list = { type: 'array', items: { type: 'string' } };
+// Inspection addresses the frozen snapshot; evidence remains repository-relative.
+// Exact membership and successful native reads are still checked by apply().
+const inspectedList = { type: 'array', items: { type: 'string', pattern: '^(tree/.+|diff\\.patch|index\\.patch|commits\\.txt|manifest\\.json)$' } };
 const schema = { type: 'array', items: { type: 'object', additionalProperties: false,
   required: ['instructionId', 'outcome', 'reason', 'snapshotHash', 'inspected', 'evidence', 'dependencyOwner', 'missingDependency', 'replacementId'],
-  properties: { instructionId: { type: 'string' }, outcome: { type: 'string', enum: outcomes }, reason: { type: 'string' }, snapshotHash: { type: 'string' }, inspected: list, evidence: list,
+  properties: { instructionId: { type: 'string' }, outcome: { type: 'string', enum: outcomes }, reason: { type: 'string' }, snapshotHash: { type: 'string' }, inspected: inspectedList, evidence: list,
     dependencyOwner: { type: ['string', 'null'], enum: ['user', 'external', null] }, missingDependency: { type: ['string', 'null'] }, replacementId: { type: ['string', 'null'] } } } };
 const pending = state => Object.values(state.instructions || {}).filter(s => s.state === 'outstanding').sort((a,b) => a.priority - b.priority || a.originRound - b.originRound || a.id.localeCompare(b.id));
 function add(state, steps, round, provenance = 'validated') {
