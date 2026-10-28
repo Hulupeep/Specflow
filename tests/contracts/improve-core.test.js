@@ -146,7 +146,7 @@ describe('TEST-EXECUTION Improve atomic checker boundary (#44/#178)', () => {
       doc.acceptance[0].check.execution = { adapter: 'jest', required_case_ids: ['required'] };
       const result = await prepare(f, { contractDoc: doc });
       expect(result.frozen.status).toBe('rejected');
-      expect(result.frozen.errors.join('\n')).toMatch(/execution is unsupported.*#178/);
+      expect(result.frozen.errors.join('\n')).toMatch(/native|execution|checker_paths/);
     } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
   });
   test.each(['missing', 'duplicate', 'result', 'identity'])('%s projected finding cannot replace the bound frozen checker', quiet(async kind => {
@@ -169,7 +169,7 @@ describe('TEST-EXECUTION Improve atomic checker boundary (#44/#178)', () => {
 });
 
 // Everything up to a recorded baseline: candidates, Duo critique, evaluator-authored holdout, frozen contract.
-async function prepare(f, { checkInput = 'src/journey.json', contractDoc = contract(), runId = 'improve-test', critique = PURSUE, holdoutPrefix = '' } = {}) {
+async function prepare(f, { checkInput = 'src/journey.json', contractDoc = contract(), runId = 'improve-test', critique = PURSUE, holdoutPrefix = '', nativeOracle = null } = {}) {
   const { runDir } = improve.startRun({ target: f.repo, mission: f.mission, runId, stateDir: f.state, worktreeRoot: f.worktrees });
   expect(improve.recordCandidates(runDir, writeTmp(f, 'cands.json', candidates())).status).toBe('recorded');
   expect(improve.critique(runDir, { invokePeer: fakePeer([critique]) }).status).toBe('recorded');
@@ -177,19 +177,20 @@ async function prepare(f, { checkInput = 'src/journey.json', contractDoc = contr
     fs.mkdirSync(path.join(runDir, dir), { recursive: true });
     fs.writeFileSync(path.join(runDir, dir, 'steps.cjs'), (dir === 'holdout' ? holdoutPrefix : '') + stepCheck(max).replace('/src/journey.json', '/' + checkInput));
   }
-  improve.recordOracle(runDir, { role: 'evaluator', executor: 'fake-evaluator', files: ['holdout/steps.cjs'] });
+  if(nativeOracle) nativeOracle(runDir);
+  improve.recordOracle(runDir, { role: 'evaluator', executor: 'fake-evaluator', files: nativeOracle ? ['holdout/steps.cjs','holdout/native.test.js','holdout/jest.config.cjs'] : ['holdout/steps.cjs'] });
   const frozen = improve.freezeContract(runDir, writeTmp(f, 'contract.json', contractDoc));
   return { runDir, frozen };
 }
 
-async function runToImplementation(f, { contractDoc, edits = {}, peer = [KEEP], builder = FAKE_BUILDER(), holdoutPrefix = '' } = {}) {
-  const { runDir, frozen } = await prepare(f, { contractDoc, holdoutPrefix });
+async function runToImplementation(f, { contractDoc, edits = {}, peer = [KEEP], builder = FAKE_BUILDER(), holdoutPrefix = '', nativeOracle = null, continuationPolicy } = {}) {
+  const { runDir, frozen } = await prepare(f, { contractDoc, holdoutPrefix, nativeOracle });
   expect(frozen.status).toBe('frozen');
   expect((await improve.verifyPhase(runDir, 'baseline')).status).toBe('baseline_recorded');
   const invokePeer = fakePeer(peer);
   const built = await improve.build(runDir, {
     policy: writeTmp(f, 'builder.json', builder),
-    invokePeer,
+    invokePeer, continuationPolicy,
     afterBuilderRound: (ws, round) => { if (edits[round]) edits[round](ws); },
   });
   return { runDir, ws: path.join(f.worktrees, 'improve-test'), built, invokePeer };
@@ -389,11 +390,12 @@ describe('IMPROVE slice 2: Duo peer, evaluator-authored holdout (#175/#178)', ()
     expect(built.peer_recommendation).toBeNull();
   }));
 
-  test('repair budget matches duo-build: 1 initial round + 3 repairs', quiet(async () => {
+  test('subscription stagnation names diagnosis rather than arbitrary repair budget', quiet(async () => {
     const f = fixture();
     const { built } = await runToImplementation(f, { edits: { 1: (ws) => setSteps(ws, 4) }, peer: [CONTINUE] });
-    expect(built.rounds).toHaveLength(4);
-    expect(built.stop_reason).toBe('repair budget exhausted');
+    expect(built.rounds).toHaveLength(2);
+    expect(built.stop_reason).toMatch(/diagnos|No new evidence-backed progress/i);
+    expect(built.stop_reason).toContain('AC-1');
   }));
 
   test('the hidden holdout decides, not the practice checks', quiet(async () => {
@@ -1112,3 +1114,40 @@ test('EFFORT-PEER-POLICY wrapper cannot hide forbidden policy fields',quiet(asyn
  expect(()=>improve.critique(runDir,{peerPolicy:writeTmp(f,'peer.json',{adapter_policy:{billing:'subscription_cli'},model:'ignored-model'}),invokePeer:invoke})).toThrow(/peer_policy_field/);
  expect(invoke).not.toHaveBeenCalled();
 }));
+
+
+describe('NATIVE178 lifecycle: hidden native checks use the existing decision rail',()=>{
+ function docAndOracle(skipAfter=false) {
+  const doc=contract(),c=doc.acceptance[0].check;
+  delete c.command;c.artifact='holdout/native.test.js';Object.assign(c,{verification_level:'process',boundaries:['filesystem'],configuration_ids:['local'],checker_paths:['holdout/native.test.js','holdout/jest.config.cjs'],input_paths:[],rule_paths:[],execution:{adapter:'jest',test_files:['holdout/native.test.js'],required_case_ids:['holdout/native.test.js::bounded journey'],optional_case_ids:[],args:['--config','holdout/jest.config.cjs']}});
+  const nativeOracle=runDir=>{
+   fs.symlinkSync(path.resolve(__dirname,'../../node_modules'),path.join(runDir,'node_modules'),'dir');
+   fs.writeFileSync(path.join(runDir,'holdout/jest.config.cjs'),"module.exports={rootDir:require('path').resolve(__dirname,'..'),testEnvironment:'node',testMatch:['**/native.test.js']};");
+   fs.writeFileSync(path.join(runDir,'holdout/native.test.js'),"const steps=JSON.parse(require('fs').readFileSync(process.env.IMPROVE_WORKSPACE+'/src/journey.json')).steps;"+(skipAfter?"const selected=steps===2?test.skip:test;":"const selected=test;")+"selected('bounded journey',()=>{expect(steps).toBeLessThanOrEqual(2)});");
+  };return{doc,nativeOracle};
+ }
+ test.each([false,true])('NATIVE178: true gain versus required skip (%s) remains mechanically decided',quiet(async skipAfter=>{
+  const f=fixture();try{const{doc,nativeOracle}=docAndOracle(skipAfter),{runDir}=await runToImplementation(f,{contractDoc:doc,nativeOracle,edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');const d=improve.evaluate(runDir);expect(d.decision).toBe(skipAfter?'INCONCLUSIVE':'KEEP');const evidence=fs.readFileSync(path.join(runDir,'evidence.jsonl'),'utf8').trim().split('\n').map(JSON.parse).filter(x=>x.phase==='after'&&x.set==='holdout');expect(evidence[0].measurements.summary).toMatchObject({collected:1,passed:skipAfter?0:1,skipped:skipAfter?1:0});await expect(improve.verifyPhase(runDir,'after')).rejects.toThrow(/already consumed/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test('NATIVE178: failed held-out native assertion reverts while preserving audit evidence',quiet(async()=>{
+  const f=fixture();try{const{doc,nativeOracle}=docAndOracle(),{runDir}=await runToImplementation(f,{contractDoc:doc,nativeOracle,edits:{1:ws=>setSteps(ws,3)}});await improve.verifyPhase(runDir,'after');expect(improve.evaluate(runDir).decision).toBe('REVERT');const applied=improve.finalize(runDir);expect(applied.branch_retained).toBe(false);expect(fs.readFileSync(applied.report,'utf8')).toContain('REVERT');expect(fs.readFileSync(applied.report,'utf8')).toMatch(/Native case accounting[\s\S]*after\/holdout.*AC-1.*fail.*0.*1.*0/);expect(JSON.parse(fs.readFileSync(path.join(f.repo,'src/journey.json'))).steps).toBe(4);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test('NATIVE178: changing native raw report after verification cannot retain product',quiet(async()=>{
+  const f=fixture();try{const{doc,nativeOracle}=docAndOracle(),{runDir}=await runToImplementation(f,{contractDoc:doc,nativeOracle,edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');const ev=fs.readFileSync(path.join(runDir,'evidence.jsonl'),'utf8').trim().split('\n').map(JSON.parse).find(x=>x.phase==='after'&&x.native_execution);fs.appendFileSync(ev.native_execution.artifacts.report.path,' ');expect(improve.evaluate(runDir).decision).toBe('INCONCLUSIVE');}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+});
+
+describe('EFFORT178: useful subscription work and explicit boundaries',()=>{
+ test('EFFORT178: six progressing repairs can complete without an invented count cap',quiet(async()=>{
+  const f=fixture();try{setSteps(f.repo,8);git(f.repo,'add','.');git(f.repo,'commit','-qm','larger synthetic input');const doc=contract();
+   for(let threshold=6;threshold>=3;threshold--)doc.acceptance.push({id:'P-'+threshold,statement:'preserve fixture while measuring practice',mandatory:true,required_level:1,intent:'preservation',baseline_expectation:'pass',dev_baseline_expectation:'fail',check:{artifact:'holdout/steps.cjs',level:1,command:['node','-e','process.exit(0)']},dev_check:{artifact:'dev/steps.cjs',level:1,command:['node','-e',stepCheck(threshold)]}});
+   const edits=Object.fromEntries(Array.from({length:6},(_,i)=>[i+1,ws=>setSteps(ws,7-i)])),{built,runDir}=await runToImplementation(f,{contractDoc:doc,edits,peer:[CONTINUE,CONTINUE,CONTINUE,CONTINUE,CONTINUE,KEEP]});expect(built.rounds).toHaveLength(6);expect(built.peer_recommendation).toBe('keep');expect(improve.events(runDir).find(x=>x.event==='implementation_started').continuation_policy).toMatchObject({usageMode:'unknown',maxElapsedMs:3600000});
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test('EFFORT178: explicit maxCalls remains a named checkpoint',quiet(async()=>{
+  const f=fixture();try{const{built}=await runToImplementation(f,{continuationPolicy:writeTmp(f,'continuation.json',{usageMode:'subscription',maxCalls:1}),peer:[CONTINUE]});expect(built.rounds).toHaveLength(1);expect(built.stop_reason).toMatch(/maxCalls checkpoint/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test('EFFORT178: explicit elapsed horizon remains binding',quiet(async()=>{
+  const f=fixture();try{const{built}=await runToImplementation(f,{continuationPolicy:writeTmp(f,'continuation.json',{usageMode:'subscription',maxElapsedMs:1}),peer:[CONTINUE]});expect(built.rounds).toHaveLength(0);expect(built.stop_reason).toMatch(/maxElapsedMs checkpoint/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+});
