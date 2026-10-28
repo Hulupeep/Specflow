@@ -5,6 +5,7 @@ const args=process.argv.slice(2),host=path.basename(process.argv[1]);
 if(args.includes('--version')){console.log('simulated-native-critic');process.exit(0);}
 if(args[0]==='auth'){console.log(JSON.stringify({loggedIn:process.env.ADVISORY_TEST_CASE!=='auth_error'}));process.exit(0);}
 if(args[0]==='login'){console.log(process.env.ADVISORY_TEST_CASE==='auth_error'?'Not authenticated':'Logged in using simulated-fixture');process.exit(0);}
+if(host==='claude'&&JSON.parse(args[args.indexOf('--json-schema')+1]||'{}').$schema==='https://json-schema.org/draft/2020-12/schema'){console.error('Simulated Claude CLI: unsupported schema dialect annotation');process.exit(1);}
 const prompt=fs.readFileSync(0,'utf8');fs.writeFileSync('received-prompt.txt',prompt);
 const req=JSON.parse(fs.readFileSync('request.json')),mode=process.env.ADVISORY_TEST_CASE||'clean';
 if(process.env.ADVISORY_TEST_COUNT)fs.appendFileSync(process.env.ADVISORY_TEST_COUNT,'called\n');

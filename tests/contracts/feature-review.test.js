@@ -45,6 +45,9 @@ describe('J-FEATURE-REVIEW-CLEAN: complete frozen subject, fresh context and non
   expect(()=>advice.validateResponse({summary:'clean',findings:[],gate_decision:'passed'},{})).toThrow(/invalid advisory/i);
   expect(()=>advice.validateResponse({summary:'clean',findings:[],purpose:'preparation'},{})).toThrow(/invalid advisory/i);
  });
+ test('Claude schema compatibility removes only the unsupported dialect annotation',()=>{
+  const transport=require('../../scripts/readonly-review.cjs'),schema=require('zod').toJSONSchema(advice.Response),compatible=transport.providerSchema(schema,'claude');expect(schema.$schema).toBe('https://json-schema.org/draft/2020-12/schema');expect(compatible.$schema).toBeUndefined();const expected=structuredClone(schema);delete expected.$schema;expect(compatible).toEqual(expected);expect(schema.additionalProperties).toBe(false);
+ });
  test('frozen tree citations normalize only with the exact manifest hash and an actual native read',()=>{
   const f={id:'F1',severity:'p1',location:'tree/app.js:1',summary:'Concern',disposition:'open',tracking_issue:null,rationale:null,evidence:[{path:'tree/app.js',sha256:sha('source')}]},m={'app.js':{sha256:sha('source')}};
   expect(advice.validateResponse({summary:'finding',findings:[f]},m,['tree/app.js']).findings[0].evidence[0].path).toBe('app.js');
