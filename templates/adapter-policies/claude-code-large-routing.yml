@@ -163,3 +163,6 @@ routes:
     5_impl:
       policy: claude-coder
       reason: implementation and local verification
+    5_review:
+      policy: fable-reviewer
+      reason: fresh read-only advisory review; Gate C remains authoritative

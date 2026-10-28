@@ -22,6 +22,19 @@ test('explicit source slices retain partial extent; truncation cannot masquerade
  const result=access.collect(codex("sed -n '2,2p' -- proof.txt",'line two\n'),dir,['proof.txt']);expect(result.receipts[0].extent).toBe('partial');
  expect(access.collect(codex('cat proof.txt','line one\n'),dir,['proof.txt']).inspected).toEqual([]);
 });
+test('opt-in full coverage joins actual Codex slices without treating a one-line access as completion',()=>{
+ const one=codex("sed -n '1p' -- proof.txt",'line one\n'),two=codex("sed -n '2p' -- proof.txt",'line two\n');two[0].item.id='cmd-2';
+ expect(access.collect(one,dir,['proof.txt'],{coverage:true}).complete).toEqual([]);
+ expect(access.collect([...one,...two],dir,['proof.txt'],{coverage:true}).coverage['proof.txt']).toEqual({totalLines:2,linesRead:2,complete:true});
+ expect(access.collect(one,dir,['proof.txt']).coverage).toBeUndefined();
+});
+test('opt-in full coverage joins only matching Claude line contents and handles empty successful reads',()=>{
+ const one=claude();one[1].message.content[0].content='1→line one';const two=claude();two[0].message.content[0].id='read-2';two[1].message.content[0].tool_use_id='read-2';two[1].message.content[0].content='2→line two';
+ expect(access.collect(one,dir,['proof.txt'],{coverage:true}).complete).toEqual([]);
+ expect(access.collect([...one,...two],dir,['proof.txt'],{coverage:true}).complete).toEqual(['proof.txt']);
+ two[1].message.content[0].content='2→invented';expect(access.collect([...one,...two],dir,['proof.txt'],{coverage:true}).complete).toEqual([]);
+ fs.writeFileSync(path.join(dir,'empty.patch'),'');const empty=claude('Read',{file_path:'empty.patch'});empty[1].message.content[0].content='The file exists but is empty';expect(access.collect(empty,dir,['empty.patch'],{coverage:true}).complete).toEqual(['empty.patch']);
+});
 test('invented citation is rejected even if another file was really read',()=>{
  expect(()=>access.apply({inspected:['manifest.json']},access.collect(claude(),dir,['proof.txt']))).toThrow(/receipt/);
 });

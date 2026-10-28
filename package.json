@@ -18,6 +18,8 @@
     "skills/",
     "scripts/",
     "docs/gate-d.md",
+    "docs/advisory-review.md",
+    "docs/contracts/feature-review.yml",
     "setup-project.sh",
     "install-hooks.sh",
     "verify-setup.sh",

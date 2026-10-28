@@ -6,15 +6,14 @@ const client = require('./typesafe-client.cjs');
 const prompts = require('./typesafe-questions.cjs');
 const evidenceContext = require('./typesafe-evidence.cjs');
 const actionAdvice = require('./typesafe-actions.cjs');
-const excluded = name => /(^|\/)(\.env(?:\.[^/]*)?|[^/]*\.(?:pem|key)|credentials(?:\.[^/]*)?)$|(^|\/)(?:production|prod)[-_/].*log|(^|\/)logs\/production|(?:production|prod)\.log$/i.test(name)
-  || /(^|\/)\.specflow\/runs\/[^/]+\/adapter\//.test(name.replace(/\\/g,'/'));
+const {excluded,peerEnv}=require('./review-input.cjs');
 function config(previous = {}, update = {}) {
   const next = { mode: 'shadow', model: 'jev-1.13.0', maxCalls: 20, calls: 0, consecutiveFailures: 0, changes: [], ...previous, ...update };
   if (next.envFile && (typeof next.envFile !== 'string' || !/^\.env(?:\.[^/]*)?$/.test(path.basename(next.envFile)))) throw Error('Explicit credential file must use a protected .env name');
   if (!['off', 'shadow', 'advisory'].includes(next.mode) || !Number.isInteger(next.maxCalls) || next.maxCalls < 1 || next.maxCalls > 100 || !/^jev-\d+\.\d+\.\d+$/.test(next.model)) throw Error('Invalid TypeSafe configuration');
   return next;
 }
-function peerEnv(env) { return Object.fromEntries(Object.entries(env).filter(([key]) => !/^TYPESAFE_/i.test(key))); }
+
 function run({ state, batch, tree, round, dir, snapshot, save, execute = spawnSync }) {
   if (process.env.SPECFLOW_DUO_REVIEWER) throw Error('Recursive TypeSafe advice forbidden');
   const cfg = state.typesafe = config(state.typesafe);

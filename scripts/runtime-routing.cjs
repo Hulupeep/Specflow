@@ -14,7 +14,7 @@ const STATE_SCHEMA_VERSION = 1;
 // Mechanical gates deliberately have no model assignment. Read the real path,
 // rather than accepting a route merely because a policy with that name exists.
 function validateRoleRoutes(profile, sourceRoot, { requireComplete = true } = {}) {
-  const required = { 'spec-build': ['discover','draft','adversary','tickets'], 'feature-build': ['2_contract','3_e2e','4_oracle','5_impl'] };
+  const required = { 'spec-build': ['discover','draft','adversary','tickets'], 'feature-build': ['2_contract','3_e2e','4_oracle','5_impl','5_review'] };
   for(const loop of Object.keys(profile.routes||{}))if(!Object.hasOwn(required,loop))throw Error(`Orphan routing loop: ${loop}`);
   for (const [loop, stages] of Object.entries(required)) {
     const canonical=path.join(sourceRoot,'templates/loops',loop+'.yaml');
