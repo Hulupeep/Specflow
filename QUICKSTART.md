@@ -174,7 +174,7 @@ npm test -- journeys
 - Contract tests → **hard gate** (always block PR)
 - Required journey tests → **executed gates**; manual review is additional evidence and cannot replace a required journey.
 
-Why manual review for journeys? Flaky tests, aspirational DOD, known issues. See [CI-INTEGRATION.md](CI-INTEGRATION.md).
+Failed, flaky, missing or skipped required journeys remain non-passing. Diagnose and repair the test/environment; a linked deferral records a gap rather than a pass. See [CI-INTEGRATION.md](CI-INTEGRATION.md).
 
 ---
 
