@@ -8,7 +8,7 @@ The actual merged PR #104 changed only `docs/PRD.md`; its description was not ev
 | PRD | v1.1 source reconciliation: latest mission preserved; dated capability/open-ticket tables replaced with scoped source status and remaining proof |
 | PRD-COMMERCIAL | New derivative positioning; no invented customers, revenue or proof claims |
 | should-i-use-specflow | Existing risk tiers retained, commercial fit clarified |
-| QUICKSTART, CONTRACTS-README, CI-INTEGRATION, root SKILL | Valid setup material retained; narrow current-boundary notes and contradictory optional-journey wording corrected |
+| QUICKSTART, CONTRACTS-README, CI-INTEGRATION, root SKILL, legacy Claude recipe and designer guide | Valid setup material retained; narrow current-boundary notes and contradictory optional-journey wording corrected |
 | preflightprd, STATUS, foundations deck, simple walkthrough | Moved intact to the historical archive with replacement links |
 | RELEASES, CHANGELOG | Dated history retained; no new release or publication claimed |
 | Scoped specs, plans, handoffs and research | Historical/design context; current accepted contracts and fresh evidence govern execution |

@@ -1,5 +1,7 @@
 # Specflow Designer Guide
 
+Journey design defines observable acceptance; the owning checks must actually run. Required server-state journeys use the real seeded auth/API/persistence path, and a model saying it verified the flow is not a gate verdict. Read [how it works](how-it-works.md) for current independent-verification and evidence limits.
+
 > Your flows become the tests. Your journeys become the contracts.
 
 ## Your Role in LLM Development
