@@ -18,7 +18,7 @@ invariants:
     tests: [acceptance-edited-after-implementation, frozen-check-edited]
   - id: I-IMPROVE-003
     rule: "Evidence satisfies a criterion only at or above its required strength and only from a non-builder producer; level 1-2 evidence comes only from frozen executable checks."
-    tests: [AC-06-4, judgment-for-deterministic, submitted-level-1, builder-self-review]
+    tests: ["AC-06-4: supporting screenshot", judgment-for-deterministic, submitted-level-1, builder-self-review]
   - id: I-IMPROVE-004
     rule: "Prohibited external side effects are classified and blocked before execution and recorded; command environments exclude secrets."
     tests: [side-effect-classification, blocked-exec-ledgered, prohibited-contract-command, secret-scrub]

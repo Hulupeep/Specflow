@@ -320,6 +320,17 @@ describe('IMPROVE-02 frozen contract and evidence strength (#174)', () => {
     expect(ac1.not_counted.map((n) => n.why).join(' ')).toMatch(/level 4 cannot satisfy level 1/);
   }));
 
+  test.each([3,4])('AC-06-4: supporting screenshot at level %s cannot replace unavailable runtime state',quiet(async level=>{
+    const f=fixture();try{
+      const{runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)},holdoutPrefix:"if(process.env.IMPROVE_PHASE==='after')process.exit(2);"});
+      await improve.verifyPhase(runDir,'after');
+      // Supplied image fixture, not an actual UI journey or persisted-state observation.
+      const image=path.join(runDir,'supporting.png');fs.writeFileSync(image,Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZyoAAAAASUVORK5CYII=','base64'));
+      const judgment=improve.submitJudgment(runDir,{criterion:'AC-1',level,result:'pass',producer_role:'ux-evaluator',executor:'independent-image-review',rationale:'The supplied screenshot looks shorter; no runtime state was observed',source:{kind:'screenshot',artifact:image}});
+      expect(judgment.status).toBe('recorded');const d=improve.evaluate(runDir),criterion=d.criteria.find(c=>c.id==='AC-1');expect(criterion.status).toBe('missing');expect(criterion.not_counted).toEqual(expect.arrayContaining([expect.objectContaining({id:judgment.item.id,why:expect.stringContaining(`level ${level} cannot satisfy level 1`)})]));expect(d.decision).toBe('INCONCLUSIVE');expect(improve.finalize(runDir).branch_retained).toBe(false);
+    }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+  }));
+
   test('submitted evidence cannot claim level 1 and builder self-review is not counted', quiet(async () => {
     const f = fixture();
     const { runDir } = await runToImplementation(f);
