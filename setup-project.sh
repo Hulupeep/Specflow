@@ -326,7 +326,8 @@ if [ ! -f "$TARGET_DIR/package.json" ]; then
   },
   "devDependencies": {
     "jest": "^29.7.0",
-    "js-yaml": "^4.1.0"
+    "js-yaml": "^4.1.0",
+    "zod": "4.6.7"
   }
 }
 PKGJSON
@@ -340,7 +341,7 @@ if [ ! -f "$TARGET_DIR/jest.config.js" ]; then
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.js'],
-  testPathIgnorePatterns: ['/node_modules/', '/demo/'],
+  testPathIgnorePatterns: ['/node_modules/', '/demo/', '/.specflow/runs/', '/.specflow/duo/'],
 };
 JESTCFG
   echo -e "${GREEN}✓${NC} Created jest.config.js"

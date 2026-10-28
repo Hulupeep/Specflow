@@ -24,4 +24,6 @@ function finish(){
  else {fs.writeFileSync(args[args.indexOf('-o')+1],JSON.stringify(result));events.push({type:'turn.completed'});}
  for(const e of events)console.log(JSON.stringify(e));
 }
-if(mode==='timeout'||mode==='hold')setTimeout(finish,mode==='timeout'?10000:1200);else finish();
+if(mode==='stubborn'){process.on('SIGTERM',()=>{});setInterval(()=>{},1000);}
+else if(mode==='descendant_pipe'){require('child_process').spawn(process.execPath,['-e',"process.on('SIGTERM',()=>{});setInterval(()=>{},1000);"],{stdio:['ignore',1,2]});setTimeout(()=>process.exit(0),300);}
+else if(mode==='timeout'||mode==='hold')setTimeout(finish,mode==='timeout'?10000:1200);else finish();

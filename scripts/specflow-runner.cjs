@@ -2393,7 +2393,7 @@ function runLoopBody(options) {
 
   if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '7_ci_handoff') {
     let advisory,review={status:'not_reviewed',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending'};
-    if(contract.advisory_context){try{advisory=require('./advisory-review.cjs');review=advisory.handoff(contract.advisory_context);if(review.status==='not_reviewed'&&contract.advisory_last_result?.status==='unavailable')review=contract.advisory_last_result;}catch(error){review={...contract.advisory_last_result,status:'unavailable',scope_status:'unknown',clean:false,findings:contract.advisory_last_result?.findings||[],gate_decision:'pending',cause:'Advisory capability unavailable: '+error.message};}}
+    if(contract.advisory_context){try{advisory=require('./advisory-review.cjs');review=advisory.handoff(contract.advisory_context);if(review.status==='not_reviewed'&&contract.advisory_last_result?.status==='unavailable')review=contract.advisory_last_result;if(review.status==='invalid')review.findings=contract.advisory_last_result?.findings||review.findings;}catch(error){review={...contract.advisory_last_result,status:'unavailable',scope_status:'unknown',clean:false,findings:contract.advisory_last_result?.findings||[],gate_decision:'pending',cause:'Advisory capability unavailable: '+error.message};}}
     const entry = {
       stage: '7_ci_handoff',
       event: 'human_handoff',
@@ -2402,7 +2402,7 @@ function runLoopBody(options) {
       next_action: 'human pushes the branch or opens the PR so branch-protected Gate C can run',
       advisory_review: review,
       evidence_note: advisory ? advisory.handoffText(review,contract.advisory_repository)
-        : `Advisory review: ${review.status}; scope: ${review.scope_status}; Gate C decision remains pending. ${review.cause||''}\n${(review.findings||[]).map(f=>`${f.severity} ${f.id}: ${f.summary} (${f.disposition}); tracking issue ${f.tracking_issue||'none'}; ${f.rationale||''}; evidence ${JSON.stringify(f.evidence||[])}`).join('\n')}`,
+        : `Advisory review: ${review.status}; scope: ${review.scope_status}; Gate C decision remains pending. ${review.cause||''}\n${(review.findings||[]).map(f=>`${f.severity} ${f.id}: ${f.summary} (${f.disposition}); tracking issue ${f.tracking_issue?(contract.advisory_repository?'https://github.com/'+contract.advisory_repository+'/issues/'+f.tracking_issue:'#'+f.tracking_issue):'none'}; ${f.rationale||''}; evidence ${JSON.stringify(f.evidence||[])}`).join('\n')}`,
     };
     appendLedger(ledgerPath, entry);
     contract.terminal_status = 'handoff';
@@ -2499,7 +2499,7 @@ function runLoopBody(options) {
     const context={root:resolve(root),runKey:slugify(slug),issue:record?.issue?.number,recordPath:contract.tier_record?rel(contract.tier_record):null,inputPaths:[...new Set(inputPaths)],baseCommit:contract.advisory_base_commit||prepared?.base_commit||null,privatePaths,policy,simulation:options.advisorySimulation===true,fixtureExecutable:options.advisoryFixtureExecutable||null};
     let result;
     try{result=require('./advisory-review.cjs').run(context);}catch(error){result={status:'unavailable',scope_status:'unknown',clean:false,findings:contract.advisory_last_result?.findings||[],gate_decision:'pending',invoked:false,mode:'not_invoked',cause:error.message};}
-    contract.advisory_context=context;contract.advisory_last_result=result;contract.advisory_repository=record?.source?.repo||null;
+    contract.advisory_context=context;contract.advisory_last_result={...result,findings:result.findings||contract.advisory_last_result?.findings||[]};contract.advisory_repository=record?.source?.repo||null;
     const active=result.status==='pending';
     const entry={stage:'5_review',event:'advisory_review',result:active?'pending':'recorded',advisory_review:result,gate_decision:'pending'};
     appendLedger(ledgerPath,entry);

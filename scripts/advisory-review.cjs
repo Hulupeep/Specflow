@@ -75,11 +75,24 @@ function mergeFindings(previous,next){
   merged.set(f.id,prior?{...f,severity:rank[f.severity]>rank[prior.severity]?f.severity:prior.severity,location:prior.location,summary:prior.summary}:f);
  }return [...merged.values()];
 }
-function validateResponse(value,entries){
+function validateResponse(value,entries,inspected=null){
  const parsed=Response.safeParse(value);if(!parsed.success)throw Error('Invalid advisory response: '+parsed.error.message);
- for(const f of parsed.data.findings)for(const r of f.evidence)if(entries[r.path]?.sha256!==r.sha256)throw Error('Finding cites changed or unavailable evidence');
+ for(const f of parsed.data.findings){const seen=new Set();for(const r of f.evidence){if(entries[r.path]?.sha256!==r.sha256&&r.path.startsWith('tree/')&&entries[r.path.slice(5)]?.sha256===r.sha256)r.path=r.path.slice(5);if(entries[r.path]?.sha256!==r.sha256)throw Error('Finding cites changed or unavailable evidence');if(seen.has(r.path))throw Error('Duplicate finding evidence');seen.add(r.path);if(inspected&&!inspected.includes('tree/'+r.path))throw Error('Finding cites content without a successful native read');}}
  mergeFindings([],parsed.data.findings);return parsed.data;
 }
+function recoveredFindings(o,previous){
+ const findings=previous?.review.findings||[];
+ if(previous?.review.execution_status!=='invalid'||!previous.review.invoked)return findings;
+ // Recover actual concerns from complete native reads and valid frozen hashes,
+ // without changing an old invalid execution or granting readiness credit.
+ try{const dir=path.join(paths(o).dir,previous.attempt),request=json(path.join(dir,'request.json')),access=json(path.join(dir,'access-receipts.json'));
+  if(request.requiredReads.some(p=>!access.inspected.includes(p)))return findings;
+  let value;if(previous.review.provider==='codex')value=json(path.join(dir,'response.json'));else{const events=fs.readFileSync(path.join(dir,'stdout.txt'),'utf8').trim().split('\n').map(JSON.parse),w=events.findLast(e=>e.type==='result'||e.structured_output);value=w?.structured_output||JSON.parse(w?.result);}
+  const manifest=json(path.join(dir,'manifest.json'));for(const [name,e]of Object.entries(manifest))if(hash(fs.readFileSync(safe(path.join(dir,'tree'),name)))!==e.sha256)return findings;
+  return mergeFindings(findings,validateResponse(value,manifest,access.inspected).findings);
+ }catch{return findings;}
+}
+function operationState(active){const states=[groupState(active.owner),...(active.invoked?[groupState(active.native_identity)]:[])];return states.includes('live')?'live':states.includes('unknown')?'unknown':'dead';}
 function groupState(owner){
  const own=identity.state(owner);if(own==='live'||own==='unknown')return own;
  if(!owner||owner.group!==owner.pid||identity.boot()!==owner.boot_id)return 'unknown';
@@ -92,7 +105,7 @@ function view(o,record){
  let projection='missing';try{projection=hash(fs.readFileSync(safe(o.root,p.report)))===record.projection?.sha256?'current':'tampered';}catch{}
  return {status:r.execution_status,scope_status:scope,clean:r.execution_status==='completed'&&scope==='current'&&r.findings.length===0,findings:r.findings,gate_decision:'pending',attempt_id:r.attempt_id,input_snapshot_sha256:r.input_snapshot_sha256,projection,cause:r.cause,mode:r.mode,invoked:r.invoked};
 }
-function handoff(o){try{const old=view(o,current(o)),active=pending(o);return active?{...old,status:'pending',clean:false,liveness:groupState(active.owner),attempt_id:active.attempt}:old;}catch(e){return {status:'invalid',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending',cause:'Canonical review unavailable: '+e.message};}}
+function handoff(o){try{const old=view(o,current(o)),active=pending(o);return active?{...old,status:'pending',clean:false,liveness:operationState(active),attempt_id:active.attempt}:old;}catch(e){return {status:'invalid',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending',cause:'Canonical review unavailable: '+e.message};}}
 function markdown(r){return `# Advisory review #${r.issue}\n\nPurpose: advisory; Gate C decision: pending.\nExecution: ${r.execution_status}; scope at execution: ${r.scope_status}; mode: ${r.mode}; invoked: ${r.invoked}.\nAttempt: ${r.attempt_id}\nInput snapshot: ${r.input_snapshot_sha256||'unavailable'}\nDiff: ${r.input_diff_sha256||'unavailable'}\nBase: ${r.base_commit||'unavailable'}\nReviewer: ${r.reviewer_policy}; requested: ${r.requested_model||'unknown'}; served: ${r.served_model||'unknown'}\n${r.cause?'\nCause: '+r.cause+'\n':''}\n${r.findings.map(f=>`- **${f.severity} ${f.id}** ${f.location}: ${f.summary}\n  Disposition: ${f.disposition==='fixed'?'reported fixed':f.disposition}${f.tracking_issue?'; tracking issue #'+f.tracking_issue:''}. ${f.rationale||''}\n${f.evidence.map(e=>'  Evidence: '+e.path+' sha256:'+e.sha256).join('\n')}`).join('\n')||'No findings recorded. This means clean only for a completed, current review.'}\n\nThis report is a projection; canonical attempts and the current handoff retain findings and freshness. It grants no preparation, Duo or merge approval.\n`;}
 function blank(o,id,previous=[]){return {schema_version:1,issue:o.issue,rail:'5_review',purpose:'advisory',attempt_id:id,reviewer_policy:o.policy?.id||'unavailable',execution_status:'unavailable',scope_status:'unknown',base_commit:null,input_diff_sha256:null,input_snapshot_sha256:null,input_refs:[],provider:o.policy?.command||'unavailable',requested_model:o.policy?.requested_model||o.policy?.model||null,served_model:null,invoked:false,mode:'not_invoked',findings:previous,cause:null,gate_decision:'pending'};}
 function pending(o){const p=paths(o);try{const pointer=json(p.current),dir=path.join(p.dir,pointer.attempt);if(fs.existsSync(path.join(dir,'result.json')))return null;return {...json(path.join(dir,'pending.json')),...(fs.existsSync(path.join(dir,'custody.json'))?json(path.join(dir,'custody.json')):{}),attempt:pointer.attempt};}catch(e){if(e.code==='ENOENT')return null;throw e;}}
@@ -111,12 +124,12 @@ function worker(o){
  const tool={path:toolPath,sha256:hash(fs.readFileSync(toolPath)),version:(version.stdout||'').trim()};
  return kernel.withLock(path.join(p.dir,'operation.lock'),tool,()=>{
   const active=pending(o);let previous=current(o);
-  if(active){const liveness=groupState(active.owner);if(liveness!=='dead')return {status:'pending',liveness,attempt_id:active.attempt,gate_decision:'pending'};
+  if(active){const liveness=operationState(active);if(liveness!=='dead')return {status:'pending',liveness,attempt_id:active.attempt,gate_decision:'pending'};
    const old=active.reviewBase||blank(o,active.attempt,active.previousFindings||[]);Object.assign(old,active.subject||{},{execution_status:'interrupted',cause:'Owning worker and process group terminated before completion',invoked:active.invoked===true,mode:active.invoked?(active.simulation?'simulated':'live'):'not_invoked'});
    publish(o,path.join(p.dir,active.attempt),old,'Interrupted attempt retained before fresh retry');previous=current(o);
   }
   const existing=view(o,previous);if(existing.status==='completed'&&existing.scope_status==='current')return existing;
-  const id=crypto.randomUUID(),dir=path.join(p.dir,id);fs.mkdirSync(dir,{mode:0o700});const r=blank(o,id,previous?.review.findings||[]);
+  const id=crypto.randomUUID(),dir=path.join(p.dir,id);fs.mkdirSync(dir,{mode:0o700});const r=blank(o,id,recoveredFindings(o,previous));
   const op={owner:identity.identity(),previousFindings:r.findings,invoked:false,subject:null,reviewBase:structuredClone(r),simulation:o.simulation===true};
   if(!op.owner||op.owner.group!==op.owner.pid)throw Error('Detached process identity unavailable');
   immutable(path.join(dir,'pending.json'),op);atomic(p.current,{attempt:id,previous:previous?.attempt||null});
@@ -128,7 +141,7 @@ function worker(o){
    const tree=path.join(dir,'tree');for(const [name,e]of Object.entries(frozen.entries)){const file=safe(tree,name);fs.mkdirSync(path.dirname(file),{recursive:true});fs.writeFileSync(file,e.virtual??fs.readFileSync(safe(o.root,name)));fs.chmodSync(file,e.mode);}
    immutable(path.join(dir,'manifest.json'),frozen.files);immutable(path.join(dir,'diff.patch'),frozen.diff);immutable(path.join(dir,'index.patch'),frozen.index);immutable(path.join(dir,'accepted-ticket.json'),frozen.accepted);
    const requiredReads=[...new Set(['request.json','manifest.json','diff.patch','index.patch','accepted-ticket.json',...frozen.input_refs.map(x=>'tree/'+x.path),...frozen.changed.filter(x=>frozen.entries[x]).map(x=>'tree/'+x)])];
-   const request={purpose:'advisory',gate_decision:'pending',base_commit:r.base_commit,input_snapshot_sha256:r.input_snapshot_sha256,requiredReads,prior_findings:r.findings,mode:o.simulation?'simulated':'live',omitted:'Sensitive files, private runner/adaptor transcripts and State Memory; only the designated derived review projection is excluded from the public source subject.'};
+   const request={purpose:'advisory',gate_decision:'pending',base_commit:r.base_commit,input_snapshot_sha256:r.input_snapshot_sha256,requiredReads,prior_findings:r.findings,evidence_path_format:'Use repository-relative manifest keys and their exact hashes; tree/ is the frozen directory, not an extra source namespace.',prior_findings_rule:'Return each prior finding ID with its current disposition, rationale and current change/check evidence. Omission retains the prior concern; reported fixes remain visible and never grant a gate verdict.',mode:o.simulation?'simulated':'live',omitted:'Sensitive files, private runner/adaptor transcripts and State Memory; only the designated derived review projection is excluded from the public source subject.'};
    immutable(path.join(dir,'request.json'),request);
    const outputSchema=z.toJSONSchema(Response),provider=r.provider,model=r.requested_model;
    immutable(path.join(dir,'schema.json'),transport.providerSchema(outputSchema,provider));
@@ -150,16 +163,17 @@ function worker(o){
    const relay=cp.spawnSync(process.execPath,[path.join(__dirname,'advisory-review-worker.cjs'),'--native',dir],{env:{...privateFiles.peerEnv(process.env),...spec.env,SPECFLOW_DUO_REVIEWER:'1'},encoding:'utf8',maxBuffer:65536});
    if(relay.status!==0||!fs.existsSync(path.join(dir,'native-result.json')))return {status:'pending',liveness:'unknown',gate_decision:'pending',cause:'Native launch relay interrupted; process-group custody retained'};
    const out=json(path.join(dir,'native-result.json'));r.invoked=out.invoked;r.mode=r.invoked?(o.simulation?'simulated':'live'):'not_invoked';
+   if(out.group_state&&out.group_state!=='dead')return {status:'pending',liveness:out.group_state,gate_decision:'pending',cause:'Native process-group termination is not yet proven; retained custody prevents duplicate work'};
    if(out.error||out.status!==0)throw Error(out.error==='ETIMEDOUT'?'Native critic timed out':`Native critic unavailable (${out.error||'exit '+out.status}); raw stderr retained privately`);
    r.execution_status='invalid';
    const events=fs.readFileSync(path.join(dir,'stdout.txt'),'utf8').trim().split('\n').filter(Boolean).map(JSON.parse),wrapper=events.findLast(e=>e.type==='result'||e.structured_output);
    r.served_model=events.find(e=>e.type==='system'&&e.model)?.model||events.find(e=>e.message?.model)?.message.model||events.find(e=>e.model)?.model||null;
    if(wrapper?.is_error)throw Error('Native critic reported an error');
-   const access=receipts.collect(events,dir,requiredReads);immutable(path.join(dir,'access-receipts.json'),access);
+   const access=receipts.collect(events,dir,[...requiredReads,...Object.keys(frozen.files).map(p=>'tree/'+p)]);immutable(path.join(dir,'access-receipts.json'),access);
    const missing=requiredReads.filter(x=>!access.inspected.includes(x));if(missing.length)throw Error('Missing native content reads: '+missing.join(', '));
    if(provider==='codex'&&!fs.existsSync(path.join(dir,'response.json')))throw Error('Native structured output missing');
    const value=provider==='claude'?(wrapper?.structured_output||JSON.parse(wrapper?.result)):json(path.join(dir,'response.json'));
-   const parsed=validateResponse(value,frozen.entries);r.findings=mergeFindings(r.findings,parsed.findings);summary=parsed.summary;
+   const parsed=validateResponse(value,frozen.entries,access.inspected);r.findings=mergeFindings(r.findings,parsed.findings);summary=parsed.summary;
    // Neither a changed live subject nor a modified frozen tree is a clean review.
    const actual={};function walk(dir,prefix=''){for(const name of fs.readdirSync(dir)){const rel=prefix+name,file=safe(tree,rel),st=fs.statSync(file);if(st.isDirectory())walk(file,rel+'/');else actual[rel]={sha256:hash(fs.readFileSync(file)),mode:st.mode&0o777};}}walk(tree);
    if(digest(Object.entries(actual).sort())!==digest(Object.entries(frozen.files).sort())||Object.entries(frozenControl).some(([f,h])=>hash(fs.readFileSync(path.join(dir,f)))!==h))throw Error('Frozen critic input changed');

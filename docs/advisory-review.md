@@ -69,6 +69,11 @@ The worker retains the selected timeout and any explicit owner limits. There is
 no invented fixed subscription review allowance and no paid/opposite-host
 fallback. A configured fallback is never passed to the native invocation.
 
+Timeout first requests termination of the actual detached native session, then
+escalates after a short grace period using birth-checked ownership. Surviving
+members retain custody; uncertain termination cannot become a clean review or
+permission to duplicate the call.
+
 Simulation fixtures must supply a byte-pinned fixture executable in an isolated
 PATH. A missing or mismatched fixture blocks before provider authentication or
 launch. Such fixtures prove protocol behavior only; actual authenticated host
@@ -78,3 +83,9 @@ Contract: `docs/contracts/feature-review.yml` (I-REVIEW-001 through I-REVIEW-004
 Journeys: `tests/contracts/feature-review.test.js`, with runner and host-routing
 regressions. This replaces the original unbuilt
 `docs/specs/feature-review/contract.yml` placeholder; no duplicate contract exists.
+The contract is shipped as a framework reference in the Specflow package. It is
+not installed as an application's domain contract with unavailable framework
+test hooks. Fresh setup projects declare the pinned Zod schema dependency;
+existing custom package manifests remain preserved. A legacy copied project
+without that dependency reports the capability gap. Use the complete Specflow
+package, or explicitly install `zod@4.6.7` in that project before retrying.

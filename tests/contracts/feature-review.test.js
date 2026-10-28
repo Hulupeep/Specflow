@@ -45,6 +45,15 @@ describe('J-FEATURE-REVIEW-CLEAN: complete frozen subject, fresh context and non
   expect(()=>advice.validateResponse({summary:'clean',findings:[],gate_decision:'passed'},{})).toThrow(/invalid advisory/i);
   expect(()=>advice.validateResponse({summary:'clean',findings:[],purpose:'preparation'},{})).toThrow(/invalid advisory/i);
  });
+ test('frozen tree citations normalize only with the exact manifest hash and an actual native read',()=>{
+  const f={id:'F1',severity:'p1',location:'tree/app.js:1',summary:'Concern',disposition:'open',tracking_issue:null,rationale:null,evidence:[{path:'tree/app.js',sha256:sha('source')}]},m={'app.js':{sha256:sha('source')}};
+  expect(advice.validateResponse({summary:'finding',findings:[f]},m,['tree/app.js']).findings[0].evidence[0].path).toBe('app.js');
+  expect(()=>advice.validateResponse({summary:'finding',findings:[f]},m,[])).toThrow(/successful native read/i);
+  expect(()=>advice.validateResponse({summary:'finding',findings:[{...f,evidence:[{path:'tree/app.js',sha256:sha('wrong')}]}]},m,['tree/app.js'])).toThrow(/unavailable evidence/i);
+ });
+ test('Jest discovers canonical tests without executing frozen advisory copies',()=>{
+  const r=cp.spawnSync(process.execPath,[path.join(SOURCE,'node_modules/jest/bin/jest.js'),'--runInBand','--listTests','--json','tests/contracts/feature-review.test.js'],{cwd:SOURCE,encoding:'utf8',timeout:10000});if(r.status!==0)throw Error(r.stderr);expect(JSON.parse(r.stdout)).toEqual([path.join(SOURCE,'tests/contracts/feature-review.test.js')]);
+ });
 });
 function simulatedHost(host='codex'){
  const bin=fs.mkdtempSync(path.join(os.tmpdir(),'advisory-bin-'));const script=path.join(bin,host);
@@ -77,6 +86,15 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
  test('a missing simulation pin blocks before a real or simulated provider can launch',()=>{
   const bin=simulatedHost();try{expect(advice.run({...options(),fixtureExecutable:null})).toMatchObject({status:'unavailable',invoked:false,mode:'not_invoked'});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);}finally{fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
+ test('the worker is importable for tests without launching a provider',()=>{
+  const bin=simulatedHost();try{expect(require('../../scripts/advisory-review-worker.cjs')).toMatchObject({native:expect.any(Function),run:expect.any(Function)});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);}finally{fs.rmSync(bin,{recursive:true,force:true});}
+ });
+ test.each(['stubborn','descendant_pipe'])('configured timeout terminates the proven-owned %s session, including inherited pipes',mode=>{
+  const bin=simulatedHost(),o={...options(),timeoutMs:mode==='stubborn'?150:650,waitMs:3500};try{process.env.ADVISORY_TEST_CASE=mode;const r=advice.run(o);expect(r).toMatchObject({status:'unavailable',invoked:true,mode:'simulated',clean:false});expect(r.cause).toMatch(/timed out/i);}finally{try{const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),dir=path.join(p.dir,pointer.attempt),op=JSON.parse(fs.readFileSync(path.join(dir,'custody.json'))),id=require('../../scripts/improve-process-identity.cjs');if(op.native_identity&&(op.native_members||[]).some(i=>i.group===op.native_identity.group&&id.state(i)==='live'))process.kill(-op.native_identity.group,'SIGKILL');if(id.state(op.owner)==='live')process.kill(-op.owner.group,'SIGKILL');}catch{}fs.rmSync(bin,{recursive:true,force:true});}
+ },10000);
+ test('new setup projects declare the actual advisory schema dependency',()=>{
+  const setup=fs.readFileSync(path.join(SOURCE,'setup-project.sh'),'utf8'),text=setup.split('<<PKGJSON\n')[1].split('\nPKGJSON')[0],p=JSON.parse(text);expect(p.dependencies?.zod||p.devDependencies?.zod).toBe(require(path.join(SOURCE,'package.json')).dependencies.zod);
+ });
  test('a live source edit cannot inherit a completed current-scope review',()=>{
   const bin=simulatedHost();try{process.env.ADVISORY_TEST_CASE='hold';const o={...options(),waitMs:100};expect(advice.run(o).status).toBe('pending');nativeCustody(o);put('app.js','changed while native review runs');const until=Date.now()+6000;while(advice.handoff(o).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);expect(advice.handoff(o)).toMatchObject({status:'completed',scope_status:'stale',clean:false});}finally{fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
@@ -102,6 +120,16 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
    const handoff=advice.handoffText(next,'Hulupeep/Specflow');expect(handoff).toContain('F1');expect(handoff).toContain('Gate C decision remains pending');
   }finally{fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
+ test('a historical protocol-rejected response retains its valid observed concerns without upgrading that old execution',()=>{
+  const bin=simulatedHost();try{const o=options(),finding={id:'F1',severity:'p1',location:'tree/app.js:1',summary:'Concern from earlier invalid protocol',disposition:'open',tracking_issue:null,rationale:null,evidence:[{path:'tree/app.js',sha256:sha(fs.readFileSync(path.join(root,'app.js')))}]};
+   put('app.js','module.exports=2;\n');finding.evidence[0].sha256=sha(fs.readFileSync(path.join(root,'app.js')));process.env.ADVISORY_TEST_FINDINGS=JSON.stringify([finding]);const first=advice.run(o);expect(first.status).toBe('completed');
+   const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),file=path.join(p.dir,pointer.attempt,'result.json'),record=JSON.parse(fs.readFileSync(file));
+   // Explicit supplied historical state: retain the actual simulated native raw
+   // reads/output, but reproduce the former tree-prefix validation rejection.
+   record.review.execution_status='invalid';record.review.findings=[];record.review.cause='Historical tree-prefix protocol rejection';fs.writeFileSync(file,JSON.stringify(record));delete process.env.ADVISORY_TEST_FINDINGS;
+   const next=advice.run(o);expect(next.status).toBe('completed');expect(next.findings[0]).toMatchObject({id:'F1',severity:'p1',disposition:'open'});expect(JSON.parse(fs.readFileSync(file)).review.execution_status).toBe('invalid');
+  }finally{fs.rmSync(bin,{recursive:true,force:true});}
+ },15000);
  test('re-entry never duplicates a live detached operation',()=>{
   const bin=simulatedHost();try{process.env.ADVISORY_TEST_CASE='hold';const o={...options(),waitMs:100};expect(advice.run(o).status).toBe('pending');const second=advice.run({...o,waitMs:500});expect(second.status).toBe('pending');
    const until=Date.now()+6000;while(advice.handoff(o).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
@@ -111,9 +139,9 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
  test('a killed worker retains custody of its live native child and later retries without overwrite',()=>{
   const bin=simulatedHost();try{process.env.ADVISORY_TEST_CASE='hold';const o={...options(),waitMs:100};advice.run(o);const p=advice.paths(o),until=Date.now()+4000;let pointer,op;
    while(Date.now()<until){try{pointer=JSON.parse(fs.readFileSync(p.current));op=JSON.parse(fs.readFileSync(path.join(p.dir,pointer.attempt,'custody.json')));if(op.invoked)break;}catch{}Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);}
-   expect(op.invoked).toBe(true);process.kill(op.owner.pid,'SIGKILL');expect(advice.run({...o,waitMs:500}).status).toBe('pending');
-   const deadBy=Date.now()+6000;while(advice.groupState(op.owner)!=='dead'&&Date.now()<deadBy)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
-   expect(advice.groupState(op.owner)).toBe('dead');delete process.env.ADVISORY_TEST_CASE;
+   expect(op.invoked).toBe(true);process.kill(-op.owner.group,'SIGKILL');expect(advice.run({...o,waitMs:500}).status).toBe('pending');
+   const deadBy=Date.now()+6000;while(advice.groupState(op.native_identity)!=='dead'&&Date.now()<deadBy)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);
+   expect(advice.groupState(op.native_identity)).toBe('dead');delete process.env.ADVISORY_TEST_CASE;
    const next=advice.run({...o,waitMs:10000});expect(next.status).toBe('completed');expect(next.attempt_id).not.toBe(pointer.attempt);
    const interrupted=JSON.parse(fs.readFileSync(path.join(p.dir,pointer.attempt,'result.json')));expect(interrupted.review).toMatchObject({execution_status:'interrupted',invoked:true,gate_decision:'pending'});
    const hashBefore=sha(fs.readFileSync(p.current));Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,150);expect(sha(fs.readFileSync(p.current))).toBe(hashBefore);
@@ -134,6 +162,11 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
    const saved=yaml.load(fs.readFileSync(contract)).run_contract;expect(saved.current_stage_or_rail).toBe('6_provenance');saved.current_stage_or_rail='7_ci_handoff';fs.writeFileSync(contract,yaml.dump({run_contract:saved}));
    const h=runner.runLoop(opts);expect(h.status).toBe('human_ci_handoff_required');expect(h.entry.advisory_review.findings[0].id).toBe('F1');expect(h.entry.evidence_note).toContain('#54');expect(h.entry.evidence_note).toContain('pending');
    expect(runner.readLedger(ledger).some(x=>x.event==='gate_passed'&&x.stage==='5_review')).toBe(false);
+   const p=advice.paths(saved.advisory_context),pointer=JSON.parse(fs.readFileSync(p.current)),canonical=path.join(p.dir,pointer.attempt,'result.json'),bytes=fs.readFileSync(canonical);fs.writeFileSync(canonical,'corrupt canonical control');
+   const corrupt=runner.runLoop(opts);expect(corrupt.entry.advisory_review).toMatchObject({status:'invalid',clean:false,findings:[{id:'F1'}]});fs.writeFileSync(canonical,bytes);
+   put('app.js','changed before retry');process.env.ADVISORY_TEST_CASE='hold';expect(advice.run({...saved.advisory_context,waitMs:100}).status).toBe('pending');nativeCustody(saved.advisory_context);
+   saved.current_stage_or_rail='5_review';fs.writeFileSync(contract,yaml.dump({run_contract:saved}));const pending=runner.runUntilTerminal(opts);expect(pending.status).toBe('advisory_review_pending');expect(pending.iterations).toBe(1);expect(yaml.load(fs.readFileSync(contract)).run_contract.advisory_last_result.findings[0].id).toBe('F1');
+   const until=Date.now()+6000;while(advice.handoff(saved.advisory_context).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);expect(advice.handoff(saved.advisory_context).status).toBe('completed');
   }finally{fs.rmSync(bin,{recursive:true,force:true});}
  },20000);
  test('a legacy copied project without Zod reports its advisory capability gap and preserves handoff',()=>{
@@ -145,8 +178,15 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
   fs.mkdirSync(path.join(root,'QA/loops'),{recursive:true});for(const loop of ['feature-build','spec-build'])fs.copyFileSync(path.join(SOURCE,'templates/loops',loop+'.yaml'),path.join(root,'QA/loops',loop+'.yaml'));
   const contract=path.join(root,'.specflow/copied.yaml'),ledger=path.join(root,'.specflow/copied.jsonl');const c=runner.createRunContract({loop:'feature-build',slug:'copied',goal:'Supplied-state legacy capability negative',input:'ticket.md',contractPath:contract,ledgerPath:ledger,tierRecord:supplied.tier_record,repoRoot:root}).run_contract;c.current_stage_or_rail='5_review';fs.writeFileSync(contract,yaml.dump({run_contract:c}));
   const code=`const fs=require('fs'),yaml=require('js-yaml'),r=require('./scripts/specflow-runner.cjs');const options=${JSON.stringify({loop:'feature-build',slug:'copied',contract,ledger,adapterRouting:path.join(root,'.specflow/adapter-routing.yml'),confirmModels:true})};const a=r.runLoop(options);if(a.status!=='advisory_recorded'||a.entry.advisory_review.status!=='unavailable')throw Error(JSON.stringify(a));const c=yaml.load(fs.readFileSync(options.contract)).run_contract;c.current_stage_or_rail='7_ci_handoff';fs.writeFileSync(options.contract,yaml.dump({run_contract:c}));const h=r.runLoop(options);if(h.status!=='human_ci_handoff_required'||h.entry.advisory_review.status!=='unavailable')throw Error(JSON.stringify(h));console.log(JSON.stringify({simulated:true,gap:a.entry.advisory_review.cause,handoff:h.status}));`;
-  const result=cp.spawnSync(process.execPath,['-e',code],{cwd:root,encoding:'utf8',timeout:10000});if(result.status!==0)throw Error(result.stderr+result.stdout);const data=JSON.parse(result.stdout);expect(data.gap).toMatch(/zod/);expect(data.handoff).toBe('human_ci_handoff_required');
- },15000);
+  const result=cp.spawnSync(process.execPath,['-e',code],{cwd:root,env:{...process.env},encoding:'utf8',timeout:10000});if(result.status!==0)throw Error(result.stderr+result.stdout);const data=JSON.parse(result.stdout);expect(data.gap).toMatch(/zod/);expect(data.handoff).toBe('human_ci_handoff_required');
+  // Install the exact declared library bytes and run the copied rail itself;
+  // the model remains an explicitly pinned simulated native event fixture.
+  const bin=simulatedHost();try{fs.symlinkSync(path.join(SOURCE,'node_modules/zod'),path.join(root,'node_modules/zod'));
+   const opts={loop:'feature-build',slug:'copied',contract,ledger,adapterRouting:path.join(root,'.specflow/adapter-routing.yml'),confirmModels:true,advisorySimulation:true,advisoryFixtureExecutable:fixtureExecutable};
+   const positive=`const fs=require('fs'),yaml=require('js-yaml'),r=require('./scripts/specflow-runner.cjs'),o=${JSON.stringify(opts)};const c=yaml.load(fs.readFileSync(o.contract)).run_contract;c.current_stage_or_rail='5_review';fs.writeFileSync(o.contract,yaml.dump({run_contract:c}));const a=r.runLoop(o);if(a.status!=='advisory_recorded'||a.entry.advisory_review.status!=='completed'||a.entry.advisory_review.mode!=='simulated')throw Error(JSON.stringify(a));console.log(JSON.stringify({copiedRail:true,simulated:true,mode:a.entry.advisory_review.mode}));`;
+   const actual=cp.spawnSync(process.execPath,['-e',positive],{cwd:root,env:{...process.env},encoding:'utf8',timeout:15000});if(actual.status!==0)throw Error(actual.stderr+actual.stdout);expect(JSON.parse(actual.stdout)).toMatchObject({copiedRail:true,simulated:true});
+  }finally{fs.rmSync(bin,{recursive:true,force:true});}
+ },25000);
 });
 describe('J-FEATURE-REVIEW-FINDINGS / RECOVERY: canonical concerns survive omissions',()=>{
  const finding={id:'F1',severity:'critical',location:'app.js:1',summary:'A real concern',disposition:'open',tracking_issue:null,rationale:null,evidence:[]};
