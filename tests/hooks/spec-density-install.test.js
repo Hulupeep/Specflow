@@ -63,6 +63,14 @@ test.each(['codex', 'claude-code'])('%s installed label setup is idempotent and 
     const text=fs.readFileSync(path.join(root,'target',rel),'utf8');expect(text).not.toMatch(/adversary ≤ 4|uplift ≤ 3|cycles ≤ 4|re-audits ≤ 3|Repeats until|do_until:/);
     expect(text).toContain('no-new-evidence');
   }
+  // J-AUDIT-SKILL-LOOP-BOUNDARY: both initial install and real update loop above refresh all host skill copies.
+  for (const localHost of ['.claude','.codex','.agents']) {
+    for (const rel of ['SKILL.md','references/preflight-gate.md','references/uplift-process.md']) {
+      const installed = fs.readFileSync(path.join(root,'target',localHost,'skills/specflow-audit',rel),'utf8');
+      expect(installed).toBe(fs.readFileSync(path.join(source,'skills/specflow-audit',rel),'utf8'));
+      if(rel==='SKILL.md')expect(installed).toContain('## Loop boundary (#97)');
+    }
+  }
   const duo = fs.readFileSync(path.join(root, 'target', skillRoot, 'skills/duo-build/SKILL.md'), 'utf8');
   expect(duo).toContain('specflow-tier.cjs inspect <record.json> duo-build build');
   const feature = fs.readFileSync(path.join(root, 'target/QA/loops/feature-build.yaml'), 'utf8');
