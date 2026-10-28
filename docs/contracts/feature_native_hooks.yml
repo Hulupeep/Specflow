@@ -1,0 +1,31 @@
+contract_meta:
+  id: feature_native_hooks
+  version: 1
+  created_from_spec: GitHub113 owning native hooks
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_native_hooks'
+invariants:
+  - id: I-NATIVE-HOOK-001
+    rule: Actual native host session and selected project/run identify owning work through canonical run operational metadata. STATE hints are locators only. No newest/token inference or silent cross-session takeover; malformed owned state is nonpassing and unrelated/no-scope sessions remain unaffected.
+  - id: I-NATIVE-HOOK-002
+    rule: Stop executes current owning canonical gates and revalidates freshness in the invocation. Required red, deferred, skipped, stale, missing or copied evidence and maker-written closure flags cannot pass. Neither hook nor saved metadata grants gate advancement, acceptance or protected human approval.
+  - id: I-NATIVE-HOOK-003
+    rule: Supported controlled human-gated release calls are denied before dispatch using the existing action policy. Post-tool observation cannot prove prevention. Unsupported dynamic or compound controlled shell routes fail explicitly; the adapter is not a general arbitrary-program sandbox.
+  - id: I-NATIVE-HOOK-004
+    rule: Repeated identical no-progress Stop feedback is bounded with its concrete cause. Genuine source or validated review progress remains eligible; no invented subscription dollar, repair or review-count ceiling, model call or scheduler is introduced.
+journey: J-PLUGIN-HOOKS-ENFORCE
+capability_boundary:
+  registration: one default hooks/hooks.json
+  required_host: actual native PreToolUse, PostToolUse and Stop event/control receipts
+  owning: current same-process canonical stage and freshness
+  preserved: existing npm and pinned Duo ownership/cadence
+  limits: unsupported controlled routes block, never approve; no registered-id/publication/customer proof
+  remaining: [115-marketplace, 116-integrated-release]
+test_hooks:
+  tests:
+    - file: tests/contracts/native-plugin-hooks.test.js
+    - file: tests/contracts/native-plugin-commands.test.js
+    - file: tests/contracts/native-plugin-layout.test.js

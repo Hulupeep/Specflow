@@ -62,3 +62,20 @@ whose directory validator prefers the marketplace when both are present. The roo
 CLAUDE.md warning is expected: it is not loaded as plugin context. Native roles and
 skills supply their own context. Schema validation alone never substitutes for a
 real native journey.
+
+Native hooks load once from `hooks/hooks.json`. The installed Node adapter uses
+actual host session/project identity, canonical run-contract or existing
+execution-ledger ownership metadata, and STATE memory as locators only.
+Explicit native run/verify invocation attaches operational enforcement; trace and
+status remain diagnostic. A different session cannot silently take over.
+Stop executes current owning checks and freshness, required deferral stays red,
+and supported release calls are denied before tool dispatch. Stored pass/closed
+flags do not approve anything. Repeated identical no-progress Stop attempts end
+with the actual blocker; progressing subscription repairs have no invented
+financial/count brake. This is not a general arbitrary-program sandbox.
+Duo retains its existing owner/pinned cadence. Owning native integration and final
+release qualification must be evidenced separately from manifest/transport checks.
+
+Within owned native scope, dynamic/compound shell syntax and leading global
+git/gh options are explicitly unsupported. Use the selected project and an
+explicit operation; ordinary nonplugin CLI behavior is unchanged.

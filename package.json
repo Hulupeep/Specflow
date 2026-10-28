@@ -41,7 +41,8 @@
     "commands/",
     "docs/contracts/feature_native_plugin.yml",
     "docs/native-plugin.md",
-    "docs/contracts/feature_native_commands.yml"
+    "docs/contracts/feature_native_commands.yml",
+    "docs/contracts/feature_native_hooks.yml"
   ],
   "scripts": {
     "prepack": "node scripts/native-plugin.cjs --check && node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",

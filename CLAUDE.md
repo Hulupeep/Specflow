@@ -83,6 +83,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 
 | Contract | Protects | Rules |
 |----------|----------|-------|
+| `feature_native_hooks` | Exact-session native owning gates, fresh checks and pre-dispatch controls | I-NATIVE-HOOK-001 through I-NATIVE-HOOK-004 |
 | `feature_native_commands` | Native structured command dispatch and canonical gate authority | I-NATIVE-CMD-001 through I-NATIVE-CMD-003 |
 | `feature_native_plugin` | Native root/catalog identity, retained role rules and actual loaded proof | I-NATIVE-001 through I-NATIVE-004 |
 | `feature_plugin_runtime` | Cold runtime/vendor closure and preserved retained pins | I-PLUGIN-001 through I-PLUGIN-003 |
