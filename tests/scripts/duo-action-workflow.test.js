@@ -2,6 +2,7 @@ const fs=require('fs'),path=require('path'),os=require('os'),{execFileSync}=requ
 test.each(['claude-code','codex'])('J-DUO-ACTION-LIVE preparation %s uses actual installed native skill and preserves unverified state',host=>{
  const dest=fs.mkdtempSync(path.join(os.tmpdir(),'duo-native-prep-'));
  try{const {meta,prompt}=proof.prepare(dest,host);expect(fs.existsSync(path.join(meta.root,meta.installedSkill))).toBe(true);expect(prompt.startsWith(host==='claude-code'?'/duo-build':'$duo-build')).toBe(true);expect(meta.invocation.args).not.toContain('--disable-slash-commands');expect(meta.realModels).toBe(true);const summary=proof.summarize(meta,0);expect(summary.passed).toBe(false);expect(summary.verifiedCorrection).toBe(false);
+ for(const [key,value] of [['maintenance.auto','false'],['gc.auto','0']])expect(execFileSync('git',['config','--local',key],{cwd:meta.root,encoding:'utf8'}).trim()).toBe(value);
  const helper=path.join(meta.root,'scripts/duo-build.cjs');try{execFileSync(process.execPath,[helper,'status',meta.runId],{cwd:meta.root,env:{...process.env,SPECFLOW_DUO_REVIEWER:'1'},stdio:'pipe'});throw Error('Recursion escaped');}catch(e){expect(e.status).toBe(2);expect(e.stderr.toString()).toContain('Recursive');}
  }finally{fs.rmSync(dest,{recursive:true,force:true});}
 });

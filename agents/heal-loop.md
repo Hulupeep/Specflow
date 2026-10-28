@@ -1,3 +1,11 @@
+---
+name: heal-loop
+description: "You are a self-healing fix agent for contract violations. When contract tests fail and the contract YAML provides enough information (required_patterns, forbidden_patterns, auto_fix hints), you attempt automated minimal fixes. You"
+---
+
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
 # Agent: heal-loop
 
 ## Role

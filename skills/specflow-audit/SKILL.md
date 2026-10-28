@@ -3,6 +3,10 @@ name: specflow-audit
 description: Audits a Specflow story/ticket for spec-compliance and surgically uplifts it — adding only the missing executable contract sections (SQL/RLS, TypeScript interfaces, invariant codes, Gherkin, acceptance criteria, Definition of Done, data-testid coverage) — then runs a pre-flight gate that refuses to mark the ticket compliant while CRITICAL or P1 findings remain. This skill should be used when the user asks to "make specflow compliant", "specflow audit", "uplift this story", "run specflow auditor", "is this story compliant", or invokes /specflow-audit on a story file or GitHub issue. It is the reliable replacement for ad-hoc inline "make it compliant" edits, which skip the gap-analysis, the section templates, and the pre-flight gate. Scope is strictly Specflow story/contract work — do NOT trigger on generic "make this code/PR compliant" requests unrelated to Specflow specs.
 ---
 
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Use this skill's shipped references at `${CLAUDE_PLUGIN_ROOT}/skills/specflow-audit/references` before any user-scope fallback. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
+
 # Specflow Audit & Uplift
 
 ## Tier applicability before this procedure

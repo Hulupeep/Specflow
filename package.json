@@ -36,11 +36,15 @@
     "docs/onboarding.md",
     "docs/contracts/feature_install_ux.yml",
     "docs/plugin-runtime.md",
-    "docs/contracts/feature_plugin_runtime.yml"
+    "docs/contracts/feature_plugin_runtime.yml",
+    ".claude-plugin/plugin.json",
+    "commands/",
+    "docs/contracts/feature_native_plugin.yml",
+    "docs/native-plugin.md"
   ],
   "scripts": {
-    "prepack": "node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
-    "prepublishOnly": "node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
+    "prepack": "node scripts/native-plugin.cjs --check && node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
+    "prepublishOnly": "node scripts/native-plugin.cjs --check && node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
     "sync:loops": "node scripts/sync-loop-templates.cjs",
     "normalize": "node scripts/normalize-eol.cjs",
     "postinstall": "echo '' && echo '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557' && echo '\u2551  @colmbyrne/specflow installed                       \u2551' && echo '\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563' && echo '\u2551                                                       \u2551' && echo '\u2551  Run in EACH project you want to enforce:             \u2551' && echo '\u2551                                                       \u2551' && echo '\u2551    npx @colmbyrne/specflow init . --runtime auto      \u2551' && echo '\u2551                                                       \u2551' && echo '\u2551  This creates hooks, contracts, agents, tests, and    \u2551' && echo '\u2551  CLAUDE.md (or appends rules to your existing one).   \u2551' && echo '\u2551  Then fill in the Project Context in CLAUDE.md.       \u2551' && echo '\u2551                                                       \u2551' && echo '\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d' && echo ''",

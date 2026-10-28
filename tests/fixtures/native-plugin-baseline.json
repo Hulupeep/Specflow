@@ -1,0 +1,35 @@
+{
+  "source": "02da4dc0069ff8eefe37ee2f142005b02face0d6",
+  "agents": {
+    "agents/board-auditor.md": "54ce6bed958d5189d7cb090bae9d4a3422856541e5ef44ee5d6072fe3aac11ca",
+    "agents/contract-generator.md": "a5ee752dcac8da4088afa67667f38aaffbd6f16065ffb4b322c949e4dda5a275",
+    "agents/contract-test-generator.md": "6d6fef8a037b8df32243249b52ebf47816db23b57b4fd2a698881e0d92fc2966",
+    "agents/contract-validator.md": "abf03f6e51b6bc350b5611a0f2ea356d2a709622aaa8fd0ddde102caaf60e336",
+    "agents/db-coordinator.md": "405fcad2e29fc92fb6e5cdf097b31e90703b32470e8134d6857660651727ef87",
+    "agents/dependency-mapper.md": "6fb0a2d22f1458f8574b4e276d06e801844cff7abc7d6bc1f7c2a3b372ab0591",
+    "agents/e2e-test-auditor.md": "902efcc60b815715244ef1efb450e5ee55dbee1aee736196658cb4837e2ae836",
+    "agents/edge-function-builder.md": "ddc2d3edf9d05faf74c621b8b7538c69ddcf9313ad1457419a10559411fe6fa0",
+    "agents/frontend-builder.md": "94d7d4190e433cd88940aa59575686d35eb5800111f448caf2d840c3bd60eb11",
+    "agents/heal-loop.md": "43cd28a9c225b7b3ec7a71e7dd198285fb14136ef4fc6a8def7170916624dc56",
+    "agents/issue-lifecycle.md": "eee0ead77222b016bb342881be415b593f632fa1a4c7f510b919b61c17193a9a",
+    "agents/journey-enforcer.md": "31b1526b920fcdad3bd49d0793da9b0ee3c62ed18aa5e800a099c781eb5da684",
+    "agents/journey-gate.md": "f8d7abdbbbe882034ea5e165916514066dc577ee8f9e171d7b2b34f8b986a5c3",
+    "agents/journey-tester.md": "a111675060dfcb7a078c5eb516a1ce4cbd3ddeaa1f81171c14ae0fa3a8938290",
+    "agents/migration-builder.md": "5a7c034d5ab79c2a743f7d14d77ccc945676a3b2f7beec0eaf5cd5e68a2158cf",
+    "agents/playwright-from-specflow.md": "5814916c4f7f836c0a27f34390ab1280e09112d5b5eb2f373ccb9a4f0193d10b",
+    "agents/pre-flight-simulator.md": "55c2f59b98e95c1700cace2bff324ea50311ac87e1b24b5475537853a93bd5cc",
+    "agents/quality-gate.md": "74eb54d892e15f12d292c7b4104d85c42df97253457e50b4123919dfb833d0cc",
+    "agents/specflow-uplifter.md": "d287e79d9571734cf114bad071e6a59461176f1295ccdc13cd9916edd627c0d2",
+    "agents/specflow-writer.md": "1a6b60f59bb1c944b9ea65743e1051971670c5ca60540852a2fe935f85f54acb",
+    "agents/sprint-executor.md": "2b8d3c00260c9255070313e65def309748855345c89d56dc118225dcad0e0b1c",
+    "agents/test-runner.md": "2ed2db1743091be5cd39603473df4d0bd7a7e1e79f9382435d79748e0d29ba2f",
+    "agents/ticket-closer.md": "8875a0d53363725816d45b4d18505308e24aac40bd7c51de5715525aa1db8e78",
+    "agents/waves-controller.md": "12394f7c0cd1b02dbbc4aa2584d3a6c2b832a3c2ba41b6ecf052aa55308d6540"
+  },
+  "skills": {
+    "skills/specflow-audit/SKILL.md": "eb7de938347ee3d55a2a6b0b781748b0d7d8394298daa9589bb733eb4c105954",
+    "skills/specflow-simulate/SKILL.md": "a58e60f2870c0b6f3c33bfd574d933c46acca28b023590937334177d3cceeea2",
+    "skills/duo-build/SKILL.md": "ca055407e169a5e8f69eeed8d20f19ecb7e0cac9adafca8dd4b1ec334e468750",
+    "skills/specflow-loop-selector/SKILL.md": "2b969de0980713611b6fbe290b385e09547a1669b530742b34c3cf36eb3f5f06"
+  }
+}

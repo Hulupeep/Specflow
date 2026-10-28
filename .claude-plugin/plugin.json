@@ -1,0 +1,38 @@
+{
+  "name": "specflow",
+  "version": "0.11.1",
+  "description": "Specflow native layout and role/skill catalog. Workflow commands and owning enforcement remain under qualification.",
+  "author": {
+    "name": "Colm Byrne"
+  },
+  "commands": [
+    "./commands/about.md"
+  ],
+  "agents": [
+    "./agents/board-auditor.md",
+    "./agents/contract-generator.md",
+    "./agents/contract-test-generator.md",
+    "./agents/contract-validator.md",
+    "./agents/db-coordinator.md",
+    "./agents/dependency-mapper.md",
+    "./agents/e2e-test-auditor.md",
+    "./agents/edge-function-builder.md",
+    "./agents/frontend-builder.md",
+    "./agents/heal-loop.md",
+    "./agents/issue-lifecycle.md",
+    "./agents/journey-enforcer.md",
+    "./agents/journey-gate.md",
+    "./agents/journey-tester.md",
+    "./agents/migration-builder.md",
+    "./agents/playwright-from-specflow.md",
+    "./agents/pre-flight-simulator.md",
+    "./agents/quality-gate.md",
+    "./agents/specflow-uplifter.md",
+    "./agents/specflow-writer.md",
+    "./agents/sprint-executor.md",
+    "./agents/test-runner.md",
+    "./agents/ticket-closer.md",
+    "./agents/waves-controller.md"
+  ],
+  "skills": "./skills/"
+}

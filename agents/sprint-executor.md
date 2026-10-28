@@ -1,3 +1,11 @@
+---
+name: sprint-executor
+description: "You are a sprint execution coordinator. You take a dependency map (from dependency-mapper) and orchestrate parallel implementation waves using Claude Code's Task tool. You create tasks with `blockedBy` relationships, pre-assign co"
+---
+
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
 # Agent: sprint-executor
 
 ## Tier applicability before this procedure

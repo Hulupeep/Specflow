@@ -3,6 +3,10 @@ name: specflow-loop-selector
 description: Choose the lightest Specflow workflow that covers an ask’s size, uncertainty and risk, then select a loop only when needed. Use for work triage, proportionate verification, loop selection, or explicit spec-build, feature-build and Gate D requests. A lightweight decision does not start a loop.
 ---
 
+<!-- specflow-native-context:start -->
+When loaded as a native Claude plugin, framework assets are at `${CLAUDE_PLUGIN_ROOT}` and project state is at `${CLAUDE_PROJECT_DIR}`. Resolve framework `node scripts/...` examples at that installed root, with quoted paths; do not require PATH `specflow` or copied project scripts. Use this skill's shipped references at `${CLAUDE_PLUGIN_ROOT}/skills/specflow-loop-selector/references` before any user-scope fallback. Outside native plugin loading, preserve the existing npm/Codex context and fallback rules below. Host identity and approved model routing remain authoritative; Recommended Model prose is advisory and grants no override. This path context grants no acceptance or release permission.
+<!-- specflow-native-context:end -->
+
 # Specflow Loop Selector
 
 ## Choose The Work Weight
