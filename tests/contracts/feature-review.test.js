@@ -245,6 +245,22 @@ describe('J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-RECOVERY: canonical conce
   const fixed={...finding,disposition:'fixed',rationale:'Changed the path; required native gates remain separate.',evidence:[{path:'app.js',sha256:sha('change')}]};
   expect(advice.mergeFindings([finding],[fixed])).toEqual([fixed]);
  });
+ test('active publication remains pending until its completion pointer commits',()=>{
+  const bin=simulatedHost();try{
+   const o=options(),done=advice.run(o);expect(done.status).toBe('completed');
+   const p=advice.paths(o),pointer=JSON.parse(fs.readFileSync(p.current)),dir=path.join(p.dir,pointer.attempt);
+   const custody=JSON.parse(fs.readFileSync(path.join(dir,'custody.json')));
+   // Reconstruct the actual publisher window: result exists, pointer not committed,
+   // owning publisher still live. No provider response or receipt is invented.
+   fs.writeFileSync(path.join(dir,'custody.json'),JSON.stringify({...custody,owner:require('../../scripts/improve-process-identity.cjs').identity()}));
+   const uncommitted={...pointer};delete uncommitted.completion_sha256;fs.writeFileSync(p.current,JSON.stringify(uncommitted));
+   expect(advice.handoff(o)).toMatchObject({status:'pending',clean:false,gate_decision:'pending'});
+   const result=path.join(dir,'result.json'),bytes=fs.readFileSync(result);fs.writeFileSync(result,'{');
+   expect(advice.handoff(o)).toMatchObject({status:'pending',clean:false,gate_decision:'pending'});
+   fs.writeFileSync(result,bytes);fs.writeFileSync(p.current,JSON.stringify(pointer));
+   expect(advice.handoff(o)).toMatchObject({status:'completed',gate_decision:'pending'});
+  }finally{fs.rmSync(bin,{recursive:true,force:true});}
+ });
  test('missing earlier review is not reviewed, with no invented completion or merge verdict',()=>{
   const h=advice.handoff(options());expect(h.status).toBe('not_reviewed');expect(h.gate_decision).toBe('pending');expect(h.clean).toBe(false);
  });
