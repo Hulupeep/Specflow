@@ -78,6 +78,6 @@ test.each(['codex','claude-code'])('J-PLUGIN-FAILURE: %s propagates executed CLI
 test.each(['spawn-error','signal','buffer-error'])('setup never turns verifier %s after successful init into exit zero',kind=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'specflow verifier spawn ')),spy=jest.spyOn(cp,'spawnSync');try{
   spy.mockImplementation((exe,args)=>args.includes('init')?{status:0,stdout:'installed',stderr:''}:kind==='signal'?{status:null,signal:'SIGTERM',stdout:'',stderr:''}:{status:null,error:new Error(kind==='buffer-error'?'maxBuffer exceeded':'verifier spawn unavailable'),stdout:'',stderr:''});
-  const result=require('../../scripts/specflow-setup.cjs').setup({target:root,runtime:'codex',sourceRoot:ROOT});expect(result.installation.status).toBe('installed');expect(result.readiness.status).toBe('incomplete');expect(result.exitCode).not.toBe(0);expect(result.readiness.detail).toContain(kind==='signal'?'SIGTERM':kind==='buffer-error'?'maxBuffer exceeded':'verifier spawn unavailable');
+  const result=require(ROOT+'/scripts/specflow-setup.cjs').setup({target:root,runtime:'codex',sourceRoot:ROOT});expect(result.installation.status).toBe('installed');expect(result.readiness.status).toBe('incomplete');expect(result.exitCode).not.toBe(0);expect(result.readiness.detail).toContain(kind==='signal'?'SIGTERM':kind==='buffer-error'?'maxBuffer exceeded':'verifier spawn unavailable');
  }finally{spy.mockRestore();fs.rmSync(root,{recursive:true,force:true});}
 });
