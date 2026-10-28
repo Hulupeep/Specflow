@@ -2,7 +2,7 @@ contract_meta:
   id: feature_improve_core
   version: 5
   created_from_spec: "GitHub #171, #173, #174, #175, #176, #178 (learning slices 1-2; tickets remain spec:thin)"
-  covers_reqs: [AC-CORE-2, AC-CORE-4, AC-CORE-6, AC-02-1, AC-02-2, AC-02-3, AC-02-4, AC-04-1, AC-04-2, AC-04-3, AC-04-4, AC-06-1, AC-06-2, AC-06-3, AC-06-5]
+  covers_reqs: [AC-CORE-2, AC-CORE-4, AC-CORE-6, AC-02-1, AC-02-2, AC-02-3, AC-02-4, AC-04-1, AC-04-2, AC-04-3, AC-04-4, AC-06-1, AC-06-2, AC-06-3, AC-06-4, AC-06-5]
   owner: specflow-core
 llm_policy:
   enforce: true
@@ -18,7 +18,7 @@ invariants:
     tests: [acceptance-edited-after-implementation, frozen-check-edited]
   - id: I-IMPROVE-003
     rule: "Evidence satisfies a criterion only at or above its required strength and only from a non-builder producer; level 1-2 evidence comes only from frozen executable checks."
-    tests: [judgment-for-deterministic, submitted-level-1, builder-self-review]
+    tests: [AC-06-4, judgment-for-deterministic, submitted-level-1, builder-self-review]
   - id: I-IMPROVE-004
     rule: "Prohibited external side effects are classified and blocked before execution and recorded; command environments exclude secrets."
     tests: [side-effect-classification, blocked-exec-ledgered, prohibited-contract-command, secret-scrub]
