@@ -1,6 +1,6 @@
 contract_meta:
   id: feature_improve_worker
-  version: 1
+  version: 2
   created_from_spec: "GitHub #217; docs/specs/improve-worker/story.md"
   covers_reqs: [AC-WORKER-01, AC-WORKER-02, AC-WORKER-03, AC-WORKER-04, AC-WORKER-05, AC-WORKER-06, AC-WORKER-07, AC-WORKER-08, AC-WORKER-09, AC-WORKER-10, AC-WORKER-11]
   owner: specflow-core
@@ -17,7 +17,10 @@ invariants:
     tests: [worker-role-provenance, worker-output-escape]
   - id: I-WORKER-003
     rule: "Existing Improve freeze/baseline/holdout/decision semantics remain authoritative; the pinned launcher, helper, software and consumed generated-input identities cannot be hidden as mutable output."
-    tests: [worker-core-compatible, worker-runtime-tamper]
+    tests: [worker-core-compatible, worker-runtime-tamper, worker-installed-module-layout]
+  - id: I-WORKER-008
+    rule: "Nested and hoisted npm layouts are supported. Pinned module search roots include absence; later insertion, dangling links, root replacement and loaded dependency byte changes fail before command authority can execute."
+    tests: [worker-installed-module-layout]
   - id: I-WORKER-004
     rule: "Artifact capture has no live writers, is bounded and no-follow, rejects special/link/traversal inputs, and confirms all worker termination before committing."
     tests: [worker-output-escape, worker-process-lifetime]
@@ -34,3 +37,4 @@ test_hooks:
   tests:
     - file: tests/contracts/improve-worker.test.js
     - file: tests/integration/improve-worker.test.js
+    - file: tests/contracts/improve-worker-install.test.js
