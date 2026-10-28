@@ -5,10 +5,20 @@
   },
   "plugins": [
     {
+      "name": "specflow",
+      "source": {
+        "source": "npm",
+        "package": "@colmbyrne/specflow",
+        "version": "0.12.0"
+      },
+      "description": "Specflow contracts, native workflows, independent verification and owning hooks"
+    },
+    {
       "name": "specflow-improve",
       "source": "./plugins/specflow-improve",
       "version": "0.1.2",
       "description": "Thin authenticated Improve caller"
     }
-  ]
+  ],
+  "description": "Specflow delivery workflows and the thin Improve service caller"
 }

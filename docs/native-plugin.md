@@ -24,7 +24,7 @@ owning checks. State and gate authority remain with the existing runtime.
 Git and the accepted project's test framework are required when those owning
 checks depend on them; bundled runtime dependencies do not replace those tools.
 Audit/simulate remain `/specflow:specflow-audit` and `/specflow:specflow-simulate`.
-Owning hooks (#113), marketplace
+Owning hooks (#113) are implemented. Marketplace
 publication (#115) and final integrated/cache proof (#116) remain separate work;
 the overall plugin (#109) is still under qualification.
 
@@ -79,3 +79,24 @@ release qualification must be evidenced separately from manifest/transport check
 Within owned native scope, dynamic/compound shell syntax and leading global
 git/gh options are explicitly unsupported. Use the selected project and an
 explicit operation; ordinary nonplugin CLI behavior is unchanged.
+
+## Versioned marketplace release
+
+The `specflow-repo` catalog retains the thin Improve plugin and pins the full
+`specflow` entry to `@colmbyrne/specflow` at the canonical package version.
+`node scripts/native-plugin.cjs` synchronizes the Claude manifest, Codex manifest
+and marketplace package pin from `package.json`; `--check` rejects version drift.
+The catalog entry does not override the installed plugin manifest's version.
+
+The release candidate is 0.12.0. It is not yet published or installed from the
+public registry. Do not merge a catalog pin that points at an unavailable version.
+The npm payload omits lockfiles and bundles its required runtime dependencies;
+this avoids relying on a host dependency install to supply the verifier runtime.
+Claude's [npm plugin source contract](https://code.claude.com/docs/en/plugins/marketplace-reference#npm-plugin-source)
+defines fetch and install-script behavior. The Git-hosted catalog is distinct
+from the npm package it selects.
+
+Before release, retain package/source hashes and parity results, then verify the
+published tarball, registered marketplace identity, cached version update, actual
+native command execution and owning red-gate hook. Local or inline loads do not
+stand in for that proof. Preserve existing registrations and credentials.
