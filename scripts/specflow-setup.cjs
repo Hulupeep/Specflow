@@ -16,7 +16,7 @@ function setup({target='.',runtime,sourceRoot=path.resolve(__dirname,'..'),repla
 function cli(args,sourceRoot){try{
  const at=args.indexOf('--runtime'),runtime=require('./runtime-routing.cjs').resolveRuntime({runtime:at<0?'auto':args[at+1],interactive:!!(process.stdin.isTTY&&process.stdout.isTTY)});
  const target=args.find((a,i)=>!a.startsWith('--')&&(at<0||i!==at+1))||'.',r=setup({target,runtime,sourceRoot,replaceRouting:args.includes('--replace-routing')});
- if(args.includes('--json'))console.log(JSON.stringify(r,null,2));else console.log(`Runtime: ${runtime}\nInstall ${r.installation.target}: ${r.installation.status}\n${r.installation.detail}\nStrict verify ${r.readiness.target}: ${r.readiness.status}\n${r.readiness.detail||''}\nInstall state: ${path.join(r.installation.target,'.specflow/install-state.yml')}\nRerun preserves custom routing/gates; review any reported divergence.`);
+ if(args.includes('--json'))console.log(JSON.stringify(r,null,2));else console.log(`Runtime: ${runtime}\nInstall ${r.installation.target}: ${r.installation.status}\n${r.installation.detail}\nStrict verify ${r.readiness.target}: ${r.readiness.status}\n${r.readiness.detail||''}\nActive: ${r.doctor?.activeInstallation.identity||'unverifiable'}; staged: ${r.doctor?.stagedInstallation?.identity||'none'}\nInstall state: ${path.join(r.installation.target,'.specflow/install-state.yml')}\nRerun preserves custom routing/gates; review any reported divergence.`);
  return r.exitCode;
 }catch(e){console.error('specflow setup: '+e.message);return 1;}}
 module.exports={setup,cli};

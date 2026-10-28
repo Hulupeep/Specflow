@@ -42,6 +42,24 @@ test.each(['codex','claude-code'])('J-PLUGIN-SETUP: %s verifies target B with sp
 test.each(['codex','claude-code'])('J-PLUGIN-FAILURE: %s preserves missing CLI detail and performs no repair',runtime=>{
  const f=isolated();try{fs.unlinkSync(f.bin+'/specflow');const isolatedBin=f.base+'/only-node';fs.mkdirSync(isolatedBin);const target=f.project('untouched');const before=fs.readdirSync(target);const r=cp.spawnSync(process.execPath,[host(runtime)+'/scripts/setup.cjs',target],{env:{...f.env,PATH:isolatedBin},encoding:'utf8'});expect(r.status).not.toBe(0);expect(r.stderr).toContain('ENOENT');expect(r.stderr).toContain('specflow setup');expect(fs.readdirSync(target)).toEqual(before);}finally{f.remove();}
 });
+test.each(['codex','claude-code'])('J-PLUGIN-STAGED: %s setup names active and staged identities without changing a pinned run',runtime=>{
+ const f=isolated(),target=f.project('retained target');try{
+  assertExit(f.run(CLI,['init',target,'--runtime',runtime]),0);
+  const context=target+'/CLAUDE.md';fs.writeFileSync(context,fs.readFileSync(context,'utf8').replaceAll('[org/repo-name]','Fixture/project').replaceAll('[GitHub Issues | Jira | Linear | Shortcut | Notion]','GitHub Issues').replaceAll('[gh | jira | linear | sc | MCP]','gh').replace(/^\*\*Project Board:\*\*.*$/m,'**Project Board:** GitHub Issues').replace(/^\*\*Board CLI:\*\*.*$/m,'**Board CLI:** gh'));
+  assertExit(f.run(CLI,['verify','--strict'],target),0);
+  const doctor=require(ROOT+'/scripts/specflow-doctor.cjs'),active=doctor.inspect({targetRoot:target,sourceRoot:ROOT}).activeInstallation.identity;
+  const dir=target+'/.specflow/duo/unfinished';fs.mkdirSync(dir,{recursive:true});const pin=Buffer.from('retained runtime pin\n');fs.writeFileSync(dir+'/run.json',JSON.stringify({goalStatus:'incomplete'}));fs.mkdirSync(dir+'/runtime');fs.writeFileSync(dir+'/runtime/duo-runtime.cjs',pin);
+  const runBefore=fs.readFileSync(dir+'/run.json'),runtimeBefore=fs.readFileSync(target+'/scripts/duo-runtime.cjs'),next=f.base+'/next core';fs.mkdirSync(next);
+  for(const name of ['scripts','bin','templates','skills','hooks','agents','docs','plugins','setup-project.sh','install-hooks.sh','verify-setup.sh','CLAUDE-MD-TEMPLATE.md','package.json'])fs.cpSync(ROOT+'/'+name,next+'/'+name,{recursive:true});
+  fs.symlinkSync(ROOT+'/node_modules',next+'/node_modules','dir');const meta=JSON.parse(fs.readFileSync(next+'/package.json'));meta.description+=' (staged fixture)';fs.writeFileSync(next+'/package.json',JSON.stringify(meta));fs.appendFileSync(next+'/scripts/teardown-gate.cjs','\n// staged package revision\n');
+  fs.writeFileSync(f.bin+'/specflow',`#!/bin/sh\nexec '${process.execPath}' '${next}/bin/specflow.js' "$@"\n`,{mode:0o700});
+  const r=f.run(host(runtime)+'/scripts/setup.cjs',[target,'--json']);assertExit(r,1);const result=JSON.parse(r.stdout);
+  if(result.readiness.status!=='ready')throw Error(result.readiness.detail);
+  expect(result.installation.status).toBe('staged');expect(result.readiness.status).toBe('ready');expect(result.doctor.activeInstallation.identity).toBe(active);expect(result.doctor.stagedInstallation.identity).toMatch(/^[a-f0-9]{64}$/);expect(result.doctor.stagedInstallation.identity).not.toBe(active);
+  const human=f.run(host(runtime)+'/scripts/setup.cjs',[target]);assertExit(human,1);expect(human.stdout).toContain('Active: '+active);expect(human.stdout).toContain('staged: '+result.doctor.stagedInstallation.identity);
+  expect(fs.readFileSync(dir+'/run.json')).toEqual(runBefore);expect(fs.readFileSync(dir+'/runtime/duo-runtime.cjs')).toEqual(pin);expect(fs.readFileSync(target+'/scripts/duo-runtime.cjs')).toEqual(runtimeBefore);expect(fs.existsSync(f.base+'/provider-called')).toBe(false);
+ }finally{f.remove();}
+},180000);
 test.each(['codex','claude-code'])('J-PLUGIN-GATE: %s installed payload accepts good and rejects red, required-skip and forged receipt',runtime=>{
  for(const mode of ['good','red','required-skip','forged']){
   const env=oracleFixture({skipRequired:mode==='required-skip'||mode==='forged'}),f=isolated();try{
