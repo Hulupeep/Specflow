@@ -69,6 +69,11 @@ dispositions remain advisory claims; the owning mandatory gates verify behavior.
 
 ## Recovery
 
+If native execution finishes but canonical publication fails, the rail stays
+pending. It retains invocation and finding history; an outer error with unknown
+invocation cannot claim `not_invoked` or advance to provenance. Repair the
+reported local artifact obstruction, then resume using retained custody.
+
 The one-shot detached worker records pending custody before native work. On the
 currently supported Linux execution path, the existing kernel mutex and actual
 boot/PID/start/process-group identity prevent duplicate live work. A returning

@@ -22,6 +22,7 @@ function finish(){
   else events.push({type:'item.completed',item:{id:'r'+i,type:'command_execution',command:"cat -- '"+file+"'",status:'completed',exit_code:0,aggregated_output:text}});
  }
  const result={summary:'Simulated advisory protocol result',findings:JSON.parse(process.env.ADVISORY_TEST_FINDINGS||'[]')};
+ if(mode==='publication_failure')fs.mkdirSync(process.env.ADVISORY_TEST_PUBLICATION_PATH,{recursive:true});
  if(host==='claude')events.push({type:'system',model:'simulated-claude-model'},{type:'result',structured_output:result});
  else {fs.writeFileSync(args[args.indexOf('-o')+1],JSON.stringify(result));events.push({type:'turn.completed'});}
  for(const e of events)console.log(JSON.stringify(e));

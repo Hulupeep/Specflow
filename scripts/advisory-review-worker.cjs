@@ -35,7 +35,7 @@ function native(dir){
 }
 function run(requestFile){
  const o=JSON.parse(fs.readFileSync(requestFile));let result;
- try{result=advice.worker(o);}catch(e){result=e.code==='store_busy'?{status:'pending',liveness:'live',gate_decision:'pending'}:{status:'unavailable',scope_status:'unknown',clean:false,findings:advice.handoff(o).findings,gate_decision:'pending',invoked:false,mode:'not_invoked',cause:e.message};}
+ try{result=advice.worker(o);}catch(e){result={status:'pending',scope_status:'unknown',clean:false,findings:advice.mergeFindings(o.previousFindings||[],advice.handoff(o).findings||[]),gate_decision:'pending',liveness:e.code==='store_busy'?'live':'unknown',cause:'Canonical operation incomplete; invocation must be reconciled from retained custody: '+e.message};}
  advice.atomic(o.delivery,result);
 }
 module.exports={native,run};
