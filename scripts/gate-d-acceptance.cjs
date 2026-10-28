@@ -115,7 +115,7 @@ function accept(options = {}) {
     for (const o of required.filter(o => o.configuration_ids.includes(c.id))) {
       const states = o.check_ids.map(id => stage.findings?.find(f => f.check_id === id)?.verifier_result);
       const passed = stage.gate === 'pass' && current.gate === 'pass' && states.every(s => s === 'pass');
-      const status = passed ? 'passed' : current.status === 'stale' ? 'stale' : states.includes('fail') ? 'failed' : 'missing';
+      const status = passed ? 'passed' : current.status === 'stale' ? 'stale' : states.includes('fail') ? 'failed' : states.includes('blocked') ? 'blocked' : 'missing';
       obligations.push({ id: o.id, configuration_id: c.id, status, check_ids: o.check_ids });
       if (!passed) errors.push(`${o.id}/${c.id}: ${status}; ${stage.reason || current.reason || 'required current check missing'}`);
     }
@@ -127,6 +127,6 @@ function accept(options = {}) {
     const current = outcome.bind(contract, { root, configurationId: scope.configuration.id, environment: scope.configuration.environment });
     if (current.status !== 'bound' || outcome.freshness(scope.bound.binding, current.binding).status !== 'current') errors.push(`${scope.configuration.id}: normative scope changed during acceptance`);
   }
-  return finish({ report_validity: after.errors.length ? 'invalid' : 'valid', outcome_acceptance: errors.length ? obligations.some(o => o.status === 'stale') ? 'stale' : 'failed' : 'passed', errors, obligations, approval_scope: approvalScope, contract_sha256: outcome.contractHash(contract), configuration_bindings: scopes.map(s => s.bound.binding), report_files: before.files, report_dir: reportDir });
+  return finish({ report_validity: after.errors.length ? 'invalid' : 'valid', outcome_acceptance: errors.length ? obligations.some(o => o.status === 'stale') ? 'stale' : obligations.some(o => o.status === 'failed') ? 'failed' : obligations.some(o => o.status === 'blocked') ? 'blocked' : 'failed' : 'passed', errors, obligations, approval_scope: approvalScope, contract_sha256: outcome.contractHash(contract), configuration_bindings: scopes.map(s => s.bound.binding), report_files: before.files, report_dir: reportDir });
 }
 module.exports = { schema, validateDeclarations, mappings, report, safeRead, accept };

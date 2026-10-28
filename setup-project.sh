@@ -64,7 +64,9 @@ if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
   echo "$$" > "$DUO_INSTALL_LOCK/pid"
   trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
   duo_install_exit=0
-  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+  DUO_RUNTIME_ARGS=()
+  [ -n "$SPECFLOW_RUNTIME_ARG" ] && DUO_RUNTIME_ARGS+=(--runtime "$SPECFLOW_RUNTIME_ARG")
+  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held "${DUO_RUNTIME_ARGS[@]}" || duo_install_exit=$?
   [ "$duo_install_exit" -eq 10 ] && exit 0
   [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
 fi
@@ -162,6 +164,8 @@ echo -e "${BLUE}[4/10]${NC} Copying scripts, examples, and QA loops kit..."
 # teardown-gate, verify-seed, adversary-spawn, verify-ticket-journey, verify-falsification,
 # verify-seams, verify-adr, verify-graph, specflow-compile).
 for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+  # The managed transaction above already installed and checked every CJS gate.
+  [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ] && continue
     case "$(basename "$script")" in specflow-review.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
   if [ -f "$script" ]; then
     cp "$script" "$TARGET_DIR/scripts/"
@@ -341,6 +345,7 @@ if [ ! -f "$TARGET_DIR/jest.config.js" ]; then
 module.exports = {
   testEnvironment: 'node',
   testMatch: ['**/tests/**/*.test.js'],
+  modulePathIgnorePatterns: ['/.specflow/runs/', '/.specflow/duo/'],
   testPathIgnorePatterns: ['/node_modules/', '/demo/', '/.specflow/runs/', '/.specflow/duo/'],
 };
 JESTCFG

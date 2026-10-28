@@ -27,6 +27,16 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  doctor: {
+    usage: 'specflow doctor [target-dir] [--json]',
+    desc: 'Read-only local installation, ownership, runtime and gate-capability diagnostics',
+    run: args => { process.exitCode = require('../scripts/specflow-doctor.cjs').cli(args, SPECFLOW_ROOT); },
+  },
+  setup: {
+    usage: 'specflow setup [target-dir] --runtime auto|codex|claude-code [--json] [--replace-routing]',
+    desc: 'Run public init and strict verification against the same target, reporting both outcomes',
+    run: args => { process.exitCode = require('../scripts/specflow-setup.cjs').cli(args, SPECFLOW_ROOT); },
+  },
   review: {
     usage: 'specflow review <bind|start|resume|status|capture|review|finish> [options]',
     desc: 'Fresh same-host native role review through the owning frozen review engine; never Duo verification',
@@ -68,17 +78,19 @@ const COMMANDS = {
     run: (args) => { process.exitCode = require('../scripts/duo-build.cjs').cli(args); },
   },
   init: {
-    usage: 'specflow init [target-dir] --runtime codex|claude-code [--replace-routing]',
+    usage: 'specflow init [target-dir] --runtime auto|codex|claude-code [--replace-routing]',
     desc: 'Set up Specflow in a project (safe to re-run)',
     run: (args) => {
       const runtimeIndex = args.indexOf('--runtime');
-      const runtime = runtimeIndex >= 0 ? args[runtimeIndex + 1] : null;
+      let runtime = runtimeIndex >= 0 ? args[runtimeIndex + 1] : null;
       if (runtimeIndex >= 0 && (!runtime || runtime.startsWith('--'))) {
         console.error('specflow init: --runtime requires codex or claude-code');
         process.exit(1);
       }
       const replaceRouting = args.includes('--replace-routing');
-      const targetArg = args.find((arg, index) => !arg.startsWith('--') && index !== runtimeIndex + 1);
+      try { runtime = require('../scripts/runtime-routing.cjs').resolveRuntime({ runtime, envRuntime: process.env.SPECFLOW_RUNTIME, interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY) }); }
+      catch (error) { console.error(error.message); process.exitCode = 1; return; }
+      const targetArg = args.find((arg, index) => !arg.startsWith('--') && (runtimeIndex < 0 || index !== runtimeIndex + 1));
       const target = resolve(targetArg || '.');
       normalizeShellScripts(SPECFLOW_ROOT);
       execFile('bash', [join(SPECFLOW_ROOT, 'setup-project.sh'), target, ...(runtime ? ['--runtime', runtime] : []), ...(replaceRouting ? ['--replace-routing'] : [])]);
@@ -94,18 +106,20 @@ const COMMANDS = {
     },
   },
   update: {
-    usage: 'specflow update [target-dir] [--ci] --runtime codex|claude-code [--replace-routing]',
+    usage: 'specflow update [target-dir] [--ci] --runtime auto|codex|claude-code [--replace-routing]',
     desc: 'Update hooks and optionally install CI workflows',
     run: (args) => {
       const ciFlag = args.includes('--ci') ? '--ci' : '';
       const runtimeIndex = args.indexOf('--runtime');
-      const runtime = runtimeIndex >= 0 ? args[runtimeIndex + 1] : null;
+      let runtime = runtimeIndex >= 0 ? args[runtimeIndex + 1] : null;
       if (runtimeIndex >= 0 && (!runtime || runtime.startsWith('--'))) {
         console.error('specflow update: --runtime requires codex or claude-code');
         process.exit(1);
       }
       const replaceRouting = args.includes('--replace-routing');
-      const targetArg = args.find((arg, index) => !arg.startsWith('--') && index !== runtimeIndex + 1);
+      try { runtime = require('../scripts/runtime-routing.cjs').resolveRuntime({ runtime, envRuntime: process.env.SPECFLOW_RUNTIME, interactive: Boolean(process.stdin.isTTY && process.stdout.isTTY) }); }
+      catch (error) { console.error(error.message); process.exitCode = 1; return; }
+      const targetArg = args.find((arg, index) => !arg.startsWith('--') && (runtimeIndex < 0 || index !== runtimeIndex + 1));
       const target = resolve(targetArg || '.');
       normalizeShellScripts(SPECFLOW_ROOT);
       execFile('bash', [join(SPECFLOW_ROOT, 'install-hooks.sh'), target, ...(ciFlag ? [ciFlag] : []), ...(runtime ? ['--runtime', runtime] : []), ...(replaceRouting ? ['--replace-routing'] : [])]);

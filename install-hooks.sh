@@ -82,7 +82,9 @@ if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
     echo "$$" > "$DUO_INSTALL_LOCK/pid"
     trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
     duo_install_exit=0
-    node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+    DUO_RUNTIME_ARGS=()
+    [ -n "$SPECFLOW_RUNTIME_ARG" ] && DUO_RUNTIME_ARGS+=(--runtime "$SPECFLOW_RUNTIME_ARG")
+    node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held "${DUO_RUNTIME_ARGS[@]}" || duo_install_exit=$?
     [ "$duo_install_exit" -eq 10 ] && exit 0
     [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
   fi
@@ -277,6 +279,8 @@ fi
 if ls "$SCRIPT_DIR/scripts/"*.cjs >/dev/null 2>&1; then
   mkdir -p "$TARGET_DIR/scripts"
   for script in "$SCRIPT_DIR/scripts/"*.cjs; do
+    # Never bypass the managed gate ownership transaction with an unconditional copy.
+    [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ] && continue
     case "$(basename "$script")" in review-assignment.cjs|specflow-review.cjs|review-continuation.cjs|specflow-tier.cjs|specflow-specification.cjs|specflow-volume.cjs|specflow-publication.cjs|specflow-reviews.cjs|typesafe-effort-analysis.cjs|typesafe-effort-trial.cjs|typesafe-routing.cjs|typesafe-routing-bridge.cjs|duo-review-receipts.cjs|typesafe-evidence.cjs|typesafe-questions-v1.cjs|duo-build.cjs|duo-progress.cjs|duo-direction.cjs|duo-actions.cjs|duo-cadence.cjs|duo-runtime.cjs|typesafe-duo.cjs|typesafe-client.cjs|typesafe-questions.cjs|typesafe-actions.cjs) continue ;; esac
     cp "$script" "$TARGET_DIR/scripts/"
     echo -e "${GREEN}✓${NC} scripts/$(basename "$script")"

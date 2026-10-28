@@ -1,0 +1,37 @@
+contract_meta:
+  id: feature_install_ux
+  version: 1
+  created_from_spec: 'GitHub #124; replaces its unbuilt plugin-assisted-onboarding/contract.yml placeholder'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_install_ux'
+invariants:
+  - id: I-INSTALL-001
+    rule: Host plugins select runtime; the public CLI alone owns installation, routing, update, migration and strict verification semantics.
+  - id: I-INSTALL-002
+    rule: Missing or conflicting noninteractive auto hints fail before routing mutation; explicit runtime wins and directories never select a host.
+  - id: I-INSTALL-003
+    rule: Managed reruns are idempotent; custom routing and gate bytes remain preserved. Routing replacement does not authorise arbitrary gate replacement.
+references:
+  - id: I-ADAPTER-001
+    source: docs/PRD.md
+    note: Provider output never grants a gate verdict; onboarding and doctor never invoke a provider.
+capability_boundary:
+  evidence_kind: artifact_identity
+  native_session_attestation: false
+  host_roots:
+    codex: plugins/codex/specflow
+    claude-code: plugins/claude-code/specflow
+  gate_payload: [target, runDir, reportDir]
+  reached_entrypoint: scripts/teardown-gate.cjs
+  reached_action: accept-gate-d
+  setup: public init then strict verify in the same canonical target
+  distribution: Thin adapters require the matching public CLI; self-contained release is issue111.
+test_hooks:
+  tests:
+    - file: tests/contracts/runtime-detection.test.js
+    - file: tests/contracts/specflow-doctor.test.js
+    - file: tests/contracts/plugin-onboarding.test.js
+    - file: tests/hooks/installer-fixes.test.js

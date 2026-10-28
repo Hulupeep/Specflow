@@ -68,13 +68,29 @@ function packageVersion(sourceRoot) {
 
 function runtimeError(value) {
   const detail = value ? `unknown runtime "${value}"` : 'runtime is required in non-interactive mode';
-  return new Error(`${detail}; use --runtime codex|claude-code or set SPECFLOW_RUNTIME`);
+  return new Error(`${detail}; use --runtime codex|claude-code or set SPECFLOW_RUNTIME\n` +
+    'npx @colmbyrne/specflow init . --runtime codex\n' +
+    'npx @colmbyrne/specflow init . --runtime claude-code');
+}
+
+function detectRuntime(env = process.env) {
+  const signals = [];
+  if (Object.hasOwn(RUNTIMES, env.SPECFLOW_RUNTIME)) signals.push(['SPECFLOW_RUNTIME', env.SPECFLOW_RUNTIME]);
+  if (/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(env.CODEX_THREAD_ID || '')) signals.push(['CODEX_THREAD_ID', 'codex']);
+  if (env.CLAUDECODE === '1') signals.push(['CLAUDECODE', 'claude-code']);
+  const hosts = [...new Set(signals.map(row => row[1]))];
+  return { requested: 'auto', detected: hosts.length === 1 ? hosts[0] : null, signals: signals.map(row => row[0]), ambiguous: hosts.length > 1 };
 }
 
 function resolveRuntime(options = {}) {
   const explicit = options.runtime || options.envRuntime;
-  if (explicit) {
-    if (!RUNTIMES[explicit]) throw runtimeError(explicit);
+  if (explicit === 'auto') {
+    const env = options.env || process.env;
+    const detection = detectRuntime(options.envRuntime === undefined ? env : { ...env, SPECFLOW_RUNTIME: options.envRuntime });
+    if (detection.detected) return detection.detected;
+    if (!options.interactive) throw runtimeError(detection.ambiguous ? 'auto (conflicting host signals)' : null);
+  } else if (explicit) {
+    if (!Object.hasOwn(RUNTIMES, explicit)) throw runtimeError(explicit);
     return explicit;
   }
   if (!options.interactive) throw runtimeError(null);
@@ -83,7 +99,7 @@ function resolveRuntime(options = {}) {
   const buffer = Buffer.alloc(128);
   const bytes = fs.readSync(0, buffer, 0, buffer.length, null);
   const answer = buffer.toString('utf8', 0, bytes).trim();
-  if (!RUNTIMES[answer]) throw runtimeError(answer);
+  if (!Object.hasOwn(RUNTIMES, answer)) throw runtimeError(answer);
   return answer;
 }
 
@@ -157,7 +173,7 @@ function copyShippedTemplates(sourceRoot, targetRoot) {
   }
 }
 
-function isKnownShippedProfile(activePath, sourceRoot, targetRoot) {
+function isKnownShippedProfile(activePath, sourceRoot, targetRoot, { exactOnly = false } = {}) {
   if (!fs.existsSync(activePath)) return false;
   const activeHash = sha256(fs.readFileSync(activePath));
   let activeSemantic;
@@ -168,10 +184,11 @@ function isKnownShippedProfile(activePath, sourceRoot, targetRoot) {
   }
   const { sourceDir, installedDir } = templatePaths(sourceRoot, targetRoot);
   for (const template of Object.values(RUNTIMES)) {
-    for (const directory of [sourceDir, installedDir]) {
+    for (const directory of exactOnly ? [sourceDir] : [sourceDir, installedDir]) {
       const candidate = path.join(directory, template);
       if (!fs.existsSync(candidate)) continue;
       if (sha256(fs.readFileSync(candidate)) === activeHash) return true;
+      if (exactOnly) continue;
       try {
         if (semanticFingerprint(candidate) === activeSemantic) return true;
       } catch (_) {
@@ -207,6 +224,7 @@ function installRuntimeRouting(options = {}) {
   const priorRouting = priorState && priorState.routing;
   const runtime = resolveRuntime({
     runtime: options.runtime,
+    env: options.env,
     envRuntime: options.envRuntime === undefined ? process.env.SPECFLOW_RUNTIME : options.envRuntime,
     interactive: options.interactive === undefined ? Boolean(process.stdin.isTTY && process.stdout.isTTY) : options.interactive,
   });
@@ -226,7 +244,8 @@ function installRuntimeRouting(options = {}) {
   let legacy = false;
   if (activeExists && !replace) {
     if (priorRouting) {
-      custom = priorRouting.managed === false || activeHash !== priorRouting.installed_sha256;
+      custom = priorRouting.managed === false || activeHash !== priorRouting.installed_sha256
+        || !isKnownShippedProfile(activePath, sourceRoot, targetRoot, { exactOnly: true });
     } else {
       legacy = isKnownShippedProfile(activePath, sourceRoot, targetRoot);
       custom = !legacy;
@@ -338,6 +357,7 @@ module.exports = {
   sha256,
   semanticFingerprint,
   resolveRuntime,
+  detectRuntime,
   installRuntimeRouting,
   verifyRuntimeRouting,
   verifyInstalledSelectorSkills,

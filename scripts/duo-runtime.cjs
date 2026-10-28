@@ -53,22 +53,32 @@ function bundle(source) {
   const result={};
   const put=(rel,file)=>{if(fs.existsSync(file)) result[rel]=fs.readFileSync(noLinks(file),'utf8');};
   for(const name of helpers)put('scripts/'+name,path.join(source,'scripts',name));
+  // Gate helpers use the same ownership transaction as the frozen review runtime.
+  // Keep the pin list unchanged: only installation ownership is broadened.
+  for(const name of fs.readdirSync(path.join(source,'scripts')).filter(n=>n.endsWith('.cjs')).sort())put('scripts/'+name,path.join(source,'scripts',name));
   for(const target of ['.claude','.codex','.agents']) { put(`${target}/skills/duo-build/SKILL.md`,path.join(source,'skills/duo-build/SKILL.md')); put(`${target}/skills/duo-build/references/routing-study.md`,path.join(source,'skills/duo-build/references/routing-study.md')); }
+  for(const target of ['.claude','.codex','.agents'])put(`${target}/skills/specflow-loop-selector/SKILL.md`,path.join(source,'skills/specflow-loop-selector/SKILL.md'));
   put('.claude/hooks/duo-review-check.sh',path.join(source,'hooks/duo-review-check.sh'));
   return result;
 }
-function install(source,root,{held=false,beforeWrite}={}) {
-  if(!held)return lock(root,()=>install(source,root,{held:true,beforeWrite}));
+function install(source,root,{held=false,beforeWrite,requestedRuntime=null}={}) {
+  if(requestedRuntime&&!['codex','claude-code'].includes(requestedRuntime))throw Error('Use --runtime codex|claude-code');
+  if(!held)return lock(root,()=>install(source,root,{held:true,beforeWrite,requestedRuntime}));
   const dir=path.join(base(root),'runtime-update'), next=bundle(source), stagedVersion=hash(JSON.stringify(next)), pendingRunIds=unfinished(root);
+  const manifest=path.join(source,'package.json');
+  const metadata=fs.existsSync(manifest)?JSON.parse(fs.readFileSync(manifest)):null;
+  const packageIdentity=metadata?{name:metadata.name,version:metadata.version,root:path.resolve(source),manifestSha256:hash(fs.readFileSync(manifest))}:null;
   const ownedFile=path.join(dir,'installed.json'), previous=fs.existsSync(ownedFile)?read(ownedFile):{hashes:{}};
   if(pendingRunIds.length) {
-    write(path.join(dir,'staged.json'),{files:next,stagedVersion,pendingRunIds});
+    write(path.join(dir,'staged.json'),{files:next,stagedVersion,pendingRunIds,package:packageIdentity,requestedRuntime});
     return {state:'staged',pendingRunIds,activeVersion:previous.version||'legacy_unknown',stagedVersion,reason:'Unfinished runs retain their exact installation; rerun the installer after completion. Reload the native skill in a new conversation.'};
   }
   const before={},modes={};
   for(const rel of Object.keys(next)) {
     const file=noLinks(path.join(root,rel));before[rel]=fs.existsSync(file)?fs.readFileSync(file):null;modes[rel]=before[rel]?fs.statSync(file).mode & 0o777:null;
-    if(before[rel] && hash(before[rel])!==hash(next[rel]) && previous.hashes[rel]!==hash(before[rel])) throw Error(`Custom or unowned duo file preserved: ${rel}; compare it before installation`);
+    // Neither a writable hash nor a package locator can grant overwrite rights.
+    // Divergent bytes need the explicit reviewed backup/restore procedure.
+    if(before[rel] && hash(before[rel])!==hash(next[rel])) throw Error(`Custom or unverifiable managed file preserved: ${rel}; review and back up before restoring the executing package's canonical bytes`);
   }
   const written=[];
   try {
@@ -81,7 +91,7 @@ function install(source,root,{held=false,beforeWrite}={}) {
     // Remove staging before the final metadata commit; a failed cleanup leaves
     // the previous manifest authoritative while transaction-owned bytes roll back.
     noLinks(path.join(dir,'staged.json'));fs.rmSync(path.join(dir,'staged.json'),{force:true});
-    write(ownedFile,{version:stagedVersion,hashes:Object.fromEntries(Object.entries(next).map(([k,v])=>[k,hash(v)]))});
+    write(ownedFile,{version:stagedVersion,package:packageIdentity,hashes:Object.fromEntries(Object.entries(next).map(([k,v])=>[k,hash(v)]))});
   } catch(e) {
     for(const rel of written.reverse()) {
       const file=path.join(root,rel);
@@ -101,8 +111,8 @@ function describe(root,state) {
   }
   return {active:state.runtime?.identity||'legacy_unknown',installed:fs.existsSync(installed)?read(installed).version:'unrecorded',staged:fs.existsSync(staged)?read(staged).stagedVersion:null,staleGuide};
 }
-module.exports={selected,helpers,lock,pin,verify,dispatch,unfinished,install,describe};
+module.exports={selected,helpers,lock,pin,verify,dispatch,unfinished,install,describe,bundle};
 if(require.main===module) {
-  try { const [command,source,root,held]=process.argv.slice(2);if(command!=='install')throw Error('Use install <source> <target> [--lock-held]');const result=install(path.resolve(source),path.resolve(root),{held:held==='--lock-held'});console.log(JSON.stringify(result));process.exitCode=result.state==='staged'?10:0; }
+  try { const [command,source,root,...args]=process.argv.slice(2);if(command!=='install')throw Error('Use install <source> <target> [--lock-held] [--runtime HOST]');const at=args.indexOf('--runtime'),requested=at>=0?args[at+1]:null;const requestedRuntime=requested?require('./runtime-routing.cjs').resolveRuntime({runtime:requested,interactive:!!(process.stdin.isTTY&&process.stdout.isTTY)}):null;const result=install(path.resolve(source),path.resolve(root),{held:args.includes('--lock-held'),requestedRuntime});console.log(JSON.stringify(result));process.exitCode=result.state==='staged'?10:0; }
   catch(e){console.error(e.message);process.exitCode=2;}
 }

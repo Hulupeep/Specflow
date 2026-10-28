@@ -165,3 +165,8 @@ test('TE004: CI wiring allocates a fresh report and invokes the native framework
  expect(steps.find(s=>s.name==='Execute canonical suites').run).toContain('$SPECFLOW_CANONICAL_REPORT');
  expect(steps.find(s=>s.name==='Reconcile native case results').run).toContain('test-execution.cjs validate-report');
 });
+test('TE005 (#263): fresh required skip is current/blocked; a later input change is stale',()=>{
+ env=fixture({requiredSkip:true});env.accept();const result=runner.runVerifierStage({root:env.root,runDir:env.runDir,sliceTags:['integration'],configurationId:'local',environment:'isolated-node'});
+ expect(runner.revalidateVerifierStage(result)).toMatchObject({status:'current',gate:'blocked',reason:expect.stringContaining('required_case_skipped')});
+ require('fs').appendFileSync(env.root+'/input.txt','changed after current blocked result');expect(runner.revalidateVerifierStage(result)).toMatchObject({status:'stale',gate:'blocked'});
+});
