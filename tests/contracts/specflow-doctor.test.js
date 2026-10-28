@@ -1,0 +1,37 @@
+const fs=require('fs'),os=require('os'),path=require('path'),cp=require('child_process');
+const runtime=require('../../scripts/duo-runtime.cjs'),routing=require('../../scripts/runtime-routing.cjs');
+const ROOT=process.env.SPECFLOW_TEST_PACKAGE_ROOT||path.resolve(__dirname,'../..');
+function fixture(){const root=fs.mkdtempSync(path.join(os.tmpdir(),'specflow doctor '));runtime.install(ROOT,root);routing.installRuntimeRouting({sourceRoot:ROOT,targetRoot:root,runtime:'codex',interactive:false});return root;}
+function doctor(root,args=[]){const r=cp.spawnSync(process.execPath,[path.join(ROOT,'bin/specflow.js'),'doctor',root,'--json',...args],{encoding:'utf8',env:{...process.env,SPECFLOW_RUNTIME:'',CODEX_THREAD_ID:'',CLAUDECODE:''}});return {process:r,value:JSON.parse(r.stdout)};}
+function bytes(root){const result={};function walk(dir){for(const f of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,f.name);if(f.isDirectory())walk(p);else result[path.relative(root,p)]=fs.readFileSync(p).toString('base64');}}walk(root);return result;}
+describe('J-INSTALL-DOCTOR (#124)',()=>{
+ test('reports actual local identity without host inference or mutation',()=>{const root=fixture();try{
+  const before=bytes(root),{process:r,value:d}=doctor(root);expect(r.status).toBe(0);expect(d).toMatchObject({status:'healthy',inspectedProject:fs.realpathSync(root),detectedRuntime:null,installedRuntime:'codex',routingOwnership:'managed'});
+  expect(d.activeInstallation.identity).toMatch(/^[a-f0-9]{64}$/);expect(d.capabilities).toContainEqual(expect.objectContaining({id:'gate-d',status:'present',evidenceKind:'artifact_identity'}));expect(bytes(root)).toEqual(before);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}});
+ test.each(['missing','modified','forged-record','crlf'])('actual gate %s is not healthy even with same package version',mode=>{const root=fixture();try{
+  const file=path.join(root,'scripts/teardown-gate.cjs');
+  if(mode==='missing')fs.rmSync(file,{force:true});else {let s=fs.readFileSync(file,'utf8');fs.writeFileSync(file,mode==='crlf'?s.replace(/\n/g,'\r\n'):s+'\n// user-owned change\n');}
+  if(mode==='forged-record'){const f=path.join(root,'.specflow/duo/runtime-update/installed.json'),m=JSON.parse(fs.readFileSync(f));m.hashes['scripts/teardown-gate.cjs']=routing.sha256(fs.readFileSync(file));fs.writeFileSync(f,JSON.stringify(m));}
+  const before=bytes(root),{value:d}=doctor(root);expect(d.status).toBe('repair_required');expect(d.capabilities.find(x=>x.id==='gate-d').status).not.toBe('present');expect(bytes(root)).toEqual(before);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}});
+ test('modified gate is preserved by the actual hooks installer',()=>{const root=fixture();try{
+  const file=path.join(root,'scripts/teardown-gate.cjs');fs.writeFileSync(file,'// custom gate\n');
+  const r=cp.spawnSync('bash',[path.join(ROOT,'install-hooks.sh'),root,'--runtime','codex'],{encoding:'utf8',timeout:20000});
+  expect(r.status).not.toBe(0);expect(fs.readFileSync(file,'utf8')).toBe('// custom gate\n');
+ }finally{fs.rmSync(root,{recursive:true,force:true});}});
+ test('staged update retains active identity and pinned run',()=>{const root=fixture();try{
+  const active=doctor(root).value.activeInstallation.identity,dir=path.join(root,'.specflow/duo/unfinished');fs.mkdirSync(dir,{recursive:true});fs.writeFileSync(dir+'/run.json',JSON.stringify({goalStatus:'incomplete'}));const before=fs.readFileSync(root+'/scripts/duo-runtime.cjs');
+  const next=path.join(root,'next-package');fs.mkdirSync(next);fs.cpSync(ROOT+'/scripts',next+'/scripts',{recursive:true});fs.cpSync(ROOT+'/skills/duo-build',next+'/skills/duo-build',{recursive:true});const meta=JSON.parse(fs.readFileSync(ROOT+'/package.json'));meta.version='0.0.0-next-fixture';fs.writeFileSync(next+'/package.json',JSON.stringify(meta));fs.appendFileSync(next+'/scripts/teardown-gate.cjs','\n// next package revision\n');
+  const staged=runtime.install(next,root);expect(staged.state).toBe('staged');expect(staged.stagedVersion).not.toBe(active);const d=doctor(root).value;expect(d.activeInstallation.identity).toBe(active);expect(d.stagedInstallation).toMatchObject({identity:staged.stagedVersion,version:'0.0.0-next-fixture'});expect(fs.readFileSync(root+'/scripts/duo-runtime.cjs')).toEqual(before);expect(fs.existsSync(dir+'/run.json')).toBe(true);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}});
+ test('custom cross-host profile reports actual and requested runtime separately',()=>{const root=fixture();try{
+  const file=root+'/.specflow/adapter-routing.yml';fs.appendFileSync(file,'\n# custom operator annotation\n');routing.installRuntimeRouting({sourceRoot:ROOT,targetRoot:root,runtime:'claude-code',interactive:false});const before=bytes(root),d=doctor(root).value;expect(d).toMatchObject({routingOwnership:'custom',requestedRuntime:'claude-code',installedRuntime:'codex'});expect(bytes(root)).toEqual(before);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}});
+});
+test('actual doctor output is checked by its owning schema, which rejects unsupported authority',()=>{const root=fixture();try{const d=doctor(root).value,Schema=require('../../scripts/specflow-doctor.cjs').DoctorResult;expect(Schema.safeParse(d).success).toBe(true);expect(Schema.safeParse({...d,gate_decision:'passed'}).success).toBe(false);expect(d.capabilities).toContainEqual(expect.objectContaining({id:'native-host-session',evidenceKind:'not_verified',status:'unverifiable'}));}finally{fs.rmSync(root,{recursive:true,force:true});}});
+test('two installed fixture package versions report their own identity despite newer executing source',()=>{const root=fixture();try{
+ const kit=root+'/older-kit',target=root+'/other-project';fs.mkdirSync(kit);for(const area of ['scripts','templates'])fs.cpSync(ROOT+'/'+area,kit+'/'+area,{recursive:true});for(const skill of ['duo-build','specflow-loop-selector'])fs.cpSync(ROOT+'/skills/'+skill,kit+'/skills/'+skill,{recursive:true});const pkg=JSON.parse(fs.readFileSync(ROOT+'/package.json'));pkg.version='0.0.0-older-fixture';fs.writeFileSync(kit+'/package.json',JSON.stringify(pkg));fs.mkdirSync(target);runtime.install(kit,target);routing.installRuntimeRouting({sourceRoot:kit,targetRoot:target,runtime:'claude-code',interactive:false});
+ const a=doctor(root).value,b=doctor(target).value;expect(a.activeInstallation.version).toBe(require(ROOT+'/package.json').version);expect(b).toMatchObject({status:'healthy',installedRuntime:'claude-code',inspectedPackage:{root:kit,version:'0.0.0-older-fixture'},activeInstallation:{version:'0.0.0-older-fixture'}});expect(b.specflowVersion).toBe(require(ROOT+'/package.json').version);expect(a.inspectedProject).not.toBe(b.inspectedProject);
+}finally{fs.rmSync(root,{recursive:true,force:true});}});
+test('missing installed selector is diagnosed rather than a healthy first-use route',()=>{const root=fixture();try{for(const area of ['.claude','.codex','.agents']){const p=root+'/'+area+'/skills/specflow-loop-selector';fs.mkdirSync(p,{recursive:true});fs.copyFileSync(ROOT+'/skills/specflow-loop-selector/SKILL.md',p+'/SKILL.md');}fs.unlinkSync(root+'/.codex/skills/specflow-loop-selector/SKILL.md');const before=bytes(root),d=doctor(root).value;expect(d.status).toBe('repair_required');expect(d.findings.some(f=>f.code==='missing_selector_skill'||f.message.includes('specflow-loop-selector'))).toBe(true);expect(bytes(root)).toEqual(before);}finally{fs.rmSync(root,{recursive:true,force:true});}});
