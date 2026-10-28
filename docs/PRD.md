@@ -1,9 +1,9 @@
 # Specflow PRD — A Trust Harness for Frontier Coding Agents
 
-**Version:** 1.0
-**Date:** 2026-07-02
-**Status:** Active — supersedes positioning in `docs/preflightprd.md` for the loop-runtime era
-**Sources:** repo state at `main` + `feat/verifier-rail-102`; issues/PRs #77–#103; `docs/ss/loops.md` and `docs/ss/loops-talk-evaluation.md` (Anthropic long-running-agent materials); `docs/specs/fable-enable.md`
+**Version:** 1.1
+**Date:** 2026-10-28 (source/documentation reconciliation; original positioning dated 2026-07-02)
+**Status:** Active — supersedes positioning in `docs/old-do-not-use/preflightprd.md` for the loop-runtime era
+**Sources:** current source, active contract index and canonical CI for the 2026-10-28 reconciliation. Original positioning drew on `main` + `feat/verifier-rail-102`, issues/PRs #77–#103, `docs/ss/loops.md`, `docs/ss/loops-talk-evaluation.md` and `docs/specs/fable-enable.md`. Those dated sources are not current capability receipts.
 
 ---
 
@@ -24,7 +24,7 @@ Researcher, builder, reviewer and chief of staff are replaceable roles. Their
 briefs, assignments and durable work live in HeyStax and versioned task/evidence
 artifacts, so replacing an agent does not require rebuilding its chat memory.
 
-Specflow is a model-agnostic trust harness for frontier coding agents. It lets Claude, Codex, Fable-class models, Ruflo, or other agent swarms produce the work — but only contracts, verifier evidence, mechanical gates, ledger state, and human boundaries decide what advances or ships. The model is the actuator; the gate is the sensor. A provider's output — and its exit code — is never a gate verdict. Specflow runs an LLM as an untrusted worker inside a contracted loop (`specflow run`), requires an independent verifier to exercise the built thing where behavior matters, records everything to a durable on-disk ledger, and mechanically enforces the boundaries (push, merge, PR, override) that only a human may cross. The thesis in one line: **frontier models can carry more of the work; Specflow must carry the trust.**
+Specflow is a model-agnostic trust harness for frontier coding agents. It lets Claude, Codex, Fable-class models, Ruflo, or other agent swarms produce the work — but only contracts, verifier evidence, mechanical gates, ledger state, and human boundaries decide what advances or ships. The model is the actuator; the gate is the sensor. A provider's output — and its exit code — is never a gate verdict. Specflow runs an LLM as an untrusted worker inside a contracted loop (`specflow run`), requires an independent verifier to exercise the built thing where behavior matters, records everything to a durable on-disk ledger, and mechanically enforces the boundaries (push, merge, PR, override) that only explicit human authorization may cross. The thesis in one line: **frontier models can carry more of the work; Specflow must carry the trust.**
 
 ---
 
@@ -40,7 +40,7 @@ Concretely:
 - **Commercial teams cannot merge on model confidence.** "The agent says it's done" is not evidence. Production brownfield systems, paid client delivery, and audit-sensitive work need runtime evidence, provenance, and a decision trail.
 - **Plausible completion is the new failure mode.** Not crashes — working-looking UIs with dead backends, green unit tests over hard-coded data, journeys that were never actually driven.
 
-The failure path is letting capability accumulate authority: the stronger the model, the more roles it absorbs, until the entity producing the change is also the entity certifying it. Specflow exists to make that structurally impossible.
+The failure path is letting capability accumulate authority: the stronger the model, the more roles it absorbs, until the entity producing the change is also the entity certifying it. Specflow separates those responsibilities and rejects unsupported acceptance within its declared checks; it cannot guarantee that an incomplete contract catches every defect.
 
 **Capability does not create authority.**
 
@@ -127,48 +127,24 @@ Specflow sits **underneath or around** those systems as the harness: the model s
 
 ---
 
-## 8. Current capabilities
+## 8. Current source capabilities and qualification limits
 
-Verified against the repo as of 2026-07-02. The suite passes **835/835 tests across 33 suites** on the current verifier-rail branch (830/830 at the last main merge).
+This section describes source capabilities, not the contents of every published installation. Inspect the installed version and retained runtime pins separately. Current canonical tests and their native reports live in [Actions](https://github.com/Hulupeep/Specflow/actions/workflows/canonical-tests.yml); test totals change with the source and are not a commercial success metric.
 
-### Implemented
-
-| Capability | What it is |
+| Source capability | Governing reference |
 |---|---|
-| `specflow run` | The local contracted loop runner (`scripts/specflow-runner.cjs`): executes `spec-build` and `feature-build` loops stage by stage, `--until-terminal` for long runs |
-| `run-contract.yaml` | Durable per-run contract: goal, stages, gates, adapter policy, stop rules — the run's setpoint on disk |
-| `ledger.jsonl` | Append-only machine state: model requested vs effective, action, evidence paths, divergence, gate results, human authorizations |
-| `spec-build` | Outer-contract pipeline: PRD → adversary → tickets → falsification → seams → journeys → simulation (Gates A/B) |
-| `feature-build` | Slice execution loop: implement one approved slice under contract, through Gate C |
-| Gate C | Pre-merge mechanical gate: contracts, journeys, provenance, verifier evidence |
-| Gate D | Teardown/integration gate: persona-walk, hop tables, value evidence |
-| Verifier lifecycle (#100, #101) | Maker proposes a slice-local verification contract → independent verifier accepts/rejects/strengthens → findings written separately → gate consumes |
-| Maker–verifier verification contracts | The negotiated "what does done mean for this slice, tested how," written to disk before the maker builds |
-| Verifier policies | Per-slice policy for what verification is required and how strict |
-| Runtime verifier checks | The verifier exercises the built behavior (drives the app/API), not just the artifacts |
-| Enforced verifier rail (#102, #103) | Verifier stage is enforced in `feature-build`, not optional: runtime-required slices cannot advance the gate without verifier evidence |
-| Mandatory verifier by slice type | Required for: `ui`, `workflow`, `api_behavior`, `integration`, `data_mutation`, `auth`, `billing`, `runtime_required` — by slice type, not a global toggle |
-| Maker-claim subordination | A maker can claim complete; a blocked/failed required verifier finding blocks the gate regardless |
-| Human-only ledgered skip | A human may skip a required verification — the skip is recorded in the ledger with attribution |
-| Screenshot-only insufficiency | Value-bearing checks (`api_behavior`, `data_mutation`, `billing`) cannot pass on screenshot evidence alone |
-| `specflow run trace` (#93) | Divergence report over the ledger: maker claim vs verifier finding vs gate result, with links to transcripts, files, model metadata |
-| Provenance gate | Post-code check that output is real (no hard-coded/mock data passing as implementation) |
-| Adapter policies | Controlled local CLI adapters (`claude-print` / `codex-exec` style) with budget, tool, and timeout caps; provider-agnostic policy layer |
-| `never_without_human` | Mechanically enforced stop rules — push, merge, PR, `--no-verify`, override — detected from provider events |
+| Risk-based work routing and progressive specification | `skills/specflow-loop-selector/SKILL.md`, `templates/SPECIFICATION.md` |
+| Contracted runner, durable ledger and trace | `scripts/specflow-runner.cjs` |
+| Accepted verification lifecycle and owning native execution | `docs/contracts/outcome-assurance.yml`, `docs/contracts/test-execution.yml` |
+| Independent numerical correctness, separate provenance/consistency | `docs/contracts/oracle-correctness.yml`, `docs/contracts/data-seams.yml` |
+| Integrated outcome acceptance distinct from report lint | `docs/gate-d.md` |
+| Fresh advisory and explicit Duo review, retained findings/ownership | `docs/advisory-review.md`, `docs/duo-build.md` |
+| Host-aware installation and source native adapters | `docs/onboarding.md`, `docs/native-plugin.md` |
+| Repo-local Improve/controller/service interfaces | `docs/ops/improve-service.md` |
 
-### Planned / open
+Selected source/native and synthetic corpus journeys have engineering evidence. This does not establish released marketplace startup, universal host behavior, real-product benefit or customer validation. Required skips, missing current evidence and exceptions cannot become passing acceptance.
 
-| Item | Issue | Status |
-|---|---|---|
-| Durable `.specflow/STATE.md` + lesson-file memory | #85 | Open |
-| Isolated worktree execution for delegated agents | #86 | Open |
-| Model roles, effort, fallbacks, budgets as policy metadata | #83 | Open (honesty/ledger parts partially in 0.10.0) |
-| Harness-minimal principle codified | #94 | Open |
-| Vision evidence for teardown/Gate D | #88 | Open |
-| Cost-per-accepted-change counters | #89 | Open |
-| `/loop` routines and manifests | #87 | Open — deliberately last |
-| Loop-era audit skill refresh | #97 | Open |
-| Issue hygiene | #77, #80, #81, #84-adjacent children | Implementation merged; several tickets need closure to match reality |
+Remaining qualification includes final versioned npm/plugin publication and registered released installs, real-product single/multi-cycle Improve outcomes, and the complete unattended operational handoff. HeyStax is the target control plane; existing interfaces do not prove that whole target delivered. Recurring schedules remain off unless separately authorized.
 
 ---
 
@@ -177,7 +153,7 @@ Verified against the repo as of 2026-07-02. The suite passes **835/835 tests acr
 The core loop, end to end:
 
 1. **A human or agent starts with a product/change goal** — an idea doc, a bug, a client requirement.
-2. **`spec-build` creates the outer contract**: PRD, invariants, journeys, acceptance criteria, seams, risks — hardened by an adversary before any ticket exists. The outer contract owns the *what*; it deliberately does not pin implementation detail (planner over-granularity cascades errors over long horizons).
+2. **`spec-build` creates the outer contract**: the applicable goal, contracts, journeys, acceptance, seams and risks — deepening the selected slice while future tickets stay thin. The outer contract owns the *what*; it deliberately does not pin implementation detail (planner over-granularity cascades errors over long horizons).
 3. **`feature-build` takes one approved slice.**
 4. **The maker proposes a slice-local verification contract** — "done means X, verified by Y" — before writing code.
 5. **An independent verifier accepts, rejects, or strengthens it.** The negotiated contract is written to disk. The verifier's job is to be harsher than the maker's proposal.
@@ -185,8 +161,8 @@ The core loop, end to end:
 7. **The runtime verifier exercises the behavior where required** — launches the app, drives the journey, reads console/network/backend state. Mandatory for UI, workflow, API-behavior, integration, data-mutation, auth, billing, and `runtime_required` slices.
 8. **Findings are written separately** — the verifier never sees the maker's reasoning trace, and its findings file is its own artifact.
 9. **The mechanical gate consumes verifier evidence.** Maker claims are inputs, not verdicts. Missing or failed required evidence blocks.
-10. **The ledger records everything**: model requested/effective, action, evidence, maker-claim/verifier-finding divergence, gate result, and any human boundary crossings or ledgered skips.
-11. **A human reviews or authorizes only where needed** — at `never_without_human` boundaries (push, PR, merge, override) and ledgered skips, not on every line of diff.
+10. **The ledger records everything**: model requested/effective, action, evidence, maker-claim/verifier-finding divergence, gate result, and attributed boundary decisions or nonpassing exceptions.
+11. **A human reviews or authorizes only where needed** — at `never_without_human` boundaries (push, PR, merge, override) and explicit exceptions, not on every line of diff.
 12. **`specflow run trace` explains what happened** — the run is readable after the fact, including where the maker's judgment diverged from the gate.
 
 ---
@@ -201,7 +177,7 @@ These are the invariants that define the product. If any of these can be crossed
 | 2 | **A provider exit code cannot become a pass.** | `I-ADAPTER-001`: gates re-run checks; adapter results are never verdicts |
 | 3 | **A screenshot alone cannot satisfy value-bearing behavior.** | Value-bearing tags (`api_behavior`, `data_mutation`, `billing`) require non-visual evidence |
 | 4 | **Missing verifier evidence cannot advance runtime-required work.** | Enforced verifier rail: required-when slice types block without findings |
-| 5 | **A failed required finding cannot be overridden silently.** | Only a human may skip, and the skip is ledgered with attribution |
+| 5 | **A failed required finding cannot be overridden silently.** | Owner exceptions stay attributed and distinct; missing, failed or skipped required evidence cannot pass |
 | 6 | **Model fallback/downgrade cannot be hidden.** | Requested vs effective model recorded per ledger entry; silent downgrade = failed contract |
 | 7 | **The agent cannot push, merge, open a PR, or override gates without human approval.** | `never_without_human`, mechanically enforced from provider events |
 | 8 | **The verifier cannot be polluted by maker chain-of-thought.** | Verifier input is artifact + behavior + spec + rubric — never the maker's reasoning trace |
@@ -230,7 +206,7 @@ These are the invariants that define the product. If any of these can be crossed
 - **A fully hosted autonomous agent platform.** Hosted long runs belong to the Agent SDK / cloud layer; Specflow is the local harness.
 - **Replacing Claude Code, Codex, or Ruflo.** They are the workers. Specflow governs their lane.
 - **A general swarm orchestrator.** Who runs when is the model layer's job; Specflow decides whether a lane's output may land.
-- **Auto-merge / auto-deploy.** Merge authority is a human boundary, permanently.
+- **Auto-merge / auto-deploy.** The harness cannot grant itself merge/deploy authority; existing scoped owner authorization and release policy remain authoritative.
 - **Blind trust in Fable/Claude/Codex output** — including "the model is stronger now, relax the gates." Stronger models get thinner scaffolding, never weaker gates.
 - **Heavy provider-specific scaffolding that becomes the product.** Adapters stay thin and deletable (#94).
 - **A full project management suite.** Specflow reads and writes issues via board CLIs; it does not replace the board.
@@ -240,11 +216,11 @@ These are the invariants that define the product. If any of these can be crossed
 
 ## 12. Commercial value
 
-The buyer pain, verbatim:
+The intended buyer problem (positioning, not a sourced customer quotation):
 
 > **"I used an AI agent. It produced something that looks done. I need to know whether it is safe to merge."**
 
-Every serious adopter of coding agents hits this within weeks. Specflow's answer is an evidence packet per change instead of a confidence claim.
+This is the adoption problem Specflow is intended to address; its frequency and willingness to pay require market evidence. Specflow's answer is an evidence packet per change instead of a confidence claim.
 
 | Buyer | Value |
 |---|---|
@@ -297,19 +273,9 @@ The economic frame is **cost per accepted change** (#89): agents make raw output
 
 ## 15. Near-term roadmap
 
-Ordered by trust-durability, not novelty. Verifier work (#84/#92/#100–#103) and trace (#93) are shipped; what remains is state, isolation, discipline, and only then automation.
+The sequence follows remaining proof rather than July ticket status: finish qualified distribution and current audit/handoff/docs; prove a useful real-product Improve cycle; then prove bounded repeat/recovery and operational reporting. Keep control-plane and unattended claims behind actual end-to-end evidence. Do not rebuild already implemented memory, isolation or routing merely because an old table called them planned.
 
-| Priority | Item | Why this order |
-|---|---|---|
-| 1 | **Issue hygiene** for implemented verifier tickets (#77, #80, #81, #84 children) | The board must match reality before it can be trusted as a record |
-| 2 | **#85 State** — durable `.specflow/STATE.md` + lesson files | Model-independent, low-regret; long runs need memory that survives compaction |
-| 3 | **#86 Worktree** — isolated delegated execution | Prerequisite for safe parallel maker/verifier work; durable primitive |
-| 4 | **#94 Harness minimal** — codify the disposable-scaffolding principle | Prevents Fable-era over-scaffolding before it accretes |
-| 5 | **#83 Model routing** — roles/effort/fallback as policy metadata | Honesty rules are durable; keep the taxonomy thin, behind the ledger, not product center |
-| 6 | **#88 Vision gate** — evidence-only visual verification | Useful evidence for Gate D; ships only as evidence, never as verdict |
-| 7 | **#89 Cost** — cost-per-accepted-change reporting | Commercial metric; not trust-critical, so it follows trust work |
-| 8 | **#87 Routine** — `/loop` and manifests | Deliberately last: scheduled autonomy only after gates, state, and worktrees are safe |
-| 9 | **#97 Audit skill refresh** | Agents must treat audit as part of the loop, not a standalone stamp |
+The existing issue tracker records concrete selected work. Source-tested, native-qualified, merged, released, deployed and customer-validated remain separate states. Subscription effort continues on verified progress without invented financial exhaustion; explicit limits and real expensive billable-route brakes still apply.
 
 ---
 
@@ -320,13 +286,13 @@ This PRD is complete because it answers, in one place:
 - **What is the actual problem?** Frontier agents produce large plausible changes and self-certify them; capability does not create authority (§2).
 - **Why does it matter now?** Long-horizon Fable-class runs, the self-evaluation trap, and the merge-authority decision every org is making this year (§3).
 - **Who is it for?** Teams merging AI-produced changes into commercially consequential systems (§4).
-- **Who is it not for?** Demos, hobby flow, manual-review-everything projects, and anyone wanting autonomous merge (§5).
+- **Who is it not for?** Demos, hobby flow, manual-review-everything projects, and anyone wanting merge/deploy without explicit owner authority (§5).
 - **What does Specflow do?** Contracted loop runtime, verifier lifecycle, runtime evidence, mechanical gates, ledger, trace, human boundaries (§8–§9).
 - **What does it refuse to do?** Be the worker, orchestrate swarms, auto-merge, trust provider output, or guarantee correctness without evidence (§10–§11).
 - **Why is it different from prompt packs, agent swarms, and CI?** It is the trust layer those systems lack, sitting beneath and around them (§6).
 - **What trust boundaries must never be crossed?** Nine, enumerated and enforced (§10).
-- **What has shipped?** Verifier lifecycle, enforced verifier rail, trace, provenance, adapters, `never_without_human` — 835/835 tests green (§8).
-- **What remains?** State, worktrees, harness-minimal, routing metadata, vision, cost, routines, audit refresh — in that order (§15).
+- **What has shipped?** See the scoped source capability table and current canonical execution evidence (§8); counts alone are not acceptance.
+- **What remains?** Versioned distribution qualification, remaining handoff/docs and real-product Improve/operational proof (§15).
 - **What commercial value does this create?** Evidence packets instead of confidence claims; measurable cost per accepted change (§12).
 
 ---
@@ -346,7 +312,7 @@ AI coding agents can now run for hours and produce large, plausible changes — 
 
 Specflow is a model-agnostic trust harness. Claude, Codex, Fable-class models, or agent swarms produce the work; **contracts, verifier evidence, mechanical gates, ledger state, and human boundaries decide what advances or ships.** The model is the actuator. The gate is the sensor. A provider's output — or exit code — is never a verdict.
 
-The loop: a spec is hardened into a contract; the maker proposes how its slice will be verified; an **independent verifier** — which never sees the maker's reasoning — strengthens that contract, then actually *drives the built behavior* at runtime; a mechanical gate consumes the verifier's evidence; an append-only ledger records models, claims, findings, divergences, and every human authorization; `specflow run trace` makes the whole run readable after the fact. Slices touching UI, workflows, APIs, integrations, data mutation, auth, or billing **cannot advance without verifier evidence** — a maker's "complete" claim cannot outvote a failed finding, and only a human can skip a required check, on the record. Push, merge, and PR remain mechanically human-only.
+The loop: a spec is hardened into a contract; the maker proposes how its slice will be verified; an **independent verifier** — which never sees the maker's reasoning — strengthens that contract, then actually *drives the built behavior* at runtime; a mechanical gate consumes the verifier's evidence; an append-only ledger records models, claims, findings, divergences, and every human authorization; `specflow run trace` makes the whole run readable after the fact. Slices touching UI, workflows, APIs, integrations, data mutation, auth, or billing **cannot advance without verifier evidence** — a maker's "complete" claim cannot outvote a failed finding, and recorded exceptions do not turn missing required checks into a pass. Existing owner authorization and release boundaries remain authoritative.
 
 ## Why now
 
@@ -354,7 +320,7 @@ Anthropic's own long-running-agent research confirms the design independently: s
 
 ## Status and value
 
-The trust core is shipped and tested (835/835 across 33 suites): the contracted loop runner, verifier lifecycle, enforced verifier rail, runtime evidence requirements, provenance gate, trace tooling, and mechanically enforced human boundaries. Remaining work — durable state memory, worktree isolation, cost reporting, scheduled routines — is sequenced so that autonomy features land only after the trust layer beneath them is safe.
+Current source implements the contracted runner, owning verifier lifecycle, native accounting, correctness/provenance distinctions, trace, retained state and controlled improvement interfaces. Released-install qualification, real-product gains and unattended operational delivery need their own evidence; source tests do not establish them. See §8 and §15 for current scope.
 
 For a buyer, the value is one sentence: **"My AI agent produced something that looks done — Specflow tells me, with evidence, whether it is safe to merge."** Agencies get client-ready evidence packets instead of assurances. Teams get agent speed with concentrated, boundary-level human review instead of line-by-line reading. The metric that matters is cost per *accepted* change — and Specflow is how it comes down without trust going with it.
 

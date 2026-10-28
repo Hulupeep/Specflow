@@ -1,435 +1,86 @@
 # Specflow
 
-**Specs that enforce themselves.**
+**Capability does not create authority.** Specflow is a trust harness for coding agents: agents produce changes; declared contracts, independent verification and mechanical gates decide whether the evidence supports acceptance.
 
-LLMs drift. You write a rule; three iterations later the model "helpfully" ignores it. Specflow turns your specs into contract tests that break the build when violated — so drift can't ship.
+## The problem
 
----
+An agent can build a plausible interface, pass tests over substituted data and call the feature complete. A stronger model can produce more work without making that completion claim reliable. Reviewers need to see what actually ran, against which inputs, and what remains unresolved.
 
-Current source also consumes independently reviewed JSON expectations through the owning native verifier, reporting correctness separately from provenance and consistency; see [the comparison schema](CONTRACT-SCHEMA.md#independent-value-comparisons-70). Released-install qualification remains separate.
+## The product
 
-For host-aware setup, read-only diagnostics and thin host actions, see [onboarding](docs/onboarding.md).
+Specflow carries a selected change from intent to evidence. It keeps the accepted scope, required checks, findings and run history outside the builder's conversation. The builder can be replaced without treating its confidence or remembered summary as proof.
 
-## The Problem
+Use the lightest workflow that covers the risk. A copy tweak may need tests and a screenshot; a bounded bug needs a failing regression and relevant contracts. New behavior needs simulation of divergent routes. Database/RPC changes require their replay, rollback, pgTAP and migration-replay checks. Multi-slice work also needs integrated journey acceptance. [Work routing](docs/should-i-use-specflow.md) chooses the parts; it does not waive existing requirements.
 
-```typescript
-// Your spec: "Service workers MUST NOT use localStorage"
-// LLM adds this anyway after iteration 3:
-const token = localStorage.getItem('auth') // No crash. Just drift.
-```
+| Part | Purpose |
+|---|---|
+| Contracts and journeys | Define observable acceptance and preserve existing behavior |
+| `spec-build` | Strengthen intent and deepen only the next justified slice |
+| `feature-build` | Implement a ready slice while preserving its required checks |
+| Independent verifier | Exercise the built behavior and compare it with the accepted reference |
+| Gates C and D | Consume current slice and integrated outcome evidence |
+| Run contract, ledger and trace | Explain decisions, attempts, failures, exceptions and gaps |
 
-**LLMs don't read. They attend.** Your spec competes with millions of training examples. You can't fix this with better prompts. You need a gate.
+A review model is not the mechanical verifier. Fresh same-host advisory review, explicit cross-family Duo review, native execution and customer validation are different claims.
 
----
+## Install and use
 
-## The Solution
-
-Contract tests scan your source code for forbidden patterns. Break a rule → build fails. Journey tests run Playwright against your critical flows. If a journey doesn't pass, the feature isn't done.
-
----
-
-## Quick start: Duo build with optional TypeSafe
-
-Start one interactive agent and give it a target. **Duo** reuses `spec-build`
-preparation and `feature-build` implementation, then sends each meaningful batch
-to the other model for independent review. Claude Code builds → Codex reviews;
-Codex builds → Claude reviews. Both read the same goal and acceptance criteria.
-You do not need to copy messages between agents or run all three workflows yourself.
-
-### 1. Install Duo into your project
-
-Install and authenticate **both Claude Code and Codex**. For GitHub projects,
-also install and authenticate `gh`. Check their login status:
-
-```sh
-claude auth status
-codex login status
-gh auth status
-```
-
-Use the current GitHub source for this Duo setup. From a directory **outside your
-target project**, clone the kit and run its installer (replace the project path):
+These examples use a checked-out source kit. Source capability and a published npm or marketplace release have separate qualification; do not infer the installed version's behavior from current main.
 
 ```sh
 git clone https://github.com/Hulupeep/Specflow.git specflow-kit
-bash specflow-kit/install-hooks.sh /absolute/path/to/your-project --runtime claude-code
+node specflow-kit/bin/specflow.js init /absolute/path/to/your-project --runtime codex
+# Or select --runtime claude-code
 ```
 
-Use `--runtime codex` if you are starting in Codex. The installer supplies the
-native Duo skills and helper scripts; no separate Duo skill installation is needed.
-Open a **new agent session in your target project** after installation. If an
-unfinished Duo run exists, managed updates are staged until that run finishes;
-rerun the installer afterwards. Missing peer authentication or required permissions
-blocks peer review and is reported explicitly.
+Fill only missing project context: repository, board/CLI, stack and selected work. Open a new agent session to load the installed instructions. [Onboarding](docs/onboarding.md) covers host selection, diagnostics, retained runs and updates. Installation checks do not establish product readiness.
 
-### 2. Start or resume in your agent
+Give the agent a target and let the installed loop selector assess its risk and existing evidence. Formal specification work follows the [progressive specification procedure](templates/SPECIFICATION.md): future work stays thin; only the selected slice becomes build-ready. A label or an old passing audit is insufficient.
 
-These are commands inside the agent conversation, not shell commands:
+For explicit independent Duo review, authenticate both provider CLIs and `gh` where GitHub reads are needed. In the agent conversation:
 
-| Agent | Existing issue | New feature | Resume |
-|---|---|---|---|
-| Claude Code | `/duo-build #905` | `/duo-build "Connect a Google account"` | `/duo-build resume <run-id>` |
-| Codex | `$duo-build #905` | `$duo-build "Connect a Google account"` | `$duo-build resume <run-id>` |
+| Host | Start | Resume |
+|---|---|---|
+| Claude Code | `/duo-build #123` | `/duo-build resume <run-id>` |
+| Codex | `$duo-build #123` | `$duo-build resume <run-id>` |
 
-The builder fixes actionable findings and requests another review. Required tests
-and release gates still apply. Keep the returned run ID; records live in
-`.specflow/duo/<run-id>/` in your project.
+The interactive builder continues authorized repairs and asks the peer to inspect frozen artifacts. Ordinary subscription work has no invented repair count or dollar ceiling; repeated non-progress requires diagnosis. Explicit limits and expensive billable-route brakes remain. [Duo details](docs/duo-build.md) explain ownership, evidence and recovery. TypeSafe is optional advice, not an approval path.
 
-### 3. Add TypeSafe evidence checks (optional)
-
-Duo works without TypeSafe. To enable it, put your API key in **`.env.local` at
-the root of the project using Duo**, not in the Specflow kit checkout:
-
-```dotenv
-TYPESAFE_API_KEY=your_key_here
-```
-
-Ensure `.env.local` is excluded by that project's `.gitignore` and remains
-untracked. Do not paste the key into an issue, prompt or run configuration.
-The installed adapter uses HTTP directly; no Python SDK is required.
-
-When starting your Duo run, tell the builder:
-
-> Configure TypeSafe for this run using `.env.local` in advisory mode before the
-> first batch review. Select the relevant acceptance criteria, assertions and
-> execution evidence. Report the run ID, active mode and whether TypeSafe calls
-> actually succeeded; make any missing evidence or unavailable service explicit.
-
-**The key alone does not enable TypeSafe.** The builder must explicitly configure
-the run with `envFile: ".env.local"`, a mode and selected evidence inputs.
-`shadow` is the default when configuring TypeSafe: it records judgments without
-sharing them with the peer. `advisory` shares the judgments with both agents and
-requires an evidence-backed response to each flag. `off` makes no calls.
-
-TypeSafe checks assertion coverage, execution and support for a claim separately.
-Its advice cannot approve completion, replace independent review or waive a test.
-Inspect actual results under `.specflow/duo/<run-id>/typesafe/round-NNN/`;
-configuration alone is not evidence that a check ran.
-
-See the [Duo guide](https://github.com/Hulupeep/Specflow/blob/main/docs/duo-build.md)
-for run configuration, review records and limitations, and
-[TypeSafe setup](https://github.com/Hulupeep/Specflow/blob/main/docs/duo-build.md#typesafe-advice-optional)
-for the helper commands and configuration format.
-
----
-
-## Core Workflow: `spec-build` → `feature-build`
-
-For serious product work, Specflow is two loops:
-
-| Loop | Use it when | Output |
-|------|-------------|--------|
-| **`spec-build`** | You have an idea, PRD, discovery note, bug cluster, or already-built-product teardown | A shared goal, thin backlog and scoped evidence for the selected next slice |
-| **`feature-build`** | You have one approved Specflow ticket ready to implement | A branch/slice that passes contract tests, journey tests, provenance, and Gate C |
-
-Run `spec-build` before code:
-
-```bash
-npx @colmbyrne/specflow run spec-build \
-  --slug auth-system \
-  --goal "ready tickets for auth system" \
-  --input docs/auth-idea.md
-```
-
-Then run `feature-build` for each ready ticket:
-
-```bash
-npx @colmbyrne/specflow run feature-build \
-  --slug auth-system-244 \
-  --goal "branch for #244 green on CI" \
-  --input "#244"
-```
-
-The short version:
-
-```text
-spec-build    = decide what should be built, harden it, slice it into enforceable tickets
-feature-build = build one ticket on rails until CI and evidence say it is ready
-```
-
-For already-built products, start one step earlier with `daily-use-teardown`;
-for merged epics, finish with Gate D. Most day-to-day work is still
-`spec-build` → `feature-build`.
-
----
-
-## The Invariant
-
-> **Frontier-model scaffolding is disposable. Gates, ledger, state, verifier evidence, and human boundaries are not.**
-
-As models get stronger they need less prompt scaffolding — so prompts, skills, and sprint decomposition are expected to come and go. What does **not** move is the trust layer: a provider's output (or exit code) is never a verdict; the mechanical gate decides, the ledger remembers, and unsafe boundaries stay human-authorized.
-
----
-
-## Install
-
-```bash
-npx @colmbyrne/specflow init . --runtime auto  # host-aware setup (safe to re-run)
-npx @colmbyrne/specflow update . --ci   # wire the build/commit hooks + CI
-```
-
-Then open **CLAUDE.md** and fill in the **Project Context** — *only the fields still blank/placeholder; an existing project may already have these:*
-- **Repository** — `your-org/your-repo`
-- **Project Board** — where issues are tracked (e.g. GitHub Issues)
-- **Board CLI** — the command-line tool for that board. For GitHub Issues that's **`gh`** (the [GitHub CLI](https://cli.github.com)); for Jira it'd be the `jira` CLI, etc. Agents use it to read/create issues, so it must be installed + authenticated.
-- **Tech Stack**
-
-**`init` installs the whole thing in one go:**
-- **Specflow** — contracts, hooks, agents, tests
-- the **loop kit** (`QA/loops/`) — **three loops** (see below) + the gate scripts (`verify-graph`, `verify-seed`, `adversary-spawn`, `verify-ticket-journey`, `verify-falsification`, `verify-seams`, `teardown-gate`)
-- the **adversary critic** skill (Gate A) into `~/.claude/skills/` (and `~/.codex/skills/` if you use Codex) — add `--no-adversary` to skip
-- the **process docs** (`PROCESS.md` / `-GUIDE` / `-CLAUDE` / `-CODEX`)
-
-On **Mac/Linux** any terminal works.
-
-> **Windows:** run these in **Git Bash**, not PowerShell or WSL. The scripts target Git Bash; PowerShell's `bash` is usually WSL, which can't see your `C:\` paths and will error with "No such file or directory".
-
-Gate D distinguishes report lint from fresh integrated outcome acceptance; see [Gate D commands and proof](docs/gate-d.md).
-
-### Commands
-
-```bash
-npx @colmbyrne/specflow init . --runtime auto  # Set up everything (safe to re-run)
-npx @colmbyrne/specflow update . --ci   # Update hooks + install CI workflows
-npx @colmbyrne/specflow verify          # Check installation (13 sections)
-npx @colmbyrne/specflow audit 500       # Audit issue #500 for compliance
-npx @colmbyrne/specflow run spec-build --slug my-feature --goal "ready tickets" --input docs/idea.md
-npx @colmbyrne/specflow graph           # Validate contract cross-references
-```
-
----
-
-## Why `spec-build` Comes First
-
-Specflow makes acceptance enforceable. Specification depth follows the next
-useful decision: keep the whole feature and future tickets **thin**, review
-material shared decisions at **contracted** depth, and make only the selected
-implementation slice **build-ready**. Reuse contracts and checks where they fit.
-
-A bounded experiment can resolve an empirical unknown before production
-contracts exist. Its observed result deepens affected assumptions; it does not
-establish readiness. Independent review, current dependency evidence and required
-gates govern promotion. Discoveries invalidate affected readiness at the next
-work boundary, including after failure or interruption.
-
-`feature-build` then implements the selected ready slice, preserving applicable
-contract, journey, oracle, provenance and release gates. Future siblings do not
-inherit readiness. See [the installed progressive specification procedure](templates/SPECIFICATION.md).
-
----
-
-## What You Get
-
-| Layer | What it does |
-|-------|-------------|
-| **Contract tests** | YAML rules scan source for forbidden patterns — break a rule, build fails |
-| **Journey tests** | Playwright tests for critical user flows — if a journey doesn't pass, the feature isn't done |
-| **Loop runner** | `specflow run` writes a durable run contract and ledger so agents execute the loop instead of referencing it |
-| **Hooks** | Auto-trigger tests on build/commit, catch violations on Write/Edit, reject commits without issue numbers |
-| **CI workflows** | PR compliance gate + post-merge audit — no contract violations merge to main |
-| **30+ agents** | Orchestrate wave execution, write contracts, audit boards, simulate specs |
-
----
-
-## Two ways to use it
-
-**On its own.** Contracts + journey tests + hooks + CI = your specs enforce themselves. That's everything in "What You Get" above — no adversary, no loop kit required. Specflow is independently useful as the architectural-enforcement layer.
-
-**As part of the end-to-end pipeline.** `specflow init` also scaffolds a runnable loop kit (`QA/loops/`) + process docs that place Specflow as **Gates B / B.5 / C** inside the larger idea→merged-code loop:
-
-```
-DISCOVER → PRD → [GATE A: adversary] → TICKETS → [Specflow: GATE B/B.5] → BUILD → [GATE C] → merged
-```
-
-Gate A (the hostile critic) is a separate skill — the [adversarial-prd-reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer). Specflow doesn't require it, but the pipeline pairs them. The loop runs whole on either runtime — Claude Code (`Workflow`) or Codex (automations); see `PROCESS-CLAUDE.md` / `PROCESS-CODEX.md`. The path (`QA/loops/*.yaml`) is the source of truth; each runtime is a binding of it. **Muscle never self-approves — Gate A (a hostile critic) and Gate C (CI on a real backend) decide.**
-
-### Prompt vs contracted loop
-
-A prompt is one instruction. A Specflow loop is a job contract: goal, input,
-current stage, next gate, durable evidence, stop condition, and
-`never_without_human` rules. `specflow run` makes that contract visible on disk
-under `.specflow/runs/<slug>/run-contract.yaml` and appends progress to
-`.specflow/runs/<slug>/ledger.jsonl`.
-
-The local runner is not a hosted scheduler. It runs or records the next bounded
-step, preserves state, and stops when a human gate, missing evidence, failed
-gate, or `agent_action_required` state is reached.
-
-After an agent completes a rail that has no built-in verifier, persist a
-hash-bound stage-evidence manifest and resume with `--stage-evidence`:
-
-An adapter's `gate_rerun_required` result includes `stage_evidence_path` and an
-`owning_gate_argv` / `owning_gate_command` for that durable run. Write the manifest
-at the indicated path, then invoke the owning verifier. It uses the same installed
-runtime and bypasses provider routing while retaining specification and permission
-gates. A configured custom owning command remains authoritative.
-
-Installed projects resolve loop YAML under `QA/loops`; source checkouts can use
-`templates/QA/loops`. If the historical default is absent, the runner can use an
-explicit packaged template path. Valid custom paths are preserved; a missing
-custom workflow is never silently replaced with another one.
-
-```yaml
-stage_evidence:
-  schema_version: 1
-  stage: 2_contract
-  artifacts:
-    - path: docs/specs/example/contract.yml
-      sha256: <sha256-of-the-file>
-  checks:
-    - name: contract-tests
-      command: npm test -- --runInBand
-```
-
-```bash
-specflow run feature-build --slug example --stage-evidence evidence/example-2-contract.yml
-```
-
-Specflow re-reads every artifact hash and reruns every check before advancing.
-The manifest is evidence, not a verdict: stale hashes, failed checks, stage
-mismatches, and commands requiring a human action all block advancement. Rail
-`7_ci_handoff` stops with `human_ci_handoff_required`; it never pushes or opens
-a PR automatically.
-
-For generative stages, an optional adapter policy can delegate one turn to an
-operator-owned CLI such as Claude Code (`claude -p`) or Codex (`codex exec`).
-Those CLIs keep their own authentication and subscriptions; Specflow stores no
-Claude/Codex subscription secrets. Provider output is never itself a gate result:
-the owning Specflow verifier must rerun before the run contract advances.
-
-For larger initiatives, use `.specflow/adapter-routing.yml` to declare the
-runtime profile. Claude Code uses the shipped Claude/Fable planning and review
-profile; Codex uses the shipped Codex-only GPT-5.6 Sol profile. Each policy also declares a thinking level
-(`effort`) such as `medium`, `high`, or `xhigh`. The shipped
-runtime-specific template requires
-`--confirm-models` before invoking a routed provider, so expensive model choices
-are shown to the operator before spend or quota use. Budget fields are caps /
-quota guards, not guaranteed costs; ChatGPT-authenticated Codex consumes Codex
-plan quota/credits rather than OpenAI API billing. Select the runtime explicitly
-with `npx @colmbyrne/specflow init . --runtime codex` on first install, then
-refresh with `npx @colmbyrne/specflow update . --runtime codex|claude-code`.
-Reruns are idempotent, custom routing is preserved unless `--replace-routing`
-is supplied, and `.specflow/install-state.yml` records routing provenance.
-
-Before any build loop starts, the agent should say either `Model routing active:`
-with the current stage's provider/model choices, or explain how to install the
-routing file. No routed model spend should happen before that confirmation.
-
-See [Specflow Model Routing](MODEL_ROUTING.md) for the operator workflow, the
-technical routing format, and how to change the defaults.
-
-### The three loops (`QA/loops/`)
-
-| Loop | For | In one line |
-|------|-----|-------------|
-| **spec-build** | a new feature / rough idea | discover → thin backlog → **Gate A** for selected contracted decisions → applicable **Gate B/B.5** for the next build-ready slice; future tickets stay thin |
-| **feature-build** | a ready ticket → tested slice | the 5 rails (ticket → contract → real-backend e2e → oracle-anchored → impl) → **Gate C** (CI vs a real seeded backend); an epic isn't done until **Gate D** — the persona walk on the *merged* tree (catches seam bugs per-slice green is blind to) |
-| **daily-use-teardown** | an *already-built* product | investigate the live app → **human confirms the map (hash-bound sign-off)** → top-thinker persona walks (WORKS/CONFUSING/BROKEN + evidence) → prioritized do-list → feeds spec-build |
-
-Start at `QA/loops/README.md`. **Maturity:** spec-build + feature-build are battle-tested on real epics; **daily-use-teardown is newer** — its distinctive stages were unproven until their first real run, so treat its output as a strong draft.
-
----
-
-## FAQ
-
-**Isn't this just more testing?** No. Tests verify behaviour. Contracts verify architecture. "No localStorage in service workers" survives any refactor.
-
-**What if I don't have a perfect spec?** Start with "document what works today." Your first contract can be: whatever we're doing now, don't break it.
-
-**Can LLMs actually follow contracts?** Even if they don't, tests catch it. You don't need the LLM to behave. You need it to be checkable.
-
----
-
-## Addendum: the full execution pipeline (adversary + Specflow + ruflo)
-
-Specflow is **Gates B / B.5 / C** of a larger loop that turns a rough idea into merged code you can
-trust — even when a multi-agent swarm (e.g. [ruflo](https://github.com/ruvnet/ruflo) / claude-flow)
-does the building. The principle:
-
-> **The swarm is muscle *inside* a phase. The gates live *between* phases, and every gate is owned
-> *outside* the swarm. Throughput is delegated; trust never is.**
-
-```
-[0] DISCOVER ─► [1] PRD ─[GATE A]─► [2] TICKETS ─[GATE B][GATE B.5]─► [3] BUILD ─[GATE C]─► merged
-  human+agent     dueling   adversary  specflow      audit+    pre-flight   ruflo      specflow
-  vs real         writer/   verdict    writer        closure   simulation   swarm      CI
-  artifact        adversary (HARD)     (ruflo //)    validator (own gate)  (ruflo //)  (unfakeable)
-```
-
-| Gate | After | What it is | Type |
-|------|-------|------------|------|
-| **A** | the PRD | Independent scoped review of selected contracted decisions through Duo: continue on verified progress with bounded diagnosis, with a durable receipt. Thin backlog writing does not require full adversary review or per-round commits. | **HARD** |
-| **B** | tickets | `specflow audit` + closure validator — every requirement → journey → test → issue, no orphans, no duplicate IDs. | soft (controller) |
-| **B.5** | tickets | **Pre-flight simulation** — examine the selected build-ready slice and direct seams; a relevant CRITICAL design gap blocks. Future tickets stay thin. *Its own gate.* | soft (controller) |
-| **C** | each build/slice | **Specflow CI** — contract tests + journey tests against a *real seeded backend* + anti-pattern audit + coverage ratchet. Runs in CI under branch protection: a violation **cannot merge**. | **HARD (unfakeable)** |
-| **D** | the *merged* epic | **Persona-walk integration gate** — per-slice green is blind to seam bugs (vertical slices, horizontal collisions). GATE D walks personas across the merged tree; a red hop is dispositioned `bug` or a *human-countersigned* `stale-oracle` — the agent can't reconcile its own oracle. An epic isn't done until D is green. | **HARD** |
-
-For applicable selected work, Gate A includes the relevant persona and falsification evidence. Contracted UI decisions receive a paper walkthrough; build-ready slices receive scoped simulation. Reuse shared evidence without imposing that package on the entire backlog.
-
-**Who does what:** *Discover* — human + agent vs the real artifact (no swarm). *PRD* — dueling
-writer/adversary, strong models. *Tickets* — `specflow-writer` fanned out by ruflo. *Build* — ruflo
-swarm: one implementer per ticket in worktrees, multi-model cost routing (cheap models for
-boilerplate, strong for hard), shared memory, kill-switch dashboard.
-
-**Why it holds:** Gate A is a *single hostile critic*, not the swarm's self-consensus; Gate C is
-*CI*, not an agent's opinion. **Soft front (controller-enforced) + hard backstop (branch-protected
-CI)** means even a gamed soft gate — or a fooled adversary — can't merge a contract violation. And
-because Gate C's journeys run against a real seeded backend, *green-but-broken* can't pass. This is
-how Specflow **bakes the truth in**.
-
-**ruflo's role is throughput, not trust** — use it where work is genuinely parallel (tickets,
-build, triage) for multi-model cost + memory + observability; keep the trust-critical moments
-(Gate A, Gate C) outside the swarm. **No fork needed** — the adversary is a runtime skill the critic
-invokes; Specflow is a CLI + CI the swarm calls.
-
----
-
-## Links
-
-<!-- absolute URLs so links resolve on the npm page too, not just GitHub -->
-| | |
-|---|---|
-| [The loop kit](https://github.com/Hulupeep/Specflow/blob/main/templates/loops/README.md) | Run the pipeline — paths, prompts, the three loops |
-| [Detailed Setup](https://github.com/Hulupeep/Specflow/blob/main/docs/getting-started.md) | Manual paths, updating, SKILL.md |
-| [Agent Library](https://github.com/Hulupeep/Specflow/blob/main/agents/README.md) | 30+ agents for wave execution |
-| [Adversarial PRD Reviewer](https://github.com/Hulupeep/adversarial-prd-reviewer) | Review relevant irreversible decisions before promotion (Gate A) |
-| [Contract Schema](https://github.com/Hulupeep/Specflow/blob/main/CONTRACT-SCHEMA.md) | YAML format for contracts |
-| [Improvement contracts](https://github.com/Hulupeep/Specflow/blob/main/templates/improve/GAIN_CONTRACT.md) | Declare a binary gain, preserve existing behaviour, and interpret KEEP evidence |
-| [CI Integration](https://github.com/Hulupeep/Specflow/blob/main/CI-INTEGRATION.md) | GitHub Actions setup |
-| [npm](https://www.npmjs.com/package/@colmbyrne/specflow) | `@colmbyrne/specflow` |
-| [Issues](https://github.com/Hulupeep/Specflow/issues) | Bugs and ideas |
-
-### Interactive build with a second model
-
-Use `/duo-build #905` in Claude Code or `$duo-build #905` in Codex. Feature text
-works too; the skill reuses spec-build preparation and feature-build implementation,
-then automatically sends each coherent batch to the other CLI for read-only review.
-Resume with `duo-build resume <run-id>` using the same native prefix.
-Install this checkout into the target project, then restart the agent session:
+For direct runner use, start in the target project with its installed routing and accepted inputs:
 
 ```sh
-bash /path/to/Specflow/install-hooks.sh /path/to/project --runtime claude-code
-# For a Codex starting session, use --runtime codex instead.
+node /absolute/path/to/specflow-kit/bin/specflow.js run spec-build \
+  --slug example --goal "Select the next useful slice" --input docs/intent.md
+node /absolute/path/to/specflow-kit/bin/specflow.js run trace \
+  --run-dir .specflow/runs/example
 ```
 
-Both `claude` and `codex` must be installed and authenticated. The builder remains
-interactive; the other CLI reviews frozen source and raw evidence. Missing peer
-access blocks duo verification. Each run saves its goal, findings, evidence and
-resume ID locally. Updated runs use the tier policy above; older active runs keep
-their pinned runtime until completion.
+These commands inspect or advance the declared run; they do not manufacture acceptance, required backend access or permission. [How it works](docs/how-it-works.md) and the [command reference](docs/reference.md) explain the verifier lifecycle.
 
-For optional TypeSafe advice, put the key in the **target project's untracked
-`.env.local`**:
+## Trust boundaries and limits
 
-```dotenv
-TYPESAFE_API_KEY=your-key
+- Provider prose, confidence and exit codes cannot become gate verdicts. The owning verifier executes current checks; stale, copied or skipped required evidence cannot pass.
+- Correctness compares actual output with an independently accepted expectation. Provenance and consumer consistency are separate facts; agreement between consumers does not establish correctness.
+- UI journeys must execute their ordered steps and assertions. Required server-state journeys use the actual auth/API/persistence path on a real seeded test or staging backend. Screenshots and mock-only success do not replace it.
+- A compliant ticket, advisory review, Duo agreement, installation check or report lint does not prove an integrated outcome. [Gate D](docs/gate-d.md) keeps report validity and outcome acceptance separate.
+- Existing permission, privacy and release boundaries remain authoritative. A model cannot grant itself push, merge, deployment or an exception. Exceptions remain recorded exceptions; they do not turn missing required proof into a pass.
+- Runs retain ownership, findings and explicit limits across interruptions and host changes. Missing capability has a concrete limitation and next action; it is not silently treated as success.
+
+These controls cover supported scoped execution paths; they are not a general OS sandbox for arbitrary programs. See the documented adapter/native limits. They are boundaries around declared evidence, not a guarantee against every bug. A weak oracle or incomplete acceptance can still miss the user's problem. Tested, merged, published, deployed and customer-validated are separate states.
+
+## Direction and current scope
+
+The goal is useful, explainable intent-to-evidence development with replaceable research, build and review roles. HeyStax is the intended operational control plane. Repo-local Improve code, controller interfaces and qualified source adapters exist; real-product benefit, final released installs and unattended end-to-end operation each need their own evidence. No recurring schedule is activated by this documentation.
+
+The intended commercial wedge is an evidence packet an agency or product team can review with a client: accepted scope, current checks, actual outcomes, unresolved findings and authorization. Customer acquisition and measurable benefit are not established by producing more tickets or green checks.
+
+Read the [internal PRD](docs/PRD.md), [commercial narrative](docs/PRD-COMMERCIAL.md), [documentation index](docs/DOC-INDEX.md), [native plugin scope](docs/native-plugin.md) and [Improve operations](docs/ops/improve-service.md).
+
+## Repository checks
+
+```sh
+npm ci --ignore-scripts
+node node_modules/jest/bin/jest.js --no-coverage --maxWorkers=2 --roots tests
 ```
 
-Tell the builder: “Use TypeSafe in advisory mode for this Duo run, reading
-`.env.local`, with a maximum of 20 calls.” It configures that file explicitly;
-the workflow does not search for keys. TypeSafe checks focused evidence and flags
-uncertainty; it cannot replace peer review or pass a required gate. Shadow mode
-records a comparison without influencing the review. The Python SDK is not needed.
-See [duo-build configuration, invocation and evidence](docs/duo-build.md).
-
-Runtime verification uses accepted native case inventories and owning Jest/Playwright reports. `specflow run verify --run-dir .specflow/runs/<slice>` executes the existing verifier without a provider call. Required skips, missing cases and stale reports block; see [the execution schema](CONTRACT-SCHEMA.md#owning-native-case-execution-te-001006-44). This source-kit capability must be present in the installed package/helpers before use.
+[Canonical CI](.github/workflows/canonical-tests.yml) reconciles the native report and rejects missing, failed or skipped checks. Its synthetic outcome corpus tests the declared failure cases; it is not customer or production-backend proof.

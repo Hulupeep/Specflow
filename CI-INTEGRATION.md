@@ -1,5 +1,7 @@
 # Specflow CI/CD Integration Guide
 
+For contracted work, the current [trust boundaries](docs/how-it-works.md) and [Gate D rules](docs/gate-d.md) govern these integration examples. Required native/journey/backend checks must actually execute with current evidence; manual review, optional-check configuration or a provider exit code cannot replace them. Pattern-only examples do not establish runtime or outcome acceptance.
+
 > Integrate contract verification into your CI/CD pipeline
 
 ## Overview

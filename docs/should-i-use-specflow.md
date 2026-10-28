@@ -1,6 +1,6 @@
 # Should I Use Specflow?
 
-This doc helps you decide. It covers what Specflow gives you, what it costs, what it doesn't catch, and what tools it works with.
+Use Specflow when the reviewable evidence for an agent-built change matters: commercial delivery, brownfield behavior, data, permissions or calculations. The intended agency wedge is an evidence packet a client can assess. This is a value proposition, not proof of paying customers. If a small existing test suite covers a reversible ask, use it; installing the harness does not mandate a full build loop.
 
 [← Back to README](../README.md)
 

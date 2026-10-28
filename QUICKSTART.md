@@ -1,5 +1,7 @@
 # Specflow Quick Start
 
+For current host-aware setup and contracted-loop boundaries, start with [onboarding](docs/onboarding.md) and [how it works](docs/how-it-works.md). The pattern-contract examples below are a lower-level adoption path, not runtime acceptance or permission to skip required checks.
+
 ## ⚠️ Critical Setup: Commit Message Format
 
 **Before anything else:** Specflow hooks only work if commits reference GitHub issues.
@@ -170,7 +172,7 @@ npm test -- journeys
 
 **Note on enforcement:**
 - Contract tests → **hard gate** (always block PR)
-- Journey tests → **flexible** (hard gate OR manual review—your choice)
+- Required journey tests → **executed gates**; manual review is additional evidence and cannot replace a required journey.
 
 Why manual review for journeys? Flaky tests, aspirational DOD, known issues. See [CI-INTEGRATION.md](CI-INTEGRATION.md).
 
