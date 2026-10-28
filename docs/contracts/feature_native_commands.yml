@@ -1,0 +1,26 @@
+contract_meta:
+  id: feature_native_commands
+  version: 1
+  created_from_spec: GitHub112 native runtime commands
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_native_commands'
+invariants:
+  - id: I-NATIVE-CMD-001
+    rule: Native commands dispatch structured argv to fixed installed canonical entrypoints with an explicit selected project. Malformed or conflicting arguments reject before dispatch; raw command arguments never become a constructed shell string.
+  - id: I-NATIVE-CMD-002
+    rule: The canonical runtime owns stage, divergence and current verifier results. The bridge preserves its exact exit and result; help, trace, model prose, historical evidence and skipped or stale required checks cannot grant gate acceptance.
+  - id: I-NATIVE-CMD-003
+    rule: Native command metadata grants no blanket tool permission or model override. Existing host approval, readiness, subscription and expensive-route controls, release boundaries and audit/simulate methods remain authoritative.
+journey: J-PLUGIN-COMMANDS
+scope:
+  commands: [run, trace, verify]
+  reused_skills: [specflow-audit, specflow-simulate]
+  remaining: [113-owning-hooks, 115-marketplace, 116-integrated-release]
+test_hooks:
+  tests:
+    - file: tests/contracts/native-plugin-commands.test.js
+    - file: tests/contracts/native-plugin-layout.test.js
+    - file: tests/contracts/loop-run-contract.test.js

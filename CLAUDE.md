@@ -83,6 +83,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 
 | Contract | Protects | Rules |
 |----------|----------|-------|
+| `feature_native_commands` | Native structured command dispatch and canonical gate authority | I-NATIVE-CMD-001 through I-NATIVE-CMD-003 |
 | `feature_native_plugin` | Native root/catalog identity, retained role rules and actual loaded proof | I-NATIVE-001 through I-NATIVE-004 |
 | `feature_plugin_runtime` | Cold runtime/vendor closure and preserved retained pins | I-PLUGIN-001 through I-PLUGIN-003 |
 | `feature_install_ux` | Host-aware public setup, local artifact identity and custom gate preservation | I-INSTALL-001 through I-INSTALL-003 |

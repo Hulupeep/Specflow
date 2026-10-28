@@ -16,7 +16,15 @@ Ordinary npm/Codex context remains supported.
 
 `/specflow:about` is a read-only identity command. It reads the actual installed
 package, native manifest and dependency inventory. It does not pass gates or grant
-release authority. Full workflow commands (#112), owning hooks (#113), marketplace
+release authority. Runtime commands are `/specflow:run`, `/specflow:trace` and `/specflow:verify`.
+They dispatch structured JSON requests to the installed canonical runner with an
+explicit project, preserve its exit/result, and inherit host tool permissions.
+Use `--help` for arguments; trace is historical diagnosis and verify executes the
+owning checks. State and gate authority remain with the existing runtime.
+Git and the accepted project's test framework are required when those owning
+checks depend on them; bundled runtime dependencies do not replace those tools.
+Audit/simulate remain `/specflow:specflow-audit` and `/specflow:specflow-simulate`.
+Owning hooks (#113), marketplace
 publication (#115) and final integrated/cache proof (#116) remain separate work;
 the overall plugin (#109) is still under qualification.
 
