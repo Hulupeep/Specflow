@@ -17,12 +17,14 @@ its successfully installed files and returns nonzero. A staged setup also record
 managed files and preserves custom routing. `--replace-routing` replaces routing
 only. A modified gate blocks an update: back it up, compare it with the named
 package, and explicitly restore the reviewed canonical bytes before rerunning.
-An update also checks the prior recorded ownership against its identified canonical
-package. A rewritten local hash cannot authorise replacement. Keep versioned
-canonical packages available; if an old package has disappeared or was replaced in
-place, divergent bytes remain unverifiable and require the same reviewed compare/
-backup/restore procedure. Identical current canonical bytes can still be refreshed.
-Custom findings include an exact, explicit backup/restore command for use after review. It checks the observed source/target hashes and retains a unique private backup; changed bytes cause it to refuse. Doctor only displays this procedure and never invokes it. Doctor never repairs or normalises bytes, requests authentication or calls a model.
+Only bytes matching the executing core package are automatically refreshed.
+A prior record or package locator cannot authorise overwriting divergent gates.
+Changed-version bytes remain preserved until a caller reviews the current
+canonical package and uses the reversible backup/restore procedure. A caller
+with standing repair authority can do that review; no new owner approval is
+introduced. Historical package identity is observation, while gate capability
+uses the executing package as its authority.
+Custom findings include an exact, explicit backup/restore command for use after review. It reuses the existing installer lock, refuses to change active bytes while unfinished runs remain, and checks the observed source/target hashes and retains a unique private backup under the normally ignored `.specflow/runs/repair-backups/`; changed bytes cause it to refuse. Doctor only displays this procedure and never invokes it. Doctor never repairs or normalises bytes, requests authentication or calls a model.
 
 Auto uses these configuration hints: `SPECFLOW_RUNTIME=codex|claude-code`, a UUID
 `CODEX_THREAD_ID`, or `CLAUDECODE=1`. Distinct supported hints conflict; blank or

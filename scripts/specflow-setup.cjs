@@ -10,7 +10,8 @@ function setup({target='.',runtime,sourceRoot=path.resolve(__dirname,'..'),repla
  const diagnostic=require('./specflow-doctor.cjs').inspect({targetRoot:canonical,sourceRoot});
  if(diagnostic.stagedInstallation)installation.status='staged';
  const verify=cp.spawnSync(process.execPath,[cli,'verify','--strict'],{cwd:canonical,encoding:'utf8',maxBuffer:8*1024*1024});
- return {runtime,installation,readiness:{target:canonical,status:verify.status===0?'ready':'incomplete',exitCode:verify.status,detail:(verify.stdout||'')+(verify.stderr||'')+(verify.error?.message||'')},doctor:diagnostic,exitCode:verify.status|| (installation.status==='staged'?1:0)};
+ const verified=verify.status===0&&!verify.error&&!verify.signal;
+ return {runtime,installation,readiness:{target:canonical,status:verified?'ready':'incomplete',exitCode:verify.status,detail:(verify.stdout||'')+(verify.stderr||'')+(verify.error?.message||'')+(verify.signal?'\nVerifier terminated by '+verify.signal:'')},doctor:diagnostic,exitCode:verified?(installation.status==='staged'?1:0):(Number.isInteger(verify.status)&&verify.status!==0?verify.status:1)};
 }
 function cli(args,sourceRoot){try{
  const at=args.indexOf('--runtime'),runtime=require('./runtime-routing.cjs').resolveRuntime({runtime:at<0?'auto':args[at+1],interactive:!!(process.stdin.isTTY&&process.stdout.isTTY)});

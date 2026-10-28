@@ -40,10 +40,10 @@ test('new eligible install applies managed bytes, preserves custom files and rol
  try{
   fs.mkdirSync(path.join(source,'hooks'));fs.writeFileSync(path.join(source,'hooks/duo-review-check.sh'),'#!/bin/bash\nexit 0');
   expect(runtime.install(source,target).state).toBe('active');expect(fs.statSync(path.join(target,'.claude/hooks/duo-review-check.sh')).mode & 0o111).toBe(0o111);expect(fs.readFileSync(path.join(target,'scripts/duo-build.cjs'),'utf8')).toBe('new version');
-  // Retain the identified canonical A package while B is tested; rewriting A
-  // in place would leave no independently inspectable prior package identity.
-  fs.cpSync(source,next,{recursive:true});fs.writeFileSync(path.join(next,'scripts/duo-build.cjs'),'newer version');fs.writeFileSync(path.join(next,'scripts/duo-actions.cjs'),'actions');
-  expect(()=>runtime.install(next,target,{beforeWrite:rel=>{if(rel.endsWith('duo-actions.cjs'))throw Error('disk fault');}})).toThrow('disk fault');expect(fs.readFileSync(path.join(target,'scripts/duo-build.cjs'),'utf8')).toBe('new version');
+  // Unchanged canonical bytes refresh; new file writes still roll back. A
+  // record cannot authorise replacing divergent bytes from a prior package.
+  fs.cpSync(source,next,{recursive:true});fs.writeFileSync(path.join(next,'scripts/readonly-review.cjs'),'read helper');fs.writeFileSync(path.join(next,'scripts/duo-actions.cjs'),'actions');
+  expect(()=>runtime.install(next,target,{beforeWrite:rel=>{if(rel.endsWith('duo-actions.cjs'))throw Error('disk fault');}})).toThrow('disk fault');expect(fs.existsSync(path.join(target,'scripts/readonly-review.cjs'))).toBe(false);expect(fs.readFileSync(path.join(target,'scripts/duo-build.cjs'),'utf8')).toBe('new version');
   fs.writeFileSync(path.join(target,'scripts/duo-build.cjs'),'custom');expect(()=>runtime.install(next,target)).toThrow('Custom');expect(fs.readFileSync(path.join(target,'scripts/duo-build.cjs'),'utf8')).toBe('custom');
  }finally{fs.rmSync(target,{recursive:true,force:true});fs.rmSync(next,{recursive:true,force:true});}
 });
@@ -73,4 +73,11 @@ test('hooks-only bootstrap refuses existing duo history before downloading or ch
  const script=path.join(source,'install-hooks.sh');fs.copyFileSync(path.resolve(__dirname,'../../install-hooks.sh'),script);const before=duo.fingerprint(f.root,[]),state=JSON.stringify(f.state());
  try{execFileSync('bash',[script,f.root],{encoding:'utf8',stdio:'pipe'});throw Error('Hooks-only installer unexpectedly succeeded');}catch(e){expect(e.status).toBe(2);expect(e.stderr.toString()).toContain('Full Specflow kit required');}
  expect(duo.fingerprint(f.root,[])).toBe(before);expect(JSON.stringify(f.state())).toBe(state);
+});
+test('changed-version gates require reviewed restoration, then refresh without touching old pins',()=>{
+ const target=fs.mkdtempSync(path.join(os.tmpdir(),'duo-reviewed-update-')),next=fs.mkdtempSync(path.join(os.tmpdir(),'duo-reviewed-kit-'));
+ try{runtime.install(source,target);fs.cpSync(source,next,{recursive:true});fs.copyFileSync(path.resolve(__dirname,'../../scripts/duo-runtime.cjs'),path.join(next,'scripts/duo-runtime.cjs'));fs.writeFileSync(path.join(next,'scripts/duo-build.cjs'),'reviewed next bytes');expect(()=>runtime.install(next,target)).toThrow('preserved');expect(fs.readFileSync(path.join(target,'scripts/duo-build.cjs'),'utf8')).toBe('new version');
+  const report=require('../../scripts/specflow-doctor.cjs').inspect({targetRoot:target,sourceRoot:next,env:{}}),finding=report.findings.find(r=>r.message.startsWith('scripts/duo-build.cjs:'));
+  execFileSync('/bin/sh',['-c',finding.repairCommand],{encoding:'utf8'});expect(runtime.install(next,target).state).toBe('active');expect(fs.readFileSync(path.join(target,'scripts/duo-build.cjs'),'utf8')).toBe('reviewed next bytes');const backups=fs.readdirSync(path.join(target,'.specflow/runs/repair-backups')).filter(n=>n.startsWith('duo-build.cjs.specflow-backup-'));expect(backups).toHaveLength(1);expect(fs.readFileSync(path.join(target,'.specflow/runs/repair-backups',backups[0]),'utf8')).toBe('new version');expect(runtime.verify(path.join(f.root,'.specflow/duo',f.run.id),f.state().runtime)).toBeUndefined();
+ }finally{fs.rmSync(target,{recursive:true,force:true});fs.rmSync(next,{recursive:true,force:true});}
 });

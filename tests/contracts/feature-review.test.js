@@ -245,3 +245,7 @@ describe('J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-RECOVERY: canonical conce
   const h=advice.handoff(options());expect(h.status).toBe('not_reviewed');expect(h.gate_decision).toBe('pending');expect(h.clean).toBe(false);
  });
 });
+test('private repair backups never become advisory or Duo source, even if forcibly tracked',()=>{
+ const file='.specflow/runs/repair-backups/custom-gate.cjs.specflow-backup-example';put(file,'SYNTHETIC_REPAIR_PRIVATE_SENTINEL');git('add','-f',file);git('commit','-qm','synthetic private backup');
+ const s=advice.subject(options());expect(s.entries[file]).toBeUndefined();expect(JSON.stringify(s)).not.toContain('SYNTHETIC_REPAIR_PRIVATE_SENTINEL');expect(require('../../scripts/duo-build.cjs').manifest(root,[])[file]).toBeUndefined();expect(()=>advice.subject({...options(),inputPaths:[file]})).toThrow(/Private|Sensitive/);
+});

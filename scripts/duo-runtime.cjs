@@ -61,15 +61,6 @@ function bundle(source) {
   put('.claude/hooks/duo-review-check.sh',path.join(source,'hooks/duo-review-check.sh'));
   return result;
 }
-function canonicalPrevious(previous) {
-  try {
-    const p=previous.package;if(!p||p.name!=='@colmbyrne/specflow')return {};
-    const bytes=fs.readFileSync(noLinks(path.join(p.root,'package.json'))),meta=JSON.parse(bytes);
-    if(hash(bytes)!==p.manifestSha256||meta.name!==p.name||meta.version!==p.version)return {};
-    const files=bundle(p.root);if(hash(JSON.stringify(files))!==previous.version)return {};
-    return Object.fromEntries(Object.entries(files).map(([name,bytes])=>[name,hash(bytes)]));
-  }catch{return {};}
-}
 function install(source,root,{held=false,beforeWrite,requestedRuntime=null}={}) {
   if(requestedRuntime&&!['codex','claude-code'].includes(requestedRuntime))throw Error('Use --runtime codex|claude-code');
   if(!held)return lock(root,()=>install(source,root,{held:true,beforeWrite,requestedRuntime}));
@@ -82,10 +73,12 @@ function install(source,root,{held=false,beforeWrite,requestedRuntime=null}={}) 
     write(path.join(dir,'staged.json'),{files:next,stagedVersion,pendingRunIds,package:packageIdentity,requestedRuntime});
     return {state:'staged',pendingRunIds,activeVersion:previous.version||'legacy_unknown',stagedVersion,reason:'Unfinished runs retain their exact installation; rerun the installer after completion. Reload the native skill in a new conversation.'};
   }
-  const before={},modes={},canonical=canonicalPrevious(previous);
+  const before={},modes={};
   for(const rel of Object.keys(next)) {
     const file=noLinks(path.join(root,rel));before[rel]=fs.existsSync(file)?fs.readFileSync(file):null;modes[rel]=before[rel]?fs.statSync(file).mode & 0o777:null;
-    if(before[rel] && hash(before[rel])!==hash(next[rel]) && (previous.hashes[rel]!==hash(before[rel])||canonical[rel]!==hash(before[rel]))) throw Error(`Custom or unverifiable managed file preserved: ${rel}; compare with the identified canonical package before installation`);
+    // Neither a writable hash nor a package locator can grant overwrite rights.
+    // Divergent bytes need the explicit reviewed backup/restore procedure.
+    if(before[rel] && hash(before[rel])!==hash(next[rel])) throw Error(`Custom or unverifiable managed file preserved: ${rel}; review and back up before restoring the executing package's canonical bytes`);
   }
   const written=[];
   try {
