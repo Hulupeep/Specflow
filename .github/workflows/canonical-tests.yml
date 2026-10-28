@@ -48,3 +48,12 @@ jobs:
           path: ${{ env.SPECFLOW_CANONICAL_REPORT }}
           if-no-files-found: error
           retention-days: 14
+      - name: Preserve synthetic outcome corpus receipts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: outcome-corpus-${{ github.sha }}
+          path: .specflow/corpus-results/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
