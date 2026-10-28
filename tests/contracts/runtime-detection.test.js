@@ -17,12 +17,12 @@ describe('J-INSTALL-HOST-DETECTION (#124)',()=>{
   const env=new Proxy({}, {get(){throw Error('detection must not run');}});
   expect(routing.resolveRuntime({runtime,env,interactive:false})).toBe(runtime);
  });
- test('noninteractive public init preserves routing on ambiguity, irrespective of installed directories',()=>{
+ test.each(['missing','conflicting'])('noninteractive public init preserves routing on %s hints, irrespective of installed directories',kind=>{
   const dir=fs.mkdtempSync(path.join(os.tmpdir(),'specflow detect '));try{
    routing.installRuntimeRouting({sourceRoot:ROOT,targetRoot:dir,runtime:'codex',interactive:false});
    const active=path.join(dir,'.specflow/adapter-routing.yml'),before=fs.readFileSync(active);
    fs.mkdirSync(path.join(dir,'.claude'),{recursive:true});fs.mkdirSync(path.join(dir,'.codex'),{recursive:true});
-   const result=cp.spawnSync(process.execPath,[path.join(ROOT,'bin/specflow.js'),'init',dir,'--runtime','auto'],{encoding:'utf8',env:{...process.env,SPECFLOW_RUNTIME:'',CODEX_THREAD_ID:uuid,CLAUDECODE:'1'},timeout:20000});
+   const result=cp.spawnSync(process.execPath,[path.join(ROOT,'bin/specflow.js'),'init',dir,'--runtime','auto'],{encoding:'utf8',env:{...process.env,SPECFLOW_RUNTIME:'',CODEX_THREAD_ID:kind==='conflicting'?uuid:'',CLAUDECODE:kind==='conflicting'?'1':''},timeout:20000});
    expect(result.status).not.toBe(0);expect(result.stderr+result.stdout).toContain('npx @colmbyrne/specflow init . --runtime claude-code');expect(fs.readFileSync(active)).toEqual(before);
   }finally{fs.rmSync(dir,{recursive:true,force:true});}
  });

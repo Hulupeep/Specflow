@@ -22,7 +22,7 @@ package. A rewritten local hash cannot authorise replacement. Keep versioned
 canonical packages available; if an old package has disappeared or was replaced in
 place, divergent bytes remain unverifiable and require the same reviewed compare/
 backup/restore procedure. Identical current canonical bytes can still be refreshed.
-Doctor never repairs or normalises bytes, requests authentication or calls a model.
+Custom findings include an exact, explicit backup/restore command for use after review. It checks the observed source/target hashes and retains a unique private backup; changed bytes cause it to refuse. Doctor only displays this procedure and never invokes it. Doctor never repairs or normalises bytes, requests authentication or calls a model.
 
 Auto uses these configuration hints: `SPECFLOW_RUNTIME=codex|claude-code`, a UUID
 `CODEX_THREAD_ID`, or `CLAUDECODE=1`. Distinct supported hints conflict; blank or
@@ -35,7 +35,7 @@ Doctor identifies its executing package separately from the inspected project's
 active package/artifacts and staged update. Gate D artifact capability uses its conservative literal-require dependency closure, separately from unrelated installation ownership. It compares actual local bytes with
 the recorded package's canonical bundle, not only local recorded hashes. An
 unavailable package, legacy identity, missing/modified helper or custom cross-host
-binding remains visible. A staged update is not active: finish retained runs and
+binding remains visible. A changed canonical bundle or unresolved required dependency cannot certify a healthy gate. A staged update is not active: finish retained runs and
 rerun the installer. Existing pinned runtime bytes are never rewritten.
 
 ## Thin host actions

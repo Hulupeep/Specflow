@@ -13,11 +13,17 @@ const DoctorResult=z.object({
 }).strict();
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const quote=value=>"'"+value.replace(/'/g,"'\\''")+"'";
+function reviewedRestore(source,target,expectedSource,expectedTarget) {
+ // Display only. Executing this explicit, reversible procedure is an operator
+ // action after review; inspection itself never writes or invokes it.
+ const code='const fs=require("fs"),c=require("crypto");const [s,t,sh,th]=process.argv.slice(1);const from=fs.readFileSync(s),before=fs.readFileSync(t),hash=b=>c.createHash("sha256").update(b).digest("hex");if(hash(from)!==sh||hash(before)!==th)throw Error("Artifact changed since doctor; inspect again before repair");const backup=t+".specflow-backup-"+c.randomUUID();fs.writeFileSync(backup,before,{flag:"wx",mode:0o600});fs.writeFileSync(t,from);console.log("Backup: "+backup);';
+ return [quote(process.execPath),'-e',quote(code),...[source,target,expectedSource,expectedTarget].map(quote)].join(' ');
+}
 function gateDependencies(files) {
  const pending=['scripts/teardown-gate.cjs'],seen=new Set();
  while(pending.length){const rel=pending.pop();if(seen.has(rel))continue;seen.add(rel);
   for(const match of (files[rel]||'').matchAll(/require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g)){
-   let dep=path.posix.normalize(path.posix.join(path.posix.dirname(rel),match[1]));if(!path.posix.extname(dep))dep+='.cjs';if(Object.hasOwn(files,dep))pending.push(dep);
+   let dep=path.posix.normalize(path.posix.join(path.posix.dirname(rel),match[1]));if(!path.posix.extname(dep))dep+='.cjs';pending.push(dep);
   }
  }
  return seen;
@@ -40,6 +46,8 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
   if(canonicalPackage.name!=='@colmbyrne/specflow'||(owned?.package?.manifestSha256&&owned.package.manifestSha256!==manifestSha256))throw Error('recorded package manifest does not match reached package');
   expected=runtime.bundle(canonicalRoot);
  }catch(e){add('package_unverifiable','Installed canonical package unavailable: '+e.message,repair);}
+ const canonicalCurrent=!!owned?.version&&Object.keys(expected).length>0&&owned.version===sha(JSON.stringify(expected));
+ if(owned?.version&&Object.keys(expected).length&&!canonicalCurrent)add('package_bundle_mismatch','The reached canonical package bundle differs from the recorded installation identity; its current files cannot certify the old installation.',repair);
  if(!owned?.version||!owned.package)add('installation_unverifiable','Installation lacks a recorded package identity; compare local gates before a reviewed update.',repair);
  const artifacts=[],actual={};
  for(const [rel,wanted]of Object.entries(expected)) {
@@ -47,7 +55,7 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
   const hash=bytes?sha(bytes):null,wantedHash=sha(wanted);
   const ownership=!bytes?'missing':hash===wantedHash?'managed':owned?.hashes?.[rel]===hash?'unverifiable':'custom';
   artifacts.push({path:rel,ownership,actualSha256:hash,expectedSha256:wantedHash});if(bytes)actual[rel]=bytes.toString('utf8');
-  if(ownership!=='managed')add('gate_artifact_'+ownership,rel+': '+ownership+'. Custom bytes are preserved; compare with the named package and back up before reviewed replacement.',ownership==='custom'?undefined:repair);
+  if(ownership!=='managed')add('gate_artifact_'+ownership,rel+': '+ownership+'. Custom bytes are preserved. Review the named canonical file before using the explicit backup/restore procedure; then rerun '+repair+'.',ownership==='custom'?reviewedRestore(path.join(canonicalRoot,rel),path.join(target,rel),wantedHash,hash):repair);
  }
  const routingPath=path.join(target,'.specflow/adapter-routing.yml');
  let routingOwnership=!fs.existsSync(routingPath)?'missing':state?.routing?.managed===false?'custom':'managed';
@@ -63,11 +71,13 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
  const complete=artifacts.length>0&&artifacts.every(a=>a.ownership==='managed');
  const gate=artifacts.find(a=>a.path==='scripts/teardown-gate.cjs');
  const dependencies=gateDependencies(expected),gatePresent=!!gate&&[...dependencies].every(rel=>artifacts.some(a=>a.path===rel&&a.ownership==='managed'));
- const capabilities=[{id:'gate-d',status:gatePresent&&owned?.package?'present':gate?.ownership==='missing'?'missing':gate?'stale':'unverifiable',entrypoint:gate?'scripts/teardown-gate.cjs':null,evidenceKind:gatePresent?'artifact_identity':'not_verified'},
+ for(const rel of dependencies)if(!Object.hasOwn(expected,rel))add('gate_dependency_missing','The canonical package is missing required gate dependency '+rel,repair);
+ const gateVerified=gatePresent&&canonicalCurrent&&!!owned?.package;
+ const capabilities=[{id:'gate-d',status:gateVerified?'present':gate?.ownership==='missing'?'missing':gate?'stale':'unverifiable',entrypoint:gate?'scripts/teardown-gate.cjs':null,evidenceKind:gateVerified?'artifact_identity':'not_verified'},
   {id:'native-host-session',status:'unverifiable',entrypoint:null,evidenceKind:'not_verified'}];
  return DoctorResult.parse({status:detection.ambiguous?'runtime_ambiguous':findings.some(f=>f.severity==='error')?'repair_required':'healthy',specflowVersion:executing.version,detectedRuntime:detection.detected,activeRoutingProfile:typeof active?.routing_profile?.id==='string'&&active.routing_profile.id?active.routing_profile.id:null,routingOwnership,findings,
   inspectedProject:target,inspectedPackage:{name:canonicalPackage.name,version:canonicalPackage.version,root:canonicalRoot,manifestSha256},
-  activeInstallation:{identity:complete?sha(JSON.stringify(actual)):null,version:typeof owned?.package?.version==='string'?owned.package.version:null},
+  activeInstallation:{identity:complete&&canonicalCurrent?sha(JSON.stringify(actual)):null,version:typeof owned?.package?.version==='string'?owned.package.version:null},
   stagedInstallation:staged&&/^[a-f0-9]{64}$/.test(staged.stagedVersion||'')?{identity:staged.stagedVersion,version:typeof staged.package?.version==='string'?staged.package.version:null}:null,
   requestedRuntime,installedRuntime,artifacts,capabilities});
 }
