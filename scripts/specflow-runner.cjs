@@ -2504,6 +2504,7 @@ function runLoopBody(options) {
     const entry={stage:'5_review',event:'advisory_review',result:active?'pending':'recorded',advisory_review:result,gate_decision:'pending'};
     appendLedger(ledgerPath,entry);
     if(!active)contract.current_stage_or_rail=nextStage(contract,options);
+    contract.next_gate=active?'Await the existing owned critic operation; inspect its canonical custody and resume without duplicating it':'Required provenance and native verification remain next; advisory findings/gaps are retained';
     contract.terminal_status=active?'blocked':'in_progress';writeYaml(contractPath,{run_contract:contract});
     return {status:active?'advisory_review_pending':'advisory_recorded',entry,contractPath,ledgerPath};
   }

@@ -16,6 +16,7 @@ function finish(){
  const events=[];
  if(mode!=='no_reads')for(const [i,file]of req.requiredReads.entries()){
   const text=fs.readFileSync(file,'utf8');
+  if(mode==='first_line'&&text.length){const first=text.match(/[^\n]*\n|[^\n]+$/)[0];if(host==='claude')events.push({type:'assistant',message:{content:[{type:'tool_use',id:'r'+i,name:'Read',input:{file_path:path.resolve(file),limit:1}}]}},{type:'user',message:{content:[{type:'tool_result',tool_use_id:'r'+i,content:'1→'+first.replace(/\n$/,'')}]}});else events.push({type:'item.completed',item:{id:'r'+i,type:'command_execution',command:"sed -n '1p' -- '"+file+"'",status:'completed',exit_code:0,aggregated_output:first}});continue;}
   if(host==='claude'){events.push({type:'assistant',message:{content:[{type:'tool_use',id:'r'+i,name:'Read',input:{file_path:path.resolve(file)}}]}},{type:'user',message:{content:[{type:'tool_result',tool_use_id:'r'+i,content:text||'<system-reminder>The file exists but has empty contents.</system-reminder>'}]}});}
   else events.push({type:'item.completed',item:{id:'r'+i,type:'command_execution',command:"cat -- '"+file+"'",status:'completed',exit_code:0,aggregated_output:text}});
  }

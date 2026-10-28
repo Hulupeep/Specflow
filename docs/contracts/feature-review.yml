@@ -36,3 +36,4 @@ test_hooks:
     - file: tests/contracts/feature-review.test.js
     - file: tests/contracts/loop-run-contract.test.js
     - file: tests/contracts/runtime-bindings.test.js
+    - file: tests/scripts/duo-review-receipts.test.js

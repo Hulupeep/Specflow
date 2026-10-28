@@ -33,6 +33,14 @@ own review. Changed source, tests, accepted decisions or routing input do. Scope
 status is recomputed at handoff. Missing or edited Markdown is reported, while
 findings come from the canonical attempt, never from that Markdown.
 
+The executor requires complete native content coverage of the accepted artifacts
+and build patches. Valid consecutive `sed`/Read chunks can satisfy coverage;
+one-line access cannot. The complete patches expose all changed code, including
+untracked files. Relevant frozen source/test context can be inspected selectively;
+the background manifest is an index, not a demand to read every unchanged file.
+Inspection and full coverage remain separate receipt facts. This stricter
+advisory check does not relabel historical Duo receipts or their pinned policy.
+
 ## Attempts and findings
 
 Private immutable attempt files live under

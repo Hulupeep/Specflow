@@ -64,7 +64,7 @@ function simulatedHost(host='codex'){
  return bin;
 }
 function nativeCustody(o){const p=advice.paths(o),until=Date.now()+5000;while(Date.now()<until){try{const pointer=JSON.parse(fs.readFileSync(p.current)),op=JSON.parse(fs.readFileSync(path.join(p.dir,pointer.attempt,'custody.json')));if(op.invoked)return {pointer,op,p};}catch{}Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,25);}throw Error('Simulated native operation never reached actual launch');}
-describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulated peer',()=>{
+describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-RECOVERY: native construction, simulated peer',()=>{
  test.each(['codex','claude'])('%s completes isolated frozen content protocol, not a preparation or merge gate',host=>{
   const bin=simulatedHost(host);try{const o=options();if(host==='claude')Object.assign(o.policy,{provider:'claude-print',command:'claude',model:'claude-fable-5'});
    const result=advice.run(o);expect(result).toMatchObject({status:'completed',scope_status:'current',clean:true,gate_decision:'pending',mode:'simulated',invoked:true});
@@ -85,6 +85,9 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
  },15000);
  test('a missing simulation pin blocks before a real or simulated provider can launch',()=>{
   const bin=simulatedHost();try{expect(advice.run({...options(),fixtureExecutable:null})).toMatchObject({status:'unavailable',invoked:false,mode:'not_invoked'});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);}finally{fs.rmSync(bin,{recursive:true,force:true});}
+ },15000);
+ test('one-line receipts cannot pass a complete accepted-input and build-diff review',()=>{
+  const bin=simulatedHost();try{put('app.js','module.exports=2;\n// another changed line\n');process.env.ADVISORY_TEST_CASE='first_line';const r=advice.run(options());expect(r).toMatchObject({status:'invalid',clean:false});expect(r.cause).toMatch(/incomplete required content/i);}finally{fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
  test('the worker is importable for tests without launching a provider',()=>{
   const bin=simulatedHost();try{expect(require('../../scripts/advisory-review-worker.cjs')).toMatchObject({native:expect.any(Function),run:expect.any(Function)});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);}finally{fs.rmSync(bin,{recursive:true,force:true});}
@@ -159,7 +162,7 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
    fs.writeFileSync(contract,yaml.dump({run_contract:c}));const opts={loop:'feature-build',slug:'fixture',contract,ledger,adapterRouting:path.join(root,'.specflow/adapter-routing.yml'),confirmModels:true,advisorySimulation:true,advisoryFixtureExecutable:fixtureExecutable};
    expect(runner.runLoop({...opts,dryRun:true})).toMatchObject({status:'dry_run',purpose:'advisory',gate_decision:'pending'});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);expect(yaml.load(fs.readFileSync(contract)).run_contract.current_stage_or_rail).toBe('5_review');
    const result=runner.runLoop(opts);expect(result.status).toBe('advisory_recorded');expect(result.entry.advisory_review).toMatchObject({status:'completed',mode:'simulated',gate_decision:'pending'});
-   const saved=yaml.load(fs.readFileSync(contract)).run_contract;expect(saved.current_stage_or_rail).toBe('6_provenance');saved.current_stage_or_rail='7_ci_handoff';fs.writeFileSync(contract,yaml.dump({run_contract:saved}));
+   const saved=yaml.load(fs.readFileSync(contract)).run_contract;expect(saved.current_stage_or_rail).toBe('6_provenance');expect(saved.next_gate).toMatch(/provenance/);saved.current_stage_or_rail='7_ci_handoff';fs.writeFileSync(contract,yaml.dump({run_contract:saved}));
    const h=runner.runLoop(opts);expect(h.status).toBe('human_ci_handoff_required');expect(h.entry.advisory_review.findings[0].id).toBe('F1');expect(h.entry.evidence_note).toContain('#54');expect(h.entry.evidence_note).toContain('pending');
    expect(runner.readLedger(ledger).some(x=>x.event==='gate_passed'&&x.stage==='5_review')).toBe(false);
    const p=advice.paths(saved.advisory_context),pointer=JSON.parse(fs.readFileSync(p.current)),canonical=path.join(p.dir,pointer.attempt,'result.json'),bytes=fs.readFileSync(canonical);fs.writeFileSync(canonical,'corrupt canonical control');
@@ -188,7 +191,7 @@ describe('J-FEATURE-REVIEW-CLEAN / FINDINGS: actual native construction, simulat
   }finally{fs.rmSync(bin,{recursive:true,force:true});}
  },25000);
 });
-describe('J-FEATURE-REVIEW-FINDINGS / RECOVERY: canonical concerns survive omissions',()=>{
+describe('J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-RECOVERY: canonical concerns survive omissions',()=>{
  const finding={id:'F1',severity:'critical',location:'app.js:1',summary:'A real concern',disposition:'open',tracking_issue:null,rationale:null,evidence:[]};
  test('omission cannot erase a concern, nor can a retry downgrade it',()=>{
   expect(advice.mergeFindings([finding],[])).toEqual([finding]);

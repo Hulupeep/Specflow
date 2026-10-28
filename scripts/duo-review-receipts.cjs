@@ -54,16 +54,30 @@ function imageBytes(part, frozen) {
   const bytes = Buffer.from(source.data, 'base64');
   return bytes.toString('base64') === source.data && bytes.equals(frozen) ? bytes : null;
 }
-function collect(events, round, allowed) {
+function collect(events, round, allowed, { coverage = false } = {}) {
   const receipts = [], calls = new Map(), allow = new Set(allowed), seen = new Set();
+  const covered = new Map();
   const relative = file => path.relative(round, path.resolve(round, file)).split(path.sep).join('/');
-  const add = (file, tool, callId, extent, output) => {
+  const add = (file, tool, callId, extent, output, ranges = []) => {
     const name = relative(file);
     if (!allow.has(name) || !fs.existsSync(path.join(round, name))) return;
     const key = JSON.stringify([name, tool, callId]);
     if (seen.has(key)) return;
     seen.add(key);
     receipts.push({ path: name, tool, callId, extent, outputHash: digest(output) });
+    if (coverage) {
+      const text = fs.readFileSync(path.join(round, name), 'utf8');
+      const lines = text.length ? text.replace(/\n$/, '').split('\n') : [];
+      const row = covered.get(name) || { lines: new Set(), total: lines.length, full: false };
+      if (extent === 'full' || !text.length) row.full = true;
+      if (tool === 'Read' && typeof output === 'string') {
+        for (const match of output.matchAll(/^\s*(\d+)[\t→](.*)$/gm)) {
+          const n = Number(match[1]); if (n > 0 && lines[n - 1] === match[2]) row.lines.add(n);
+        }
+      }
+      for (const [start, end] of ranges) for (let n = start; n <= Math.min(end, row.total); n++) row.lines.add(n);
+      covered.set(name, row);
+    }
   };
   for (const event of events) {
     for (const block of event.message?.content || []) {
@@ -122,10 +136,15 @@ function collect(events, round, allowed) {
       const expected = read.tool === 'cat' ? text : lines.slice(read.start - 1, read.end).join('');
       // A successful command without the requested content is not a read receipt.
       if (expected.length ? !item.aggregated_output.includes(expected) : text.length !== 0 || read.tool !== 'cat' || item.aggregated_output !== '') continue;
-      add(file, read.tool, item.id, read.start === 1 && read.end >= lines.length ? 'full' : 'partial', item.aggregated_output);
+      add(file, read.tool, item.id, read.start === 1 && read.end >= lines.length ? 'full' : 'partial', item.aggregated_output, [[read.start, read.end]]);
     }
   }
-  return { version: 1, mechanism: 'successful native tool results', receipts, inspected: [...new Set(receipts.map(r => r.path))].sort() };
+  const result = { version: 1, mechanism: 'successful native tool results', receipts, inspected: [...new Set(receipts.map(r => r.path))].sort() };
+  if (coverage) {
+    result.coverage = Object.fromEntries([...covered].map(([name, r]) => [name, { totalLines: r.total, linesRead: r.full ? r.total : r.lines.size, complete: r.full || r.lines.size === r.total }]));
+    result.complete = Object.keys(result.coverage).filter(name => result.coverage[name].complete).sort();
+  }
+  return result;
 }
 function apply(result, access, request) {
   const declared = result.inspected || [];
