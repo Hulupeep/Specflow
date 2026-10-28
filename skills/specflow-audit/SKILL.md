@@ -95,3 +95,51 @@ This is the single most common real-world failure ("journeys missing or not exec
 Scoped grading uses the shared `specflow-reviews.cjs` issue/tier ledger through Duo preparation (`specification.targetTier`). Continue while first-time verified evidence advances. Two no-progress reviews or three invalid responses require diagnosis. Further materially different recoveries need fresh stable executed observations not already used in the episode; a fixed recovery count does not end subscription work. Repeated facts, renamed notes or missing evidence retain their concrete diagnostic blocker. Do not reset history via host/run names. An ungraded fix remains ungraded until an independent current regrade passes. See duo-build for recover-review and optional execution checkpoints.
 
 Publication: save the sanitized proposed comment in `bodyFile`, then write a request JSON with `repo`, `issue`, `bodyFile`, and all `linkedFiles`. Run `node scripts/specflow-publication.cjs <request.json>` and stop on non-zero exit. It requires the project mechanical scanner and private-baseline canary where applicable. Never publish private sources or raw provider records. Preserve concurrent issue-body edits: publish proposals instead of replacing a fetched body.
+
+<!-- specflow-loop-boundary:start -->
+## Loop boundary (#97)
+
+For the selected slice, preserve create/refine → `specflow-simulate` →
+`specflow-audit` → pre-flight gate. Apply the shared tier policy: thin backlog
+capture does not demand the full build-ready ceremony. Loop selection remains
+with `specflow-loop-selector`; audit never becomes a second router.
+
+Story/ticket compliance is distinct from feature-build readiness and release
+readiness. A passing audit does not grant either. For an existing spec-build or
+feature-build run, inspect its canonical run contract and `specflow run status
+--contract <run-contract.yaml>`, then continue its required rails. Do not create
+an alternate run or advance a gate from an audit comment.
+
+Fresh simulation must cover current ticket scope, contracts and referenced issue
+bodies/artifacts. Any covered ticket, contract or referenced-issue-body change
+after `simulated_at` makes the status `stale` and blocks feature-build until
+re-simulation, audit and pre-flight pass. Compare actual covered scope as well as
+its recorded update times; an ordinary comment/updatedAt change alone is not a
+covered scope change. Matching timestamps never prove unchanged content.
+
+The existing `scripts/specflow-runner.cjs` `isSimulationFresh` check compares
+local input mtimes with the simulation file mtime when `simulationPath` is
+configured. It is not a complete content-hash binding for simulation; an
+unconfigured check is not freshness evidence. The agent must additionally compare
+recorded canonical scope/content hashes with current inputs, using the existing
+`specflow-tier.cjs` `issueHash`/`referenceErrors` helpers and the current-source
+checks in `specflow-specification.cjs`. Those helpers do not automatically bind
+all simulation inputs. Record the covered input hashes with the walkthrough and
+check their presence/current contents explicitly. Missing/unavailable bindings
+block; do not infer freshness from a timestamp or an old passing status.
+
+After code, feature-build requires actual source-provenance and independent
+correctness evidence for value-bearing calculations: no hard-coded literals,
+fake mocks or made-up API inputs without cited real source/oracle evidence.
+Provenance alone is not correctness. Preserve applicable Gate C replay/rollback/
+pgTAP and CI migration-replay, plus Gate D outcome acceptance; UI/server-state
+journeys must run against their real seeded backend. A compliant ticket, green
+unit test or model verdict does not replace these gates. Use their existing
+run-contract paths; this skill implements no new verifier.
+
+The installer refreshes this canonical skill and references into project-local
+`.claude/skills`, `.codex/skills` and `.agents/skills`. In Codex the installed skill
+is the prompt equivalent; any legacy user `/specflow-audit` prompt must point to
+these current references. Do not overwrite unrelated global prompts or custom
+permissions. Installed native plugins resolve references from their plugin root.
+<!-- specflow-loop-boundary:end -->
