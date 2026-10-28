@@ -1186,16 +1186,25 @@ function pinnedLauncher({ directory, config, mode }) {
       '/usr/bin/python3'
     ])
   ].map((f) => ({ file: f, real: fs.realpathSync(f), sha256: fileSha(fs.realpathSync(f)) }));
+  // npm may hoist dependencies above the package. Pin every loaded module's
+  // search locations, including absence: later insertion can shadow a dependency.
+  const moduleRoots = [...new Set([
+    ...module.paths,
+    ...Object.values(require.cache).flatMap((m) => m.paths || []),
+    ...require('module').globalPaths
+  ])].map((file) => {
+    try { fs.lstatSync(file); }
+    catch (error) { if (error.code === 'ENOENT') return { file, real: null }; throw error; }
+    return { file, real: fs.realpathSync(file) };
+  });
   const filename = path.join(directory, mode === 'git' ? 'git' : 'worker-command');
   const code =
     '#!' +
     process.execPath +
     '\n' +
-    "'use strict';const fs=require('fs'),crypto=require('crypto');if(fs.realpathSync(" +
-    JSON.stringify(path.join(__dirname, '../node_modules')) +
-    ')!==' +
-    JSON.stringify(fs.realpathSync(path.join(__dirname, '../node_modules'))) +
-    ")throw Error('runtime_input_changed');for(const x of " +
+    "'use strict';const fs=require('fs'),crypto=require('crypto');for(const x of " +
+    JSON.stringify(moduleRoots) +
+    "){let present=true;try{fs.lstatSync(x.file);}catch(e){if(e.code!=='ENOENT')throw Error('runtime_input_changed');present=false;}let real=null;if(present){try{real=fs.realpathSync(x.file);}catch{throw Error('runtime_input_changed');}}if(real!==x.real)throw Error('runtime_input_changed');}for(const x of " +
     JSON.stringify(inputs) +
     "){if(fs.realpathSync(x.file)!==x.real||crypto.createHash('sha256').update(fs.readFileSync(x.file)).digest('hex')!==x.sha256)throw Error('runtime_input_changed');}require(" +
     JSON.stringify(__filename) +
