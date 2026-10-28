@@ -18,10 +18,16 @@ authoritative. Advice cannot grant permission, and a completed batch is not a
 completed goal. The interactive agent chooses commands; the helper never executes
 reviewer-written shell text.
 
-Malformed/interrupted peer responses are recorded and capped at three consecutive
-failures, separately from the maximum three product repairs after the initial
-validated review. Valid feedback clears only the response-failure streak. Resume
-preserves earlier recorded budgets. Keep narrative notes in the excluded run
+Malformed/interrupted peer responses remain protocol failures and grant no
+acceptance. Three consecutive failures require diagnosis, separate from product
+repair history. Ordinary subscription and unknown-cost routes have no implicit
+repair-count or invented dollar ceiling: continue while fresh verified evidence
+advances. Two no-progress reviews require diagnosis, not abandonment. Further
+recoveries need fresh stable execution observations not already used in the
+episode. Expensive billable API routes retain their configured financial/effort
+brakes; explicit caller checkpoints and legacy pinned limits remain authoritative.
+Resume preserves history and explicit limits; subscription work never becomes
+unlimited repetition without evidence. Keep narrative notes in the excluded run
 directory: editing a root `audit.md` still changes the source snapshot. The helper
 does not exempt arbitrary source files or require identical tests to run for its
 generated audit/continuation.
@@ -140,9 +146,11 @@ behaviour because a model agreed with another model.
 Finding IDs persist across reviews, batch names and hosts. Every prior open
 finding requires a peer disposition; closure needs a submitted builder resolution
 and evidence. Progress is newly verified criteria, confirmed closures or new
-observations backed by changed evidence. Two consecutive no-progress reviews stop
-the run; an open repair cycle also has at most three repairs after its initial
-review. Cosmetic edits, renamed batches and host switches cannot reset it.
+observations backed by changed evidence. Two consecutive no-progress reviews
+require an evidenced diagnosis and materially different recovery. Ordinary
+subscription repairs have no implicit three-repair ceiling. Explicit caller
+checkpoints, expensive billable-route brakes and legacy pinned limits remain.
+Cosmetic edits, renamed batches and host switches cannot reset history.
 
 The native skill runs these helpers for you (examples use Claude as the builder):
 
@@ -306,9 +314,12 @@ node scripts/duo-build.cjs eligibility RUN_ID --session OWNER_TOKEN --batch BATC
 
 This returns all known allowance/evidence blockers and unreported-response warnings.
 Protocol-invalid replies retain raw output and leave validated progress intact.
-They use the separate three-failure protocol limit, not a validated repair attempt.
-The existing initial-plus-three-repair and two-no-progress limits remain. Exhaustion
-preserves read-only inspection; renaming or switching hosts cannot replenish it.
+Three consecutive protocol failures require diagnosis rather than consuming a
+validated product repair. Two no-progress reviews also require diagnosis. These
+are evidence guards, not a fixed subscription repair allowance or fictional cost
+exhaustion. An explicit caller limit or expensive billable-route ceiling remains
+enforced. Preserve concrete causes, raw history and unused execution observations;
+renaming a run or switching hosts cannot replenish limits or manufacture progress.
 
 Claude's bound Stop hook names outstanding builder work and requests one corrective
 continuation; a second ignored stop reports the blocker. Codex uses the same skill,

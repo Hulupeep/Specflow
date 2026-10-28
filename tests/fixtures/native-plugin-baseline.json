@@ -27,9 +27,21 @@
     "agents/waves-controller.md": "12394f7c0cd1b02dbbc4aa2584d3a6c2b832a3c2ba41b6ecf052aa55308d6540"
   },
   "skills": {
-    "skills/specflow-audit/SKILL.md": "eb7de938347ee3d55a2a6b0b781748b0d7d8394298daa9589bb733eb4c105954",
+    "skills/specflow-audit/SKILL.md": "afe3060e60d983cc596f805fdc52e58bb2614a0a1cf615962f7bbc6aeb33a4d6",
     "skills/specflow-simulate/SKILL.md": "a58e60f2870c0b6f3c33bfd574d933c46acca28b023590937334177d3cceeea2",
     "skills/duo-build/SKILL.md": "ca055407e169a5e8f69eeed8d20f19ecb7e0cac9adafca8dd4b1ec334e468750",
     "skills/specflow-loop-selector/SKILL.md": "2b969de0980713611b6fbe290b385e09547a1669b530742b34c3cf36eb3f5f06"
-  }
+  },
+  "semanticRevisions": [
+    {
+      "issue": 97,
+      "reason": "Teach existing loop freshness and downstream readiness boundary; original audit phases retained.",
+      "files": [
+        "skills/specflow-audit/SKILL.md"
+      ],
+      "previousHashes": {
+        "skills/specflow-audit/SKILL.md": "eb7de938347ee3d55a2a6b0b781748b0d7d8394298daa9589bb733eb4c105954"
+      }
+    }
+  ]
 }

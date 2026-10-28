@@ -90,3 +90,29 @@ None
 - `override:<reason>` — a human explicitly accepted a known finding; record who and why.
 
 Timestamps: do not invent a clock. Read the real UTC time (e.g. `date -u +%Y-%m-%dT%H:%M:%SZ`) when stamping `simulated_at`.
+
+## Loop freshness and downstream boundary (#97)
+
+Preserve create/refine → simulate → audit → pre-flight for the selected slice.
+Audit compliance is not feature-build readiness or release acceptance. The
+selector chooses the loop. An existing run continues through `specflow run` and
+its canonical run contract, with applicable provenance, independent correctness,
+Gate C and Gate D evidence still required after implementation.
+
+Before build, any covered ticket, contract or referenced-issue-body change after
+`simulated_at` makes `simulation_status: stale` and blocks feature-build until
+re-simulation, audit and pre-flight pass. Check actual covered scope plus its
+recorded update times. Compare recorded input content hashes with current covered
+artifacts too: a changed hash blocks even when timestamps match. An unrelated
+comment timestamp cannot invalidate unchanged acceptance by itself.
+
+The concrete legacy runner check is `scripts/specflow-runner.cjs`
+`isSimulationFresh({simulationPath,inputPaths})`: it compares local input mtimes
+with simulation-file mtime when configured. It is not a simulation content-hash
+verifier, and its unconfigured result is not proof. The agent performs the
+additional recorded-hash comparison using existing `specflow-tier.cjs`
+`issueHash`/`referenceErrors` and `specflow-specification.cjs` current-source
+checks; these helpers do not automatically bind all simulation inputs. Record
+covered ticket/contract/reference hashes with the walkthrough. Do not replace
+the mtime/update-time minimum with a timestamp-only or assumed hash-freshness
+claim. Missing, unavailable or unverifiable required inputs/bindings block.
