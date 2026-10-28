@@ -20,7 +20,10 @@ function assertExit(r,expected){expect({status:r.status,error:r.error?.message,s
 test.each(['codex','claude-code'])('J-PLUGIN-SETUP: %s verifies target B with spaces, retains install on incomplete readiness and matches direct init',runtime=>{
  const f=isolated();try{
   const a=f.project('ready A'),b=f.project('incomplete B'),direct=f.project('direct');
-  let r=f.run(CLI,['init',a,'--runtime',runtime]);assertExit(r,0);
+  f.env.CODEX_THREAD_ID=runtime==='codex'?'12345678-abcd-4321-89ef-123456789abc':'';f.env.CLAUDECODE=runtime==='claude-code'?'1':'';
+  let r=f.run(CLI,['init',a,'--runtime','auto']);assertExit(r,0);
+  // The explicit host action must also win over contradictory current hints.
+  f.env.CODEX_THREAD_ID=runtime==='claude-code'?'12345678-abcd-4321-89ef-123456789abc':'';f.env.CLAUDECODE=runtime==='codex'?'1':'';
   let text=fs.readFileSync(a+'/CLAUDE.md','utf8').replaceAll('[org/repo-name]','Fixture/project').replaceAll('[GitHub Issues | Jira | Linear | Shortcut | Notion]','GitHub Issues').replaceAll('[gh | jira | linear | sc | MCP]','gh');
   // Use concrete project context; the setup implementation must not edit it for B.
   text=text.replace(/^\*\*Project Board:\*\*.*$/m,'**Project Board:** GitHub Issues').replace(/^\*\*Board CLI:\*\*.*$/m,'**Board CLI:** gh');fs.writeFileSync(a+'/CLAUDE.md',text);
@@ -46,7 +49,12 @@ test.each(['codex','claude-code'])('J-PLUGIN-GATE: %s installed payload accepts 
    const report=env.root+'/.specflow/gate-d';fs.mkdirSync(report+'/evidence',{recursive:true});fs.writeFileSync(report+'/journey-map.md','- J: J-CLI — isolated value outcome\n');fs.writeFileSync(report+'/findings.md',`## J: J-CLI\nstatus: ${mode==='red'?'red\ndisposition: bug':'green'}\nevidence/result.json\n`);fs.writeFileSync(report+'/evidence/result.json',JSON.stringify({expected:900,actual:mode==='red'?2400:900}));env.accept();
    // A submitted passing receipt cannot cover a required case that actually skips.
    if(mode==='forged'){fs.mkdirSync(env.runDir+'/runtime-evidence',{recursive:true});fs.writeFileSync(env.runDir+'/runtime-evidence/forged.json',JSON.stringify({gate:'pass',executed:3,skipped:0}));fs.writeFileSync(env.runDir+'/verifier-findings.jsonl',JSON.stringify({check_id:'C-correctness',verifier_result:'pass',execution:{result:'pass',summary:{passed:3,skipped:0}}})+'\n');}
-   const payload=f.base+'/payload.json';fs.writeFileSync(payload,JSON.stringify({target:env.root,runDir:env.runDir,reportDir:report}));const r=f.run(host(runtime)+'/scripts/gate.cjs',[payload]);assertExit(r,mode==='good'?0:1);const result=JSON.parse(r.stdout);expect(result.outcome_acceptance==='passed').toBe(mode==='good');expect(fs.existsSync(f.base+'/provider-called')).toBe(false);
+   const payload=f.base+'/payload.json';fs.writeFileSync(payload,JSON.stringify({target:env.root,runDir:env.runDir,reportDir:report}));const r=f.run(host(runtime)+'/scripts/gate.cjs',[payload]);assertExit(r,mode==='good'?0:1);const result=JSON.parse(r.stdout);expect(result.report_validity).toBe('valid');expect(result.outcome_acceptance==='passed').toBe(mode==='good');expect(fs.existsSync(f.base+'/provider-called')).toBe(false);
+   if(mode==='red')expect(result.errors.join(' ')).toContain('required hop red');
+   if(mode==='required-skip'||mode==='forged'){
+    const reports=[];function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const p=path.join(dir,e.name);if(e.isDirectory())walk(p);else if(e.name==='native-report.json')reports.push(JSON.parse(fs.readFileSync(p)));}}walk(env.runDir+'/runtime-evidence');
+    expect(reports.length).toBeGreaterThan(0);expect(reports.some(r=>r.testResults.some(s=>s.assertionResults.some(c=>c.fullName==='C-values'&&c.status==='pending')))).toBe(true);expect(result.obligations).toContainEqual(expect.objectContaining({id:'O-values',status:'blocked'}));
+   }
    expect(fs.readFileSync(env.root+'/scripts/teardown-gate.cjs')).toEqual(fs.readFileSync(ROOT+'/scripts/teardown-gate.cjs'));
   }finally{env.remove();f.remove();}
  }

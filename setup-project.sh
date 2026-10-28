@@ -64,7 +64,9 @@ if [ -f "$SCRIPT_DIR/scripts/duo-runtime.cjs" ]; then
   echo "$$" > "$DUO_INSTALL_LOCK/pid"
   trap 'rm -f "$DUO_INSTALL_LOCK/pid"; rmdir "$DUO_INSTALL_LOCK"' EXIT
   duo_install_exit=0
-  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held || duo_install_exit=$?
+  DUO_RUNTIME_ARGS=()
+  [ -n "$SPECFLOW_RUNTIME_ARG" ] && DUO_RUNTIME_ARGS+=(--runtime "$SPECFLOW_RUNTIME_ARG")
+  node "$SCRIPT_DIR/scripts/duo-runtime.cjs" install "$SCRIPT_DIR" "$TARGET_DIR" --lock-held "${DUO_RUNTIME_ARGS[@]}" || duo_install_exit=$?
   [ "$duo_install_exit" -eq 10 ] && exit 0
   [ "$duo_install_exit" -eq 0 ] || exit "$duo_install_exit"
 fi

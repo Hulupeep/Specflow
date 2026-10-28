@@ -1217,6 +1217,14 @@ function verifierRequiredForSlice(sliceTags = [], options = {}) {
   return tags.some((t) => requiredWhen.includes(t));
 }
 
+function verifierReceiptsCurrent(findings, checks, options) {
+  return (checks || []).filter(c => c.required).every(check => {
+    const finding = findings.find(f => f.check_id === check.id);
+    const receipt = finding && owningRuntimeFindings.get(finding);
+    return finding && receipt?.result === finding.verifier_result && testExecution.owns(receipt, check, options.verificationContract, options);
+  });
+}
+
 function verifierGateDecision(findings = [], checks, options = {}) {
   if (!Array.isArray(findings) || findings.some((f) => !f || typeof f !== 'object'
     || (f.required !== undefined && typeof f.required !== 'boolean'))) return 'blocked';
@@ -1233,11 +1241,7 @@ function verifierGateDecision(findings = [], checks, options = {}) {
     }
   }
   if (options.requireOwning) {
-    for (const check of (checks || []).filter(c => c.required)) {
-      const finding = required.find(f => f.check_id === check.id);
-      const receipt = finding && owningRuntimeFindings.get(finding);
-      if (!finding || receipt?.result !== finding.verifier_result || !testExecution.owns(receipt, check, options.verificationContract, options)) return 'blocked';
-    }
+    if (!verifierReceiptsCurrent(required, checks, options)) return 'blocked';
   }
   if (required.some((f) => !['pass', 'fail'].includes(f.verifier_result))) return 'blocked';
   if (required.some((f) => f.verifier_result === 'fail')) return 'fail';
@@ -1338,7 +1342,7 @@ function runVerifierStage(options = {}) {
   });
   const nextCommand = ['specflow', 'run', 'verify', '--run-dir', paths.baseDir, ...(options.configurationId ? ['--configuration-id', options.configurationId] : []), ...(options.environment ? ['--environment', options.environment] : [])].map(shellQuote).join(' ');
   const result = { status: gate === 'pass' ? 'passed' : 'blocked', required, gate, findings, summary, proof_claims: proofClaims, data_seams: seamResults, reason, next_command: nextCommand, parent_outcome: parent, ...(bound ? { binding_status: bound.status } : {}) };
-  owningVerifierStages.set(result, { contract: contractGate.contract, checks, executionToken, findings: [...findings], options: { root: options.root, runDir: options.runDir, contract: options.contract, ledger: options.ledger, configurationId: options.configurationId, environment: options.environment } });
+  owningVerifierStages.set(result, { contract: contractGate.contract, checks, executionToken, findings: [...findings], findingsHash: outcomeContract.hashValue(findings), options: { root: options.root, runDir: options.runDir, contract: options.contract, ledger: options.ledger, configurationId: options.configurationId, environment: options.environment } });
   return result;
 }
 
@@ -1348,8 +1352,10 @@ function revalidateVerifierStage(result) {
   if (!scope) return { status: 'missing', gate: 'blocked', reason: 'current owning verifier stage required' };
   const latest = requireAcceptedVerificationContract(scope.options);
   if (!latest.accepted || outcomeContract.hashValue(latest.contract) !== outcomeContract.hashValue(scope.contract)) return { status: 'stale', gate: 'blocked', reason: 'latest verifier acceptance changed' };
-  const gate = verifierGateDecision(scope.findings, scope.checks, { ...scope.options, requireOwning: true, verificationContract: scope.contract, executionToken: scope.executionToken });
-  return { status: gate === 'blocked' ? 'stale' : 'current', gate, reason: gate === 'blocked' ? 'owning native receipt, artifact or binding became stale' : null };
+  const options = { ...scope.options, requireOwning: true, verificationContract: scope.contract, executionToken: scope.executionToken };
+  if (outcomeContract.hashValue(scope.findings) !== scope.findingsHash || !verifierReceiptsCurrent(scope.findings, scope.checks, options)) return { status: 'stale', gate: 'blocked', reason: 'owning native receipt, artifact or binding became stale' };
+  const gate = verifierGateDecision(scope.findings, scope.checks, options);
+  return { status: 'current', gate, reason: gate === 'blocked' ? result.reason : null };
 }
 
 // --- VERIFIER-TRACE-01 (epic #100): maker/verifier/gate divergence surface ----

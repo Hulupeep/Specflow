@@ -13,10 +13,15 @@ specflow doctor '/path/to/project' --json
 
 `setup` runs public init and then `verify --strict` in the same canonical target.
 It reports installation and readiness separately. An incomplete project retains
-its successfully installed files and returns nonzero. Rerunning refreshes
+its successfully installed files and returns nonzero. A staged setup also records the requested runtime separately from the still-active binding. Rerunning refreshes
 managed files and preserves custom routing. `--replace-routing` replaces routing
 only. A modified gate blocks an update: back it up, compare it with the named
 package, and explicitly restore the reviewed canonical bytes before rerunning.
+An update also checks the prior recorded ownership against its identified canonical
+package. A rewritten local hash cannot authorise replacement. Keep versioned
+canonical packages available; if an old package has disappeared or was replaced in
+place, divergent bytes remain unverifiable and require the same reviewed compare/
+backup/restore procedure. Identical current canonical bytes can still be refreshed.
 Doctor never repairs or normalises bytes, requests authentication or calls a model.
 
 Auto uses these configuration hints: `SPECFLOW_RUNTIME=codex|claude-code`, a UUID
@@ -27,7 +32,7 @@ commands. An interactive public CLI can ask for a choice. Hints do not authentic
 an agent or prove a current native host session; use explicit runtime when unsure.
 
 Doctor identifies its executing package separately from the inspected project's
-active package/artifacts and staged update. It compares actual local bytes with
+active package/artifacts and staged update. Gate D artifact capability uses its conservative literal-require dependency closure, separately from unrelated installation ownership. It compares actual local bytes with
 the recorded package's canonical bundle, not only local recorded hashes. An
 unavailable package, legacy identity, missing/modified helper or custom cross-host
 binding remains visible. A staged update is not active: finish retained runs and

@@ -13,15 +13,25 @@ const DoctorResult=z.object({
 }).strict();
 const sha=bytes=>crypto.createHash('sha256').update(bytes).digest('hex');
 const quote=value=>"'"+value.replace(/'/g,"'\\''")+"'";
+function gateDependencies(files) {
+ const pending=['scripts/teardown-gate.cjs'],seen=new Set();
+ while(pending.length){const rel=pending.pop();if(seen.has(rel))continue;seen.add(rel);
+  for(const match of (files[rel]||'').matchAll(/require\(\s*['"](\.\.?\/[^'"]+)['"]\s*\)/g)){
+   let dep=path.posix.normalize(path.posix.join(path.posix.dirname(rel),match[1]));if(!path.posix.extname(dep))dep+='.cjs';if(Object.hasOwn(files,dep))pending.push(dep);
+  }
+ }
+ return seen;
+}
 function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=process.env}={}) {
  const target=fs.realpathSync(targetRoot),executing=JSON.parse(fs.readFileSync(path.join(sourceRoot,'package.json'))),findings=[];
  const add=(code,message,repairCommand,severity='error')=>findings.push({code,severity,message,...(repairCommand?{repairCommand}:{})});
  const read=(rel,parse=JSON.parse)=>{try{return parse(fs.readFileSync(path.join(target,rel),'utf8'));}catch(e){if(e.code!=='ENOENT')add('invalid_metadata',rel+': '+e.message);return null;}};
  const owned=read('.specflow/duo/runtime-update/installed.json'),staged=read('.specflow/duo/runtime-update/staged.json');
  const state=read('.specflow/install-state.yml',yaml.load),active=read('.specflow/adapter-routing.yml',yaml.load);
- const detection=routing.detectRuntime(env),requestedRuntime=Object.hasOwn(routing.RUNTIMES,state?.routing?.runtime)?state.routing.runtime:null;
+ const desired=staged?.requestedRuntime||state?.routing?.runtime;
+ const detection=routing.detectRuntime(env),requestedRuntime=Object.hasOwn(routing.RUNTIMES,desired)?desired:null;
  const installedRuntime=Object.hasOwn(routing.RUNTIMES,active?.routing_profile?.runtime)?active.routing_profile.runtime:null;
- const selected=installedRuntime||requestedRuntime||detection.detected||'codex';
+ const selected=requestedRuntime||installedRuntime||detection.detected||'codex';
  const repair=`npx @colmbyrne/specflow update ${quote(target)} --runtime ${selected}`;
  let canonicalRoot=sourceRoot,canonicalPackage=executing,manifestSha256=null,expected={};
  try {
@@ -47,12 +57,13 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
   if(!checked.ok)add(checked.status,checked.error,repair);
  }catch(e){add('routing_unverifiable',e.message,repair);}
  if(routingOwnership==='custom')add('custom_routing','Custom routing preserved; inspect its actual profile before explicit replacement.',repair+' --replace-routing','warning');
- if(requestedRuntime&&installedRuntime&&requestedRuntime!==installedRuntime)add('runtime_mismatch',`Requested ${requestedRuntime}; preserved active ${installedRuntime}.`,repair+' --replace-routing');
+ if(requestedRuntime&&installedRuntime&&requestedRuntime!==installedRuntime)add(staged?'runtime_staged':'runtime_mismatch',`Requested ${requestedRuntime}; preserved active ${installedRuntime}.`,staged?repair:repair+' --replace-routing',staged?'warning':'error');
  if(detection.ambiguous)add('runtime_ambiguous','Conflicting current host hints; choose --runtime codex or --runtime claude-code.',repair);
  if(staged)add('update_staged',`Update ${staged.stagedVersion} is staged; complete retained runs and rerun the installer. Active bytes were not replaced.`,repair,'warning');
  const complete=artifacts.length>0&&artifacts.every(a=>a.ownership==='managed');
  const gate=artifacts.find(a=>a.path==='scripts/teardown-gate.cjs');
- const capabilities=[{id:'gate-d',status:complete&&owned?.package?'present':gate?.ownership==='missing'?'missing':gate?'stale':'unverifiable',entrypoint:gate?'scripts/teardown-gate.cjs':null,evidenceKind:complete?'artifact_identity':'not_verified'},
+ const dependencies=gateDependencies(expected),gatePresent=!!gate&&[...dependencies].every(rel=>artifacts.some(a=>a.path===rel&&a.ownership==='managed'));
+ const capabilities=[{id:'gate-d',status:gatePresent&&owned?.package?'present':gate?.ownership==='missing'?'missing':gate?'stale':'unverifiable',entrypoint:gate?'scripts/teardown-gate.cjs':null,evidenceKind:gatePresent?'artifact_identity':'not_verified'},
   {id:'native-host-session',status:'unverifiable',entrypoint:null,evidenceKind:'not_verified'}];
  return DoctorResult.parse({status:detection.ambiguous?'runtime_ambiguous':findings.some(f=>f.severity==='error')?'repair_required':'healthy',specflowVersion:executing.version,detectedRuntime:detection.detected,activeRoutingProfile:typeof active?.routing_profile?.id==='string'&&active.routing_profile.id?active.routing_profile.id:null,routingOwnership,findings,
   inspectedProject:target,inspectedPackage:{name:canonicalPackage.name,version:canonicalPackage.version,root:canonicalRoot,manifestSha256},
@@ -61,5 +72,23 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
   requestedRuntime,installedRuntime,artifacts,capabilities});
 }
 function runtimePath(root,relative){const file=path.join(root,relative);for(let p=file;p!==path.dirname(p);p=path.dirname(p))if(fs.existsSync(p)&&fs.lstatSync(p).isSymbolicLink())throw Error('managed artifact is a symlink');return file;}
-function cli(args,sourceRoot){try{const target=args.find(a=>!a.startsWith('--'))||'.',result=inspect({targetRoot:target,sourceRoot});console.log(args.includes('--json')?JSON.stringify(result,null,2):[`Specflow ${result.specflowVersion}: ${result.status}`,`Project: ${result.inspectedProject}`,`Runtime: ${result.installedRuntime||'unverified'}; profile: ${result.activeRoutingProfile||'missing'}`,`Package: ${result.inspectedPackage.root}`,`Active: ${result.activeInstallation.identity||'unverifiable'}; staged: ${result.stagedInstallation?.identity||'none'}`,...result.findings.map(f=>`${f.code}: ${f.message}${f.repairCommand?'\nRepair: '+f.repairCommand:''}`)].join('\n'));return result.status==='healthy'?0:1;}catch(e){console.error('specflow doctor: '+e.message);return 1;}}
+function cli(args,sourceRoot) {
+ try {
+  const target=args.find(a=>!a.startsWith('--'))||'.',result=inspect({targetRoot:target,sourceRoot});
+  const lines=[
+   `Specflow ${result.specflowVersion}: ${result.status}`,
+   `Project: ${result.inspectedProject}`,
+   `Detected runtime: ${result.detectedRuntime||'unavailable'}`,
+   `Routing ownership: ${result.routingOwnership}`,
+   `Runtime: ${result.installedRuntime||'unverified'}; requested: ${result.requestedRuntime||'unavailable'}; profile: ${result.activeRoutingProfile||'missing'}`,
+   `Package: ${result.inspectedPackage.root}`,
+   `Active: ${result.activeInstallation.identity||'unverifiable'}; staged: ${result.stagedInstallation?.identity||'none'}`,
+   `Artifacts: ${result.artifacts.filter(a=>a.ownership==='managed').length} managed; ${result.artifacts.filter(a=>a.ownership!=='managed').length} divergent`,
+   ...result.capabilities.map(c=>`${c.id}: ${c.status} (${c.evidenceKind})`),
+   ...result.findings.map(f=>`${f.code}: ${f.message}${f.repairCommand?'\nRepair: '+f.repairCommand:''}`),
+  ];
+  console.log(args.includes('--json')?JSON.stringify(result,null,2):lines.join('\n'));
+  return result.status==='healthy'?0:1;
+ }catch(e){console.error('specflow doctor: '+e.message);return 1;}
+}
 module.exports={inspect,cli,DoctorResult};
