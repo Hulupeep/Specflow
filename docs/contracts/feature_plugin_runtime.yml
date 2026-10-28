@@ -1,0 +1,27 @@
+contract_meta:
+  id: feature_plugin_runtime
+  version: 1
+  created_from_spec: GitHub #111; scoped full-plugin foundation
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_plugin_runtime'
+invariants:
+  - id: I-PLUGIN-001
+    rule: Exposed runner, verifier, doctor and teardown dependencies resolve from the shipped payload without ambient npm modules, downloads or global search. Missing dependencies remain failures, never substitute a weaker gate.
+  - id: I-PLUGIN-002
+    rule: New retained runtime closures bind first-party scripts, resources and vendor bytes with the existing pin/verify lifecycle. Removing the original package cannot change the selected runtime. Tampering blocks; old pins, history and staged/custom bytes remain preserved.
+  - id: I-PLUGIN-003
+    rule: Vendored dependencies retain exact upstream versions, source identities, unchanged bytes, licenses and complete file hashes. Canonical scripts and installed copies stay byte-identical; native plugin loading and hook acceptance require separate executed proof.
+capability_boundary:
+  dependency_versions: {js-yaml: 4.3.2, zod: 4.6.7}
+  runtime_requires: Node stdlib plus bundled files
+  excluded: [MCP service SDK graph, project test frameworks, provider authentication, native plugin loading]
+  legacy: Historical pins are not rewritten or certified with the new closure.
+test_hooks:
+  tests:
+    - file: tests/contracts/plugin-runtime.test.js
+    - file: tests/scripts/duo-runtime-pinning.test.js
+    - file: tests/contracts/plugin-onboarding.test.js
+    - file: tests/contracts/specflow-doctor.test.js

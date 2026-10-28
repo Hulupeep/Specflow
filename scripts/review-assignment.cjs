@@ -21,7 +21,7 @@ function resolve(root,record,sourceRoot=path.resolve(__dirname,'..')) {
   const verified=routing.verifyRuntimeRouting({targetRoot:root,sourceRoot});
   if(!verified.ok)throw Error(verified.error);
   if(verified.status!=='ok')throw Error('Custom routing is preserved; fresh-native requires a verified managed assignment');
-  const yaml=require('js-yaml');
+  const yaml=require('./vendor/js-yaml/js-yaml.cjs');
   const active=path.join(root,'.specflow/adapter-routing.yml'), p=yaml.load(fs.readFileSync(active,'utf8'));
   if(fileHash(active)!==fileHash(path.join(sourceRoot,'templates/adapter-policies',routing.RUNTIMES[verified.runtime])))throw Error('Managed active profile differs from the trusted shipped assignment');
   const r=p.routing_profile.normal_review, policy=p.policies[r.policy].adapter_policy;

@@ -1,4 +1,6 @@
 contracts:
+  - id: feature_plugin_runtime
+    path: docs/contracts/feature_plugin_runtime.yml
   - id: feature_install_ux
     path: docs/contracts/feature_install_ux.yml
   - id: test_execution

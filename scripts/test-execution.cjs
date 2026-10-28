@@ -223,7 +223,7 @@ function journeys(root=process.cwd()) {
    }catch{errors.push(`issue_discovery_failed: #${number}; restore GitHub read access and retry`);}
   }
   if(ids.size>1000)errors.push('journey inventory exceeds bounded hook scope; split the selected work without dropping required IDs');
-  const yaml=require('js-yaml'),documents=[];
+  const yaml=require('./vendor/js-yaml/js-yaml.cjs'),documents=[];
   for(const directory of ['docs/contracts','contracts','docs']) {
    const full=path.join(root,directory);if(!fs.existsSync(full))continue;
    for(const name of fs.readdirSync(full).filter(f=>/^journey_.*\.ya?ml$/.test(f))) {

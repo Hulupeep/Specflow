@@ -10,7 +10,7 @@ let schemaSet;
 function schemas() {
   if (schemaSet) return schemaSet;
 let z;
-  try { ({ z } = require('zod')); } catch { throw Error('outcome schema capability unavailable: install zod@4.6.7 in the copied project, or use the complete Specflow package'); }
+  try { ({ z } = require('./vendor/zod/index.cjs')); } catch { throw Error('outcome schema capability unavailable: the bundled Zod runtime is missing or corrupt; restore the complete Specflow package'); }
 const text = z.string().trim().min(1);
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const localPath = text.refine(p => !path.isAbsolute(p) && !p.split(/[\\/]/).some(s => s === '..' || s === '.') && !p.includes('\\'), 'repository-relative file required');

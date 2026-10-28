@@ -211,11 +211,13 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
    const until=Date.now()+6000;while(advice.handoff(saved.advisory_context).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);expect(advice.handoff(saved.advisory_context).status).toBe('completed');
   }finally{fs.rmSync(bin,{recursive:true,force:true});}
  },20000);
- test('a legacy copied project without Zod reports its advisory capability gap and preserves handoff',()=>{
+ test('a copied project with missing bundled Zod reports its advisory capability gap and preserves handoff',()=>{
   const supplied=require('../helpers/spec-density.js').fixture(root);routing.installRuntimeRouting({sourceRoot:SOURCE,targetRoot:root,runtime:'codex',interactive:false});
   const recipe=fs.readFileSync(path.join(SOURCE,'setup-project.sh'),'utf8').split('\n').find(l=>l.includes('case "$(basename "$script")"'));
   const excluded=new Set(recipe.match(/ in (.*?)\) continue/)[1].split('|'));
   fs.cpSync(path.join(SOURCE,'scripts'),path.join(root,'scripts'),{recursive:true,filter:p=>fs.statSync(p).isDirectory()||p.endsWith('.cjs')&&!excluded.has(path.basename(p))});
+  // Deliberately remove the bundled capability before the rail can invoke a provider.
+  fs.rmSync(path.join(root,'scripts/vendor/zod'),{recursive:true,force:true});
   fs.mkdirSync(path.join(root,'node_modules'),{recursive:true});fs.symlinkSync(path.join(SOURCE,'node_modules/js-yaml'),path.join(root,'node_modules/js-yaml'));
   fs.mkdirSync(path.join(root,'QA/loops'),{recursive:true});for(const loop of ['feature-build','spec-build'])fs.copyFileSync(path.join(SOURCE,'templates/loops',loop+'.yaml'),path.join(root,'QA/loops',loop+'.yaml'));
   const contract=path.join(root,'.specflow/copied.yaml'),ledger=path.join(root,'.specflow/copied.jsonl');const c=runner.createRunContract({loop:'feature-build',slug:'copied',goal:'Supplied-state legacy capability negative',input:'ticket.md',contractPath:contract,ledgerPath:ledger,tierRecord:supplied.tier_record,repoRoot:root}).run_contract;c.current_stage_or_rail='5_review';fs.writeFileSync(contract,yaml.dump({run_contract:c}));
@@ -223,7 +225,7 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
   const result=cp.spawnSync(process.execPath,['-e',code],{cwd:root,env:{...process.env},encoding:'utf8',timeout:10000});if(result.status!==0)throw Error(result.stderr+result.stdout);const data=JSON.parse(result.stdout);expect(data.gap).toMatch(/zod/);expect(data.handoff).toBe('human_ci_handoff_required');
   // Install the exact declared library bytes and run the copied rail itself;
   // the model remains an explicitly pinned simulated native event fixture.
-  const bin=simulatedHost();try{fs.symlinkSync(path.join(SOURCE,'node_modules/zod'),path.join(root,'node_modules/zod'));
+  const bin=simulatedHost();try{fs.cpSync(path.join(SOURCE,'scripts/vendor/zod'),path.join(root,'scripts/vendor/zod'),{recursive:true});
    const opts={loop:'feature-build',slug:'copied',contract,ledger,adapterRouting:path.join(root,'.specflow/adapter-routing.yml'),confirmModels:true,advisorySimulation:true,advisoryFixtureExecutable:fixtureExecutable};
    const positive=`const fs=require('fs'),yaml=require('js-yaml'),r=require('./scripts/specflow-runner.cjs'),o=${JSON.stringify(opts)};const c=yaml.load(fs.readFileSync(o.contract)).run_contract;c.current_stage_or_rail='5_review';fs.writeFileSync(o.contract,yaml.dump({run_contract:c}));const a=r.runLoop(o);if(a.status!=='advisory_recorded'||a.entry.advisory_review.status!=='completed'||a.entry.advisory_review.mode!=='simulated')throw Error(JSON.stringify(a));console.log(JSON.stringify({copiedRail:true,simulated:true,mode:a.entry.advisory_review.mode}));`;
    const actual=cp.spawnSync(process.execPath,['-e',positive],{cwd:root,env:{...process.env},encoding:'utf8',timeout:15000});if(actual.status!==0)throw Error(actual.stderr+actual.stdout);expect(JSON.parse(actual.stdout)).toMatchObject({copiedRail:true,simulated:true});

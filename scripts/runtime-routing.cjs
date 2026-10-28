@@ -3,7 +3,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
-const yaml = require('js-yaml');
+const yaml = require('./vendor/js-yaml/js-yaml.cjs');
 
 const RUNTIMES = {
   codex: 'codex-gpt56-sol-routing.yml',

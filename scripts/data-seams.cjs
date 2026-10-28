@@ -8,7 +8,7 @@ const digest = bytes => crypto.createHash('sha256').update(bytes).digest('hex');
 const validPath = value => typeof value === 'string' && value && !path.isAbsolute(value) && !value.includes('\\') && !value.includes('\0') && !value.split('/').some(p => !p || p === '.' || p === '..' || p === '.git');
 const validPointer = value => typeof value === 'string' && (value === '' || value.startsWith('/')) && !/~(?:[^01]|$)/.test(value);
 let shapes;
-function schemas(z = require('zod').z) {
+function schemas(z = require('./vendor/zod/index.cjs').z) {
   if (shapes) return shapes;
   const text = z.string().trim().min(1), local = text.refine(validPath, 'repository-relative artifact path required');
   const ids = z.array(text).refine(a => new Set(a).size === a.length, 'duplicate id');

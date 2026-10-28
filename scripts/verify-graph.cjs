@@ -23,13 +23,8 @@
 const { readdirSync, readFileSync, existsSync, statSync } = require('fs');
 const { resolve, join, basename } = require('path');
 
-// Try to load js-yaml, fall back to basic parsing
-let yaml;
-try {
-  yaml = require('js-yaml');
-} catch {
-  yaml = null;
-}
+// A missing bundled parser is an invalid installation, never a weaker gate.
+const yaml = require('./vendor/js-yaml/js-yaml.cjs');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -67,11 +62,7 @@ function info(msg) {
 
 function parseYaml(filePath) {
   const content = readFileSync(filePath, 'utf8');
-  if (yaml) {
-    return yaml.load(content);
-  }
-  // Basic fallback: extract key fields via regex
-  return { _raw: content, _path: filePath };
+  return yaml.load(content);
 }
 
 function extractField(doc, fieldPath) {

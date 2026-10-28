@@ -83,6 +83,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 
 | Contract | Protects | Rules |
 |----------|----------|-------|
+| `feature_plugin_runtime` | Cold runtime/vendor closure and preserved retained pins | I-PLUGIN-001 through I-PLUGIN-003 |
 | `feature_install_ux` | Host-aware public setup, local artifact identity and custom gate preservation | I-INSTALL-001 through I-INSTALL-003 |
 | `runtime_bindings` | Complete host roles, real routes and method-bound native review | I-RUNTIME-001 through I-RUNTIME-004 |
 | `feature_review` | Fresh advisory critic, frozen build subject, durable findings and truthful handoff | I-REVIEW-001 through I-REVIEW-004 |
