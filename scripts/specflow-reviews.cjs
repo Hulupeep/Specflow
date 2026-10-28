@@ -2,6 +2,7 @@
 const continuation = require('./review-continuation.cjs');
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const policy = require('./specflow-tier.cjs');
+const assignments = require('./review-assignment.cjs');
 
 function statePath(root, number) {
   if (!Number.isSafeInteger(number) || number < 1) throw Error('A stable positive issue number is required');
@@ -63,9 +64,13 @@ function extendLimits(root, record, tier, input) {
   if (!['contracted','build-ready'].includes(tier)) throw Error('Unknown review tier');
   return change(root,record.issue.number,state=>{const result=continuation.extend(control(state,tier,record.profile?.reviewPolicy),input);state.events.push({kind:'review-limit-extension',tier,...result});return result;});
 }
-function begin(root, record, tier, builder, {criteria = [], ownerRun = null, evidenceFingerprint = null} = {}) {
+function begin(root, record, tier, builder, {criteria = [], ownerRun = null, evidenceFingerprint = null, reviewAssignment = null} = {}) {
   if (!['contracted', 'build-ready'].includes(tier)) throw Error('Thin work has no automatic adversary or pre-flight round');
   if (!['codex', 'claude-code'].includes(builder)) throw Error('Unknown review builder');
+  if(reviewAssignment){
+    if(!assignments.trusted(reviewAssignment)||reviewAssignment.runtime!==builder)throw Error('Trusted selected native review assignment required');
+    assignments.validate(root,reviewAssignment);assignments.match(record,reviewAssignment);
+  }
   return change(root, record.issue.number, state => {
     const rounds = state.reviews[tier] ||= [];
     const c = control(state,tier,record.profile?.reviewPolicy);
@@ -76,6 +81,7 @@ function begin(root, record, tier, builder, {criteria = [], ownerRun = null, evi
     if (previous?.outcome === 'escalated') throw Error('Repair-induced findings require escalation, not another automatic review');
     if (previous?.scope === scope && (!evidenceFingerprint || previous.evidenceFingerprint === evidenceFingerprint) && rounds.at(-1)?.status !== 'protocol_failed' && !continuation.pending(c).length) throw Error('No new evidence or scope change since the last review; stop instead of repeating it');
     const reservation = { id: crypto.randomUUID(), tier, number: record.issue.number, scope, builder, criteria, ownerRun, evidenceFingerprint, findings:structuredClone(previous?.findings || []), gateIds:(record.profile?.gates || []).map(g=>g.id), at: new Date().toISOString(), status: 'pending' };
+    if(reviewAssignment){reservation.reviewAssignment=reviewAssignment;reservation.reviewMethod='fresh-native';reservation.reviewPurpose='preparation';}
     continuation.beforeCall(c,refs=>validateRecovery(root,refs));
     rounds.push(reservation);
     return structuredClone(reservation);
@@ -137,7 +143,14 @@ function complete(root, reservation, report) {
     result.errors.push(...evidenceErrors);
     if (report.readinessComplete !== true) result.errors.push('Scoped preparation acceptance is incomplete; batch acceptance is not promotion');
     if (report.nativeOutcome !== 'accepted') result.errors.push('Native peer did not accept the reviewed scope');
-    if (report.identity?.family === (reservation.builder === 'codex' ? 'gpt' : 'claude')) {result.protocolErrors.push('Required independent peer uses the builder model family');result.errors.push('Required independent peer uses the builder model family');}
+    if(round.reviewMethod==='fresh-native'){
+      assignments.validate(root,round.reviewAssignment);
+      if(report.identity?.method!=='fresh-native'||report.identity?.purpose!=='preparation'||!assignments.owns(report.reviewProof,round,report)){
+        result.protocolErrors.push('Fresh-native requires owning native content execution for preparation, not a caller or advisory receipt');
+        result.errors.push(result.protocolErrors.at(-1));
+      }
+      if(report.identity?.family!==(round.reviewAssignment.runtime==='codex'?'gpt':'claude')){result.protocolErrors.push('Native reviewer does not match selected host');result.errors.push(result.protocolErrors.at(-1));}
+    }else if (report.identity?.family === (reservation.builder === 'codex' ? 'gpt' : 'claude')) {result.protocolErrors.push('Required independent peer uses the builder model family');result.errors.push('Required independent peer uses the builder model family');}
     if ((report.verifiedCriteria || []).some(id=>!(round.criteria || []).includes(id))) {result.protocolErrors.push('Verified criterion is not in the reserved acceptance index');result.errors.push('Verified criterion is not in the reserved acceptance index');}
     if ((report.gates || []).some(g=>!(round.gateIds || []).includes(g.id))) {result.protocolErrors.push('Reported gate is not in the reserved required gates');result.errors.push('Reported gate is not in the reserved required gates');}
     if (result.errors.length) result.outcome = result.outcome === 'escalated' ? 'escalated' : 'blocked';
@@ -166,6 +179,7 @@ function latest(root, record, tier) {
   const rounds = load(root, record.issue.number).reviews[tier] || [];
   const review = rounds.at(-1);
   if (!review || review.scope !== policy.inputHash(record)) throw Error('No scoped review of the current specification; fixes without regrade remain ungraded');
+  if(review.reviewMethod==='fresh-native'){assignments.validate(root,review.reviewAssignment);assignments.match(record,review.reviewAssignment);}
   if (!['passed', 'passed_with_warnings'].includes(review.outcome)) throw Error(`Scoped review is ${review.outcome || 'unfinished'}`);
   const errors = checkedRefs(root, review.evidence, 'Scoped review');
   if (errors.length) throw Error(errors.join('; '));
@@ -187,6 +201,6 @@ function stageGate(root, record, stage) {
   const tier = stage === 'adversary' ? 'contracted' : 'build-ready';
   if (!record?.issue?.number) return {status:'blocked',passed:false,reason:'Bind the selected issue before scoped review'};
   const result=status(root,record,tier);
-  return {...result,tier,next_action:result.passed?'Advance using the accepted scoped review':result.reviewStatus==='pending'?`${result.reason}. Wait for the active reviewer; if its process has exited, record review-failed with the owning --session token before retrying`:`${result.reason || 'Current scope needs independent regrade'}. ${result.guard?.reason || 'Correct the identified cause and run scoped Duo preparation on current evidence'}`};
+  return {...result,tier,next_action:result.passed?'Advance using the accepted scoped review':result.reviewStatus==='pending'?`${result.reason}. Wait for the active reviewer; if its process has exited, record review-failed with the owning --session token before retrying`:`${result.reason || 'Current scope needs independent regrade'}. ${result.guard?.reason || `Correct the identified cause and run scoped ${record.profile?.reviewAssignment?'specflow review (fresh-native)':'Duo'} preparation on current evidence`}`};
 }
 module.exports = { statePath, load, change, begin, complete, fail, latest, classify, status, stageGate, recover, extendLimits, control };

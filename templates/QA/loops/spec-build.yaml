@@ -73,7 +73,7 @@ stages:
       adversary still DECIDES (one critic, not a committee).
       Why here: persona walks find PRD-level design flaws — catching them now costs a
       PRD edit; catching them at B.5 costs redone tickets, audit, and uplift.
-    review_boundary: scoped Duo preparation; continue on verified progress with bounded diagnosis, persisted by issue/tier; stop on no new evidence
+    review_boundary: scoped preparation through the trusted fresh-native role or explicit cross-family Duo; continue on verified progress with bounded diagnosis, persisted by issue/tier; stop on no new evidence
   - id: GATE_A               # HARD — the trust gate
     type: hard
     gate: >

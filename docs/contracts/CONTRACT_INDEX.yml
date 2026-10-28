@@ -35,3 +35,5 @@ contracts:
     path: docs/contracts/data-seams.yml
   - id: gate_d_acceptance
     path: docs/contracts/gate-d-acceptance.yml
+  - id: runtime_bindings
+    path: docs/contracts/runtime-bindings.yml

@@ -84,13 +84,18 @@ user does not copy review messages or run three separate workflows.
    specification/check mapping; they do not require an unbuilt feature's
    acceptance test to pass before implementation. Required implementation
    journeys and release tests still run before claiming completion.
-5. Request native Duo preparation review with `workKind:"preparation"` and
+5. For normal same-host role review, run `specflow review bind RECORD` before
+   the gates in step 4. The verified installed managed runtime profile selects
+   and pins the fresh-native critic; custom/stale routing or stronger Duo policy
+   returns a concrete blocker. Request `specflow review` preparation review with `workKind:"preparation"` and
    `specification:{record:"RECORD",targetTier:"contracted"}` or `build-ready`.
    Index all scoped criteria and gates, submit the gate evidence paths and
    relevant source, then follow the regular capture/review procedure. Claude
    builders also bind `specification.reviewerModel` to their already approved
-   Codex model; its explicit CLI selection is recorded separately from served
-   model telemetry. No automatic model selection is introduced.
+   Codex model when using explicit Duo; its CLI selection is recorded separately from served
+   model telemetry. Normal fresh-native uses the selected profile model and is
+   labelled same-host, never Duo-verified. Explicit `specflow duo-build` remains
+   cross-family, with no fallback; historical runs keep their original method.
 6. Fix evidenced findings and re-review while first-time criteria/gates or finding
    closures advance. There is no fixed two-review allowance. Two consecutive
    no-progress reviews require diagnosis; three protocol failures require

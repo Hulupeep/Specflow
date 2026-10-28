@@ -27,6 +27,11 @@ function normalizeShellScripts(root) {
 }
 
 const COMMANDS = {
+  review: {
+    usage: 'specflow review <bind|start|resume|status|capture|review|finish> [options]',
+    desc: 'Fresh same-host native role review through the owning frozen review engine; never Duo verification',
+    run: args => { process.exitCode = require('../scripts/specflow-review.cjs').cli(args); },
+  },
   'improve-controller': {
     usage: 'specflow improve-controller <register|admit|status|report|cancel|schedule> --host OWNER_PRIVATE_HOST.json [--repo ID] [--request ID] [--run ID] [--file POLICY.json] [--state paused|disabled|enabled]',
     desc: 'Durable bounded owner-local admission and diagnoses; live activation unavailable until recovery',

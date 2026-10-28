@@ -155,6 +155,14 @@ The coding agent owns building and delivery. Select lifecycle and review depth
 separately: `spec-build` resolves missing requirements; `feature-build` executes
 ready work; Duo adds independent scrutiny where justified and can span either
 preparation or implementation. They are not mutually exclusive work weights.
+Normal scoped review uses `specflow review`: bind the selected record before gates
+to the verified managed runtime profile, then run a fresh read-only same-host
+critic through the existing frozen review engine. It is labelled fresh-native,
+never Duo-verified. Explicit `specflow duo-build` and historical unspecified runs
+retain cross-family semantics and missing-peer blockers. Stronger project policy
+`profile.requiredReviewMethod: duo` takes precedence. Custom/stale routing cannot
+be authorised by caller fields; follow the concrete diagnostic. A changed method
+requires current binding, gates and regrade, retaining previous findings/history.
 A display-only heading-colour change can proceed directly with a visual check
 and relevant existing checks, without a new ticket or loop. A ready research
 handoff does not automatically need `spec-build` before `feature-build`. Record
