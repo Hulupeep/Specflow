@@ -84,6 +84,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 | Contract | Protects | Rules |
 |----------|----------|-------|
 | `runtime_bindings` | Complete host roles, real routes and method-bound native review | I-RUNTIME-001 through I-RUNTIME-004 |
+| `feature_review` | Fresh advisory critic, frozen build subject, durable findings and truthful handoff | I-REVIEW-001 through I-REVIEW-004 |
 | `gate_d_acceptance` | Current required outcome/configuration proof and protected optional signoff | GD-001 through GD-007 |
 | `data_seams` | Declared schema semantics, required integration mappings and built-reference/native consumers | DS-001 through DS-006 |
 | `oracle_correctness` | Independent value comparison and distinct provenance/consistency | PC-001 through PC-006 |

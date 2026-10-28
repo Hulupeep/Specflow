@@ -30,6 +30,13 @@ for(const [loop,routes] of Object.entries(profile.routes))for(const [stage,route
    assert.equal(runner.runAdapter(p,{cwd:root,env:{...process.env},stage}).status,'gate_rerun_required');
    rows.push({loop,stage,provider:p.provider,transition:'scoped_gate_blocked',simulated:true});continue;
  }
+ if(stage==='5_review'){
+   // This supplied-state fixture has no Git subject or real native peer. The
+   // dedicated advisory journeys qualify its actual frozen protocol separately.
+   const review=runner.runLoop({...options,advisorySimulation:true});assert.equal(review.status,'advisory_recorded');
+   assert.equal(review.entry.advisory_review.clean,false);assert.equal(review.entry.gate_decision,'pending');
+   rows.push({loop,stage,provider:policyProvider,transition:'6_provenance',simulated:true});continue;
+ }
  if(stage==='5_impl'){
    process.env.PROTOCOL_FAIL='1';const failed=runner.runLoop(options);assert.equal(failed.status,'adapter_failed');
    assert.equal(yaml.load(fs.readFileSync(options.contract,'utf8')).run_contract.current_stage_or_rail,stage);

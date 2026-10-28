@@ -1,0 +1,27 @@
+// Explicitly simulated native event protocol. No model is contacted.
+'use strict';
+const fs=require('fs'),path=require('path');
+const args=process.argv.slice(2),host=path.basename(process.argv[1]);
+if(args.includes('--version')){console.log('simulated-native-critic');process.exit(0);}
+if(args[0]==='auth'){console.log(JSON.stringify({loggedIn:process.env.ADVISORY_TEST_CASE!=='auth_error'}));process.exit(0);}
+if(args[0]==='login'){console.log(process.env.ADVISORY_TEST_CASE==='auth_error'?'Not authenticated':'Logged in using simulated-fixture');process.exit(0);}
+const prompt=fs.readFileSync(0,'utf8');fs.writeFileSync('received-prompt.txt',prompt);
+const req=JSON.parse(fs.readFileSync('request.json')),mode=process.env.ADVISORY_TEST_CASE||'clean';
+if(process.env.ADVISORY_TEST_COUNT)fs.appendFileSync(process.env.ADVISORY_TEST_COUNT,'called\n');
+if(mode==='error'){console.error('simulated transport failure');process.exit(23);}
+function finish(){
+ if(mode==='empty')return;
+ if(mode==='tamper')fs.appendFileSync('tree/app.js','unauthorised frozen edit');
+ if(mode==='malformed'){console.log('not-json');return;}
+ const events=[];
+ if(mode!=='no_reads')for(const [i,file]of req.requiredReads.entries()){
+  const text=fs.readFileSync(file,'utf8');
+  if(host==='claude'){events.push({type:'assistant',message:{content:[{type:'tool_use',id:'r'+i,name:'Read',input:{file_path:path.resolve(file)}}]}},{type:'user',message:{content:[{type:'tool_result',tool_use_id:'r'+i,content:text||'<system-reminder>The file exists but has empty contents.</system-reminder>'}]}});}
+  else events.push({type:'item.completed',item:{id:'r'+i,type:'command_execution',command:"cat -- '"+file+"'",status:'completed',exit_code:0,aggregated_output:text}});
+ }
+ const result={summary:'Simulated advisory protocol result',findings:JSON.parse(process.env.ADVISORY_TEST_FINDINGS||'[]')};
+ if(host==='claude')events.push({type:'system',model:'simulated-claude-model'},{type:'result',structured_output:result});
+ else {fs.writeFileSync(args[args.indexOf('-o')+1],JSON.stringify(result));events.push({type:'turn.completed'});}
+ for(const e of events)console.log(JSON.stringify(e));
+}
+if(mode==='timeout'||mode==='hold')setTimeout(finish,mode==='timeout'?10000:1200);else finish();

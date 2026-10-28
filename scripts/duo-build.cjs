@@ -90,15 +90,8 @@ function peer(builder) {
   if (!['codex', 'claude-code'].includes(builder)) throw Error('builder must be codex or claude-code');
   return builder === 'codex' ? 'claude' : 'codex';
 }
-function check(builder, invoke = command) {
-  guard();
-  const exe = peer(builder);
-  const version = invoke(exe, ['--version']).trim();
-  const auth = invoke(exe, exe === 'claude' ? ['auth', 'status'] : ['login', 'status'], { combineOutput: true });
-  if (exe === 'claude' && jsonText(auth).loggedIn !== true) throw Error('Claude authentication unavailable');
-  if (exe === 'codex' && !/Logged in using\s+\S/i.test(auth)) throw Error('Codex authentication not confirmed by login status');
-  return { peer: exe, version, authenticated: true, artifactAccess: 'not yet verified', enforcedMode: exe === 'claude' ? 'Read/Glob/Grep only, dontAsk' : 'read-only sandbox, approval never' };
-}
+function check(builder,invoke=command){guard();return require('./readonly-review.cjs').check(peer(builder),invoke);}
+
 function jsonText(value) { return JSON.parse(value); }
 function manifest(root, extras = []) {
   return snapshot.manifest(root, extras, { git, safe, hash, excluded: typesafe.excluded });
@@ -207,13 +200,8 @@ function validatePins(root, dir, state) {
   }
 }
 const receipts = require('./duo-review-receipts.cjs');
-function providerSchema(value,provider){
-  const copy=structuredClone(value);
-  // Codex strict structured outputs reject uniqueItems. Keep the normative
-  // duplicate check in the owning validator rather than weakening acceptance.
-  function visit(node){if(!node||typeof node!=='object')return;if(provider==='codex')delete node.uniqueItems;for(const child of Object.values(node))visit(child);}
-  visit(copy);return copy;
-}
+function providerSchema(value,provider){return require('./readonly-review.cjs').providerSchema(value,provider);}
+
 const schema = {
   type: 'object', additionalProperties: false,
   required: ['outcome', 'summary', 'findings', 'unrelated', 'index_complete', 'assessments', 'resolutions', 'diagnostics', 'direction'],
@@ -261,16 +249,8 @@ function githubContext(root) {
   const match = /^(?:https:\/\/github\.com\/|git@github\.com:)([A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+?)(?:\.git)?$/.exec(remote);
   return match ? { repository: match[1], head: git(root, 'rev-parse', 'HEAD').trim() } : null;
 }
-function invocation(builder, dir, github = null, reviewerModel = null) {
-  const reads = ['issue view', 'issue list', 'pr view', 'pr list', 'pr diff', 'pr checks', 'run view', 'run list', 'repo view', 'auth status'];
-  const cache = path.resolve(dir, 'gh-cache');
-  const env = github ? { XDG_CACHE_HOME: cache, GH_PROMPT_DISABLED: '1', GH_PAGER: 'cat' } : {};
-  const transport = 'You are a read-only duo reviewer. Use Read, Glob and Grep for ALL local inspection, including JSON. Read every path in the required-read checklist before deciding. Bash is ONLY for one standalone allowlisted gh read per call. Never use gh api, local shell utilities, pipes, redirects, command chaining or substitution. Use gh --json/--jq options to select output instead of shell tools. Do not probe permissions, edit files, run skills or launch another model. If required access is unavailable, report blocked with the missing evidence.';
-  if (peer(builder) === 'claude') return { exe: 'claude', env, args: ['-p', '--effort', 'medium', '--append-system-prompt', transport, '--output-format', 'stream-json', '--verbose', '--json-schema', JSON.stringify(schema), '--permission-mode', 'dontAsk', '--tools', github ? 'Read,Glob,Grep,Bash' : 'Read,Glob,Grep', '--allowedTools', ['Read,Glob,Grep', ...(github ? reads.flatMap(cmd => [`Bash(gh ${cmd})`, `Bash(gh ${cmd} *)`]) : [])].join(','), '--disable-slash-commands', '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}', '--no-session-persistence', '--setting-sources', '', '--safe-mode'] };
-  if(reviewerModel && !/^(gpt|o[134]|codex)[A-Za-z0-9._-]*$/.test(reviewerModel)) throw Error('Codex scoped review requires an explicit supported model family');
-  const permissions = github ? ['--strict-config', '-c', 'default_permissions="duo-review"', '-c', 'permissions.duo-review.extends=":read-only"', '-c', `permissions.duo-review.filesystem={${JSON.stringify(cache)}="write"}`, '-c', 'permissions.duo-review.network.enabled=true'] : ['--sandbox', 'read-only'];
-  return { exe: 'codex', env, args: ['exec', ...permissions, ...(reviewerModel ? ['--model',reviewerModel] : []), '--json', '--ephemeral', '--ignore-user-config', '-c', 'approval_policy="never"', '--skip-git-repo-check', '--output-schema', path.join(dir, 'schema.json'), '-o', path.join(dir, 'response.json'), '-'] };
-}
+function invocation(builder,dir,github=null,reviewerModel=null,{purpose='duo',outputSchema=schema}={}){return require('./readonly-review.cjs').invocation(peer(builder),dir,github,reviewerModel,{purpose,outputSchema});}
+
 function validateReview(result, request) {
   if (!result || !['accepted', 'changes_required', 'blocked'].includes(result.outcome) || !result.summary?.trim() || !Array.isArray(result.findings) || !Array.isArray(result.unrelated) || !Array.isArray(result.inspected)) throw Error('Malformed peer outcome');
   for (const f of result.findings) for (const key of ['id', 'basis', 'evidence', 'action']) if (typeof f[key] !== 'string' || !f[key].trim()) throw Error(`Finding missing ${key}`);

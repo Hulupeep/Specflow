@@ -37,3 +37,5 @@ contracts:
     path: docs/contracts/gate-d-acceptance.yml
   - id: runtime_bindings
     path: docs/contracts/runtime-bindings.yml
+  - id: feature_review
+    path: docs/contracts/feature-review.yml

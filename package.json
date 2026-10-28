@@ -18,6 +18,7 @@
     "skills/",
     "scripts/",
     "docs/gate-d.md",
+    "docs/advisory-review.md",
     "setup-project.sh",
     "install-hooks.sh",
     "verify-setup.sh",

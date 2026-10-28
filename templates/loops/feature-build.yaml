@@ -30,8 +30,8 @@ progress_display:             # EMIT this at the START of every tick so the huma
     GATE_C stays ⛔ until CI is green vs the real seeded backend and provenance passes. Show "now / next / blocked-on" + CI status under it.
   template: |
     ┌──────────────────────── FEATURE-BUILD #{issue} ────────────────────────┐
-      ticket ─▶ contract ─▶ e2e ─▶ oracle ─▶ impl ─▶ prov ─▶ HITL ═╣⛔C╠═▶ ready-for-review
-        {r1}      {r2}      {r3}     {r4}    {r5}    {r6}    {h}      {c}
+      ticket ─▶ contract ─▶ e2e ─▶ oracle ─▶ impl ─▶ critic ─▶ prov ─▶ HITL ═╣⛔C╠═▶ ready-for-review
+        {r1}      {r2}      {r3}     {r4}    {r5}     {review}    {r6}    {h}      {c}
                   ▲____________ ↺ repair ___________│
     └─────────────────────────────────────────────────────────────────────────┘
       now: {current_rail}   next: {next_rail}   CI: {ci_status}   blocked-on: {blocker_or_none}
@@ -61,6 +61,16 @@ rails:                        # advance all unblocked rails in order
     gate: every asserted number traced to the live calc / real source (never guessed)
   - id: 5_impl
     gate: smallest mergeable slice (<1000 lines) makes it pass
+  - id: 5_review
+    gate: advisory attempt recorded; completed/current, stale and unavailable remain distinct
+    do: >
+      invoke the selected fresh read-only critic with frozen accepted inputs, tests,
+      current source and committed plus working build diff. Exclude builder sessions,
+      transcripts and State Memory. Persist canonical findings and the public projection.
+      Review is advisory: errors stay visible while mandatory verification continues;
+      no critic output grants preparation, Duo or Gate C approval. Do not duplicate
+      a known-live operation. Carry serious concerns, including reported fixes, to handoff.
+    evidence: evidence/review-${issue}.md
   - id: 6_provenance
     gate: >
       value-bearing outcomes have independent correctness comparisons plus separate
@@ -114,14 +124,18 @@ repair:
   inherited_baseline: >
     not yours — but PROVE it before claiming it: run the failing test on the BASE branch first;
     only a base-branch red may be classified inherited. File the tracking ticket. Never silent --no-verify.
-  budget: 3 attempts/rail, 2 full passes
-  on_exhausted: escalate with classified failure + last diff
+  budget: >
+    Follow the accepted route-aware continuation policy. Subscription work has no
+    invented fixed repair/review count or fictional dollar ceiling. Preserve explicit
+    owner limits and enforce real expensive billable-route guards before invocation.
+  on_exhausted: report the actual explicit limit, route and unresolved failure; preserve evidence
+  no_progress: diagnose the concrete repeated failure and change the recovery action; do not repeat blindly
 
-escalate_when: [precondition unmet, AC ambiguous (>1 reading), slice can't stay <1000 lines, budget exhausted]
+escalate_when: [precondition unmet, unresolved material AC ambiguity, slice can't stay <1000 lines, explicit owner limit or required expensive-route guard]
 never_without_human: [git push, open PR, merge, --no-verify, override contract]
 
 done_when:
-  - 7 rails complete, muscle run + spot-checked, provenance evidence complete, GATE C green, evidence note complete
+  - 8 rails complete, advisory state visible, muscle run + spot-checked, provenance evidence complete, GATE C green, evidence note complete
   - if CI has not been triggered, STOP at "ready for human CI handoff" — human pushes/opens the PR
   - after human CI handoff and green Gate C, STOP at "branch ready for review"
   - NOTE (slice-done ≠ epic-done): the EPIC is not done until GATE D (epic_gate below) is green.

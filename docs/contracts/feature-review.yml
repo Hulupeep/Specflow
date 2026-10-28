@@ -1,0 +1,38 @@
+contract_meta:
+  id: feature_review
+  version: 1
+  created_from_spec: 'GitHub #54'
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: 'override_contract: feature_review'
+invariants:
+  - id: I-REVIEW-001
+    rule: >-
+      Advisory review output never becomes a Gate C verdict. Its actual purpose
+      remains advisory and cannot satisfy preparation, promotion or explicit Duo.
+  - id: I-REVIEW-002
+    rule: >-
+      The critic never receives the implementer's hidden reasoning transcript.
+      Reuse fresh read-only native invocation and content receipts over frozen
+      accepted inputs, tests, source and committed plus uncommitted build subject;
+      exclude builder sessions, adapter transcripts, State Memory and lessons.
+  - id: I-REVIEW-003
+    rule: >-
+      A routed policy key must resolve to an actual feature-build rail. Both
+      hosts route 5_review after 5_impl while preserving 6_provenance/7_ci_handoff.
+  - id: I-REVIEW-004
+    rule: >-
+      Review findings remain visible at CI handoff, including reported fixes of
+      serious concerns with their rationale/evidence and linked deferrals.
+      Canonical attempts survive omission/retry and editable-report tampering.
+      Completed/current, stale, unavailable, invalid, interrupted and missing
+      evidence stay distinct. Real process identity/custody prevents duplicate
+      live calls and fenced attempts cannot overwrite newer output. Subscription
+      reviews have no invented fixed retry allowance.
+test_hooks:
+  tests:
+    - file: tests/contracts/feature-review.test.js
+    - file: tests/contracts/loop-run-contract.test.js
+    - file: tests/contracts/runtime-bindings.test.js

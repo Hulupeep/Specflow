@@ -150,3 +150,6 @@ routes:
     5_impl:
       policy: codex-sol-implementer
       reason: implementation and local verification
+    5_review:
+      policy: codex-sol-reviewer
+      reason: fresh read-only advisory review; Gate C remains authoritative

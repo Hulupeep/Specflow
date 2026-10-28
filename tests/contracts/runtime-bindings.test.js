@@ -26,7 +26,7 @@ describe('J-RUNTIME-CODEX-ONLY / J-RUNTIME-CLAUDE-ONLY', () => {
     const r=spawnSync(process.execPath,[path.join(SOURCE,'tests/helpers/runtime-path-protocol.cjs'),SOURCE,runtime],{cwd:root,env,encoding:'utf8',timeout:30000});
     if(r.status!==0)throw Error(r.stdout+r.stderr);
     const result=JSON.parse(r.stdout);expect(result).toMatchObject({simulated:true,productionReady:false,handoff:'human_ci_handoff_required',scoped:'scoped_review_required'});
-    expect(result.rows).toHaveLength(8);
+    expect(result.rows).toHaveLength(9);
     const argv=fs.readFileSync(path.join(root,'argv.jsonl'),'utf8').trim().split('\n').map(JSON.parse);
     expect(argv.every(x=>x.host===host)).toBe(true);
   });
