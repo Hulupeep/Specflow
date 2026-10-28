@@ -1595,7 +1595,7 @@ function materializeStagePrompt(contract, options = {}) {
     `- Loop path: ${contract.path}`,
     `- Stop condition: ${contract.stop_condition}`,
     `- Never without human: ${(contract.never_without_human || []).join(', ') || 'none declared'}`,
-    `- Durable evidence: ${(contract.durable_evidence || []).join(', ') || 'none declared'}`,
+    `- Durable evidence: ${(Array.isArray(contract.durable_evidence)?contract.durable_evidence:Object.values(contract.durable_evidence||{})).join(', ') || 'none declared'}`,
     '',
     '## Stage Definition',
     stageSpec ? yaml.dump(stageSpec, { lineWidth: 120, noRefs: true }).trim() : 'No YAML stage body found; use the run contract and next gate.',
@@ -2398,11 +2398,23 @@ function runLoopBody(options) {
   }
 
   if (contract.loop === 'feature-build' && contract.current_stage_or_rail === '7_ci_handoff') {
+    const draft=require('./pr-description.cjs').check(contract.repository_root||process.cwd(),contract,{issue:options.issue});
+    contract.pr_description=draft;
+    if(draft.path){
+      if(Array.isArray(contract.durable_evidence)){if(!contract.durable_evidence.includes(draft.path))contract.durable_evidence.push(draft.path);}
+      else if(contract.durable_evidence&&typeof contract.durable_evidence==='object')contract.durable_evidence.pr_description=draft.path;
+    }
+    if(draft.status!=='draft_present'){
+      const entry={stage:'7_ci_handoff',event:'pr_description',result:'blocked',stop_reason:'pr_description_required',errors:draft.errors,pr_description:draft,next_action:`Write a complete PR description at ${draft.path||'the bound issue evidence path'} from current evidence/provenance, then resume. This is builder work, not a human CI wait.`};
+      appendLedger(ledgerPath,entry);contract.terminal_status='in_progress';writeYaml(contractPath,{run_contract:contract});
+      return {status:'pr_description_required',entry,pr_description:draft,contractPath,ledgerPath};
+    }
     let advisory,review={status:'not_reviewed',scope_status:'unknown',clean:false,findings:[],gate_decision:'pending'};
     if(contract.advisory_context){try{advisory=require('./advisory-review.cjs');review=advisory.handoff(contract.advisory_context,contract.advisory_anchor);const old=contract.advisory_last_result;if(old?.status==='unavailable'&&!old.anchor)review={...review,...old,clean:false};const known=old?.findings||[];if(known.some(f=>!review.findings?.some(r=>r.id===f.id))){review={...review,status:'invalid',clean:false,cause:review.cause||'Canonical history omitted an earlier observed finding'};}review.findings=advisory.mergeFindings(known,review.findings||[]);}catch(error){review={...contract.advisory_last_result,status:'unavailable',scope_status:'unknown',clean:false,findings:contract.advisory_last_result?.findings||[],gate_decision:'pending',cause:'Advisory capability unavailable: '+error.message};}}
     const entry = {
       stage: '7_ci_handoff',
       event: 'human_handoff',
+      pr_description: draft,
       result: 'blocked',
       stop_reason: 'human_ci_handoff_required',
       next_action: 'human pushes the branch or opens the PR so branch-protected Gate C can run',
@@ -2413,7 +2425,7 @@ function runLoopBody(options) {
     appendLedger(ledgerPath, entry);
     contract.terminal_status = 'handoff';
     writeYaml(contractPath, { run_contract: contract });
-    return { status: 'human_ci_handoff_required', entry, contractPath, ledgerPath };
+    return { status: 'human_ci_handoff_required', entry, pr_description:draft, contractPath, ledgerPath };
   }
 
   // Specification review has one native boundary: Duo reserves the durable
@@ -2916,7 +2928,7 @@ function cli(argv = process.argv.slice(2)) {
       return 2;
     }
     console.log(JSON.stringify(result, null, 2));
-    return result.status === 'blocked_specification' ? 2 : 0;
+    return ['blocked_specification','pr_description_required'].includes(result.status) ? 2 : 0;
   } catch (e) {
     console.error(`specflow run failed: ${e.message}`);
     return 1;

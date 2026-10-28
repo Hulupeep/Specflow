@@ -1,0 +1,23 @@
+contract_meta:
+  id: feature_pr_handoff
+  version: 1
+  created_from_spec: "GitHub #79"
+  covers_reqs: [AC-PRBODY-1, AC-PRBODY-2, AC-PRBODY-3]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_pr_handoff"
+invariants:
+  - id: I-PRBODY-001
+    rule: "A feature-build run cannot report ready human CI handoff without an actual complete non-placeholder PR draft bound to its issue and recorded in durable evidence. Missing or invalid draft remains builder work."
+  - id: I-PRBODY-002
+    rule: "Drafts summarize actual evidence/provenance, preserve findings and pending/failed/not-run status, contain required review sections and name the expected closing issue. Structure checking does not establish factual truth, CI, review, privacy or release approval."
+  - id: I-PRBODY-003
+    rule: "The existing human/explicit-authority, privacy and Gate C/D boundaries remain authoritative. Provide the body path when opening is HITL; use body-file only when actual publication is authorized and mechanically privacy-checked."
+test_hooks:
+  tests:
+    - file: tests/contracts/pr-description.test.js
+    - file: tests/contracts/loop-run-contract.test.js
+    - file: tests/contracts/feature-review.test.js
+    - file: tests/contracts/runtime-bindings.test.js

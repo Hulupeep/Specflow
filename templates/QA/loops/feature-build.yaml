@@ -44,6 +44,7 @@ inputs:
 state:
   branch: feat/${issue}-${slug}
   evidence: an evidence note on the branch/thread (diff, test results, oracle, audit rows)
+  pr_description: evidence/pr-description-${issue}.md
   gate_c: branch-protected CI vs a real seeded backend
 
 preconditions:
@@ -96,7 +97,17 @@ rails:                        # advance all unblocked rails in order
       unsupported required adapters or missing owners/checks block explicitly.
     evidence: evidence/provenance-${issue}.json
   - id: 7_ci_handoff
+    pr_description: evidence/pr-description-${issue}.md
+    do: >
+      Before stopping, write the complete PR description from actual evidence/provenance.
+      Include Summary, related issue with closing keyword, Contract / journey IDs,
+      What changed, Test plan with exact commands/results, Gate C status, Risk / rollout,
+      Screenshots / recordings or explicit N/A. No placeholder HTML comments or empty required
+      sections. Preserve serious advisory findings. Pending/failed/not-run evidence stays explicit;
+      the draft is not gate approval. Use gh pr create --body-file only within existing authority
+      and after the configured privacy check; when PR opening is HITL, cite the durable body path.
     gate: >
+      A complete non-placeholder PR description exists at the durable path before ready handoff;
       human has pushed/opened the PR or otherwise triggered branch-protected CI.
       The agent stops here when CI does not exist yet; once CI exists, the next tick reads Gate C.
 
@@ -136,7 +147,7 @@ never_without_human: [git push, open PR, merge, --no-verify, override contract]
 
 done_when:
   - 8 rails complete, advisory state visible, muscle run + spot-checked, provenance evidence complete, GATE C green, evidence note complete
-  - if CI has not been triggered, STOP at "ready for human CI handoff" — human pushes/opens the PR
+  - if CI has not been triggered, require the complete durable PR body, then STOP at "ready for human CI handoff" and cite its path — human pushes/opens the PR
   - after human CI handoff and green Gate C, STOP at "branch ready for review"
   - NOTE (slice-done ≠ epic-done): the EPIC is not done until GATE D (epic_gate below) is green.
 
