@@ -27,6 +27,11 @@ outside `.specflow/` produce an explicit isolation gap rather than silently
 omitting application source. Sensitive files and uninitialised dependency source
 cannot count as inspected content.
 
+Run storage is not a blanket source exclusion. Known private adapter/advisory
+directories, generated builder prompts, adapter-smoke transcripts, run control
+files and explicitly declared private state stay withheld. Other run-tree
+source, tests and accepted contracts remain in the manifest and build patches.
+
 Only the executor-owned `evidence/review-<issue>.md` projection is excluded from
 the public source subject. Writing or committing that report does not stale its
 own review. Changed source, tests, accepted decisions or routing input do. Scope
@@ -73,6 +78,11 @@ If native execution finishes but canonical publication fails, the rail stays
 pending. It retains invocation and finding history; an outer error with unknown
 invocation cannot claim `not_invoked` or advance to provenance. Repair the
 reported local artifact obstruction, then resume using retained custody.
+
+If the kernel custody capability is unavailable before an attempt starts, the
+runner records an explicit uninvoked advisory gap and continues mandatory
+verification. It never substitutes an unsafe lock. Existing active or uncertain
+custody stays pending, with its invocation facts retained.
 
 The one-shot detached worker records pending custody before native work. On the
 currently supported Linux execution path, the existing kernel mutex and actual

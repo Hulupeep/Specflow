@@ -50,7 +50,7 @@ function base(root,recorded){
 function subject(o){
  const p=paths(o),baseCommit=base(o.root,o.baseCommit),inputs=[...new Set(o.inputPaths||[])];
  if((o.privatePaths||[]).some(p=>!p.startsWith('.specflow/')))throw Error('Custom builder control paths outside .specflow require explicit input isolation; source cannot be silently omitted');
- const withheld=name=>privateFiles.excluded(name)||name===o.recordPath||/^\.specflow\/(?:runs|duo|lessons)\//.test(name)||name==='.specflow/STATE.md'||(o.privatePaths||[]).some(x=>name===x||name.startsWith(x+'/'))||(o.ownedProjection&&name===p.report);
+ const withheld=name=>privateFiles.excluded(name)||name===o.recordPath||/^\.specflow\/(?:duo|lessons)\//.test(name)||/^\.specflow\/runs\/(?:adapter-smoke\/|[^/]+\/(?:advisory|adapter|prompts)\/|[^/]+\/(?:run-contract\.(?:yaml|yml|json)|ledger\.jsonl)$)/.test(name)||name==='.specflow/STATE.md'||(o.privatePaths||[]).some(x=>name===x||name.startsWith(x+'/'))||(o.ownedProjection&&name===p.report);
  for(const name of inputs)if(withheld(name))throw Error('Private builder state cannot be a critic input');
  const entries=snapshot.manifest(o.root,inputs,{git,safe,hash,excluded:withheld});
  const wanted=(...args)=>git(o.root,'diff',...args,'--name-only','-z').split('\0').filter(x=>x&&!withheld(x));
@@ -133,11 +133,16 @@ function publish(o,dir,r,summary){
  const pointer=json(p.current);if(pointer.attempt!==r.attempt_id)throw Error('Fenced advisory completion cannot replace its successor');
  atomic(p.current,{...pointer,completion_sha256:hash(fs.readFileSync(path.join(dir,'completion.json')))});
 }
+function custodyUnavailable(o,error){
+ const active=pending(o),old=handoff(o),cause='Native custody capability unavailable: '+error.message;
+ if(active)return {...old,status:'pending',clean:false,cause};
+ return {status:'unavailable',scope_status:'unknown',clean:false,findings:mergeFindings(o.previousFindings||[],old.findings||[]),gate_decision:'pending',invoked:false,mode:'not_invoked',cause};
+}
 function worker(o){
  const p=paths(o);fs.mkdirSync(p.dir,{recursive:true,mode:0o700});
- const toolPath='/usr/bin/flock',version=cp.spawnSync(toolPath,['--version'],{encoding:'utf8'});
- const tool={path:toolPath,sha256:hash(fs.readFileSync(toolPath)),version:(version.stdout||'').trim()};
- return kernel.withLock(path.join(p.dir,'operation.lock'),tool,()=>{
+ let tool;try{const toolPath='/usr/bin/flock',bytes=fs.readFileSync(toolPath),version=cp.spawnSync(toolPath,['--version'],{encoding:'utf8',timeout:5000,maxBuffer:65536});if(version.error||version.status!==0)throw Error('flock version capability failed');tool={path:toolPath,sha256:hash(bytes),version:(version.stdout||'').trim()};kernel.tool(tool);}catch(e){return custodyUnavailable(o,e);}
+ let entered=false;try{return kernel.withLock(path.join(p.dir,'operation.lock'),tool,()=>{
+  entered=true;
   const active=pending(o);let previous=current(o);
   if(active){const liveness=operationState(active);if(liveness!=='dead')return {status:'pending',liveness,attempt_id:active.attempt,gate_decision:'pending'};
    const old=active.reviewBase||blank(o,active.attempt,active.previousFindings||[]);Object.assign(old,active.subject||{},{execution_status:'interrupted',cause:'Owning worker and process group terminated before completion',invoked:active.invoked===true,mode:active.invoked?(active.simulation?'simulated':'live'):'not_invoked'});
@@ -204,7 +209,7 @@ function worker(o){
    if(json(p.current).attempt!==id)throw Error('Fenced advisory attempt cannot publish');
    publish(o,dir,r,summary);return view(o,current(o));
   }catch(e){return {status:'pending',scope_status:r.scope_status,clean:false,findings:r.findings,gate_decision:'pending',attempt_id:id,invoked:r.invoked,mode:r.mode,liveness:'unknown',cause:'Canonical publication incomplete: '+e.message};}
- },{create:true});
+ },{create:true});}catch(e){if(!entered&&e.code==='kernel_capability_unavailable')return custodyUnavailable(o,e);throw e;}
 }
 function run(o){
  const p=paths(o);fs.mkdirSync(p.dir,{recursive:true,mode:0o700});const id=crypto.randomUUID(),requestFile=path.join(p.dir,'launch-'+id+'.json'),delivery=path.join(p.dir,'delivery-'+id+'.json');

@@ -32,6 +32,11 @@ describe('J-FEATURE-REVIEW-CLEAN: complete frozen subject, fresh context and non
   expect(s.diff).toContain('committed');expect(s.diff).toContain('working');expect(s.index).toContain('staged');expect(s.diff).toContain('untracked');expect(s.changed).toContain('new.js');
   expect(JSON.stringify(s)).not.toContain('PRIVATE_REASONING_SENTINEL');expect(s.input_refs).toContainEqual({path:'ticket.md',sha256:sha(fs.readFileSync(path.join(root,'ticket.md')))});
  });
+ test('non-private run-tree source and accepted contracts remain in the subject while known runner transcripts stay private',()=>{
+  put('.specflow/runs/fixture/domain.js','committed domain source');put('.specflow/runs/other/contracts/public.yml','accepted public contract');git('add','-f','.specflow/runs/fixture/domain.js','.specflow/runs/other/contracts/public.yml');git('commit','-qm','run-tree source');put('.specflow/runs/fixture/domain.js','working domain source');
+  for(const f of ['.specflow/runs/fixture/adapter/build.jsonl','.specflow/runs/other/advisory/raw.json','.specflow/runs/fixture/prompts/5_impl.md','.specflow/runs/adapter-smoke/codex.jsonl'])put(f,'PRIVATE_RUN_REASONING_SENTINEL');
+  const s=advice.subject({...options(),inputPaths:['ticket.md','.specflow/runs/other/contracts/public.yml']});expect(s.entries['.specflow/runs/fixture/domain.js']).toBeDefined();expect(s.entries['.specflow/runs/other/contracts/public.yml']).toBeDefined();expect(s.diff).toContain('working domain source');expect(s.diff).toContain('accepted public contract');expect(JSON.stringify(s)).not.toContain('PRIVATE_RUN_REASONING_SENTINEL');
+ });
  test('unknown base is unavailable; HEAD after implementation is never an implicit fallback',()=>{
   expect(()=>advice.subject({...options(),baseCommit:null})).toThrow(/base/i);
  });
@@ -83,6 +88,19 @@ describe('J-FEATURE-REVIEW-CLEAN / J-FEATURE-REVIEW-FINDINGS / J-FEATURE-REVIEW-
  },15000);
  test.each([['error','unavailable'],['malformed','invalid'],['empty','invalid'],['no_reads','invalid'],['tamper','invalid'],['timeout','unavailable']])('%s is explicit %s, never clean or approval', (mode,status)=>{
   const bin=simulatedHost();try{process.env.ADVISORY_TEST_CASE=mode;const r=advice.run({...options(),timeoutMs:mode==='timeout'?150:5000});expect(r).toMatchObject({status,clean:false,gate_decision:'pending',invoked:true,mode:'simulated'});expect(r.cause).toBeTruthy();}finally{fs.rmSync(bin,{recursive:true,force:true});}
+ },15000);
+ test.each(['missing','unsupported-version','unsupported-acquire'])('custody capability %s is an uninvoked availability gap before an attempt, not permanent pending',mode=>{
+  const bin=simulatedHost(),read=fs.readFileSync,spawn=cp.spawnSync;let rspy,sspy;try{
+   const o={...options(),delivery:path.join(root,'.specflow/capability-delivery.json')},request=path.join(root,'.specflow/capability-request.json');put('.specflow/capability-request.json',JSON.stringify(o));
+   if(mode==='missing')rspy=jest.spyOn(fs,'readFileSync').mockImplementation((file,...args)=>{if(file==='/usr/bin/flock')throw Object.assign(Error('fixture flock missing'),{code:'ENOENT'});return read(file,...args);});
+   else sspy=jest.spyOn(cp,'spawnSync').mockImplementation((exe,args,opts)=>exe==='/usr/bin/flock'&&(mode==='unsupported-version'||args.includes('--exclusive'))?{status:2,stdout:'',stderr:'fixture unsupported flock capability'}:spawn(exe,args,opts));
+   require('../../scripts/advisory-review-worker.cjs').run(request);expect(JSON.parse(read(o.delivery))).toMatchObject({status:'unavailable',invoked:false,mode:'not_invoked',clean:false,cause:expect.stringMatching(/custody.*unavailable/i)});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);expect(fs.existsSync(advice.paths(o).current)).toBe(false);
+  }finally{rspy?.mockRestore();sspy?.mockRestore();fs.rmSync(bin,{recursive:true,force:true});}
+ });
+ test('a custody capability outage does not discard an already active native operation',()=>{
+  const bin=simulatedHost(),read=fs.readFileSync;let spy,o;try{process.env.ADVISORY_TEST_CASE='hold';o={...options(),waitMs:100,delivery:path.join(root,'.specflow/capability-delivery.json')};expect(advice.run(o).status).toBe('pending');nativeCustody(o);put('.specflow/capability-request.json',JSON.stringify(o));spy=jest.spyOn(fs,'readFileSync').mockImplementation((file,...args)=>{if(file==='/usr/bin/flock')throw Object.assign(Error('fixture flock missing'),{code:'ENOENT'});return read(file,...args);});require('../../scripts/advisory-review-worker.cjs').run(path.join(root,'.specflow/capability-request.json'));expect(JSON.parse(read(o.delivery))).toMatchObject({status:'pending',invoked:true,mode:'simulated'});spy.mockRestore();spy=null;
+   const until=Date.now()+6000;while(advice.handoff(o).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);expect(advice.handoff(o).status).toBe('completed');expect(fs.readFileSync(process.env.ADVISORY_TEST_COUNT,'utf8')).toBe('called\n');
+  }finally{spy?.mockRestore();if(o){const until=Date.now()+6000;while(advice.handoff(o).status==='pending'&&Date.now()<until)Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,50);}fs.rmSync(bin,{recursive:true,force:true});}
  },15000);
  test('authentication failure is an uninvoked gap, with no native review launch',()=>{
   const bin=simulatedHost();try{process.env.ADVISORY_TEST_CASE='auth_error';expect(advice.run(options())).toMatchObject({status:'unavailable',invoked:false,mode:'not_invoked',clean:false});expect(fs.existsSync(process.env.ADVISORY_TEST_COUNT)).toBe(false);}finally{fs.rmSync(bin,{recursive:true,force:true});}
