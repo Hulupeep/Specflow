@@ -24,6 +24,8 @@ const os = require('os');
 const runner = require('./specflow-runner.cjs');
 const duoBuild = require('./duo-build.cjs');
 const duoDirection = require('./duo-direction.cjs');
+const nativeExecution = require('./test-execution.cjs');
+const continuation = require('./review-continuation.cjs');
 
 const DECISIONS = ['KEEP', 'REVERT', 'INCONCLUSIVE'];
 const EVIDENCE_LEVELS = { 1: 'deterministic', 2: 'behavioural-journey', 3: 'heuristic', 4: 'judgment' };
@@ -32,8 +34,8 @@ const MECHANICAL_PRODUCER = 'verifier-mechanical';
 const RUNTIME_CHECK_TYPES = ['playwright', 'api', 'db-reread', 'console', 'network', 'screenshot', 'custom-script'];
 const CANDIDATE_KINDS = ['ux-refinement', 'workflow', 'defect', 'feature', 'cleanup', 'redesign'];
 const MIN_CANDIDATES = 3;
-// Same budget as duo-build: three product repairs after the initial reviewed batch.
-const MAX_REPAIRS = 3;
+// A session horizon is independent of money or a fabricated repair count.
+const DEFAULT_BUILD_HORIZON_MS = 60 * 60 * 1000;
 const adapterSpend = require('./adapter-spend.cjs');
 const HOLDOUT_DIR = 'holdout/';
 const DEV_DIR = 'dev/';
@@ -396,7 +398,7 @@ function validateContract(runDir, contract, selected) {
     if (a?.required_level <= 2) {
       if (!a.check) errors.push(`${where}: level ${a.required_level} needs an executable check frozen with the contract`);
       else {
-        if (!Array.isArray(a.check.command) || !a.check.command.length) errors.push(`${where}: check.command argv is required`);
+        if (!a.check.execution && (!Array.isArray(a.check.command) || !a.check.command.length)) errors.push(`${where}: check.command argv is required`);
         if (a.check.type && !RUNTIME_CHECK_TYPES.includes(a.check.type)) errors.push(`${where}: check.type must be one of ${RUNTIME_CHECK_TYPES.join(', ')}`);
         if (![1, 2].includes(a.check.level) || a.check.level > a.required_level) errors.push(`${where}: check.level must be 1 or 2 and no weaker than required_level`);
         if (!nonempty(a.check.artifact) || !a.check.artifact.startsWith(HOLDOUT_DIR)) errors.push(`${where}: the deciding check must be a ${HOLDOUT_DIR} artifact hidden from builder and peer`);
@@ -406,15 +408,22 @@ function validateContract(runDir, contract, selected) {
     if (a?.dev_check) {
       if (!['fail', 'pass', 'n/a'].includes(a.dev_baseline_expectation)) errors.push(`${where}: dev_check needs its own dev_baseline_expectation fail|pass|n/a`);
       // Builder-visible practice check: in-sample, never decides.
-      if (!Array.isArray(a.dev_check.command) || !a.dev_check.command.length) errors.push(`${where}: dev_check.command argv is required`);
+      if (!a.dev_check.execution && (!Array.isArray(a.dev_check.command) || !a.dev_check.command.length)) errors.push(`${where}: dev_check.command argv is required`);
       if (!nonempty(a.dev_check.artifact) || !a.dev_check.artifact.startsWith(DEV_DIR)) errors.push(`${where}: dev_check artifact must live under ${DEV_DIR}`);
       else if (!fs.existsSync(path.join(runDir, a.dev_check.artifact))) errors.push(`${where}: dev_check artifact ${a.dev_check.artifact} does not exist in the run directory`);
       if (a.check && a.dev_check.artifact === a.check.artifact) errors.push(`${where}: dev_check must differ from the holdout check`);
     }
-    // This path executes a frozen atomic oracle, not the native-suite adapter.
-    // Do not silently ignore an inventory that the caller expects us to enforce.
     for (const key of ['check', 'dev_check']) {
-      if (a?.[key]?.execution !== undefined) errors.push(`${where}: ${key}.execution is unsupported by Improve; native suite receipt integration is pending #178. Use a reviewed atomic frozen checker, not an aggregate suite exit code`);
+      const c=a?.[key];
+      if(!c?.execution)continue;
+      const validation=nativeExecution.validateFrozen(nativeCheck(a,c));
+      errors.push(...validation.errors.map(error=>`${where}: ${key}: ${error}`));
+      if(!c.execution.test_files?.includes(c.artifact))errors.push(`${where}: primary artifact must be a native test file`);
+      const prefix=key==='check'?HOLDOUT_DIR:DEV_DIR;
+      for(const rel of checkArtifacts(c)) {
+        if(typeof rel!=='string'||!rel.startsWith(prefix)||rel.split('/').some(p=>!p||p==='.'||p==='..'))errors.push(`${where}: every native oracle file must remain under ${prefix}`);
+        else if(!fs.existsSync(path.join(runDir,rel)))errors.push(`${where}: missing native oracle file ${rel}`);
+      }
     }
   }
   if (!acceptance.some((a) => a.mandatory && a.required_level <= 2)) {
@@ -486,8 +495,7 @@ function freezeContract(runDir, file, options = {}) {
   else if (critique.verdict !== 'pursue') validation.errors.push(`the latest critique verdict is ${critique.verdict}; only pursue may be frozen`);
   // Holdout checks must come from a recorded oracle author, byte for byte.
   const authored = Object.assign({}, ...evs.filter(acceptedOracle).map((e) => e.artifacts));
-  for (const a of list(contract?.acceptance)) {
-    const rel = a?.check?.artifact;
+  for (const a of list(contract?.acceptance)) for(const rel of checkArtifacts(a.check)) {
     if (!rel || !fs.existsSync(path.join(runDir, rel))) continue;
     if (authored[rel] !== fileSha(path.join(runDir, rel))) validation.errors.push(`holdout ${rel} was not authored by a recorded oracle step (or changed since)`);
   }
@@ -499,7 +507,7 @@ function freezeContract(runDir, file, options = {}) {
   const version = previous.length + 1;
   const artifacts = {};
   for (const a of contract.acceptance) {
-    for (const c of [a.check, a.dev_check]) if (c?.artifact) artifacts[c.artifact] = fileSha(path.join(runDir, c.artifact));
+    for (const c of [a.check, a.dev_check]) for(const rel of checkArtifacts(c)) artifacts[rel] = fileSha(path.join(runDir, rel));
   }
   const oracle = evs.filter(acceptedOracle).map((e) => ({ role: e.role, executor: e.executor, observed_model: e.provenance?.observed_model || null }));
   const implementationStarted = Boolean(lastEvent(evs, 'implementation_started'));
@@ -702,6 +710,12 @@ async function withRuntime(runDir, ws, contract, dir, phase, fn) {
   }
 }
 
+function checkArtifacts(check) {
+  return [...new Set(check?[check.artifact,...(check.execution?[...list(check.checker_paths),...list(check.input_paths),...list(check.rule_paths)]:[])].filter(Boolean):[])];
+}
+function nativeCheck(acceptance,check) {
+  return {...check,id:acceptance.id,required:acceptance.mandatory};
+}
 // Run one check set ('holdout' decides, 'dev' is in-sample practice) and
 // optionally the gates. Findings go through the #102 runtime rail per phase.
 function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerClaim, gates }) {
@@ -710,16 +724,28 @@ function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerCla
   const outcomes = {};
   for (const a of checks) {
     const c = a[key];
-    const argv = c.command.map(vars).map((x) => x.replace(/\{artifact\}/g, c.artifact ? path.join(runDir, c.artifact) : ''));
-    const outPath = path.join(dir, `${a.id}${set === 'dev' ? '.dev' : ''}.out.txt`);
-    const r = guardedSpawn(runDir, 'verifier', argv, {
-      cwd: ws.worktreePath,
-      timeoutSeconds: c.timeout_seconds || 300,
-      env: { BASE_URL: baseUrl, IMPROVE_EVIDENCE_DIR: dir, IMPROVE_PHASE: phase, IMPROVE_CRITERION: a.id, IMPROVE_WORKSPACE: ws.worktreePath, IMPROVE_SET: set },
-    });
-    fs.writeFileSync(outPath, `${r.stdout}\n--- stderr ---\n${r.stderr}`);
-    const result = r.status !== 'ran' ? 'unavailable' : r.exit_code === 0 ? 'pass' : r.exit_code === 1 ? 'fail' : 'unavailable';
-    outcomes[a.id] = { result, measurements: lastJsonLine(r.stdout), outPath, exit_code: r.exit_code };
+    let outPath = path.join(dir, `${a.id}${set === 'dev' ? '.dev' : ''}.out.txt`);
+    if(c.execution) {
+      const check=nativeCheck(a,c),options={root:ws.worktreePath,oracleRoot:runDir,runDir:dir,verificationContract:gov.doc,
+        configurationId:c.configuration_ids?.length===1?c.configuration_ids[0]:gov.contract.runtime?.configuration_id,
+        environment:gov.contract.runtime?.environment||'isolated-improve',frozenFiles:gov.entry.artifact_sha256,
+        env:scrubbedEnv({BASE_URL:baseUrl||'',IMPROVE_EVIDENCE_DIR:dir,IMPROVE_PHASE:phase,IMPROVE_CRITERION:a.id,IMPROVE_WORKSPACE:ws.worktreePath,IMPROVE_SET:set}).env};
+      const receipt=nativeExecution.executeFrozen(check,options),owned=nativeExecution.ownsFrozen(receipt,check,gov.doc,options);
+      if(receipt.evidence_path)outPath=receipt.evidence_path;
+      else fs.writeFileSync(outPath,JSON.stringify({result:'unavailable',reason:receipt.reason}));
+      const result=owned&&['pass','fail'].includes(receipt.result)?receipt.result:'unavailable';
+      outcomes[a.id]={result,measurements:{summary:receipt.summary||null,cases:receipt.cases||[],errors:receipt.errors||[receipt.reason]},outPath,exit_code:receipt.exit_code,
+        native:owned?{receipt_path:receipt.evidence_path,receipt_sha256:fileSha(receipt.evidence_path),artifacts:receipt.artifacts,framework:receipt.framework}:null};
+    } else {
+      const argv = c.command.map(vars).map((x) => x.replace(/\{artifact\}/g, c.artifact ? path.join(runDir, c.artifact) : ''));
+      const r = guardedSpawn(runDir, 'verifier', argv, {
+        cwd: ws.worktreePath,timeoutSeconds: c.timeout_seconds || 300,
+        env: { BASE_URL: baseUrl, IMPROVE_EVIDENCE_DIR: dir, IMPROVE_PHASE: phase, IMPROVE_CRITERION: a.id, IMPROVE_WORKSPACE: ws.worktreePath, IMPROVE_SET: set },
+      });
+      fs.writeFileSync(outPath, `${r.stdout}\n--- stderr ---\n${r.stderr}`);
+      const result = r.status !== 'ran' ? 'unavailable' : r.exit_code === 0 ? 'pass' : r.exit_code === 1 ? 'fail' : 'unavailable';
+      outcomes[a.id] = { result, measurements: lastJsonLine(r.stdout), outPath, exit_code: r.exit_code };
+    }
   }
   runner.runRuntimeChecks({
     runDir: path.join(dir, set),
@@ -731,7 +757,8 @@ function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerCla
   });
   const items = checks.map((a) => ({
     criterion: a.id, level: a[key].level || a.check?.level || 2, kind: 'executable-check', set, result: outcomes[a.id].result, measurements: outcomes[a.id].measurements,
-    source: { artifact: a[key].artifact, artifact_sha256: gov.entry.artifact_sha256?.[a[key].artifact] || null, command: a[key].command },
+    source: { artifact: a[key].artifact, artifact_sha256: gov.entry.artifact_sha256?.[a[key].artifact] || null, command: a[key].command, ...(a[key].execution?{execution:a[key].execution}:{}) },
+    ...(outcomes[a.id].native?{native_execution:outcomes[a.id].native}:{}),
     evidence_path: outcomes[a.id].outPath, evidence_sha256: fileSha(outcomes[a.id].outPath),
   }));
   if (gates) {
@@ -768,7 +795,7 @@ function inputIdentity(runDir,run,gov,phase,ws) {
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
@@ -792,6 +819,11 @@ function boundReceipt(runDir,phase,{current=true}={}) {
     for(const ref of receipt.evidence) {
       const item=evidence.find(e=>e.id===ref.id),recorded=evs.find(e=>e.event==='evidence_added'&&e.evidence_id===ref.id);
       if(!item||binding.digest(item)!==ref.sha256||recorded?.record_sha256!==ref.sha256||item.phase!==phase||item.contract_version!==gov.entry.version||!fs.existsSync(item.evidence_path)||fileSha(item.evidence_path)!==item.evidence_sha256)throw Error('bound evidence changed or missing');
+      if(item.native_execution) {
+        const native=item.native_execution;
+        if(fileSha(native.receipt_path)!==native.receipt_sha256)throw Error('native receipt changed');
+        for(const artifact of Object.values(native.artifacts))if(!artifact.sha256||fileSha(artifact.path)!==artifact.sha256)throw Error('native raw artifact changed or missing');
+      }
     }
     const completed=evs.filter(e=>e.event===(phase==='baseline'?'baseline_recorded':'verification_completed')&&e.attempt===receipt.attempt).at(-1);
     if(!completed||completed.receipt_sha256!==selected.sha256)throw Error('verification attempt did not complete with this receipt');
@@ -1201,6 +1233,8 @@ async function build(runDir, options = {}) {
   }
   if (lastEvent(evs, 'implementation_started')) throw new Error('This run already has an implementation attempt; --once allows one');
   const raw = loadPolicy(options.policy);
+  const requestedContinuation=options.continuationPolicy?readJson(options.continuationPolicy):{};
+  const control=continuation.create({usageMode:spendPolicy.billing==='subscription_cli'?'subscription':spendPolicy.billing==='api'?'api':'unknown',maxElapsedMs:DEFAULT_BUILD_HORIZON_MS,...requestedContinuation});
   const policyFor = (round) => {
     const p = rolePolicy(runDir, { ...raw, role: raw.role || 'implementer' }, `builder-r${round}`);
     // The builder may not read the run directory: holdout, peer notes and evidence stay out of reach.
@@ -1213,14 +1247,21 @@ async function build(runDir, options = {}) {
   append(runDir, 'implementation_started', {
     role: 'builder', executor: policyFor(1).id, contract_version: gov.entry.version, contract_sha256: gov.entry.contract_sha256,
     workspace: ws.worktreePath, branch: ws.branch, baseline_blocker_accepted: baseline ? null : options.acceptBaselineBlocker,
-    max_rounds: 1 + MAX_REPAIRS,
+    continuation_policy: control.policy,
   });
 
   const rounds = [];
   let feedback = null;
   let stop = null;
   let claim = 'unknown';
-  for (let round = 1; round <= 1 + MAX_REPAIRS && !stop; round += 1) {
+  for (let round = 1; !stop; round += 1) {
+    const guard=continuation.decision(control);
+    if(guard) {
+      const latest=rounds.at(-1),failed=Object.entries(latest?.dev||{}).filter(([,result])=>result!=='pass').map(([id])=>id);
+      stop=`${guard.reason}; required practice criteria: ${failed.join(', ')||'none failing'}; last direction: ${latest?.peer?.reason||'not yet reviewed'}`;
+      append(runDir,'build_continuation_stopped',{kind:guard.kind,reason:stop,control});break;
+    }
+    continuation.beforeCall(control,()=>null);
     const policy = policyFor(round);
     const promptPath = path.join(runDir, 'adapters', `builder-r${round}.prompt.md`);
     fs.mkdirSync(path.dirname(promptPath), { recursive: true });
@@ -1253,7 +1294,7 @@ async function build(runDir, options = {}) {
     copyInto(inputDir, { 'practice-checks': dev.dir, 'UX_REFINEMENT_PROFILE.md': RUBRIC });
     const prompt = [
       duoDirection.prompt,
-      `Specflow improve, run ${run.run_id}, round ${round} of at most ${1 + MAX_REPAIRS}. Files: contract.json (frozen), workspace.patch, builder-summary.md, practice-checks/ (in-sample results and screenshots), direction-memory.json, UX_REFINEMENT_PROFILE.md.`,
+      `Specflow improve, run ${run.run_id}, round ${round}; progress-aware continuation within the recorded session horizon and explicit limits. Files: contract.json (frozen), workspace.patch, builder-summary.md, practice-checks/ (in-sample results and screenshots), direction-memory.json, UX_REFINEMENT_PROFILE.md.`,
       'Recommend: continue (with builder next_steps), keep (practice checks all pass and the change serves the contract without UX harm), or revert (wrong approach or harm that more rounds will not fix).',
       'Your recommendation is advisory. Hidden holdout checks and an independent evaluator decide; you cannot see them and must not look for them.',
     ].join('\n');
@@ -1269,8 +1310,10 @@ async function build(runDir, options = {}) {
     rounds.push({ ...record, dev: dev.summary, peer: peer.output, invalid });
     if (invalid) stop = `peer review invalid: ${invalid}`;
     else if (peer.output.recommendation !== 'continue') stop = `peer recommends ${peer.output.recommendation}`;
-    else if (round === 1 + MAX_REPAIRS) stop = 'repair budget exhausted';
     else feedback = renderFeedback(peer.output, dev);
+    const achievements=dev.items.flatMap(item=>[...(item.result==='pass'?[`practice:${item.criterion}`]:[]),...(item.measurements?.cases||[]).filter(c=>c.status==='passed').map(c=>`practice:${item.criterion}:${c.id}`)]);
+    continuation.observe(control,{protocol:Boolean(invalid),achievements});
+    append(runDir,'build_continuation_observed',{round,control});
   }
   const final = rounds.filter((r) => r.peer && !r.invalid).slice(-1)[0];
   // verifierTrace() compatibility: a maker_claim entry on the rail ledger.
@@ -1421,7 +1464,7 @@ function evaluate(runDir) {
     baselineBinding = { error: 'Evidence binding: baseline receipt was superseded by a newer attempt' };
   }
   const bindingErrors=[afterBinding.error,baselineBinding.error].filter(Boolean);
-  const sameVerifier = Boolean(baselineBinding.receipt && afterBinding.receipt && baselineBinding.receipt.identity.verifier === afterBinding.receipt.identity.verifier);
+  let sameVerifier = Boolean(baselineBinding.receipt && afterBinding.receipt && baselineBinding.receipt.identity.verifier === afterBinding.receipt.identity.verifier);
   if (baselineBinding.receipt && afterBinding.receipt && !sameVerifier) bindingErrors.push('Verifier identity differs between baseline and after; gain comparison is unavailable');
   // Only the exact selected receipts can supply before/after results. Earlier
   // attempts and independently appended observations cannot replace this pair.
@@ -1435,12 +1478,19 @@ function evaluate(runDir) {
     && e.producer_role === MECHANICAL_PRODUCER && !e.self_review
     && ((e.kind === 'executable-check' && e.set === 'holdout') || (e.kind === 'gate' && e.set === 'gate')));
   const decisionEvidence = [...boundEvidence, ...failures.filter(e => !boundIds.has(e.id))];
+  for(const a of gov.contract.acceptance.filter(a=>a.check?.execution)) {
+    const pair=['baseline','after'].map(phase=>boundEvidence.filter(e=>e.phase===phase&&e.criterion===a.id&&e.set==='holdout'));
+    if(pair.some(rows=>rows.length!==1)||binding.digest(pair[0][0]?.native_execution?.framework||null)!==binding.digest(pair[1][0]?.native_execution?.framework||null)) {
+      sameVerifier=false;bindingErrors.push(`Native framework identity differs or is unavailable: ${a.id}`);
+    }
+  }
   const gains = gov.contract.acceptance.filter(a => a.mandatory && a.intent === 'gain').map(a => {
     const qualifying = boundEvidence.filter(e => e.criterion === a.id && e.contract_version === gov.entry.version && e.set === 'holdout'
       && e.kind === 'executable-check' && e.producer_role === MECHANICAL_PRODUCER && !e.self_review
       && [1, 2].includes(e.level) && e.level <= a.required_level
       && e.source?.artifact === a.check?.artifact && e.source?.artifact_sha256 === gov.entry.artifact_sha256?.[a.check?.artifact]
-      && binding.digest(e.source?.command) === binding.digest(a.check?.command));
+      && binding.digest(e.source?.command||null) === binding.digest(a.check?.command||null)
+      && binding.digest(e.source?.execution||null) === binding.digest(a.check?.execution||null));
     const before = qualifying.filter(e => e.phase === 'baseline'), after = qualifying.filter(e => e.phase === 'after');
     const paired = before.length === 1 && after.length === 1;
     const established = paired && sameVerifier && a.baseline_expectation === 'fail' && before[0].result === 'fail' && after[0].result === 'pass';
@@ -1470,7 +1520,7 @@ function evaluate(runDir) {
   const railChecks = gov.contract.acceptance.filter(a => a.check).map(a => ({
     id: a.id, type: a.check.type || 'custom-script', assertion: a.statement,
     required: a.mandatory,
-    evidence_path: path.join(runPaths(runDir).phaseDir('after'), `${a.id}.out.txt`),
+    evidence_path: boundEvidence.find(e=>e.phase==='after'&&e.set==='holdout'&&e.criterion===a.id)?.evidence_path||path.join(runPaths(runDir).phaseDir('after'), `${a.id}.out.txt`),
   }));
   // Persisted callback findings are only a projection. The selected current
   // receipt and frozen inventory supply authority; neither arbitrary rows nor
@@ -1698,12 +1748,23 @@ function writeReport(runDir) {
     '',
     '## Duo rounds (practice checks are in-sample; the peer advises, never decides)',
     '',
+    `Build stop: ${lastEvent(evs,'implementation_finished')?.stop_reason||'not finished'}.`,
+    `Continuation policy: ${JSON.stringify(lastEvent(evs,'implementation_started')?.continuation_policy||'legacy recorded limit; unchanged')}.`,
+    '',
     '| Round | Practice checks | Peer | Direction |',
     '|---|---|---|---|',
     ...peerRounds.map((e) => `| ${e.round} | ${Object.entries(e.dev_summary || {}).map(([k, v]) => `${k} ${v}`).join(', ') || '-'} | ${e.invalid ? `invalid (${e.invalid})` : `${e.recommendation} / ${e.assessment}`} | ${(e.direction?.next_steps || []).map((st) => `${st.criterion}: ${st.action}`).join('; ').slice(0, 300) || e.reason || '-'} |`),
     '',
     `Holdout: ${evs.some((e) => e.event === 'holdout_consumed') ? 'consumed once for the decision' : 'not yet run'}${evs.some((e) => e.event === 'holdout_exposed') ? '; **EXPOSED** during building' : ''}. Oracle authored by ${evs.filter(acceptedOracle).map((e) => e.executor).join(', ') || 'nobody recorded'}.`,
     ...evs.filter((e) => e.event === 'oracle_disputed').map((e) => `- Oracle dispute on ${e.criterion} by ${e.role}: ${e.reason}`),
+    '',
+    '## Native case accounting',
+    '',
+    'Private native reports are executed case evidence, not customer or correctness claims. Required skips/missing cases remain non-passing; optional skips stay visible.',
+    '',
+    '| Phase/set | Criterion | Result | Passed | Failed | Skipped | Evidence |',
+    '|---|---|---|---|---|---|---|',
+    ...evidence.filter(e=>e.source?.execution).map(e=>`| ${e.phase}/${e.set} | ${e.criterion} | ${e.result} | ${e.measurements?.summary?.passed??'unavailable'} | ${e.measurements?.summary?.failed??'unavailable'} | ${e.measurements?.summary?.skipped??'unavailable'} | ${e.evidence_path} |`),
     '',
     '## Models and usage',
     '',
@@ -1747,7 +1808,7 @@ const USAGE = `Usage:
   specflow improve oracle RUN_DIR --policy EVALUATOR.yml --prompt ORACLE_BRIEF.md
   specflow improve contract RUN_DIR CONTRACT.json [--supersede "reason"]
   specflow improve baseline RUN_DIR
-  specflow improve build RUN_DIR --policy POLICY.yml [--prompt EXTRA.md] [--peer-model opus] [--peer-policy SPEND.json] [--dry-run] [--accept-baseline-blocker "why"]
+  specflow improve build RUN_DIR --policy POLICY.yml [--prompt EXTRA.md] [--peer-model opus] [--peer-policy SPEND.json] [--continuation-policy LIMITS.json] [--dry-run] [--accept-baseline-blocker "why"]
   specflow improve dispute RUN_DIR --criterion AC-n --reason "why the oracle is wrong" --role ROLE --executor ID
   specflow improve exec RUN_DIR --role ROLE -- COMMAND...
   specflow improve verify RUN_DIR
@@ -1781,7 +1842,7 @@ async function cli(argv = process.argv.slice(2)) {
       case 'baseline': result = await verifyPhase(runDir, 'baseline'); break;
       case 'critique': result = critique(runDir, { draft: args.draft, include: args.include ? String(args.include).split(',') : [], model: args.model, peerPolicy: args.peerPolicy }); break;
       case 'oracle': result = oracle(runDir, { policy: args.policy, prompt: args.prompt }); break;
-      case 'build': result = await build(runDir, { policy: args.policy, prompt: args.prompt, dryRun: Boolean(args.dryRun), acceptBaselineBlocker: args.acceptBaselineBlocker, peerModel: args.peerModel, peerPolicy: args.peerPolicy }); break;
+      case 'build': result = await build(runDir, { policy: args.policy, prompt: args.prompt, dryRun: Boolean(args.dryRun), acceptBaselineBlocker: args.acceptBaselineBlocker, peerModel: args.peerModel, peerPolicy: args.peerPolicy, continuationPolicy: args.continuationPolicy }); break;
       case 'dispute': result = dispute(runDir, { criterion: args.criterion, reason: args.reason, role: args.role, executor: args.executor }); break;
       case 'exec': {
         const run = loadRun(runDir);

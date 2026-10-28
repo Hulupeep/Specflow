@@ -148,15 +148,43 @@ function artifactBytes(file) {
  const fd=fs.openSync(file,fs.constants.O_RDONLY|(fs.constants.O_NOFOLLOW||0));
  try{const stat=fs.fstatSync(fd);if(!stat.isFile()||stat.nlink!==1||stat.size>16*1024*1024)throw Error('invalid native artifact file');return fs.readFileSync(fd);}finally{fs.closeSync(fd);}
 }
-function execute(check,options={}) {
- const validation=validate(check);
+// A trusted Improve evaluator executes private frozen files outside the product.
+// This is the same native execution core; loading a saved receipt never owns it.
+function validateFrozen(check) {
+ const result=validate(check),errors=[...result.errors],e=check?.execution||{},args=e.args||[];
+ if(check?.command!==undefined)errors.push('native frozen oracle command is owned by the adapter');
+ if(e.claim_kind&&e.claim_kind!=='behaviour'||e.comparison_ids?.length||e.seam_ids?.length)errors.push('frozen oracle supports behaviour claims only');
+ if(args[0]!=='--config'||!check?.checker_paths?.includes(args[1]))errors.push('frozen oracle requires an explicitly bound native config');
+ if(args.length!==2&&!(args.length===4&&e.adapter==='jest'&&args[2]==='--testNamePattern'&&args[3]))errors.push('unsupported frozen native args');
+ return{ok:!errors.length,errors};
+}
+function frozenBinding(check,contract,options) {
+ const root=path.resolve(options.root),oracle=path.resolve(options.oracleRoot||'');
+ if(!options.oracleRoot||oracle===root||oracle.startsWith(root+path.sep)||root.startsWith(oracle+path.sep)||fs.realpathSync(root)!==root)throw Error('frozen oracle must remain outside the product with disjoint real roots');
+ for(let cursor=oracle;cursor!==path.dirname(cursor);cursor=path.dirname(cursor))if(fs.lstatSync(cursor).isSymbolicLink())throw Error('frozen oracle root cannot follow symlinks');
+ if(!options.env||typeof options.env!=='object'||Array.isArray(options.env))throw Error('explicit scrubbed frozen oracle environment required');
+ const files={};
+ for(const file of [...check.checker_paths,...check.input_paths,...check.rule_paths]) {
+  files[file]=fileHash(oracle,file);
+  if(options.frozenFiles?.[file]!==files[file])throw Error('oracle file missing from frozen hash inventory or changed: '+file);
+ }
+ const configuration=options.configurationId;
+ if(!unique(check.configuration_ids)||!check.configuration_ids.includes(configuration))throw Error('select a declared frozen oracle configuration_id');
+ return{version:1,mode:'frozen-oracle',contract_sha256:outcome.hashValue(contract),source_sha256:require('./duo-build.cjs').fingerprint(root),oracle_root:oracle,files,
+  configuration_id:configuration,environment:options.environment||'unknown',env_sha256:outcome.hashValue(options.env),framework:framework(oracle,check.execution.adapter)};
+}
+function execute(check,options={}) {return executeNative(check,options,false);}
+function executeFrozen(check,options={}) {return executeNative(check,options,true);}
+function executeNative(check,options={},frozenOracle=false) {
+ const validation=frozenOracle?validateFrozen(check):validate(check);
  if(!validation.ok)return{executable:false,result:'blocked',reason:validation.errors.join('; ')};
  if(!options.verificationContract)return{executable:false,result:'blocked',reason:'accepted verification contract required for owning execution'};
- const root=path.resolve(options.root||process.cwd()),contract=options.verificationContract;
+ const root=path.resolve(options.root||process.cwd()),contract=options.verificationContract,executionRoot=frozenOracle?path.resolve(options.oracleRoot||root):root;
+ const bind=()=>frozenOracle?frozenBinding(check,contract,{...options,root}):binding(check,contract,options);
  let dir,before,identity,comparisons,seams;
  try {
-  comparisons=oracleComparison.select(contract,check,options.configurationId);
-  const selectedSeams=dataSeams.selectedForCheck(contract,check,options.configurationId);
+  comparisons=frozenOracle?[]:oracleComparison.select(contract,check,options.configurationId);
+  const selectedSeams=frozenOracle?[]:dataSeams.selectedForCheck(contract,check,options.configurationId);
   if(selectedSeams.length) {
    seams=dataSeams.inspect(contract,root,{phase:'built',configurationId:options.configurationId});
    const missing=selectedSeams.find(s=>!seams.data_seams.some(current=>current.id===s.id));
@@ -164,20 +192,20 @@ function execute(check,options={}) {
    const unproven=seams.data_seams.filter(s=>selectedSeams.some(selected=>selected.id===s.id)&&s.compatibility!=='compatible');
    if(!seams.ok||unproven.length)throw Error(`data seam compatibility blocked: ${[...seams.errors,...unproven.flatMap(s=>s.errors)].join('; ')}`);
   }
-  before=binding(check,contract,options);identity=framework(root,check.execution.adapter);
+  before=bind();identity=framework(executionRoot,check.execution.adapter);
   dir=privateDirectory(root,options.runDir||path.join(root,'.specflow/runs/native'));
  }catch(error){return{executable:false,result:'blocked',reason:`native execution unavailable: ${error.message}`};}
  const reportPath=path.join(dir,'native-report.json'),stdoutPath=path.join(dir,'stdout.txt'),stderrPath=path.join(dir,'stderr.txt'),observationsPath=path.join(dir,'observations.json');
  const args=check.execution.adapter==='jest'?[identity.entry,...check.execution.args,'--ci','--runInBand','--cacheDirectory',path.join(dir,'cache'),'--coverageDirectory',path.join(dir,'coverage'),'--runTestsByPath',...check.execution.test_files,'--json','--outputFile',reportPath]:[identity.entry,'test',...check.execution.test_files,...check.execution.args,'--output',path.join(dir,'artifacts'),'--reporter=json'];
- const nativeEnv={...process.env,PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never',SPECFLOW_OBSERVATIONS_PATH:comparisons.length?observationsPath:'',SPECFLOW_CONFIGURATION_ID:before.configuration_id,SPECFLOW_ENVIRONMENT:before.environment};
+ const nativeEnv={...(frozenOracle?options.env:process.env),PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never',SPECFLOW_OBSERVATIONS_PATH:comparisons.length?observationsPath:'',SPECFLOW_CONFIGURATION_ID:before.configuration_id,SPECFLOW_ENVIRONMENT:before.environment};
  // A new Playwright CLI is not running inside its caller's Jest worker.
  if(check.execution.adapter==='playwright')delete nativeEnv.JEST_WORKER_ID;
- const startedAt=new Date().toISOString(),res=cp.spawnSync(process.execPath,args,{cwd:root,env:nativeEnv,encoding:'utf8',timeout:(check.timeout_seconds||120)*1000,maxBuffer:16*1024*1024});
+ const startedAt=new Date().toISOString(),res=cp.spawnSync(process.execPath,args,{cwd:executionRoot,env:nativeEnv,encoding:'utf8',timeout:(check.timeout_seconds||120)*1000,maxBuffer:16*1024*1024});
  fs.writeFileSync(stdoutPath,res.stdout||'',{mode:0o600});fs.writeFileSync(stderrPath,res.stderr||'',{mode:0o600});
  let result,reportBytes,after,observationBytes;
  try {
   reportBytes=artifactBytes(reportPath);
-  result=reconcile(parse(JSON.parse(reportBytes.toString('utf8')),check.execution.adapter,root),check.execution);
+  result=reconcile(parse(JSON.parse(reportBytes.toString('utf8')),check.execution.adapter,executionRoot),check.execution);
  }catch(error){result={result:'blocked',cases:[],errors:[`native_report_missing_or_corrupt: ${error.code||error.message}`],summary:{collected:0,passed:0,failed:0,skipped:0}};}
  if(comparisons.length) {
   try {
@@ -188,24 +216,26 @@ function execute(check,options={}) {
   }catch(error){if(result.result!=='fail')result.result='blocked';result.errors.push(`comparison_unproven: ${error.code||error.message}`);}
  }
  try {
-  after=binding(check,contract,options);
-  const nextFramework=framework(root,check.execution.adapter);
+  after=bind();
+  const nextFramework=framework(executionRoot,check.execution.adapter);
   if(outcome.hashValue(before)!==outcome.hashValue(after)||identity.entry_sha256!==nextFramework.entry_sha256||identity.version!==nextFramework.version){result.result='blocked';result.errors.push('stale: source, contract, input, checker, environment or framework changed during native execution');}
  }catch(error){result.result='blocked';result.errors.push(`stale: ${error.message}`);}
  if(res.error){result.result='blocked';result.errors.push(`native_process_error: ${res.error.code||'execution unavailable'} (timeout_seconds: ${check.timeout_seconds||120})`);}
  else if(res.status!==0&&result.result==='pass'){result.result='fail';result.errors.push(`native_process_failed: exit ${res.status}`);}
- const receipt={version:1,attempt_id:path.basename(dir),executable:true,...result,reason:result.errors.join('; ')||null,check_id:check.id,verification_level:check.verification_level,boundaries:[...check.boundaries],command:[process.execPath,...args],root,
+ const receipt={version:1,attempt_id:path.basename(dir),executable:true,...result,reason:result.errors.join('; ')||null,check_id:check.id,verification_level:check.verification_level,boundaries:[...check.boundaries],command:[process.execPath,...args],root,...(frozenOracle?{oracle_root:executionRoot}:{}),
   started_at:startedAt,finished_at:new Date().toISOString(),exit_code:res.status,framework:identity,host:{platform:process.platform,arch:process.arch,node:process.version},binding_before:before,binding_after:after||null,
   claim_kind:check.execution.claim_kind||'behaviour',
   ...(seams?{data_seams:seams.data_seams,interface_scope:seams.scope}:{}),
   artifacts:{report:{path:reportPath,sha256:reportBytes?hash(reportBytes):null},stdout:{path:stdoutPath,sha256:hash(res.stdout||'')},stderr:{path:stderrPath,sha256:hash(res.stderr||'')},...(comparisons.length?{observations:{path:observationsPath,sha256:observationBytes?hash(observationBytes):null}}:{})}};
  receipt.evidence_path=path.join(dir,'execution.json');fs.writeFileSync(receipt.evidence_path,JSON.stringify(receipt,null,2),{mode:0o600});
- freeze(receipt);issued.set(receipt,{check:outcome.hashValue(check),contract:outcome.hashValue(contract),root,token:options.executionToken||null,receipt_sha256:hash(fs.readFileSync(receipt.evidence_path))});return receipt;
+ freeze(receipt);issued.set(receipt,{check:outcome.hashValue(check),contract:outcome.hashValue(contract),root,frozenOracle,token:options.executionToken||null,receipt_sha256:hash(fs.readFileSync(receipt.evidence_path))});return receipt;
 }
-function owns(receipt,check,contract,options={}) {
+function owns(receipt,check,contract,options={}) {return ownsNative(receipt,check,contract,options,false);}
+function ownsFrozen(receipt,check,contract,options={}) {return ownsNative(receipt,check,contract,options,true);}
+function ownsNative(receipt,check,contract,options={},frozenOracle=false) {
  const record=issued.get(receipt);
- if(!record||record.token!==(options.executionToken||null)||record.check!==outcome.hashValue(check)||record.contract!==outcome.hashValue(contract)||record.root!==path.resolve(options.root||process.cwd()))return false;
- try{if(hash(artifactBytes(receipt.evidence_path))!==record.receipt_sha256)return false;for(const artifact of Object.values(receipt.artifacts))if(artifact.sha256&&hash(artifactBytes(artifact.path))!==artifact.sha256)return false;return outcome.hashValue(receipt.binding_after)===outcome.hashValue(binding(check,contract,options));}catch{return false;}
+ if(!record||record.frozenOracle!==frozenOracle||record.token!==(options.executionToken||null)||record.check!==outcome.hashValue(check)||record.contract!==outcome.hashValue(contract)||record.root!==path.resolve(options.root||process.cwd()))return false;
+ try{if(hash(artifactBytes(receipt.evidence_path))!==record.receipt_sha256)return false;for(const artifact of Object.values(receipt.artifacts))if(artifact.sha256&&hash(artifactBytes(artifact.path))!==artifact.sha256)return false;return outcome.hashValue(receipt.binding_after)===outcome.hashValue(frozenOracle?frozenBinding(check,contract,options):binding(check,contract,options));}catch{return false;}
 }
 function journeys(root=process.cwd()) {
  root=path.resolve(root);
@@ -281,5 +311,5 @@ function cli(args=process.argv.slice(2)) {
   const result=reconcile(parsed,inventory);console.log(JSON.stringify({scope:'native report accounting only; owning CI invocation/revision supplies provenance',result:result.result,summary:result.summary,errors:result.errors,required_cases:inventory.required_case_ids.length}));return result.result==='pass'?0:1;
  }catch(error){console.error(`native report invalid: ${error.message}`);return 1;}
 }
-module.exports={validate,parse,reconcile,binding,execute,owns,journeys,cli};
+module.exports={validate,parse,reconcile,binding,execute,owns,executeFrozen,ownsFrozen,validateFrozen,journeys,cli};
 if(require.main===module)process.exitCode=cli();
