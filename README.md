@@ -164,7 +164,7 @@ As models get stronger they need less prompt scaffolding — so prompts, skills,
 ## Install
 
 ```bash
-npx @colmbyrne/specflow init .          # one command — sets up everything (safe to re-run)
+npx @colmbyrne/specflow init . --runtime auto  # host-aware setup (safe to re-run)
 npx @colmbyrne/specflow update . --ci   # wire the build/commit hooks + CI
 ```
 
@@ -189,7 +189,7 @@ Gate D distinguishes report lint from fresh integrated outcome acceptance; see [
 ### Commands
 
 ```bash
-npx @colmbyrne/specflow init .          # Set up everything (safe to re-run)
+npx @colmbyrne/specflow init . --runtime auto  # Set up everything (safe to re-run)
 npx @colmbyrne/specflow update . --ci   # Update hooks + install CI workflows
 npx @colmbyrne/specflow verify          # Check installation (13 sections)
 npx @colmbyrne/specflow audit 500       # Audit issue #500 for compliance

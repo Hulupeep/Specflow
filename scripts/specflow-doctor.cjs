@@ -42,8 +42,8 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
  const detection=routing.detectRuntime(env),requestedRuntime=Object.hasOwn(routing.RUNTIMES,desired)?desired:null;
  const installedRuntime=Object.hasOwn(routing.RUNTIMES,active?.routing_profile?.runtime)?active.routing_profile.runtime:null;
  const selected=requestedRuntime||installedRuntime||detection.detected||'codex';
- const repair=`npx @colmbyrne/specflow update ${quote(target)} --runtime ${selected}`;
- const matchingUpdate=[quote(process.execPath),quote(path.join(sourceRoot,'bin/specflow.js')),'update',quote(target),'--runtime',selected].join(' ');
+ const repair=[quote(process.execPath),quote(path.join(sourceRoot,'bin/specflow.js')),'update',quote(target),'--runtime',selected].join(' ');
+ const matchingUpdate=repair;
  for(const item of invalid){try{const file=path.join(target,item.rel);findings[item.index].repairCommand=reviewedMetadataReset(file,sha(fs.readFileSync(file)),path.join(target,'.specflow/duo/installer.lock'),matchingUpdate,backupDir,target,path.join(sourceRoot,'scripts/duo-runtime.cjs'));}catch{findings[item.index].repairCommand=matchingUpdate;}}
  let canonicalRoot=sourceRoot,canonicalPackage=executing,manifestSha256=null,observedFiles={};
  try {
@@ -72,7 +72,7 @@ function inspect({targetRoot='.',sourceRoot=path.resolve(__dirname,'..'),env=pro
  try {
   if(routingOwnership==='managed'&&state?.routing?.installed_sha256!==sha(fs.readFileSync(routingPath)))routingOwnership='custom';
   const checked=routing.verifyRuntimeRouting({sourceRoot,targetRoot:target,verifySkills:true});
-  if(!checked.ok)add(checked.status,checked.error,repair);
+  if(!checked.ok)add(checked.status,checked.error.replace(/; repair:[\s\S]*$/,''),repair+(checked.recovery_command?.includes('--replace-routing')?' --replace-routing':''));
  }catch(e){add('routing_unverifiable',e.message,repair);}
  if(routingOwnership==='custom')add('custom_routing','Custom routing preserved; inspect its actual profile before explicit replacement.',repair+' --replace-routing','warning');
  if(requestedRuntime&&installedRuntime&&requestedRuntime!==installedRuntime)add(staged?'runtime_staged':'runtime_mismatch',`Requested ${requestedRuntime}; preserved active ${installedRuntime}.`,staged?repair:repair+' --replace-routing',staged?'warning':'error');
