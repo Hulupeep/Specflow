@@ -159,6 +159,7 @@ describe('local contracted loop runner', () => {
   test('stops rail 7 at an explicit human CI handoff', () => {
     const dir = tempDir();
     const { contract, ledger } = writeFeatureRun(dir, '7_ci_handoff');
+    require('../helpers/pr-description.cjs').write(dir);
 
     const result = runLoop({ loop: 'feature-build', contract, ledger, noAdapterRouting: true });
 

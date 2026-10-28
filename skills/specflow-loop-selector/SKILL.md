@@ -305,8 +305,9 @@ run_contract:
     branch: feat/<issue>-<slug>
     evidence_note: branch/thread evidence note
     provenance: evidence/provenance-<issue>.json
+    pr_description: evidence/pr-description-<issue>.md
   precondition: simulation and audit/pre-flight are complete on the input ticket
-  stop_condition: ready for human CI handoff, then Gate C green
+  stop_condition: complete non-placeholder PR description at durable path before ready for human CI handoff (cite body path), then Gate C green
   never_without_human:
     - git push
     - open PR
