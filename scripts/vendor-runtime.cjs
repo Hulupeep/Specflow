@@ -37,4 +37,4 @@ function generate(root=path.resolve(__dirname,'..'),check=false){
  return drift;
 }
 module.exports={inventory,generate};
-if(require.main===module){try{const drift=generate(undefined,process.argv.includes('--check'));if(process.argv.includes('--check')&&drift.length)throw Error('Vendored runtime drift: '+drift.join(', '));console.log(JSON.stringify({files:Object.keys(inventory()).length,drift:drift.length}));}catch(e){console.error(e.message);process.exitCode=1;}}
+if(require.main===module){try{const drift=generate(undefined,process.argv.includes('--check'));if(process.argv.includes('--check')&&drift.length)throw Error('Vendored runtime drift: '+drift.join(', '));console.error(JSON.stringify({files:Object.keys(inventory()).length,drift:drift.length}));}catch(e){console.error(e.message);process.exitCode=1;}}
