@@ -173,7 +173,7 @@ function copyShippedTemplates(sourceRoot, targetRoot) {
   }
 }
 
-function isKnownShippedProfile(activePath, sourceRoot, targetRoot) {
+function isKnownShippedProfile(activePath, sourceRoot, targetRoot, { exactOnly = false } = {}) {
   if (!fs.existsSync(activePath)) return false;
   const activeHash = sha256(fs.readFileSync(activePath));
   let activeSemantic;
@@ -184,10 +184,11 @@ function isKnownShippedProfile(activePath, sourceRoot, targetRoot) {
   }
   const { sourceDir, installedDir } = templatePaths(sourceRoot, targetRoot);
   for (const template of Object.values(RUNTIMES)) {
-    for (const directory of [sourceDir, installedDir]) {
+    for (const directory of exactOnly ? [sourceDir] : [sourceDir, installedDir]) {
       const candidate = path.join(directory, template);
       if (!fs.existsSync(candidate)) continue;
       if (sha256(fs.readFileSync(candidate)) === activeHash) return true;
+      if (exactOnly) continue;
       try {
         if (semanticFingerprint(candidate) === activeSemantic) return true;
       } catch (_) {
@@ -243,7 +244,8 @@ function installRuntimeRouting(options = {}) {
   let legacy = false;
   if (activeExists && !replace) {
     if (priorRouting) {
-      custom = priorRouting.managed === false || activeHash !== priorRouting.installed_sha256;
+      custom = priorRouting.managed === false || activeHash !== priorRouting.installed_sha256
+        || !isKnownShippedProfile(activePath, sourceRoot, targetRoot, { exactOnly: true });
     } else {
       legacy = isKnownShippedProfile(activePath, sourceRoot, targetRoot);
       custom = !legacy;

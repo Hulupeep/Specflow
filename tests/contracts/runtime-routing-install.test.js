@@ -173,3 +173,10 @@ describe('J-RUNTIME-ROUTING-INSTALL', () => {
     });
   });
 });
+test('rewritten install-state hash cannot authorise replacing custom routing',()=>{
+ const target=fs.mkdtempSync(path.join(os.tmpdir(),'routing-record-forgery-'));try{
+  installRuntimeRouting({sourceRoot:SOURCE_ROOT,targetRoot:target,runtime:'codex',interactive:false});const active=target+'/.specflow/adapter-routing.yml',state=target+'/.specflow/install-state.yml';fs.appendFileSync(active,'\n# deliberate customization\n');const before=fs.readFileSync(active),record=yaml.load(fs.readFileSync(state,'utf8'));record.routing.installed_sha256=sha256(before);fs.writeFileSync(state,yaml.dump(record));
+  expect(installRuntimeRouting({sourceRoot:SOURCE_ROOT,targetRoot:target,runtime:'claude-code',interactive:false}).status).toBe('custom_routing_preserved');expect(fs.readFileSync(active)).toEqual(before);
+  expect(installRuntimeRouting({sourceRoot:SOURCE_ROOT,targetRoot:target,runtime:'claude-code',interactive:false,replaceRouting:true}).status).toBe('refreshed');
+ }finally{fs.rmSync(target,{recursive:true,force:true});}
+});
