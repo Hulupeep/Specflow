@@ -1,6 +1,17 @@
 'use strict';
 const fs = require('fs'), path = require('path');
 const policy = require('./specflow-tier.cjs');
+const TARGETS = Object.freeze({thin:3000, contracted:6000, 'build-ready':10000});
+const CEILING = 12000;
+const characters = text => [...text].length;
+function brief(issue = {}) {
+  const declared = policy.tierOf(issue), bodyCharacters = characters(issue.body || '');
+  const errors = [...declared.errors], warnings = [...declared.warnings];
+  const target = TARGETS[declared.tier] || null;
+  if (bodyCharacters > CEILING) errors.push(`Issue body exceeds the ${CEILING}-code-point publication ceiling`);
+  if (target && bodyCharacters > target) warnings.push(`Issue body exceeds the ${declared.tier} ${target}-code-point target`);
+  return {tier:declared.tier, bodyCharacters, target, ceiling:CEILING, errors, warnings};
+}
 const ID = /\b(?:REQ|AC)-[A-Z0-9]+(?:-[A-Z0-9]+)*\b/g;
 function definitions(text) {
   const found = new Map();
@@ -17,10 +28,8 @@ function linkedPaths(text) {
 }
 function remoteSpecifications(text) { return [...new Set([...text.matchAll(/https?:\/\/[^\s)<>]+\.(?:md|ya?ml|json|csv)(?:[?#][^\s)<>]*)?/g)].map(m=>m[0]))]; }
 function report(root, record, baseline, authorizedDecisions = []) {
-  const body = record.issue.body || '', errors = [], warnings = [], artifacts = [], documents = [{path:'issue',text:body}], content = new Map(), paths = new Set();
-  const counts = { bodyCharacters: body.length, linkedMaintainedCharacters: 0, historicalCharacters: 0, uniqueMaintainedCharacters: body.length, shared:0, reused:0, new:0, deferred:0, inapplicable:0 };
-  if (body.length > 30000) errors.push('Issue body exceeds the 30000-character maximum');
-  else if (body.length > 20000) warnings.push('Issue body exceeds the 20000-character target');
+  const body = record.issue.body || '', measured = brief(record.issue), errors = [...measured.errors], warnings = [...measured.warnings], artifacts = [], documents = [{path:'issue',text:body}], content = new Map(), paths = new Set();
+  const counts = { bodyCharacters: characters(body), linkedMaintainedCharacters: 0, historicalCharacters: 0, uniqueMaintainedCharacters: characters(body), shared:0, reused:0, new:0, deferred:0, inapplicable:0 };
   const remote=remoteSpecifications(body);
   for(const url of remote)if(!(record.profile?.artifacts||[]).some(a=>a.sourceUrl===url&&a.path&&a.sha256))errors.push(`Unmeasured remote specification: ${url}; bind a current local artifact before claiming total volume`);
   const inventory=[...(record.profile?.artifacts||[])],declared=new Set(inventory.map(a=>a.path));
@@ -44,13 +53,13 @@ function report(root, record, baseline, authorizedDecisions = []) {
     const historical = item.maintenance === 'historical';
     counts[item.shared ? 'shared' : item.reuse ? 'reused' : 'new']++;
     if (!historical && !item.reuse && !item.justification?.trim()) warnings.push(`${item.id}: new artifact has no recorded scope justification; semantic review required`);
-    if (!paths.has(item.path)) { counts[historical?'historicalCharacters':'linkedMaintainedCharacters'] += text.length; paths.add(item.path); }
+    if (!paths.has(item.path)) { counts[historical?'historicalCharacters':'linkedMaintainedCharacters'] += characters(text); paths.add(item.path); }
     if (!historical) {
       documents.push({path:item.path,text});
-      if (!content.has(item.sha256)) { counts.uniqueMaintainedCharacters += text.length; content.set(item.sha256,item.path); }
+      if (!content.has(item.sha256)) { counts.uniqueMaintainedCharacters += characters(text); content.set(item.sha256,item.path); }
       else if(content.get(item.sha256)!==item.path) warnings.push(`Duplicated specification: ${item.path} duplicates ${content.get(item.sha256)}; this is not a reduction`);
     }
-    artifacts.push({id:item.id,path:item.path,characters:text.length,historical,shared:!!item.shared,reused:!!item.reuse});
+    artifacts.push({id:item.id,path:item.path,characters:characters(text),historical,shared:!!item.shared,reused:!!item.reuse});
   }
   const ids = new Map();
   for (const doc of documents) for (const [id,defs] of definitions(doc.text)) for (const definition of defs) (ids.get(id) || ids.set(id,[]).get(id)).push({path:doc.path,definition});
@@ -62,11 +71,11 @@ function report(root, record, baseline, authorizedDecisions = []) {
     if(!current && !decision) errors.push(`Lost identifier ${id}; preserve a canonical reference or obtain an explicit owner decision`);
     else if(current && !current.some(d=>prior.some(p=>p.definition===d.definition)) && !decision) errors.push(`Changed meaning of ${id} requires an explicit recorded decision`);
   }
-  return {status:errors.length?'blocked':'reported',counts,artifacts,identifiers:Object.fromEntries(ids),errors,warnings,judgments:'Counts are mechanical signals. Applicability, scope and meaning require scoped review; length does not prove readiness.'};
+  return {status:errors.length?'blocked':'reported',counts,brief:measured,artifacts,identifiers:Object.fromEntries(ids),errors,warnings,judgments:'Counts are mechanical signals. Applicability, scope and meaning require scoped review; length does not prove readiness.'};
 }
 function portfolio(root, records) {
-  const reports=records.map(r=>report(root,r)),bodies=records.reduce((n,r)=>n+(r.issue.body||'').length,0),maintained=new Map(),historical=new Map(),warnings=[];
+  const reports=records.map(r=>report(root,r)),bodies=records.reduce((n,r)=>n+characters(r.issue.body||''),0),maintained=new Map(),historical=new Map(),warnings=[];
   for(const [i,r]of reports.entries())for(const a of r.artifacts){const bytes=fs.readFileSync(policy.localFile(root,a.path)),hash=policy.sha(bytes),map=a.historical?historical:maintained;if(map.has(hash)&&map.get(hash).path!==a.path)warnings.push(`Duplicated across ticket specifications: ${a.path} and ${map.get(hash).path}; not a reduction`);if(!map.has(hash))map.set(hash,{path:a.path,characters:a.characters});}
   return {bodyCharacters:bodies,linkedMaintainedCharacters:reports.reduce((n,r)=>n+r.counts.linkedMaintainedCharacters,0),uniqueLinkedMaintainedCharacters:[...maintained.values()].reduce((n,a)=>n+a.characters,0),historicalCharacters:[...historical.values()].reduce((n,a)=>n+a.characters,0),maintainedTotalCharacters:bodies+[...maintained.values()].reduce((n,a)=>n+a.characters,0),warnings,errors:reports.flatMap(r=>r.errors),note:'Shared content is counted once in the unique total; repeated body text and copied files remain visible. Smaller bodies alone do not prove reduced specification.'};
 }
-module.exports={report,portfolio,definitions,linkedPaths};
+module.exports={report,portfolio,definitions,linkedPaths,brief,characters,TARGETS,CEILING};

@@ -31,6 +31,21 @@ Before handing any selected ticket to wave execution, repeat the policy call wit
 `build`; reporting a planning tier does not authorize wave execution.
 
 
+## Concise execution briefs (#170)
+
+Follow the shared execution-brief rubric in `templates/SPECIFICATION.md`
+(installed: `SPECIFICATION.md`) and `scripts/specflow-volume.cjs`: thin 3,000,
+contracted 6,000, build-ready 10,000 Unicode code-point targets; 12,000 ceiling.
+Count the whole body including markup/code. Targets warn; the ceiling blocks;
+missing tier defaults to thin with a warning and conflicting tiers block.
+Explain what, why and context first (100–200 words where useful), then scope,
+acceptance, constraints and verification. Reference research/history/raw review
+logs; retain canonical acceptance IDs, definitions, required gates and valid
+execution links. Never truncate automatically or treat shortness as readiness.
+Discussion and uplift comments are proposals until explicitly reconciled with
+canonical scope. Use publication checks; never replace a concurrently edited
+body or claim an unsupported atomic update succeeded.
+
 ## Role
 You are a board compliance auditor. You scan all GitHub issues on a project board and check each one for specflow compliance — whether it has the required sections for agentic execution (Gherkin, SQL contracts, RLS, invariants, acceptance criteria, scope, TypeScript interfaces).
 

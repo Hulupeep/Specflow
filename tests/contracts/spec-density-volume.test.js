@@ -2,13 +2,13 @@ const fs=require('fs'),os=require('os'),path=require('path');const volume=requir
 let root;beforeEach(()=>root=fs.mkdtempSync(path.join(os.tmpdir(),'spec-volume-')));afterEach(()=>fs.rmSync(root,{recursive:true,force:true}));
 function artifact(file,text,extra={}){fs.writeFileSync(path.join(root,file),text);return{id:file,role:'decision',path:file,sha256:policy.sha(text),...extra};}
 const record=(body,artifacts=[])=>({issue:{number:1,body},profile:{artifacts}});
-test('body thresholds and 40 requirements are signals independent of readiness',()=>{
- expect(volume.report(root,record('x'.repeat(19999))).warnings).toEqual([]);
- expect(volume.report(root,record('x'.repeat(20000))).warnings).toEqual([]);
- expect(policy.evaluate(record('Short'),{root,operation:'build'}).status).toBe('blocked');
- expect(volume.report(root,record('x'.repeat(20001))).warnings.join()).toContain('target');
- expect(volume.report(root,record('x'.repeat(30000))).status).toBe('reported');expect(volume.report(root,record('x'.repeat(30001))).status).toBe('blocked');
- expect(volume.report(root,record(Array.from({length:40},(_,i)=>`REQ-${i}: relevant outcome`).join('\n'))).warnings.join()).toContain('scope');
+test.each(Object.entries(volume.TARGETS))('%s target and ceiling count Unicode code points without rewriting', (tier,target)=>{
+ const make=body=>({issue:{body,labels:['spec:'+tier]},profile:{artifacts:[]}});
+ for(const size of [target-1,target,target+1,12000,12001]){const body='😀'.repeat(size),r=make(body),out=volume.report(root,r);expect(out.counts.bodyCharacters).toBe(size);expect(out.warnings.some(w=>w.includes('target'))).toBe(size>target);expect(out.status).toBe(size>12000?'blocked':'reported');expect(r.issue.body).toBe(body);}
+ expect(policy.evaluate(make('Short'),{root,operation:'build'}).status).toBe('blocked');
+});
+test('missing tier warns, conflicting tiers block, markup/code count and scope signals remain visible',()=>{
+ const r=record('## Heading\n~~~sql\n😀\n~~~');expect(volume.report(root,r).counts.bodyCharacters).toBe([...r.issue.body].length);expect(volume.report(root,r).warnings.join()).toContain('No tier label');r.issue.labels=['spec:thin','spec:contracted'];expect(volume.report(root,r).errors.join()).toContain('Conflicting tier');expect(volume.report(root,record(Array.from({length:40},(_,i)=>`REQ-${i}: relevant outcome`).join('\n'))).warnings.join()).toContain('scope');
 });
 test('moving prose does not reduce maintained volume; duplicates and historical evidence are separate',()=>{
  const body='AC-1: returns the correct value',before=volume.report(root,record(body));

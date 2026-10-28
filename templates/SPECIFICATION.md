@@ -181,14 +181,34 @@ allowances require escalation, not a new run name.
 
 `volume RECORD` reports body size, linked maintained/historical content, reuse,
 new/deferred artifacts and identifier preservation. `frontier` also aggregates
-across tickets so copying or splitting prose cannot hide its volume. Bodies warn
-above 20,000 characters and block above 30,000; 40-plus REQs trigger scope review.
+across tickets so copying or splitting prose cannot hide its volume. Bodies are concise execution briefs: explain what, why and context in plain
+English (around 100–200 words where useful), then scope, acceptance, constraints
+and verification. One rubric in `scripts/specflow-volume.cjs` counts the entire
+body, including markup and code, as Unicode code points: thin target 3,000,
+contracted 6,000, build-ready 10,000; publication ceiling 12,000. Targets warn
+only above the target; the ceiling blocks only above 12,000. Missing tier warns
+and defaults to thin; conflicting tiers block. Never automatically truncate or
+rewrite oversized existing stories. 40-plus REQs trigger scope review.
+Research, history and raw review logs belong in linked records. Keep executable
+material canonical, preserve acceptance IDs/definitions and required gates, and
+measure linked maintained content separately from history. Discussion comments
+are proposals, never silently competing execution specifications.
 Map remote specification links to hashed local artifacts using `sourceUrl`, or
 report their volume unmeasured. Counts never establish semantic correctness.
 
 All issue creation/comments and linked public material pass
 `scripts/specflow-publication.cjs REQUEST.json` with `{repo,issue,bodyFile,
-linkedFiles}` (creation instead uses `action:"create",title`). The project's
+linkedFiles}` (creation instead uses `action:"create",title` and optional `tier`
+or `labels`). Creation validates size and references before any GitHub write and
+returns counts/warnings. Explicit `action:"update"` requires `expectedBodyFile`;
+it validates preserved acceptance, reads current scope before and after privacy,
+and rejects intervening edits. GitHub does not support conditional issue-body
+replacement; changed updates therefore return blocked without a body write.
+Identical bodies return unchanged. Explicit `action:"propose-update"` may post a
+labelled discussion proposal after the same checks; it never applies the body.
+Do not claim a read-then-PATCH sequence is atomic. Safe applied replacement is
+an unresolved capability of #170, not a passing update claim. See GitHub's
+[conditional request limits](https://docs.github.com/en/rest/using-the-rest-api/best-practices-for-using-the-rest-api). The project's
 `.specflow/publication-policy.json` supplies `command` argv and an explicit
 `privateBaselineRequired` boolean. The helper appends a local payload path. The
 scanner must return `success:true`; private baselines also require a real planted

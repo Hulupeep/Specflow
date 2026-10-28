@@ -1,7 +1,7 @@
 {
   "source": "02da4dc0069ff8eefe37ee2f142005b02face0d6",
   "agents": {
-    "agents/board-auditor.md": "54ce6bed958d5189d7cb090bae9d4a3422856541e5ef44ee5d6072fe3aac11ca",
+    "agents/board-auditor.md": "f896f477b9035d7390b0ee0d1bb571ca7748ceecf80b394ce2034375fb00a56f",
     "agents/contract-generator.md": "a5ee752dcac8da4088afa67667f38aaffbd6f16065ffb4b322c949e4dda5a275",
     "agents/contract-test-generator.md": "6d6fef8a037b8df32243249b52ebf47816db23b57b4fd2a698881e0d92fc2966",
     "agents/contract-validator.md": "abf03f6e51b6bc350b5611a0f2ea356d2a709622aaa8fd0ddde102caaf60e336",
@@ -19,8 +19,8 @@
     "agents/playwright-from-specflow.md": "5814916c4f7f836c0a27f34390ab1280e09112d5b5eb2f373ccb9a4f0193d10b",
     "agents/pre-flight-simulator.md": "55c2f59b98e95c1700cace2bff324ea50311ac87e1b24b5475537853a93bd5cc",
     "agents/quality-gate.md": "74eb54d892e15f12d292c7b4104d85c42df97253457e50b4123919dfb833d0cc",
-    "agents/specflow-uplifter.md": "d287e79d9571734cf114bad071e6a59461176f1295ccdc13cd9916edd627c0d2",
-    "agents/specflow-writer.md": "1a6b60f59bb1c944b9ea65743e1051971670c5ca60540852a2fe935f85f54acb",
+    "agents/specflow-uplifter.md": "64f53e42ad1b4fd0921a90b79ff70e31b81aa5e51d57d1058382c90b1f7d00c2",
+    "agents/specflow-writer.md": "8b9c416e6cef92b5363368b0eb2661dd3c0e980c2f98c4af63736f25a24a857c",
     "agents/sprint-executor.md": "2b8d3c00260c9255070313e65def309748855345c89d56dc118225dcad0e0b1c",
     "agents/test-runner.md": "2ed2db1743091be5cd39603473df4d0bd7a7e1e79f9382435d79748e0d29ba2f",
     "agents/ticket-closer.md": "8875a0d53363725816d45b4d18505308e24aac40bd7c51de5715525aa1db8e78",
@@ -31,5 +31,21 @@
     "skills/specflow-simulate/SKILL.md": "a58e60f2870c0b6f3c33bfd574d933c46acca28b023590937334177d3cceeea2",
     "skills/duo-build/SKILL.md": "ca055407e169a5e8f69eeed8d20f19ecb7e0cac9adafca8dd4b1ec334e468750",
     "skills/specflow-loop-selector/SKILL.md": "2b969de0980713611b6fbe290b385e09547a1669b530742b34c3cf36eb3f5f06"
-  }
+  },
+  "semanticRevisions": [
+    {
+      "issue": 170,
+      "reason": "Add shared concise execution-brief rubric; all prior role instructions retained.",
+      "files": [
+        "agents/specflow-writer.md",
+        "agents/board-auditor.md",
+        "agents/specflow-uplifter.md"
+      ],
+      "previousHashes": {
+        "agents/specflow-writer.md": "1a6b60f59bb1c944b9ea65743e1051971670c5ca60540852a2fe935f85f54acb",
+        "agents/board-auditor.md": "54ce6bed958d5189d7cb090bae9d4a3422856541e5ef44ee5d6072fe3aac11ca",
+        "agents/specflow-uplifter.md": "d287e79d9571734cf114bad071e6a59461176f1295ccdc13cd9916edd627c0d2"
+      }
+    }
+  ]
 }

@@ -28,6 +28,21 @@ gates remain in force. Reconcile contradictory custom legacy instructions
 explicitly using the shared policy; do not claim they passed.
 
 
+## Concise execution briefs (#170)
+
+Follow the shared execution-brief rubric in `templates/SPECIFICATION.md`
+(installed: `SPECIFICATION.md`) and `scripts/specflow-volume.cjs`: thin 3,000,
+contracted 6,000, build-ready 10,000 Unicode code-point targets; 12,000 ceiling.
+Count the whole body including markup/code. Targets warn; the ceiling blocks;
+missing tier defaults to thin with a warning and conflicting tiers block.
+Explain what, why and context first (100–200 words where useful), then scope,
+acceptance, constraints and verification. Reference research/history/raw review
+logs; retain canonical acceptance IDs, definitions, required gates and valid
+execution links. Never truncate automatically or treat shortness as readiness.
+Discussion and uplift comments are proposals until explicitly reconciled with
+canonical scope. Use publication checks; never replace a concurrently edited
+body or claim an unsupported atomic update succeeded.
+
 ## Role
 You are a specflow remediation specialist. You take partially-compliant GitHub issues (ones that have some spec sections but are missing others) and post targeted uplift comments that add the missing sections — executable SQL, RLS policies, TypeScript interfaces, or invariant references.
 
