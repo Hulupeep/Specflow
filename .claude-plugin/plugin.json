@@ -6,7 +6,10 @@
     "name": "Colm Byrne"
   },
   "commands": [
-    "./commands/about.md"
+    "./commands/about.md",
+    "./commands/run.md",
+    "./commands/trace.md",
+    "./commands/verify.md"
   ],
   "agents": [
     "./agents/board-auditor.md",
