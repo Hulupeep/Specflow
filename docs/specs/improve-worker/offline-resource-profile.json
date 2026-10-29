@@ -1,0 +1,14 @@
+{
+  "id": "offline-dependencies-v1",
+  "workBytes": 1073741824,
+  "tmpBytes": 134217728,
+  "aggregateTmpfsBytes": 1207959552,
+  "memoryBytes": 2147483648,
+  "memorySwapBytes": 2147483648,
+  "cpus": 1,
+  "pids": 128,
+  "phaseMilliseconds": 600000,
+  "watchdogGraceMilliseconds": 10000,
+  "accounting": "Tmpfs pages count against the container memory limit; aggregate tmpfs is a ceiling, not reserved extra RAM. Sequential phases do not share writable tmpfs. Memory also covers process/runtime allocations.",
+  "capacityStatus": "requires-full-target-runtime-qualification"
+}

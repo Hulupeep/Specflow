@@ -512,6 +512,40 @@ function createSoftwareLayer({
     sha256: digest({ files: [...files.values()], directories })
   };
 }
+const OFFLINE_RESOURCE_PROFILE = Object.freeze({
+  id: 'offline-dependencies-v1', workBytes: 1073741824, tmpBytes: 134217728,
+  aggregateTmpfsBytes: 1207959552, memoryBytes: 2147483648, memorySwapBytes: 2147483648,
+  cpus: 1, pids: 128, phaseMilliseconds: 600000, watchdogGraceMilliseconds: 10000
+});
+function resourcePlan({ role = 'app', resourceProfile, memory, tmpfs = [] } = {}) {
+  need(Array.isArray(tmpfs), resourceProfile === undefined ? 'worker_tmpfs_invalid' : 'offline_resource_invalid');
+  if (resourceProfile !== undefined) {
+    need(resourceProfile === OFFLINE_RESOURCE_PROFILE.id && role === 'setup' &&
+      memory === undefined && tmpfs.length === 0, 'offline_resource_invalid');
+    return { memory: OFFLINE_RESOURCE_PROFILE.memoryBytes,
+      tmpfs: [{ path: '/work', bytes: OFFLINE_RESOURCE_PROFILE.workBytes }],
+      phaseMilliseconds: OFFLINE_RESOURCE_PROFILE.phaseMilliseconds };
+  }
+  memory = memory === undefined ? 768 * 1024 * 1024 : memory;
+  need(Number.isSafeInteger(memory) && memory > 0, 'worker_memory_invalid');
+  for (const item of tmpfs) need(item && typeof item.path === 'string' &&
+    path.isAbsolute(item.path) && safeRelative(item.path.slice(1)) &&
+    Number.isSafeInteger(item.bytes) && item.bytes > 0 && item.bytes <= 256 * 1024 * 1024,
+  'worker_tmpfs_invalid');
+  return { memory, tmpfs: tmpfs.map(item => ({ path: item.path, bytes: item.bytes })) };
+}
+function validateMountTopology(destinations, code = 'offline_resource_invalid') {
+  need(Array.isArray(destinations), code);
+  const seen = [];
+  for (const destination of destinations) {
+    need(typeof destination === 'string' && path.isAbsolute(destination) &&
+      safeRelative(destination.slice(1)) && !/[\\,\r\n\0]/.test(destination) &&
+      !seen.some(other => destination === other || destination.startsWith(other + '/') ||
+        other.startsWith(destination + '/')), code);
+    seen.push(destination);
+  }
+  return true;
+}
 class DockerWorker {
   constructor({ image, layer, stateRoot, gitArea = null, uid = process.getuid(), maxMilliseconds = 120000, jobId = null }) {
     need(/^sha256:[a-f0-9]{64}$/.test(image), 'worker_image_unavailable');
@@ -627,7 +661,13 @@ class DockerWorker {
       return ['--mount', `type=bind,src=${m.source},dst=${m.destination}${m.writable === true ? '' : ',readonly'}`];
     });
   }
-  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory = 768 * 1024 * 1024 }) {
+  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory, resourceProfile }) {
+    if (resourceProfile !== undefined) need(Object.keys(arguments[0]).every(key =>
+      ['role', 'mounts', 'capsules', 'tmpfs', 'network', 'memory', 'resourceProfile'].includes(key)),
+    'offline_resource_invalid');
+    const resources = resourcePlan({ role, memory, tmpfs, resourceProfile });
+    memory = resources.memory;
+    tmpfs = resources.tmpfs;
     DockerWorker.probe();
     verifySoftwareLayer(this.layer);
     need(Array.isArray(capsules), 'capsule_mounts');
@@ -642,6 +682,10 @@ class DockerWorker {
     const selected = software.filter(
       (m) => !m.destination.startsWith('/browser/') || !software.some((d) => d.destination === '/browser')
     );
+    validateMountTopology(['/tmp', ...selected.map(m => m.destination), ...mounts.map(m => m.destination),
+      ...tmpfs.map(t => t.path)], resourceProfile ? 'offline_resource_invalid' : 'worker_mount_overlap');
+    if (resourceProfile) need(network === 'none' && [...selected, ...mounts].every(m => m.writable !== true),
+      'offline_resource_invalid');
     const args = [
       'run',
       '-d',
@@ -677,7 +721,8 @@ class DockerWorker {
       ...this.mountArgs([...selected, ...mounts], role),
       ...tmpfs.flatMap((t) => {
         need(
-          safeRelative(t.path.slice(1)) && Number.isInteger(t.bytes) && t.bytes > 0 && t.bytes <= 256 * 1024 * 1024,
+          safeRelative(t.path.slice(1)) && Number.isInteger(t.bytes) && t.bytes > 0 &&
+            t.bytes <= (resourceProfile ? OFFLINE_RESOURCE_PROFILE.workBytes : 256 * 1024 * 1024),
           'worker_tmpfs_invalid'
         );
         return ['--tmpfs', `${t.path}:rw,nosuid,nodev,size=${t.bytes},mode=0700,uid=${this.uid},gid=${this.uid}`];
@@ -695,7 +740,7 @@ class DockerWorker {
         path.join(__dirname, 'improve-worker-watchdog.cjs'),
         id,
         String(process.pid),
-        String(Date.now() + this.maxMilliseconds + 10000),
+        String(Date.now() + (resources.phaseMilliseconds || this.maxMilliseconds) + 10000),
         this.env.DOCKER_CONFIG
       ],
       { env: this.env, stdio: 'ignore', detached: true }
@@ -707,6 +752,9 @@ class DockerWorker {
       uid: this.uid,
       network,
       memory,
+      ...(resources.phaseMilliseconds ? { phaseMilliseconds: resources.phaseMilliseconds,
+        tmpfsLimits: { '/tmp': { bytes: OFFLINE_RESOURCE_PROFILE.tmpBytes, mode: '1777' },
+          '/work': { bytes: OFFLINE_RESOURCE_PROFILE.workBytes, mode: '0700', uid: this.uid, gid: this.uid } } } : {}),
       mounts: [...selected, ...mounts],
       tmpfs: ['/tmp', ...tmpfs.map((t) => t.path)]
     };
@@ -739,7 +787,7 @@ class DockerWorker {
       cwd = '/app',
       env = {},
       input,
-      timeout = this.maxMilliseconds,
+      timeout = this.receipts.get(id)?.expected.phaseMilliseconds ?? this.maxMilliseconds,
       allowFailure = false,
       binary = false,
       maxBuffer
@@ -886,7 +934,8 @@ class DockerWorker {
     if (failures.length) throw new WorkerError('worker_termination_failed', 'teardown');
   }
 }
-Object.assign(module.exports, { manifestTree, verifySoftwareLayer, createSoftwareLayer, DockerWorker, containerProcessIdentity });
+Object.assign(module.exports, { manifestTree, verifySoftwareLayer, createSoftwareLayer, DockerWorker, containerProcessIdentity,
+  OFFLINE_RESOURCE_PROFILE, resourcePlan, validateMountTopology });
 
 function isolatedGit(worker, area, args, { cwd = area, input } = {}) {
   need(path.resolve(cwd) === area || path.resolve(cwd).startsWith(area + path.sep), 'git_cwd_outside_job');
@@ -1635,6 +1684,20 @@ function validateInspection(inspect, expected) {
       !h.IpcMode?.startsWith('host'),
     'worker_unconfined'
   );
+  if (expected.tmpfsLimits) {
+    for (const [destination, limits] of Object.entries(expected.tmpfsLimits)) {
+      const parts = String(h.Tmpfs?.[destination] || '').split(',');
+      const options = Object.fromEntries(parts.map(p => p.split('=')));
+      const size = /^(\d+)([kmg])?$/i.exec(options.size || '');
+      const bytes = size && Number(size[1]) * ({ k: 1024, m: 1048576, g: 1073741824 }[size[2]?.toLowerCase()] || 1);
+      need(new Set(parts.map(p => p.split('=')[0])).size === parts.length &&
+        parts.includes('rw') && !parts.includes('ro') && parts.includes('nosuid') && parts.includes('nodev') &&
+        bytes === limits.bytes && /^[0-7]{3,4}$/.test(options.mode || '') &&
+        parseInt(options.mode, 8) === parseInt(limits.mode, 8) &&
+        (limits.uid === undefined || (options.uid === String(limits.uid) && options.gid === String(limits.gid))),
+      'worker_unconfined');
+    }
+  }
   const actual = inspect.Mounts.filter((m) => m.Type === 'bind');
   need(
     actual.length === expected.mounts.length &&
