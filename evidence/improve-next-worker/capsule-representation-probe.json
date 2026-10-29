@@ -1,0 +1,28 @@
+{
+  "scope": "Materialized dependency-layout round-trip only; original hardlink rejection retained; not isolated installation, production admission or worker qualification",
+  "originalHardlinkedFiles": 29338,
+  "result": {
+    "negativeControls": {
+      "absolute": "link_escape",
+      "escape": "link_escape",
+      "dangling": "dangling",
+      "cycle": "link_cycle",
+      "ancestor": "ancestor_link",
+      "hardlink": "hardlink",
+      "privileged": "privileged_mode",
+      "fifo": "special"
+    },
+    "emptyDirectoryExecuteModeAndLinkRoundTrip": true,
+    "byteMutationDetected": true,
+    "realDependencyRoundTrip": true,
+    "manifestSha256": "7678664748760f9ec16f680ae20a6ac5cc6aa55837ab5bb97959409fc4153ba7",
+    "entries": 35210,
+    "bytes": 494313394,
+    "links": 1408,
+    "executables": 218,
+    "elapsedSeconds": 58.72
+  },
+  "probeSha256": "f7fa9a83e078983dcc377e3f31b7a2c5058130ef3f599b9ff484693155ac0d1d",
+  "originalProbeSha256": "21d4be26ae72e6833da2a6e4e30899b60191b6af31c325edee4492dadb4ae15e",
+  "timestamp": "2026-10-29T10:31:01.592483+00:00"
+}
