@@ -1,0 +1,23 @@
+{
+  "id": "production-build-v1",
+  "source": "/app",
+  "dependencies": "/app/node_modules",
+  "output": "/app/.next",
+  "cwd": "/app",
+  "outputBytes": 1073741824,
+  "tmpBytes": 134217728,
+  "aggregateTmpfsBytes": 1207959552,
+  "memoryBytes": 2147483648,
+  "memorySwapBytes": 2147483648,
+  "cpus": 1,
+  "pids": 128,
+  "phaseMilliseconds": 600000,
+  "watchdogGraceMilliseconds": 10000,
+  "captureLimits": {
+    "maxBytes": 1073741824,
+    "maxFileBytes": 536870912,
+    "maxEntries": 100000,
+    "maxDepth": 128,
+    "maxSeconds": 300
+  }
+}

@@ -1,0 +1,216 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "jobId",
+    "source",
+    "dependencies",
+    "runtimeSha256",
+    "command",
+    "environment",
+    "resourceProfile",
+    "dependencySource"
+  ],
+  "properties": {
+    "schema": {
+      "const": "specflow.production-build-input/v1"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "receipt"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "manifestSha256"
+          ],
+          "properties": {
+            "identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "jobId",
+                "sourceContainerId",
+                "recipeSha256",
+                "sourceInputSha256"
+              ],
+              "properties": {
+                "jobId": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+                },
+                "sourceContainerId": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "recipeSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "sourceInputSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "manifestSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "receipt"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "receipt": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "manifestSha256"
+          ],
+          "properties": {
+            "identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "jobId",
+                "sourceContainerId",
+                "recipeSha256",
+                "sourceInputSha256"
+              ],
+              "properties": {
+                "jobId": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+                },
+                "sourceContainerId": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "recipeSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                },
+                "sourceInputSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$"
+                }
+              }
+            },
+            "manifestSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        }
+      }
+    },
+    "runtimeSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "command": {
+      "const": [
+        "/node/bin/node",
+        "/app/node_modules/next/dist/bin/next",
+        "build"
+      ]
+    },
+    "environment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "CI",
+        "NODE_ENV",
+        "NEXT_TELEMETRY_DISABLED",
+        "NODE_OPTIONS",
+        "NEXT_PUBLIC_SUPABASE_URL",
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+        "NEXT_PUBLIC_AUTH_BYPASS"
+      ],
+      "properties": {
+        "CI": {
+          "const": "true"
+        },
+        "NODE_ENV": {
+          "const": "production"
+        },
+        "NEXT_TELEMETRY_DISABLED": {
+          "const": "1"
+        },
+        "NODE_OPTIONS": {
+          "const": "--max-old-space-size=1536"
+        },
+        "NEXT_PUBLIC_AUTH_BYPASS": {
+          "const": "false"
+        },
+        "NEXT_PUBLIC_SUPABASE_URL": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        }
+      }
+    },
+    "resourceProfile": {
+      "const": "production-build-v1"
+    },
+    "dependencySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageSha256",
+        "lockSha256",
+        "manifestSha256"
+      ],
+      "properties": {
+        "packageSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "lockSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}
