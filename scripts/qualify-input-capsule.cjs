@@ -1,11 +1,12 @@
 'use strict';
 const fs=require('fs'),path=require('path'),assert=require('assert'),crypto=require('crypto');
-const w=require(process.cwd()+'/scripts/improve-worker.cjs');
+const w=require('./improve-worker.cjs');
+function run(args = process.argv.slice(2)) {
 // Explicit operator-supplied, previously qualified worker software configuration.
 // No downloads, models, product services or production data are used here.
-if (process.argv.length !== 4) throw Error('Usage: node scripts/qualify-input-capsule.cjs WORKER_CONFIG PRIVATE_EVIDENCE_DIRECTORY');
-const old=JSON.parse(fs.readFileSync(process.argv[2]));
-const base=path.resolve(process.argv[3]);
+if (args.length !== 2) throw Error('Usage: node scripts/qualify-input-capsule.cjs WORKER_CONFIG PRIVATE_EVIDENCE_DIRECTORY');
+const old=JSON.parse(fs.readFileSync(args[0]));
+const base=path.resolve(args[1]);
 fs.mkdirSync(base,{recursive:true,mode:0o700});
 const baseStat=fs.lstatSync(base);
 assert(baseStat.isDirectory() && !baseStat.isSymbolicLink() && baseStat.uid===process.getuid() && (baseStat.mode&0o077)===0,'Evidence directory must be owner-private');
@@ -48,3 +49,7 @@ try {
  results.status='passed';
 }catch(e){results.status='failed';results.error=e.code||e.message;process.exitCode=1;}
 finally{try{worker.close()}catch(e){results.status='failed';results.teardown=e.code;process.exitCode=1;}results.remainingOwnedContainers=worker.containers.size;results.endedAt=new Date().toISOString();fs.writeFileSync(root+'/result.json',JSON.stringify(results,null,2),{mode:0o600});fs.writeFileSync(base+'/live-result.json',JSON.stringify({root,...results},null,2),{mode:0o600});console.log(JSON.stringify({root,...results}));}
+
+}
+module.exports = { run };
+if (require.main === module) run();
