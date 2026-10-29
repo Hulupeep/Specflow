@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OfflineDependencySuccessV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "recipeSha256",
+    "capsule"
+  ],
+  "properties": {
+    "status": {
+      "const": "admitted"
+    },
+    "recipeSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "capsule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "manifestSha256"
+      ],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "jobId",
+            "sourceContainerId",
+            "recipeSha256",
+            "sourceInputSha256"
+          ],
+          "properties": {
+            "jobId": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+            },
+            "sourceContainerId": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "recipeSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            },
+            "sourceInputSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}

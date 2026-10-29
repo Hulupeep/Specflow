@@ -1,0 +1,62 @@
+# #284 exact identity data used by the selected implementation.
+schema: specflow.offline-recipe-identity/v1
+preimage_fields:
+  schema: specflow.offline-recipe/v1
+  packageSha256: selected package.json bytes
+  lockSha256: selected pnpm-lock.yaml bytes
+  cacheManifestSha256: canonical approved complete cache manifest bytes
+  softwareLayerSha256: verified existing software-layer identity
+  implementationSha256: canonical mapping of the implementation files below to their byte SHA-256
+  toolVersion: '10.7.1'
+  platform: linux-x64-glibc
+  effectiveConfigSha256: canonical fixed command/environment/cwd mapping
+  resourceProfileSha256: canonical operational resource values below
+implementation_files:
+  - scripts/improve-offline-inputs.cjs
+  - scripts/improve-offline-cache.cjs
+  - scripts/improve-worker.cjs
+  - scripts/improve-worker-capsule.py
+  - scripts/improve-worker-store.py
+  - scripts/improve-worker-watchdog.cjs
+canonical_json:
+  encoding: UTF-8
+  object_keys: recursively sorted ASCII keys
+  separators: compact comma and colon, no whitespace
+  terminal_newline: false
+  allowed_scalars: ASCII strings, booleans, null, integers in the safe JavaScript integer range
+  rejected: floats, nonfinite numbers, duplicate keys, non-ASCII strings, unknown preimage fields
+  arrays: preserve order
+  digest: lowercase hexadecimal SHA-256 of these exact bytes
+operational_resource_fields:
+  - id
+  - workBytes
+  - tmpBytes
+  - aggregateTmpfsBytes
+  - memoryBytes
+  - memorySwapBytes
+  - cpus
+  - pids
+  - phaseMilliseconds
+  - watchdogGraceMilliseconds
+fixed_effective_config:
+  cwd: /work
+  argv:
+    - /node/bin/node
+    - /tools/pnpm/bin/pnpm.cjs
+    - install
+    - --offline
+    - --frozen-lockfile
+    - --ignore-scripts
+    - --ignore-pnpmfile
+    - --package-import-method=copy
+    - --store-dir=/cache
+  env:
+    CI: 'true'
+    HOME: /tmp
+    PATH: /node/bin:/usr/bin:/bin
+    NPM_CONFIG_USERCONFIG: /dev/null
+    NPM_CONFIG_GLOBALCONFIG: /dev/null
+path_semantics: Host locator strings are excluded only after complete referenced bytes and mounted semantics are bound; locations never supply identity or authority.
+source_input_sha256: cacheManifestSha256 for store capsule; SHA-256 of canonical object containing packageSha256, lockSha256 and admitted store manifestSha256 for dependency capsule.
+job_binding: The existing receipt binds jobId and sourceContainerId independently; matching recipe content never permits foreign-job reuse.
+alias_classification: Any colon-bearing or local/git/URL/alias resolver in a root or transitive edge is offline_dependency_unsupported before snapshot lookup; a supported registry edge absent from the graph is offline_lock_mismatch.

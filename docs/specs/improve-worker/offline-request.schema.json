@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OfflineDependencyRequestV1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "package",
+    "lock",
+    "cache",
+    "tool",
+    "platform",
+    "resourceProfile",
+    "destination"
+  ],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "package": {
+      "$ref": "#/definitions/reference"
+    },
+    "lock": {
+      "$ref": "#/definitions/reference"
+    },
+    "cache": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "root",
+        "manifest"
+      ],
+      "properties": {
+        "root": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "manifest": {
+          "$ref": "#/definitions/reference"
+        }
+      }
+    },
+    "tool": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "softwareLayerSha256"
+      ],
+      "properties": {
+        "version": {
+          "const": "10.7.1"
+        },
+        "softwareLayerSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "platform": {
+      "const": "linux-x64-glibc"
+    },
+    "resourceProfile": {
+      "const": "offline-dependencies-v1"
+    },
+    "destination": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    }
+  },
+  "definitions": {
+    "reference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  }
+}
