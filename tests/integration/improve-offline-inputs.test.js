@@ -122,3 +122,42 @@ describe('offline acquisition rejects untrusted inputs before creating a worker'
     expect(create).not.toHaveBeenCalled(); expect(fs.existsSync(request.destination)).toBe(false);
   });
 });
+
+test('offline-launcher-pins: cold npm package imports and calls acquisition, then rejects either mutated installed helper', () => {
+  const { spawnSync } = require('child_process');
+  const installed = path.join(root, 'installed'); fs.mkdirSync(installed, { mode: 0o700 });
+  // Use the actual npm payload: a managed project script-only install is not
+  // the package root consumed by Improve and does not carry its templates/ tree.
+  const packed = spawnSync('npm', ['pack', '--ignore-scripts', '--json', '--pack-destination', root], {
+    cwd: path.resolve(__dirname, '../..'), encoding: 'utf8', timeout: 30000
+  });
+  expect({ status: packed.status, error: packed.error?.code }).toEqual({ status: 0, error: undefined });
+  const archive = JSON.parse(packed.stdout)[0];
+  for (const name of ['improve-offline-inputs.cjs', 'improve-offline-cache.cjs'])
+    expect(archive.files.some(f => f.path === 'scripts/' + name)).toBe(true);
+  const unpacked = spawnSync('tar', ['-xzf', path.join(root, archive.filename), '-C', installed, '--strip-components=1'], { encoding: 'utf8' });
+  expect(unpacked.status).toBe(0);
+  const code = `
+    const fs=require('fs'),path=require('path'),assert=require('assert'),cp=require('child_process');
+    const acquisition=require('./scripts/improve-offline-inputs.cjs'),worker=require('./scripts/improve-worker.cjs');
+    assert.throws(()=>acquisition.prepareOfflineInputs({},{}),e=>e.code==='offline_input_changed');
+    const checked=[];
+    for(const name of ['improve-offline-inputs.cjs','improve-offline-cache.cjs']) {
+      const dir=path.resolve('launcher-'+name);fs.mkdirSync(dir,{mode:0o700});
+      const launcher=worker.pinnedLauncher({directory:dir,config:{},mode:'worker'});
+      const before=cp.spawnSync(launcher,['check'],{encoding:'utf8'});
+      assert(!before.error);assert(!before.stderr.includes('runtime_input_changed'));
+      const file=path.resolve('scripts',name),original=fs.readFileSync(file);
+      try {fs.appendFileSync(file,'\\n// changed installed helper\\n');
+        const rejected=cp.spawnSync(launcher,['check'],{encoding:'utf8'});
+        assert.notEqual(rejected.status,0);assert(rejected.stderr.includes('runtime_input_changed'));checked.push(name);
+      } finally {fs.writeFileSync(file,original);}
+    }
+    console.log(JSON.stringify({loaded:true,negativeAcquisition:true,baselinePinCheck:true,rejectedHelpers:checked}));
+  `;
+  const r = spawnSync(process.execPath, ['--no-global-search-paths', '-e', code], { cwd: installed, encoding: 'utf8',
+    env: { PATH: path.dirname(process.execPath) + ':/usr/bin:/bin', HOME: root, NODE_PATH: '' }, timeout: 30000 });
+  expect({ status: r.status, stderr: r.stderr }).toEqual({ status: 0, stderr: '' });
+  expect(JSON.parse(r.stdout)).toEqual({ loaded: true, negativeAcquisition: true, baselinePinCheck: true,
+    rejectedHelpers: ['improve-offline-inputs.cjs', 'improve-offline-cache.cjs'] });
+}, 60000);

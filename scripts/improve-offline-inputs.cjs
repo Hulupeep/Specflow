@@ -1,5 +1,5 @@
 'use strict';
-const fs = require('fs'), path = require('path'), yaml = require('js-yaml');
+const fs = require('fs'), path = require('path'), yaml = require('./vendor/js-yaml/js-yaml.cjs');
 const cache = require('./improve-offline-cache.cjs');
 const { WorkerError, strictJSON, verifySoftwareLayer, OFFLINE_RESOURCE_PROFILE } = require('./improve-worker.cjs');
 const CONFIG = Object.freeze({ cwd: '/work', argv: ['/node/bin/node', '/tools/pnpm/bin/pnpm.cjs', 'install',
