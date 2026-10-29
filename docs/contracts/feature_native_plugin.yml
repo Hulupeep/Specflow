@@ -1,6 +1,6 @@
 contract_meta:
   id: feature_native_plugin
-  version: 1
+  version: 2
   created_from_spec: GitHub #110 and #114 native root layout/catalog
   owner: specflow-core
 llm_policy:
@@ -16,11 +16,13 @@ invariants:
     rule: Framework assets resolve from the installed native plugin root, project state from the selected project. Native use does not require PATH Specflow or copied project scripts; nonplugin context and existing human/gate boundaries remain preserved.
   - id: I-NATIVE-004
     rule: Native validation, actual loaded component/access receipts, inline installed bytes, cached immutable distribution and published/customer evidence remain distinct. Model prose alone, missing native access or skipped journeys cannot establish completion. Qualifiers preserve user global setup and never copy credentials or select a paid fallback.
+  - id: I-NATIVE-005
+    rule: The full marketplace entry pins the canonical npm package version and retains the independent Improve entry. Claude and Codex manifests derive their version from package.json; drift blocks qualification, and an unpublished package pin must not be promoted to the live catalog.
 capability_boundary:
   native_journeys: [J-PLUGIN-INSTALL, J-PLUGIN-AGENTS]
   actual_host_evidence: registered native components and successful installed-root content access
   diagnostic: about is read-only identity, never a gate verdict
-  remaining: [112-workflow-commands, 113-owning-hooks, 115-marketplace, 116-integrated-release]
+  remaining: [115-marketplace, 116-integrated-release]
 test_hooks:
   tests:
     - file: tests/contracts/native-plugin-layout.test.js

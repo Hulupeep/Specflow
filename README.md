@@ -57,6 +57,28 @@ node /absolute/path/to/specflow-kit/bin/specflow.js run trace \
 
 These commands inspect or advance the declared run; they do not manufacture acceptance, required backend access or permission. [How it works](docs/how-it-works.md) and the [command reference](docs/reference.md) explain the verifier lifecycle.
 
+## Use as a Claude Code plugin
+
+The full plugin is `specflow`; the separate `specflow-improve` entry is the thin
+caller for a configured Improve service. The full plugin uses the same versioned
+npm payload as the source kit, including the canonical scripts, agents, skills,
+commands and hooks.
+
+Release status: **0.12.0 is a candidate, not yet published**. These marketplace
+commands are the release path being qualified; the published 0.11.1 package does
+not establish their current behavior.
+
+```text
+/plugin marketplace add Hulupeep/Specflow
+/plugin install specflow@specflow-repo
+```
+
+The explicit marketplace suffix avoids ambiguity with another catalog's plugin.
+In a new Claude Code session, run `/specflow:about` to inspect the installed
+identity. `/specflow:run`, `/specflow:trace` and `/specflow:verify` use the existing
+runner and owning gates. Loading the plugin does not approve a build or merge.
+See [native installation and qualification](docs/native-plugin.md).
+
 ## Trust boundaries and limits
 
 - Provider prose, confidence and exit codes cannot become gate verdicts. The owning verifier executes current checks; stale, copied or skipped required evidence cannot pass.

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.0 (release candidate, not published)
+
+- Owning native case accounting, independent expected/actual comparison and
+  seam checks distinguish current executed evidence from declarations and copies.
+- Improve binds frozen external native oracles and uses progress-aware build
+  continuation. Ordinary subscription work has no invented monetary or review-count
+  stop; explicit limits, named stagnation and expensive billable-route controls remain.
+- Native Claude workflow commands and owning hooks use the canonical runtime.
+  Claude/Codex versions and the full marketplace package pin derive from package.json.
+- Source qualification, installed behavior, real-product outcomes and publication
+  remain separate gates. This candidate has not been published or qualified as a
+  remote cached release.
+
+
 All notable changes to `@colmbyrne/specflow`.
 
 **Update:** `npx @colmbyrne/specflow update . --ci` then `npx @colmbyrne/specflow verify`
