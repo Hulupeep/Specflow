@@ -35,6 +35,17 @@ test('opt-in full coverage joins only matching Claude line contents and handles 
  two[1].message.content[0].content='2→invented';expect(access.collect([...one,...two],dir,['proof.txt'],{coverage:true}).complete).toEqual([]);
  fs.writeFileSync(path.join(dir,'empty.patch'),'');const empty=claude('Read',{file_path:'empty.patch'});empty[1].message.content[0].content='The file exists but is empty';expect(access.collect(empty,dir,['empty.patch'],{coverage:true}).complete).toEqual(['empty.patch']);
 });
+test('bounded native read of a large manifest earns partial, not full, coverage',()=>{
+ const lines=Array.from({length:12000},(_,i)=>`entry ${i} ${'x'.repeat(60)}`);
+ fs.writeFileSync(path.join(dir,'manifest.json'),lines.join('\n')+'\n');
+ const events=claude('Read',{file_path:'manifest.json',offset:1,limit:100});
+ events[1].message.content[0].content=lines.slice(0,100).map((line,i)=>`${i+1}\t${line}`).join('\n');
+ const result=access.collect(events,dir,['manifest.json'],{coverage:true});
+ expect(result.inspected).toEqual(['manifest.json']);
+ expect(result.coverage['manifest.json']).toEqual({totalLines:12000,linesRead:100,complete:false});
+ events[1].message.content[0].is_error=true;
+ expect(access.collect(events,dir,['manifest.json'],{coverage:true}).inspected).toEqual([]);
+});
 test('invented citation is rejected even if another file was really read',()=>{
  expect(()=>access.apply({inspected:['manifest.json']},access.collect(claude(),dir,['proof.txt']))).toThrow(/receipt/);
 });

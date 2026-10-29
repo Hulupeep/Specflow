@@ -269,6 +269,14 @@ describe('REVIEW-PREFLIGHT (#269)',()=>{
  test('omitted mandatory root receipt never becomes acceptance',()=>{
   const run=start(),result=review(run,batch(),peer({change:r=>{r.inspected=r.inspected.filter(p=>p!=='manifest.json');}}));expect(result.outcome).toBe('blocked');expect(result.blocker).toMatch(/manifest.json|inspect/i);
  });
+ test('Claude peer receives bounded manifest read guidance without waiving inspection',()=>{
+  const run=start('codex');
+  expect(review(run,batch()).outcome).toBe('accepted');
+  const prompt=fs.readFileSync(path.join(root,'.specflow/duo',run.id,'round-001/prompt.txt'),'utf8');
+  expect(prompt).toContain('offset: 1 and limit: 100');
+  expect(prompt).toContain('A failed read or a partial read never proves full coverage');
+  expect(()=>duo.validateReview({outcome:'accepted',summary:'checked',findings:[],unrelated:[],inspected:[]},{requiredReads:['manifest.json']})).toThrow(/did not inspect/);
+ });
 });
 
 test('REVIEW-PREFLIGHT diagnostic root-name collisions keep the native schema enum valid',()=>{
