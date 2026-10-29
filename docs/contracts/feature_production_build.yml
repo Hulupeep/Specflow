@@ -1,0 +1,28 @@
+contract_meta:
+  id: feature_production_build
+  version: 1
+  created_from_spec: "GitHub #291; docs/specs/improve-worker/production-build-design.md"
+  covers_reqs: [REQ-BUILD-01, REQ-BUILD-02, REQ-BUILD-03, REQ-BUILD-04, REQ-BUILD-05, REQ-BUILD-06]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_production_build"
+invariants:
+  - id: I-BUILD-001
+    rule: "A real production build uses complete admitted source/dependency/runtime/command/environment identities in confinement; synthetic, mocked, host-built or silently altered product inputs cannot prove completion."
+    tests: [build-real-target, build-input-mutation]
+  - id: I-BUILD-002
+    rule: "Only the closed internal build layout may mount read-only dependencies and finite noexec output beneath read-only source. Every other overlap and shadowing remains denied; actual kernel topology must match before repository execution."
+    tests: [build-layout-rejection, build-native-load, build-input-write-denial]
+  - id: I-BUILD-003
+    rule: "A successful build becomes consumable only after quiesced complete output admission and bound receipt validation; mutation, foreign jobs, interruption and unavailable resources never confer success or replay authority."
+    tests: [build-fresh-consumer, build-input-mutation, build-capture-interruption, build-failure-diagnosis]
+  - id: I-BUILD-004
+    rule: "Installed helper identities and legacy worker/acquisition boundaries remain authoritative; cold payload absence or mutation fails before execution."
+    tests: [build-installed-pins, build-layout-rejection]
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-production-build.test.js
+    - file: tests/integration/improve-production-build.test.js
+    - file: tests/contracts/improve-worker-install.test.js

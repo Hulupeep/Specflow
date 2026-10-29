@@ -33,6 +33,8 @@ contracts:
     path: docs/contracts/feature_improve_worker.yml
   - id: feature_input_capsule
     path: docs/contracts/feature_input_capsule.yml
+  - id: feature_production_build
+    path: docs/contracts/feature_production_build.yml
   - id: feature_offline_inputs
     path: docs/contracts/feature_offline_inputs.yml
   - id: feature_preflight
