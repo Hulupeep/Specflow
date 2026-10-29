@@ -11,6 +11,7 @@ const core = require('./specflow-improve.cjs'),
 const sha = (b) => crypto.createHash('sha256').update(b).digest('hex'),
   digest = (v) => sha(JSON.stringify(v));
 const HELPER = path.join(__dirname, 'improve-worker-store.py');
+const CAPSULE_HELPER = path.join(__dirname, 'improve-worker-capsule.py');
 class WorkerError extends Error {
   constructor(
     code,
@@ -58,6 +59,49 @@ function helper(action, request, input = '') {
   }
   if (r.status !== 0) throw new WorkerError(out.error || 'artifact_helper_failed', 'artifact');
   return out;
+}
+function capsuleHelper(action, request, sourceFd) {
+  const r = spawnSync('/usr/bin/python3', [CAPSULE_HELPER, action], {
+    input: JSON.stringify(request), encoding: 'utf8', timeout: 300000,
+    maxBuffer: 1024 * 1024,
+    stdio: sourceFd === undefined ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe', sourceFd],
+    env: { PATH: '/usr/bin:/bin', HOME: '/nonexistent', PYTHONDONTWRITEBYTECODE: '1' }
+  });
+  let out;
+  try { out = JSON.parse(r.stdout); } catch { throw new WorkerError('capsule_protocol'); }
+  if (r.status !== 0) throw new WorkerError(/^capsule_[a-z_]+$/.test(out.error || '') ? out.error : 'capsule_failed');
+  return out;
+}
+function containerProcessIdentity(id, pid) {
+  need(/^[a-f0-9]{64}$/.test(id) && Number.isSafeInteger(pid) && pid > 1, 'capsule_process_identity');
+  try {
+    const probe = require('./improve-process-identity.cjs');
+    const identity = probe.identity(pid);
+    need(identity && probe.state(identity) === 'live', 'capsule_process_identity');
+    const members = fs.readFileSync(`/proc/${pid}/cgroup`, 'utf8').split('\n')
+      .flatMap(line => line.split(':').slice(2).join(':').split('/'));
+    need(members.includes(id) || members.includes(`docker-${id}.scope`), 'capsule_process_identity');
+    const namespace = fs.statSync(`/proc/${pid}/ns/mnt`);
+    need(digest(identity) === digest(probe.identity(pid)), 'capsule_process_identity');
+    return { identity, mountNamespace: `${namespace.dev}:${namespace.ino}` };
+  } catch { throw new WorkerError('capsule_process_identity'); }
+}
+function namespaceDirectory(id, pid, source, expectedProcess) {
+  need(Number.isSafeInteger(pid) && pid > 1 && path.isAbsolute(source) && safeRelative(source.slice(1)), 'capsule_source');
+  // The engine-verified proc root is the only intentional magic link. Walk all
+  // repository-controlled components with NOFOLLOW relative to an open FD.
+  need(digest(containerProcessIdentity(id, pid)) === digest(expectedProcess), 'capsule_process_identity');
+  let fd = fs.openSync(`/proc/${pid}/root`, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY);
+  try {
+    need(digest(containerProcessIdentity(id, pid)) === digest(expectedProcess), 'capsule_process_identity');
+    for (const part of source.slice(1).split('/')) {
+      const next = fs.openSync(`/proc/self/fd/${fd}/${part}`,
+        fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+      fs.closeSync(fd); fd = next;
+    }
+    need(digest(containerProcessIdentity(id, pid)) === digest(expectedProcess), 'capsule_process_identity');
+    return fd;
+  } catch (error) { fs.closeSync(fd); throw error instanceof WorkerError ? error : new WorkerError('capsule_source'); }
 }
 function strictJSON(text) {
   need(typeof text === 'string' && Buffer.byteLength(text) <= 8 * 1024 * 1024, 'json_byte_limit');
@@ -469,8 +513,9 @@ function createSoftwareLayer({
   };
 }
 class DockerWorker {
-  constructor({ image, layer, stateRoot, gitArea = null, uid = process.getuid(), maxMilliseconds = 120000 }) {
+  constructor({ image, layer, stateRoot, gitArea = null, uid = process.getuid(), maxMilliseconds = 120000, jobId = null }) {
     need(/^sha256:[a-f0-9]{64}$/.test(image), 'worker_image_unavailable');
+    this.jobId = jobId;
     this.image = image;
     this.layer = layer;
     this.stateRoot = privateDir(stateRoot);
@@ -582,9 +627,11 @@ class DockerWorker {
       return ['--mount', `type=bind,src=${m.source},dst=${m.destination}${m.writable === true ? '' : ',readonly'}`];
     });
   }
-  create({ role = 'app', mounts = [], tmpfs = [], network = 'none', memory = 768 * 1024 * 1024 }) {
+  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory = 768 * 1024 * 1024 }) {
     DockerWorker.probe();
     verifySoftwareLayer(this.layer);
+    need(Array.isArray(capsules), 'capsule_mounts');
+    mounts = [...mounts, ...capsules.map(c => this.capsuleMount(c.target, c.expected, c.destination))];
     need(
       network === 'none' || (network.startsWith('container:') && this.containers.has(network.slice(10))),
       'worker_network_unavailable'
@@ -775,6 +822,51 @@ class DockerWorker {
     need(after.Paused && after.Pid === pid, 'worker_not_quiescent');
     return result;
   }
+  capsuleLocation(target) {
+    need(safeId(this.jobId) && typeof target === 'string', 'capsule_job_identity');
+    const absolute = noLinks(path.resolve(target));
+    need(absolute.startsWith(path.resolve(this.stateRoot) + path.sep), 'capsule_outside_job');
+    return absolute;
+  }
+  capsuleState(id) {
+    need(this.containers.has(id) && this.receipts.has(id), 'capsule_container_identity');
+    const inspect = JSON.parse(this.call(['inspect', id]).stdout)[0];
+    validateInspection(inspect, this.receipts.get(id).expected);
+    need(inspect.State.Running && inspect.State.Paused && Number.isSafeInteger(inspect.State.Pid) && inspect.State.Pid > 1,
+      'capsule_not_quiescent');
+    const processIdentity = containerProcessIdentity(id, inspect.State.Pid);
+    const second = JSON.parse(this.call(['inspect', id]).stdout)[0];
+    validateInspection(second, this.receipts.get(id).expected);
+    const confirmed = second.State;
+    need(confirmed.Pid === inspect.State.Pid && confirmed.Running && confirmed.Paused, 'capsule_container_changed');
+    return { ...inspect.State, processIdentity };
+  }
+  captureCapsule(id, source, target, { recipeSha256, sourceInputSha256, limits } = {}) {
+    target = this.capsuleLocation(target);
+    privateDir(path.dirname(target));
+    const before = this.capsuleState(id);
+    const identity = { jobId: this.jobId, sourceContainerId: id, recipeSha256, sourceInputSha256 };
+    const fd = namespaceDirectory(id, before.Pid, source, before.processIdentity);
+    let staged;
+    try { staged = capsuleHelper('prepare', { sourceFd: 3, target, identity, limits }, fd); }
+    finally { fs.closeSync(fd); }
+    const after = this.capsuleState(id);
+    need(after.Pid === before.Pid && digest(after.processIdentity) === digest(before.processIdentity), 'capsule_container_changed');
+    need(staged.status === 'staged' && /^[a-f0-9]{64}$/.test(staged.manifestSha256) &&
+      Object.keys(identity).every(k => staged.identity?.[k] === identity[k]), 'capsule_receipt_identity');
+    const expected = { identity, manifestSha256: staged.manifestSha256 };
+    const result = capsuleHelper('admit', { target, expected, stageName: staged.stageName, limits });
+    need(result.status === 'admitted', 'capsule_unconfirmed');
+    return { target, ...result };
+  }
+  capsuleMount(target, expected, destination) {
+    target = this.capsuleLocation(target);
+    need(expected?.identity?.jobId === this.jobId, 'capsule_job_identity');
+    need(typeof destination === 'string' && path.isAbsolute(destination) && safeRelative(destination.slice(1)), 'capsule_destination');
+    const result = capsuleHelper('verify', { target, expected });
+    need(result.status === 'admitted', 'capsule_unconfirmed');
+    return { source: path.join(target, 'tree'), destination, writable: false };
+  }
   destroy(id) {
     if (!this.containers.has(id)) return;
     const r = this.call(['rm', '-f', id], { allowFailure: true, timeout: 20000 });
@@ -794,7 +886,7 @@ class DockerWorker {
     if (failures.length) throw new WorkerError('worker_termination_failed', 'teardown');
   }
 }
-Object.assign(module.exports, { manifestTree, verifySoftwareLayer, createSoftwareLayer, DockerWorker });
+Object.assign(module.exports, { manifestTree, verifySoftwareLayer, createSoftwareLayer, DockerWorker, containerProcessIdentity });
 
 function isolatedGit(worker, area, args, { cwd = area, input } = {}) {
   need(path.resolve(cwd) === area || path.resolve(cwd).startsWith(area + path.sep), 'git_cwd_outside_job');
@@ -1174,6 +1266,7 @@ function pinnedLauncher({ directory, config, mode }) {
     ...new Set([
       __filename,
       HELPER,
+      CAPSULE_HELPER,
       ...fs
         .readdirSync(__dirname)
         .filter((f) => f.endsWith('.cjs'))

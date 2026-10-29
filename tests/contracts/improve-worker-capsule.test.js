@@ -72,6 +72,23 @@ test('capsule-resource-limits rejects excess bytes without admission', () => {
   const r = seal({ limits: { maxBytes: 3 } }); expect(r.code).not.toBe(0);
   expect(fs.existsSync(target)).toBe(false);
 });
+test.each([
+  { maxFileBytes: 3 }, { maxEntries: 1 }, { maxDepth: 1 },
+  { maxBytes: -1 }, { maxBytes: true }, { maxBytes: 1.5 }, { maxBytes: 3 * 1024 ** 3 }
+])('capsule-resource-limits rejects breached or invalid profile %j', limits => {
+  fs.mkdirSync(path.join(source, 'nested/deep'), { recursive: true });
+  fs.writeFileSync(path.join(source, 'nested/deep/data'), 'more data');
+  expect(seal({ limits }).code).not.toBe(0); expect(fs.existsSync(target)).toBe(false);
+});
+test('capsule-worker-authority prepare creates no admitted target; trusted admission verifies the staged identity', () => {
+  const prepared = call('prepare', { source, target, identity }); expect(prepared.code).toBe(0);
+  expect(prepared.output.status).toBe('staged'); expect(fs.existsSync(target)).toBe(false);
+  const expected = { identity, manifestSha256: prepared.output.manifestSha256 };
+  expect(call('admit', { target, expected: { ...expected, identity: { ...identity, jobId: 'wrong' } }, stageName: prepared.output.stageName }).code).not.toBe(0);
+  expect(fs.existsSync(target)).toBe(false);
+  const admitted = call('admit', { target, expected, stageName: prepared.output.stageName });
+  expect(admitted.code).toBe(0); expect(verify(admitted.output).code).toBe(0);
+});
 test('capsule-no-replace retries the same complete identity but cannot overwrite conflicting data', () => {
   const first = seal(); expect(first.code).toBe(0);
   const again = seal(); expect(again.code).toBe(0);

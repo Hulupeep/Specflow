@@ -185,20 +185,36 @@ def verify_fd(fd,expected,budget):
     finally:os.close(tree)
     return {'status':'admitted',**receipt}
 def verify(req):
-    fd=directory(req['target'])
+    target=os.path.abspath(req['target']);parent,name=os.path.split(target)
+    parentfd=directory(parent);fd=None
     try:
+        owner=os.fstat(parentfd)
+        if owner.st_uid!=os.getuid() or owner.st_mode&0o077:fail('private_parent')
+        fd=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=parentfd)
+        opened=os.fstat(fd)
         result=verify_fd(fd,req['expected'],Budget(req.get('limits')))
-        parent=directory(os.path.dirname(req['target']))
-        try:os.fsync(fd);os.fsync(parent)
+        current=os.stat(name,dir_fd=parentfd,follow_symlinks=False)
+        if (opened.st_dev,opened.st_ino)!=(current.st_dev,current.st_ino):fail('race')
+        try:os.fsync(fd);os.fsync(parentfd)
         except OSError:fail('commit_unconfirmed')
-        finally:os.close(parent)
         return result
-    finally:os.close(fd)
-def seal(req):
+    finally:
+        if fd is not None:os.close(fd)
+        os.close(parentfd)
+def seal(req,defer=False):
     binding=identity(req['identity']);budget=Budget(req.get('limits'))
-    source=os.path.abspath(req['source']);target=os.path.abspath(req['target']);parent,name=os.path.split(target)
-    if source==target or target.startswith(source+'/') or source.startswith(target+'/'):fail('path_overlap')
-    src=directory(source);dest=directory(parent);stagefd=None
+    target=os.path.abspath(req['target']);parent,name=os.path.split(target)
+    if 'sourceFd' in req:
+        if not defer or type(req['sourceFd'])!=int or req['sourceFd']!=3:fail('source_fd')
+        src=os.dup(3)
+        if not stat.S_ISDIR(os.fstat(src).st_mode):os.close(src);fail('source_fd')
+    else:
+        source=os.path.abspath(req['source'])
+        if source==target or target.startswith(source+'/') or source.startswith(target+'/'):fail('path_overlap')
+        src=directory(source)
+    try:dest=directory(parent)
+    except:os.close(src);raise
+    stagefd=None
     try:
         owner=os.fstat(dest)
         if owner.st_uid!=os.getuid() or owner.st_mode&0o077:fail('private_parent')
@@ -207,8 +223,10 @@ def seal(req):
         except FileNotFoundError:exists=False
         if exists:
             old=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=dest)
-            try:return {**verify_fd(old,expected,budget),'idempotent':True}
+            try:verify_fd(old,expected,budget)
             finally:os.close(old)
+            if defer:return {'status':'staged','stageName':None,**expected}
+            return admit({'target':target,'expected':expected,'stageName':None,'limits':req.get('limits')})
         for attempt in range(10):
             stageName='.capsule-staging-'+secrets.token_hex(16)
             try:os.mkdir(stageName,0o700,dir_fd=dest);break
@@ -247,24 +265,50 @@ def seal(req):
         finally:os.close(tree)
         put(stagefd,'manifest.json',raw);put(stagefd,'receipt.json',canonical(expected));os.fsync(stagefd)
         verify_fd(stagefd,expected,budget);budget.check()
-        libc=ctypes.CDLL(None,use_errno=True)
-        rename=getattr(libc,'renameat2',None)
+        if defer:return {'status':'staged','stageName':stageName,**expected}
+        return admit({'target':target,'expected':expected,'stageName':stageName,'limits':req.get('limits')})
+    finally:
+        if stagefd is not None:os.close(stagefd)
+        os.close(src);os.close(dest)
+def admit(req):
+    target=os.path.abspath(req['target']);parent,name=os.path.split(target)
+    expected=req['expected'];identity(expected['identity']);budget=Budget(req.get('limits'))
+    dest=directory(parent);stagefd=None
+    try:
+        owner=os.fstat(dest)
+        if owner.st_uid!=os.getuid() or owner.st_mode&0o077:fail('private_parent')
+        try:os.stat(name,dir_fd=dest,follow_symlinks=False);exists=True
+        except FileNotFoundError:exists=False
+        if exists:
+            old=os.open(name,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=dest)
+            try:
+                result=verify_fd(old,expected,budget);os.fsync(old)
+                try:os.fsync(dest)
+                except OSError:fail('commit_unconfirmed')
+                return {**result,'idempotent':True}
+            finally:os.close(old)
+        stageName=req.get('stageName')
+        if not isinstance(stageName,str) or not re.fullmatch(r'\.capsule-staging-[a-f0-9]{32}',stageName):fail('staging_identity')
+        stagefd=os.open(stageName,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW,dir_fd=dest)
+        verify_fd(stagefd,expected,budget);os.fsync(stagefd);budget.check()
+        libc=ctypes.CDLL(None,use_errno=True);rename=getattr(libc,'renameat2',None)
         if rename is None:fail('atomic_rename_unavailable')
         if rename(dest,stageName.encode(),dest,name.encode(),1)!=0:
-            error=ctypes.get_errno()
-            if error==errno.EEXIST:fail('conflict')
+            if ctypes.get_errno()==errno.EEXIST:fail('conflict')
             fail('rename_failed')
         try:os.fsync(dest)
         except OSError:fail('commit_unconfirmed')
         return {'status':'admitted',**expected}
     finally:
         if stagefd is not None:os.close(stagefd)
-        os.close(src);os.close(dest)
+        os.close(dest)
 def main():
     raw=sys.stdin.buffer.read(65537)
     if len(raw)>65536:fail('request_limit')
     req=parse(raw);action=sys.argv[1]
     if action=='seal':result=seal(req)
+    elif action=='prepare':result=seal(req,defer=True)
+    elif action=='admit':result=admit(req)
     elif action=='verify':result=verify(req)
     else:fail('action')
     print(json.dumps(result,separators=(',',':')))
