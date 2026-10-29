@@ -134,6 +134,10 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
     candidate[f.id] = { ...f, status: 'open' };
   }
   const remaining = Object.values(candidate).filter(f => f.status === 'open');
+  // Existing findings may remain open outside a scoped batch even when the
+  // reviewer reports no new finding. Validate that only after every prior
+  // finding has been explicitly dispositioned and closures checked.
+  if (result.outcome === 'changes_required' && !remaining.length) throw Error('Changes required without evidenced findings');
   if (result.outcome === 'accepted' && (remaining.length || !result.index_complete || result.assessments.some(a => a.status === 'blocked'))) throw Error('Acceptance cannot omit open findings, incomplete index or blocked criteria');
   const observations = [];
   for (const d of result.diagnostics) {

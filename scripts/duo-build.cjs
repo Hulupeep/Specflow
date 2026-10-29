@@ -255,7 +255,6 @@ function validateReview(result, request) {
   if (!result || !['accepted', 'changes_required', 'blocked'].includes(result.outcome) || !result.summary?.trim() || !Array.isArray(result.findings) || !Array.isArray(result.unrelated) || !Array.isArray(result.inspected)) throw Error('Malformed peer outcome');
   for (const f of result.findings) for (const key of ['id', 'basis', 'evidence', 'action']) if (typeof f[key] !== 'string' || !f[key].trim()) throw Error(`Finding missing ${key}`);
   if (result.outcome === 'accepted' && result.findings.length) throw Error('Acceptance conflicts with blocking findings');
-  if (result.outcome === 'changes_required' && !result.findings.length) throw Error('Changes required without evidenced findings');
   if (result.outcome === 'accepted' || result.assessments?.some(a => a.status === 'verified') || result.resolutions?.some(r => r.status === 'closed')) {
     for (const file of request.requiredReads) if (!result.inspected.includes(file)) throw Error(`Peer did not inspect required artifact: ${file}`);
   }
