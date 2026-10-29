@@ -153,6 +153,57 @@ describe('acceptance: REQ-A1..A4',()=>{
   });
 });
 describe('repairs: REQ-R1..R5',()=>{
+  function twoOpenFindings() {
+    const run=start();
+    const first=review(run,batch(),peer({outcome:'changes_required',change:r=>{
+      r.findings.push({...finding(),id:'F2',criterion:'AC-2',basis:'AC-2 explanation is wrong'});
+    }}));
+    expect(first.outcome).toBe('changes_required');
+    return run;
+  }
+  function partialPeer(outcome='changes_required', change=()=>{}) {
+    return peer({outcome,change:r=>{
+      r.findings=[];
+      r.assessments[0].status='verified';
+      r.resolutions.find(x=>x.id==='F1').status='closed';
+      r.resolutions.find(x=>x.id==='F2').status='open';
+      change(r);
+    }});
+  }
+  test('SCOPED-289 closes an evidenced finding while retaining an explicitly open finding',()=>{
+    const run=twoOpenFindings();
+    const b=batch({id:'partial',criteria:['AC-1'],resolutions:[{id:'F1',change:'corrected',evidence:['raw.txt']}]});
+    const result=review(run,b,partialPeer());
+    expect(result.outcome).toBe('changes_required');
+    expect(result.findings.F1.status).toBe('closed');
+    expect(result.findings.F2.status).toBe('open');
+    expect(result.progress.findings_closed).toBe(1);
+    expect(result.history.at(-1).stage).toBe('validated');
+    expect(result.history.at(-1).review.resolutions).toHaveLength(2);
+    expect(()=>duo.finish(root,run.id,token(run.id))).toThrow(/incomplete/);
+  });
+  test('SCOPED-289 changes required with no new or retained finding remains invalid',()=>{
+    const run=start();
+    const result=review(run,batch(),peer({outcome:'changes_required',change:r=>{r.findings=[];}}));
+    expect(result.outcome).toBe('blocked');expect(result.blocker).toMatch(/without evidenced findings/);
+  });
+  test('SCOPED-289 missing disposition or unsupported closure remains invalid',()=>{
+    const omitted=twoOpenFindings();
+    const b=batch({id:'omit',criteria:['AC-1'],resolutions:[{id:'F1',change:'corrected',evidence:['raw.txt']}]});
+    const missing=review(omitted,b,partialPeer('changes_required',r=>{r.resolutions=r.resolutions.filter(x=>x.id!=='F2');}));
+    expect(missing.outcome).toBe('blocked');expect(missing.blocker).toMatch(/disposition/);
+    const unsupported=twoOpenFindings();
+    const noResolution=review(unsupported,batch({id:'unsupported',criteria:['AC-1']}),partialPeer());
+    expect(noResolution.outcome).toBe('blocked');expect(noResolution.blocker).toMatch(/builder resolution/);
+    expect(readRun(unsupported.id).findings.F1.status).toBe('open');
+  });
+  test('SCOPED-289 accepted outcome cannot retain an open finding',()=>{
+    const run=twoOpenFindings();
+    const b=batch({id:'unsafe-acceptance',criteria:['AC-1'],resolutions:[{id:'F1',change:'corrected',evidence:['raw.txt']}]});
+    const result=review(run,b,partialPeer('accepted'));
+    expect(result.outcome).toBe('blocked');expect(result.blocker).toMatch(/open findings/);
+    expect(readRun(run.id).findings.F2.status).toBe('open');
+  });
   test('missing-disposition: accepting a new batch cannot forget an earlier finding',()=>{
     const run=start();review(run,batch(),peer({outcome:'changes_required'}));put('raw.txt','new output');
     const result=review(run,batch({id:'renamed'}),peer({change:r=>{r.resolutions=[];}}));
