@@ -60,13 +60,14 @@ function helper(action, request, input = '') {
   if (r.status !== 0) throw new WorkerError(out.error || 'artifact_helper_failed', 'artifact');
   return out;
 }
-function capsuleHelper(action, request, sourceFd) {
+function capsuleHelper(action, request, sourceFd, diagnostic) {
   const r = spawnSync('/usr/bin/python3', [CAPSULE_HELPER, action], {
     input: JSON.stringify(request), encoding: 'utf8', timeout: 300000,
     maxBuffer: 1024 * 1024,
     stdio: sourceFd === undefined ? ['pipe', 'pipe', 'pipe'] : ['pipe', 'pipe', 'pipe', sourceFd],
     env: { PATH: '/usr/bin:/bin', HOME: '/nonexistent', PYTHONDONTWRITEBYTECODE: '1' }
   });
+  diagnostic?.(action, r);
   let out;
   try { out = JSON.parse(r.stdout); } catch { throw new WorkerError('capsule_protocol'); }
   if (r.status !== 0) throw new WorkerError(/^capsule_[a-z_]+$/.test(out.error || '') ? out.error : 'capsule_failed');
@@ -933,6 +934,8 @@ class DockerWorker {
     need(inspect.State.Running && inspect.State.Paused && Number.isSafeInteger(inspect.State.Pid) && inspect.State.Pid > 1,
       'capsule_not_quiescent');
     const processIdentity = containerProcessIdentity(id, inspect.State.Pid);
+    if (this.receipts.get(id).expected.productionMode)
+      require('./improve-production-build.cjs').validateKernelMounts(fs.readFileSync(`/proc/${inspect.State.Pid}/mountinfo`, 'utf8'), this.receipts.get(id).expected.productionMode);
     const second = JSON.parse(this.call(['inspect', id]).stdout)[0];
     validateInspection(second, this.receipts.get(id).expected);
     const confirmed = second.State;
@@ -946,14 +949,14 @@ class DockerWorker {
     const identity = { jobId: this.jobId, sourceContainerId: id, recipeSha256, sourceInputSha256 };
     const fd = namespaceDirectory(id, before.Pid, source, before.processIdentity);
     let staged;
-    try { staged = capsuleHelper('prepare', { sourceFd: 3, target, identity, limits }, fd); }
+    try { staged = capsuleHelper('prepare', { sourceFd: 3, target, identity, limits }, fd, this.capsuleDiagnostic); }
     finally { fs.closeSync(fd); }
     const after = this.capsuleState(id);
     need(after.Pid === before.Pid && digest(after.processIdentity) === digest(before.processIdentity), 'capsule_container_changed');
     need(staged.status === 'staged' && /^[a-f0-9]{64}$/.test(staged.manifestSha256) &&
       Object.keys(identity).every(k => staged.identity?.[k] === identity[k]), 'capsule_receipt_identity');
     const expected = { identity, manifestSha256: staged.manifestSha256 };
-    const result = capsuleHelper('admit', { target, expected, stageName: staged.stageName, limits });
+    const result = capsuleHelper('admit', { target, expected, stageName: staged.stageName, limits }, undefined, this.capsuleDiagnostic);
     need(result.status === 'admitted', 'capsule_unconfirmed');
     return { target, ...result };
   }
@@ -961,7 +964,7 @@ class DockerWorker {
     target = this.capsuleLocation(target);
     need(expected?.identity?.jobId === this.jobId, 'capsule_job_identity');
     need(typeof destination === 'string' && path.isAbsolute(destination) && safeRelative(destination.slice(1)), 'capsule_destination');
-    const result = capsuleHelper('verify', { target, expected });
+    const result = capsuleHelper('verify', { target, expected }, undefined, this.capsuleDiagnostic);
     need(result.status === 'admitted', 'capsule_unconfirmed');
     return { source: path.join(target, 'tree'), destination, writable: false };
   }

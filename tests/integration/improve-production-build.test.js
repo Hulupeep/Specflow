@@ -32,9 +32,13 @@ test('live closed layout: native mapping, immutable inputs, isolation, mismatch 
     expect(compile.status).toBe(0);
     const hostCanary = path.join(root, 'host-canary'); fs.writeFileSync(hostCanary, 'private-positive');
     expect(fs.readFileSync(hostCanary, 'utf8')).toBe('private-positive');
-    worker = new DockerWorker({ image: DockerWorker.ensureImage(root), layer: layer(), stateRoot: root, jobId: 'boundary-fixture', maxMilliseconds: 60000 });
+    const runtime = layer(), library = runtime.files.find(f => f.destination !== '/node/bin/node');
+    const libraryCopy = path.join(root, 'runtime-library'); fs.copyFileSync(library.source, libraryCopy); library.source = libraryCopy;
+    runtime.sha256 = hash(JSON.stringify({ files: runtime.files, directories: runtime.directories }));
+    worker = new DockerWorker({ image: DockerWorker.ensureImage(root), layer: runtime, stateRoot: root, jobId: 'boundary-fixture', maxMilliseconds: 60000 });
     const seed = worker.create({ role: 'setup', resourceProfile: 'offline-dependencies-v1', mounts: [{ source: native, destination: '/input/addon.node' }] });
-    worker.exec(seed, ['/node/bin/node', '-e', `const f=require('fs');for(const d of ['app','app/node_modules','app/.next','deps','foreign'])f.mkdirSync('/work/'+d);f.writeFileSync('/work/app/package.json','{}');f.writeFileSync('/work/app/pnpm-lock.yaml','lockfileVersion: 9.0');f.writeFileSync('/work/foreign/canary','foreign-positive');f.copyFileSync('/input/addon.node','/work/deps/addon.node');for(const kind of ['link','file','nonempty']){const p='/work/'+kind;f.mkdirSync(p);f.mkdirSync(p+'/node_modules');f.writeFileSync(p+'/package.json','{}');if(kind==='link')f.symlinkSync('node_modules',p+'/.next');else if(kind==='file')f.writeFileSync(p+'/.next','bad');else{f.mkdirSync(p+'/.next');f.writeFileSync(p+'/.next/entry','bad')}}`], { cwd: '/work' });
+    worker.exec(seed, ['/node/bin/node', '-e', `const f=require('fs');for(const d of ['app','app/node_modules','app/.next','deps','foreign'])f.mkdirSync('/work/'+d);f.writeFileSync('/work/app/package.json','{}');f.writeFileSync('/work/app/pnpm-lock.yaml','lockfileVersion: 9.0');f.writeFileSync('/work/foreign/canary','foreign-positive');f.copyFileSync('/input/addon.node','/work/deps/addon.node');f.mkdirSync('/work/deps/next/dist/bin',{recursive:true});f.writeFileSync('/work/deps/next/dist/bin/next',JSON.stringify('placeholder'));for(const kind of ['link','file','nonempty']){const p='/work/'+kind;f.mkdirSync(p);f.mkdirSync(p+'/node_modules');f.writeFileSync(p+'/package.json','{}');if(kind==='link')f.symlinkSync('node_modules',p+'/.next');else if(kind==='file')f.writeFileSync(p+'/.next','bad');else{f.mkdirSync(p+'/.next');f.writeFileSync(p+'/.next/entry','bad')}}`], { cwd: '/work' });
+    worker.exec(seed, ['/node/bin/node', '-e', `require('fs').writeFileSync('/work/deps/next/dist/bin/next', process.argv[1])`, "const f=require('fs');if(process.argv[2]!=='build')throw Error('fixed command required');f.writeFileSync('/app/.next/BUILD_ID','isolated-fixture-build');f.writeFileSync('/app/.next/result.json',JSON.stringify({native:require('/app/node_modules/addon.node')}));"], { cwd: '/work' });
     worker.pause(seed);
     const source = capsule(worker, seed, '/work/app', root + '/source');
     const build = require('../../scripts/improve-production-build.cjs');
@@ -55,7 +59,7 @@ test('live closed layout: native mapping, immutable inputs, isolation, mismatch 
     expect(shadowCalls).not.toHaveBeenCalled(); shadowCalls.mockRestore(); worker.layer.files.pop();
     expect(fs.readFileSync(foreign.target + '/tree/canary', 'utf8')).toBe('foreign-positive');
     const input = { schema: 'specflow.production-build-input/v1', jobId: worker.jobId, source, dependencies,
-      dependencySource, runtimeSha256: worker.layer.sha256, command: [...build.COMMAND], resourceProfile: build.PROFILE.id,
+      dependencySource, runtimeSha256: build.runtimeIdentity(worker), command: [...build.COMMAND], resourceProfile: build.PROFILE.id,
       environment: { ...build.FIXED_ENV, NEXT_PUBLIC_SUPABASE_URL: 'http://127.0.0.1:54321', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'compile-only-fixture' } };
     const bound = build.inputIdentity(worker, input);
     expect(bound.inputSha256).toMatch(/^[a-f0-9]{64}$/);
@@ -67,6 +71,52 @@ test('live closed layout: native mapping, immutable inputs, isolation, mismatch 
     expect(() => build.inputIdentity(worker, input)).toThrow(); expect(mutationCalls).not.toHaveBeenCalled();
     fs.writeFileSync(pkg, '{}'); mutationCalls.mockRestore();
     expect(build.inputIdentity(worker, input).inputSha256).toBe(bound.inputSha256);
+    const runtimeCalls = jest.spyOn(worker, 'call'), originalImage = worker.image;
+    worker.image = 'sha256:' + 'f'.repeat(64);
+    expect(() => build.inputIdentity(worker, input)).toThrow('build_input_changed');
+    worker.image = originalImage;
+    worker.layer.files[0].destination += '-changed';
+    expect(() => build.inputIdentity(worker, input)).toThrow('build_input_changed');
+    worker.layer.files[0].destination = worker.layer.files[0].destination.replace(/-changed$/, '');
+    expect(runtimeCalls).not.toHaveBeenCalled(); runtimeCalls.mockRestore();
+    const built = build.runProductionBuild(worker, input, root + '/built');
+    expect(built.receipt.schema).toBe('specflow.production-build-receipt/v1');
+    expect(built.receipt.inputSha256).toBe(bound.inputSha256);
+    expect(hash(fs.readFileSync(path.join(built.evidenceDirectory, 'input-identity.json')))).toBe(built.receipt.inputSha256);
+    expect(hash(fs.readFileSync(path.join(built.evidenceDirectory, 'producer-identity.json')))).toBe(built.receipt.producerIdentitySha256);
+    expect(built.receipt.buildIdSha256).toBe(hash('isolated-fixture-build'));
+    expect(worker.containers.has(built.receipt.output.identity.sourceContainerId)).toBe(false);
+    const consumer = build.createProductionConsumer(worker, input, built.receipt, built.target);
+    expect(consumer.id).not.toBe(built.receipt.output.identity.sourceContainerId);
+    const consumed = consumer.exec(['/node/bin/node', '-e', `const f=require('fs'),a=require('assert');a.equal(f.readFileSync('/app/.next/BUILD_ID','utf8'),'isolated-fixture-build');a.equal(JSON.parse(f.readFileSync('/app/.next/result.json')).native,42);let denied=false;try{f.writeFileSync('/app/.next/change','no')}catch(e){denied=['EROFS','EACCES'].includes(e.code)}a(denied);console.log('consumed-read-only')`]);
+    expect(consumed.stdout.trim()).toBe('consumed-read-only'); consumer.close();
+    expect(Object.keys(built.receipt).sort()).toEqual([...require('../../docs/specs/improve-worker/production-build-receipt.schema.json').required].sort());
+    expect(built.receipt.output.identity.sourceInputSha256).toBe(bound.inputSha256);
+    const mutationFiles = [pkg, path.join(dependencies.target, 'tree/addon.node'), libraryCopy, path.join(built.target, 'tree/BUILD_ID')];
+    for (const file of mutationFiles) {
+      const bytes = fs.readFileSync(file), calls = jest.spyOn(worker, 'call');
+      try { fs.appendFileSync(file, 'changed'); expect(() => build.createProductionConsumer(worker, input, built.receipt, built.target)).toThrow(); expect(calls).not.toHaveBeenCalled(); }
+      finally { fs.writeFileSync(file, bytes); calls.mockRestore(); }
+    }
+    const addon = path.join(dependencies.target, 'tree/addon.node'), originalMode = fs.statSync(addon).mode & 0o777;
+    const modeCalls = jest.spyOn(worker, 'call');
+    try { fs.chmodSync(addon, originalMode ^ 0o040); expect(() => build.createProductionConsumer(worker, input, built.receipt, built.target)).toThrow(); expect(modeCalls).not.toHaveBeenCalled(); }
+    finally { fs.chmodSync(addon, originalMode); modeCalls.mockRestore(); }
+    for (const change of [x => x.command.push('--webpack'), x => { x.environment.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'changed-fixture'; }]) {
+      const changedInput = JSON.parse(JSON.stringify(input)); change(changedInput); const calls = jest.spyOn(worker, 'call');
+      try { expect(() => build.createProductionConsumer(worker, changedInput, built.receipt, built.target)).toThrow(); expect(calls).not.toHaveBeenCalled(); }
+      finally { calls.mockRestore(); }
+    }
+    const foreignWorker = new DockerWorker({ image: worker.image, layer: worker.layer, stateRoot: root, jobId: 'other-job' });
+    const foreignCalls = jest.spyOn(foreignWorker, 'call');
+    expect(() => build.createProductionConsumer(foreignWorker, input, built.receipt, built.target)).toThrow('build_input_changed');
+    expect(foreignCalls).not.toHaveBeenCalled(); foreignCalls.mockRestore();
+    const guardedInput = JSON.parse(JSON.stringify(input)), guarded = build.createProductionConsumer(worker, guardedInput, built.receipt, built.target);
+    guardedInput.environment.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'changed-after-creation';
+    const guardedCalls = jest.spyOn(worker, 'call');
+    expect(() => guarded.exec(['/node/bin/node', '-e', 'throw Error("must not execute")'])).toThrow('build_receipt_changed');
+    expect(guardedCalls.mock.calls.some(([args]) => args[0] === 'exec')).toBe(false); guardedCalls.mockRestore();
+    expect(worker.containers.has(guarded.id)).toBe(false);
     const id = worker.createProduction({ source, dependencies });
     const probe = worker.exec(id, ['/node/bin/node', '-e', `
 const f=require('fs'),a=require('assert'),net=require('net');
@@ -99,3 +149,57 @@ const connect=(host,port)=>new Promise(resolve=>{const s=net.connect({host,port}
     expect(worker.call(['ps', '-aq', '--filter', 'label=specflow.worker=owned']).stdout.trim()).toBe('');
   } finally { worker?.close(); fs.rmSync(root, { recursive: true, force: true }); }
 }, 120000);
+
+function faultFixture(script) {
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'production-fault-'));fs.chmodSync(root,0o700);
+ const worker=new DockerWorker({image:DockerWorker.ensureImage(root),layer:layer(),stateRoot:root,jobId:'fault-fixture'});
+ const build=require('../../scripts/improve-production-build.cjs');
+ try {
+  const seed=worker.create({role:'setup',resourceProfile:'offline-dependencies-v1'});
+  worker.exec(seed,['/node/bin/node','-e',`const f=require('fs');for(const d of ['app','app/node_modules','app/.next','deps'])f.mkdirSync('/work/'+d);f.writeFileSync('/work/app/package.json','{}');f.writeFileSync('/work/app/pnpm-lock.yaml','fixture-lock');f.mkdirSync('/work/deps/next/dist/bin',{recursive:true});f.writeFileSync('/work/deps/next/dist/bin/next',process.argv[1]);`,script],{cwd:'/work'});
+  worker.pause(seed);
+  const dependencySource={packageSha256:hash('{}'),lockSha256:hash('fixture-lock'),manifestSha256:hash('fixture-store')};
+  const source=capsule(worker,seed,'/work/app',root+'/source');
+  const dependencies=capsule(worker,seed,'/work/deps',root+'/deps',hash(build.canonical(dependencySource)));worker.destroy(seed);
+  const input={schema:'specflow.production-build-input/v1',jobId:worker.jobId,source,dependencies,dependencySource,runtimeSha256:build.runtimeIdentity(worker),
+   command:[...build.COMMAND],resourceProfile:build.PROFILE.id,environment:{...build.FIXED_ENV,NEXT_PUBLIC_SUPABASE_URL:'http://127.0.0.1:54321',NEXT_PUBLIC_SUPABASE_ANON_KEY:'compile-only-fixture'}};
+  return {root,worker,input,build};
+ } catch(error) {worker.close();fs.rmSync(root,{recursive:true,force:true});throw error;}
+}
+test.each([
+ ['command',"process.stderr.write('deliberate fixture failure');process.exit(7)",'build_command_failed'],
+ ['invalid-output',"require('fs').writeFileSync('/app/.next/other','no BUILD_ID')",'build_output_invalid'],
+ ['ENOSPC',"const f=require('fs'),fd=f.openSync('/app/.next/full','w'),b=Buffer.alloc(16*1024*1024,1);while(true)f.writeSync(fd,b)",'build_resource_exhausted'],
+ ['memory',"const held=[];while(true)held.push(Buffer.alloc(64*1024*1024,1))",'build_memory_exhausted'],
+ ['deadline',"setInterval(()=>{},1000)",'worker_deadline'],
+ ['process-loss',"setInterval(()=>{},1000)",'build_process_lost'],
+ ['staged-capture-interruption',"require('fs').writeFileSync('/app/.next/BUILD_ID','fixture')",'capsule_interrupted']
+])('live build failure %s emits no receipt and confirms teardown', (kind,script,expectedCode) => {
+ const {root,worker,input,build}=faultFixture(script);let injected=false,callSpy;
+ try {
+  if(['deadline','process-loss'].includes(kind)) {
+   const original=worker.call.bind(worker);
+   callSpy=jest.spyOn(worker,'call').mockImplementation((args,options)=>{
+    if(args[0]==='exec'&&args.includes('/app/node_modules/next/dist/bin/next')) {
+     injected=true;expect(options.timeout).toBe(build.PROFILE.phaseMilliseconds);
+     // Assert the real production bound; inject an earlier real transport timeout.
+     if(kind==='deadline')return original(args,{...options,timeout:100});
+     const id=args[args.indexOf('/node/bin/node')-1];expect(original(['kill',id]).status).toBe(0);
+    }
+    return original(args,options);
+   });
+  }
+  if(kind==='staged-capture-interruption') worker.capsuleDiagnostic=(action,result)=>{
+   if(action==='prepare') {expect(JSON.parse(result.stdout).status).toBe('staged');injected=true;throw Error('capsule_interrupted');}
+  };
+  let error;try {build.runProductionBuild(worker,input,root+'/output');}catch(e){error=e;}
+  expect(error).toBeDefined();expect(error.code||error.message).toBe(expectedCode);
+  expect(error.evidenceDirectory).toBeTruthy();expect(fs.existsSync(path.join(error.evidenceDirectory,'receipt.json'))).toBe(false);
+  const files=fs.readdirSync(error.evidenceDirectory);
+  expect(files.some(f=>f.endsWith('.stdout'))).toBe(true);expect(files.some(f=>f.endsWith('.stderr'))).toBe(true);
+  expect(JSON.parse(fs.readFileSync(path.join(error.evidenceDirectory,'failure.json'))).receiptEmitted).toBe(false);
+  expect(worker.containers.size).toBe(0);
+  if(['deadline','process-loss','staged-capture-interruption'].includes(kind))expect(injected).toBe(true);
+  if(kind==='staged-capture-interruption')expect(fs.existsSync(root+'/output')).toBe(false);
+ } finally {callSpy?.mockRestore();worker.close();fs.rmSync(root,{recursive:true,force:true});}
+},120000);

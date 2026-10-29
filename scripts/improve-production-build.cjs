@@ -144,10 +144,18 @@ function helperIdentity() {
   const read = require('./improve-offline-cache.cjs').readRegular;
   return digest(canonical(Object.fromEntries(names.map(name => [name, digest(read(path.join(__dirname, name)))]))));
 }
+function runtimeIdentity(worker) {
+  requireThat(typeof worker.image === 'string' && /^sha256:[a-f0-9]{64}$/.test(worker.image), 'build_input_changed');
+  const layer = worker.layer;
+  requireThat(layer && Array.isArray(layer.files) && Array.isArray(layer.directories), 'build_input_changed');
+  const softwareLayerSha256 = digest(JSON.stringify({ files: layer.files, directories: layer.directories }));
+  requireThat(softwareLayerSha256 === layer.sha256, 'build_input_changed');
+  return digest(canonical({ image: worker.image, softwareLayerSha256 }));
+}
 function inputIdentity(worker, input) {
   input = validateInput(input);
   const { verifySoftwareLayer, strictJSON } = require('./improve-worker.cjs');
-  requireThat(input.jobId === worker.jobId && input.runtimeSha256 === worker.layer.sha256, 'build_input_changed');
+  requireThat(input.jobId === worker.jobId && input.runtimeSha256 === runtimeIdentity(worker), 'build_input_changed');
   verifySoftwareLayer(worker.layer);
   for (const [key, destination] of [['source', '/app'], ['dependencies', '/app/node_modules']])
     worker.capsuleMount(input[key].target, input[key].receipt, destination);
@@ -162,4 +170,120 @@ function inputIdentity(worker, input) {
     cwd: PROFILE.cwd, profile: PROFILE, helperAbiSha256: helperIdentity() };
   return { input, logical, inputSha256: digest(canonical(logical)) };
 }
-Object.assign(module.exports, { canonical, validateInput, inputIdentity, helperIdentity, COMMAND, FIXED_ENV });
+Object.assign(module.exports, { canonical, validateInput, inputIdentity, runtimeIdentity, helperIdentity, COMMAND, FIXED_ENV });
+
+function outputRecipe(helperAbiSha256, producerIdentitySha256) {
+  return digest(canonical({ schema: 'specflow.production-output/v1', helperAbiSha256, producerIdentitySha256 }));
+}
+function buildId(worker, target, output) {
+  worker.capsuleMount(target, output, PROFILE.output);
+  const read = require('./improve-offline-cache.cjs').readRegular;
+  const manifestBytes = read(path.join(target, 'manifest.json'));
+  requireThat(digest(manifestBytes) === output.manifestSha256, 'build_output_changed');
+  const manifest = require('./improve-worker.cjs').strictJSON(manifestBytes.toString('utf8'));
+  const entry = manifest.entries.find(e => e.path === 'BUILD_ID');
+  requireThat(entry?.kind === 'file' && entry.size > 0, 'build_output_invalid');
+  const bytes = read(path.join(target, 'tree/BUILD_ID'), PROFILE.captureLimits.maxFileBytes);
+  requireThat(bytes.length === entry.size && digest(bytes) === entry.sha256, 'build_output_changed');
+  return digest(bytes);
+}
+function verifyProductionOutput(worker, input, receipt, target) {
+  const bound = inputIdentity(worker, input);
+  canonical(receipt);
+  exact(receipt, ['schema', 'jobId', 'inputSha256', 'producerIdentitySha256', 'output', 'buildIdSha256']);
+  exact(receipt.output, ['identity', 'manifestSha256']);
+  exact(receipt.output.identity, ['jobId', 'sourceContainerId', 'recipeSha256', 'sourceInputSha256']);
+  requireThat(receipt.schema === 'specflow.production-build-receipt/v1' && receipt.jobId === worker.jobId &&
+    receipt.inputSha256 === bound.inputSha256 && receipt.output.identity.jobId === worker.jobId &&
+    [receipt.producerIdentitySha256, receipt.buildIdSha256, receipt.output.manifestSha256,
+      receipt.output.identity.sourceContainerId, receipt.output.identity.recipeSha256, receipt.output.identity.sourceInputSha256].every(validDigest) &&
+    receipt.output.identity.sourceInputSha256 === bound.inputSha256 &&
+    receipt.output.identity.recipeSha256 === outputRecipe(bound.logical.helperAbiSha256, receipt.producerIdentitySha256), 'build_receipt_changed');
+  requireThat(buildId(worker, target, receipt.output) === receipt.buildIdSha256, 'build_output_changed');
+  return bound;
+}
+function runProductionBuild(worker, input, destination) {
+  const { WorkerError } = require('./improve-worker.cjs');
+  destination = worker.capsuleLocation(destination);
+  requireThat(!fs.existsSync(destination), 'build_output_exists');
+  const area = fs.mkdtempSync(path.join(worker.stateRoot, 'production-evidence-')); fs.chmodSync(area, 0o700);
+  const originalCall = worker.call, originalDiagnostic = worker.capsuleDiagnostic;
+  const beforeOwned = new Set(worker.containers); let sequence = 0, candidate;
+  function record(phase, r) {
+    const prefix = path.join(area, String(++sequence).padStart(4, '0'));
+    fs.writeFileSync(prefix + '.stdout', r.stdout || '', { mode: 0o600, flag: 'wx' });
+    fs.writeFileSync(prefix + '.stderr', r.stderr || '', { mode: 0o600, flag: 'wx' });
+    fs.writeFileSync(prefix + '.json', JSON.stringify({ phase, status: r.status, signal: r.signal || null, error: r.error?.code || null }), { mode: 0o600, flag: 'wx' });
+  }
+  worker.call = function(args, options = {}) {
+    const r = originalCall.call(this, args, { ...options, allowFailure: true }); record('docker-' + args[0], r);
+    if (!options.allowFailure && r.status !== 0) throw new WorkerError(r.error?.code === 'ETIMEDOUT' ? 'worker_deadline' : 'docker_operation_failed', 'production-build');
+    return r;
+  };
+  worker.capsuleDiagnostic = (action, r) => { record('capsule-' + action, r); originalDiagnostic?.(action, r); };
+  try {
+    const bound = inputIdentity(worker, input);
+    fs.writeFileSync(path.join(area, 'input-identity.json'), canonical(bound.logical), { mode: 0o600, flag: 'wx' });
+    const id = worker.createProduction({ source: bound.input.source, dependencies: bound.input.dependencies });
+    requireThat(inputIdentity(worker, input).inputSha256 === bound.inputSha256, 'build_input_changed');
+    const built = worker.exec(id, COMMAND, { cwd: PROFILE.cwd, env: bound.input.environment, allowFailure: true });
+    if (built.status !== 0) {
+      let code = /\bENOSPC\b/.test(String(built.stdout) + String(built.stderr)) ? 'build_resource_exhausted' : 'build_command_failed';
+      const observed = worker.call(['inspect', id], { allowFailure: true });
+      if (observed.status === 0) {
+        const state = JSON.parse(observed.stdout)[0]?.State;
+        if (state?.OOMKilled === true) code = 'build_memory_exhausted';
+        else if (state?.Running === false) code = 'build_process_lost';
+      } else if (/No such (container|object)/i.test(observed.stderr || '')) code = 'build_process_lost';
+      throw new WorkerError(code, 'production-build');
+    }
+    requireThat(inputIdentity(worker, input).inputSha256 === bound.inputSha256, 'build_input_changed');
+    const processIdentity = worker.inspectProduction(id);
+    const producerIdentity = { containerId: id, image: worker.image, runtimeSha256: bound.input.runtimeSha256, process: processIdentity };
+    const producerIdentitySha256 = digest(canonical(producerIdentity));
+    fs.writeFileSync(path.join(area, 'producer-identity.json'), canonical(producerIdentity), { mode: 0o600, flag: 'wx' });
+    worker.pause(id);
+    requireThat(canonical(worker.capsuleState(id).processIdentity) === canonical(processIdentity), 'build_process_changed');
+    const captured = worker.captureCapsule(id, PROFILE.output, destination, {
+      recipeSha256: outputRecipe(bound.logical.helperAbiSha256, producerIdentitySha256),
+      sourceInputSha256: bound.inputSha256, limits: PROFILE.captureLimits });
+    const output = { identity: captured.identity, manifestSha256: captured.manifestSha256 };
+    candidate = { schema: 'specflow.production-build-receipt/v1', jobId: worker.jobId,
+      inputSha256: bound.inputSha256, producerIdentitySha256, output, buildIdSha256: buildId(worker, destination, output) };
+    verifyProductionOutput(worker, input, candidate, destination);
+  } catch (error) {
+    fs.writeFileSync(path.join(area, 'failure.json'), JSON.stringify({ code: error.code || error.message, receiptEmitted: false }), { mode: 0o600, flag: 'wx' });
+    error.evidenceDirectory = area;
+    throw error;
+  } finally {
+    try { for (const id of [...worker.containers]) if (!beforeOwned.has(id)) worker.destroy(id); }
+    catch (error) {
+      fs.writeFileSync(path.join(area, 'teardown-failure.json'), JSON.stringify({ code: error.code || error.message, receiptEmitted: false }), { mode: 0o600, flag: 'wx' });
+      error.evidenceDirectory = area; throw error;
+    }
+    finally { worker.call = originalCall; worker.capsuleDiagnostic = originalDiagnostic; }
+  }
+  // This point is unreachable if teardown failed; no success receipt is persisted earlier.
+  const receiptFile = path.join(area, 'receipt.json'), fd = fs.openSync(receiptFile, 'wx', 0o600);
+  try { fs.writeFileSync(fd, canonical(candidate)); fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
+  const parent = fs.openSync(area, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY);
+  try { fs.fsyncSync(parent); } finally { fs.closeSync(parent); }
+  return { receipt: candidate, target: destination, evidenceDirectory: area };
+}
+function createProductionConsumer(worker, input, receipt, target) {
+  const bound = verifyProductionOutput(worker, input, receipt, target), expectedReceipt = canonical(receipt);
+  const id = worker.createProduction({ source: bound.input.source, dependencies: bound.input.dependencies, output: { target, receipt: receipt.output } });
+  const guard = () => {
+    requireThat(canonical(receipt) === expectedReceipt, 'build_receipt_changed');
+    verifyProductionOutput(worker, input, receipt, target);
+  };
+  function invoke(method, argv) {
+    try {
+      guard();
+      requireThat(Array.isArray(argv) && argv.length > 0 && argv.every(v => typeof v === 'string' && !v.includes('\0')), 'build_consumer_command');
+      return worker[method](id, argv, { cwd: PROFILE.cwd, env: bound.input.environment });
+    } catch (error) { worker.destroy(id); throw error; }
+  }
+  return Object.freeze({ id, exec: argv => invoke('exec', argv), start: argv => invoke('start', argv), close: () => worker.destroy(id) });
+}
+Object.assign(module.exports, { runProductionBuild, verifyProductionOutput, createProductionConsumer });
