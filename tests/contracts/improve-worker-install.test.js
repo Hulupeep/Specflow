@@ -35,3 +35,11 @@ test.each(['insert-shadow','dangling-shadow','replace-root','change-dependency']
  if(change==='change-dependency')fs.appendFileSync(f.dep,'\nmodule.exports=2;');
  const r=launch(f);expect(r.status).not.toBe(0);expect(r.stderr).toMatch(/runtime_input_changed/);expect(r.stderr).not.toMatch(/principal_unavailable/);
 });
+test.each(['nested','hoisted'])('production-build helper mutation is rejected before command authority (%s)', layout => {
+ const f=fixture(layout);fs.appendFileSync(path.join(f.pkg,'scripts/improve-production-build.cjs'),'\n// mutated helper\n');
+ const r=launch(f);expect(r.status).not.toBe(0);expect(r.stderr).toMatch(/runtime_input_changed/);expect(r.stderr).not.toMatch(/principal_unavailable/);
+});
+test.each(['nested','hoisted'])('production-build helper absence is rejected before command authority (%s)', layout => {
+ const f=fixture(layout);fs.unlinkSync(path.join(f.pkg,'scripts/improve-production-build.cjs'));
+ const r=launch(f);expect(r.status).not.toBe(0);expect(r.stderr).toMatch(/runtime_input_changed|ENOENT/);expect(r.stderr).not.toMatch(/principal_unavailable/);
+});

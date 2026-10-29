@@ -546,6 +546,7 @@ function validateMountTopology(destinations, code = 'offline_resource_invalid') 
   }
   return true;
 }
+const PRODUCTION_LAYOUT = Symbol('internal-production-layout');
 class DockerWorker {
   constructor({ image, layer, stateRoot, gitArea = null, uid = process.getuid(), maxMilliseconds = 120000, jobId = null }) {
     need(/^sha256:[a-f0-9]{64}$/.test(image), 'worker_image_unavailable');
@@ -661,11 +662,47 @@ class DockerWorker {
       return ['--mount', `type=bind,src=${m.source},dst=${m.destination}${m.writable === true ? '' : ',readonly'}`];
     });
   }
-  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory, resourceProfile }) {
+  createProduction(options) {
+    need(options && Object.keys(options).every(k => ['source', 'dependencies', 'output'].includes(k)), 'build_layout_invalid');
+    const { source, dependencies, output } = options;
+    const inputs = [source, dependencies, ...(output ? [output] : [])];
+    need(inputs.every(c => c && Object.keys(c).sort().join(',') === 'receipt,target'), 'build_layout_invalid');
+    const destinations = ['/app', '/app/node_modules', '/app/.next'];
+    const mounts = inputs.map((c, i) => this.capsuleMount(c.target, c.receipt, destinations[i]));
+    for (const name of ['node_modules', '.next']) {
+      const reserved = path.join(mounts[0].source, name);
+      need(fs.lstatSync(reserved).isDirectory() && fs.readdirSync(reserved).length === 0, 'build_reserved_path');
+    }
+    return this.create({ role: 'app', mounts, resourceProfile: output ? 'production-consumer-v1' : 'production-build-v1' }, PRODUCTION_LAYOUT, inputs);
+  }
+  inspectProduction(id) {
+    need(this.containers.has(id) && this.receipts.has(id), 'worker_container_identity');
+    const expected = this.receipts.get(id).expected;
+    verifySoftwareLayer(this.layer);
+    for (const [i, input] of expected.productionInputs.entries())
+      this.capsuleMount(input.target, input.receipt, ['/app', '/app/node_modules', '/app/.next'][i]);
+    const before = JSON.parse(this.call(['inspect', id]).stdout)[0];
+    validateInspection(before, expected);
+    need(before.State.Running && !before.State.Paused, 'build_process_state');
+    const identity = containerProcessIdentity(id, before.State.Pid);
+    const result = this.call(['exec', '--workdir', '/', id, '/node/bin/node', '-e',
+      "process.stdout.write(require('fs').readFileSync('/proc/self/mountinfo','utf8'))"]);
+    require('./improve-production-build.cjs').validateKernelMounts(result.stdout, expected.productionMode);
+    const after = JSON.parse(this.call(['inspect', id]).stdout)[0];
+    validateInspection(after, expected);
+    need(after.State.Running && !after.State.Paused && after.State.Pid === before.State.Pid &&
+      digest(identity) === digest(containerProcessIdentity(id, after.State.Pid)), 'build_process_changed');
+    return identity;
+  }
+  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory, resourceProfile }, internal, productionInputs) {
+    const production = internal === PRODUCTION_LAYOUT;
+    const buildProfile = production && require('./improve-production-build.cjs').PROFILE;
     if (resourceProfile !== undefined) need(Object.keys(arguments[0]).every(key =>
       ['role', 'mounts', 'capsules', 'tmpfs', 'network', 'memory', 'resourceProfile'].includes(key)),
     'offline_resource_invalid');
-    const resources = resourcePlan({ role, memory, tmpfs, resourceProfile });
+    const resources = production ? { memory: buildProfile.memoryBytes,
+      tmpfs: resourceProfile === 'production-build-v1' ? [{ path: '/app/.next', bytes: buildProfile.outputBytes }] : [],
+      phaseMilliseconds: buildProfile.phaseMilliseconds } : resourcePlan({ role, memory, tmpfs, resourceProfile });
     memory = resources.memory;
     tmpfs = resources.tmpfs;
     DockerWorker.probe();
@@ -682,8 +719,9 @@ class DockerWorker {
     const selected = software.filter(
       (m) => !m.destination.startsWith('/browser/') || !software.some((d) => d.destination === '/browser')
     );
-    validateMountTopology(['/tmp', ...selected.map(m => m.destination), ...mounts.map(m => m.destination),
-      ...tmpfs.map(t => t.path)], resourceProfile ? 'offline_resource_invalid' : 'worker_mount_overlap');
+    const destinations = ['/tmp', ...selected.map(m => m.destination), ...mounts.map(m => m.destination), ...tmpfs.map(t => t.path)];
+    if (production) require('./improve-production-build.cjs').validateBuildTopology(destinations);
+    else validateMountTopology(destinations, resourceProfile ? 'offline_resource_invalid' : 'worker_mount_overlap');
     if (resourceProfile) need(network === 'none' && [...selected, ...mounts].every(m => m.writable !== true),
       'offline_resource_invalid');
     const args = [
@@ -717,7 +755,7 @@ class DockerWorker {
       '--env',
       'HOME=/tmp',
       '--tmpfs',
-      '/tmp:rw,nosuid,nodev,size=128m,mode=1777',
+      '/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777',
       ...this.mountArgs([...selected, ...mounts], role),
       ...tmpfs.flatMap((t) => {
         need(
@@ -725,7 +763,7 @@ class DockerWorker {
             t.bytes <= (resourceProfile ? OFFLINE_RESOURCE_PROFILE.workBytes : 256 * 1024 * 1024),
           'worker_tmpfs_invalid'
         );
-        return ['--tmpfs', `${t.path}:rw,nosuid,nodev,size=${t.bytes},mode=0700,uid=${this.uid},gid=${this.uid}`];
+        return ['--tmpfs', `${t.path}:rw,nosuid,nodev,noexec,size=${t.bytes},mode=0700,uid=${this.uid},gid=${this.uid}`];
       }),
       this.image,
       '-e',
@@ -754,7 +792,9 @@ class DockerWorker {
       memory,
       ...(resources.phaseMilliseconds ? { phaseMilliseconds: resources.phaseMilliseconds,
         tmpfsLimits: { '/tmp': { bytes: OFFLINE_RESOURCE_PROFILE.tmpBytes, mode: '1777' },
-          '/work': { bytes: OFFLINE_RESOURCE_PROFILE.workBytes, mode: '0700', uid: this.uid, gid: this.uid } } } : {}),
+          ...(production ? (tmpfs.length ? { '/app/.next': { bytes: buildProfile.outputBytes, mode: '0700', uid: this.uid, gid: this.uid, noexec: true } } : {}) :
+            { '/work': { bytes: OFFLINE_RESOURCE_PROFILE.workBytes, mode: '0700', uid: this.uid, gid: this.uid } }) } } : {}),
+      ...(production ? { productionMode: resourceProfile === 'production-build-v1' ? 'build' : 'consumer', productionInputs: structuredClone(productionInputs) } : {}),
       mounts: [...selected, ...mounts],
       tmpfs: ['/tmp', ...tmpfs.map((t) => t.path)]
     };
@@ -777,6 +817,10 @@ class DockerWorker {
       at: new Date().toISOString()
     };
     this.receipts.set(id, receipt);
+    if (production) {
+      try { this.inspectProduction(id); }
+      catch (error) { this.destroy(id); throw error; }
+    }
     fs.appendFileSync(path.join(this.stateRoot, 'inspections.jsonl'), JSON.stringify(receipt) + '\n', { mode: 0o600 });
     return id;
   }
@@ -800,6 +844,9 @@ class DockerWorker {
         argv.every((v) => typeof v === 'string' && !v.includes('\0')),
       'worker_command_invalid'
     );
+    if (this.receipts.get(id)?.expected.productionMode) {
+      try { this.inspectProduction(id); } catch (error) { this.destroy(id); throw error; }
+    }
     const args = [
       'exec',
       ...(input !== undefined ? ['-i'] : []),
@@ -835,6 +882,9 @@ class DockerWorker {
   }
   start(id, argv, { cwd = '/app', env = {} } = {}) {
     need(this.containers.has(id), 'worker_container_identity');
+    if (this.receipts.get(id)?.expected.productionMode) {
+      try { this.inspectProduction(id); } catch (error) { this.destroy(id); throw error; }
+    }
     const args = [
       '--host',
       'unix:///var/run/docker.sock',
@@ -1692,6 +1742,7 @@ function validateInspection(inspect, expected) {
       const bytes = size && Number(size[1]) * ({ k: 1024, m: 1048576, g: 1073741824 }[size[2]?.toLowerCase()] || 1);
       need(new Set(parts.map(p => p.split('=')[0])).size === parts.length &&
         parts.includes('rw') && !parts.includes('ro') && parts.includes('nosuid') && parts.includes('nodev') &&
+        (!limits.noexec || parts.includes('noexec')) &&
         bytes === limits.bytes && /^[0-7]{3,4}$/.test(options.mode || '') &&
         parseInt(options.mode, 8) === parseInt(limits.mode, 8) &&
         (limits.uid === undefined || (options.uid === String(limits.uid) && options.gid === String(limits.gid))),
