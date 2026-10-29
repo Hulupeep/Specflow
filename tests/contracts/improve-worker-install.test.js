@@ -43,3 +43,46 @@ test.each(['nested','hoisted'])('production-build helper absence is rejected bef
  const f=fixture(layout);fs.unlinkSync(path.join(f.pkg,'scripts/improve-production-build.cjs'));
  const r=launch(f);expect(r.status).not.toBe(0);expect(r.stderr).toMatch(/runtime_input_changed|ENOENT/);expect(r.stderr).not.toMatch(/principal_unavailable/);
 });
+
+describe('cold versioned npm production-build payload', () => {
+ let packedRoot, tarball;
+ beforeAll(() => {
+  packedRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'production-npm-pack-'));
+  const packed = cp.spawnSync('npm', ['pack', '--json', '--ignore-scripts', '--pack-destination', packedRoot],
+   { cwd: SOURCE, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
+  expect(packed.status).toBe(0);
+  const manifest = JSON.parse(packed.stdout)[0];
+  expect(manifest.version).toBe(require('../../package.json').version);
+  expect(manifest.files.some(file => file.path === 'scripts/improve-production-build.cjs')).toBe(true);
+  tarball = path.join(packedRoot, manifest.filename);
+ }, 120000);
+ afterAll(() => { if (packedRoot) fs.rmSync(packedRoot, { recursive: true, force: true }); });
+ test.each(['nested', 'hoisted'])('tarball installs %s and rejects changed or missing helper before authority', layout => {
+  fs.writeFileSync(path.join(root, 'package.json'), JSON.stringify({ private: true }));
+  const installed = cp.spawnSync('npm', ['install', tarball, '--ignore-scripts', '--no-audit', '--no-fund',
+   '--package-lock=false', '--install-strategy=' + layout], { cwd: root, encoding: 'utf8', timeout: 120000, maxBuffer: 4 * 1024 * 1024 });
+  expect(installed.status).toBe(0);
+  const pkg = path.join(root, 'node_modules/@colmbyrne/specflow'), helper = path.join(pkg, 'scripts/improve-production-build.cjs');
+  const bytes = fs.readFileSync(helper);
+  expect(bytes.equals(fs.readFileSync(path.join(SOURCE, 'scripts/improve-production-build.cjs')))).toBe(true);
+  expect(JSON.parse(fs.readFileSync(path.join(pkg, 'package.json'))).version).toBe(require('../../package.json').version);
+  const entry = path.join(pkg, 'scripts/improve-worker.cjs');
+  const code = `const entry=${JSON.stringify(entry)},r=require('module').createRequire(entry);r('js-yaml');console.log(JSON.stringify({dependency:r.resolve('js-yaml'),launcher:r(entry).pinnedLauncher({directory:${JSON.stringify(path.join(root, 'pin'))},config:{authority:{}},mode:'worker'})}));`;
+  const made = cp.spawnSync(process.execPath, ['-e', code], { encoding: 'utf8' });
+  expect(made.status).toBe(0);
+  const result = JSON.parse(made.stdout);
+  expect(result.dependency.startsWith(path.join(layout === 'nested' ? pkg : root, 'node_modules/js-yaml') + path.sep)).toBe(true);
+  const f = { launcher: result.launcher }, before = launch(f);
+  expect(before.status).toBe(2); expect(JSON.parse(before.stderr).code).toBe('principal_unavailable');
+  fs.appendFileSync(helper, '\n// changed after cold-package pin\n');
+  const changed = launch(f);
+  expect(changed.status).not.toBe(0); expect(changed.stderr).toMatch(/runtime_input_changed/);
+  expect(changed.stderr).not.toMatch(/principal_unavailable/);
+  fs.writeFileSync(helper, bytes);
+  expect(JSON.parse(launch(f).stderr).code).toBe('principal_unavailable');
+  fs.unlinkSync(helper);
+  const missing = launch(f);
+  expect(missing.status).not.toBe(0); expect(missing.stderr).toMatch(/runtime_input_changed|ENOENT/);
+  expect(missing.stderr).not.toMatch(/principal_unavailable/);
+ }, 180000);
+});
