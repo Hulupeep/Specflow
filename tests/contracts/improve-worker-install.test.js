@@ -17,6 +17,13 @@ function fixture(layout){
  return {pkg,modules,dep,launcher:made.stdout.trim()};
 }
 const launch=f=>cp.spawnSync(f.launcher,[],{encoding:'utf8',timeout:10000});
+test.each(['nested','hoisted'])('capsule-launcher-identity %s install rejects changed capsule helper before command authority',layout=>{
+ const f=fixture(layout),before=launch(f);
+ expect(before.status).toBe(2);expect(JSON.parse(before.stderr).code).toBe('principal_unavailable');
+ fs.appendFileSync(path.join(f.pkg,'scripts/improve-worker-capsule.py'),'\n# changed after pin\n');
+ const after=launch(f);expect(after.status).not.toBe(0);expect(after.stderr).toMatch(/runtime_input_changed/);
+ expect(after.stderr).not.toMatch(/principal_unavailable/);
+});
 test.each(['nested','hoisted'])('worker-installed-module-layout %s npm layout validates pinned code before rejecting missing authority',layout=>{
  const f=fixture(layout),r=launch(f);expect(r.status).toBe(2);expect(JSON.parse(r.stderr).code).toBe('principal_unavailable');
 });

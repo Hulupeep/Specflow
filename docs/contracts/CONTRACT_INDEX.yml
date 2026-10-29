@@ -31,6 +31,8 @@ contracts:
     path: docs/contracts/feature_improve_recovery.yml
   - id: feature_improve_worker
     path: docs/contracts/feature_improve_worker.yml
+  - id: feature_input_capsule
+    path: docs/contracts/feature_input_capsule.yml
   - id: feature_preflight
     path: docs/contracts/feature_preflight.yml
   - id: feature_spec_density

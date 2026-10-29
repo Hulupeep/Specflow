@@ -1,0 +1,90 @@
+{
+  "issue": 282,
+  "scope": "Worker-bound capsule admission qualification; not real-product Improve or final CI acceptance",
+  "at": "2026-10-29T11:28:34.709932+00:00",
+  "fullSuiteBeforeProcessIdentityHardening": {
+    "passedTests": 2664,
+    "passedSuites": 140,
+    "failed": 0,
+    "skipped": 0
+  },
+  "focusedAfterProcessIdentityHardening": {
+    "passed": 47,
+    "failed": 0,
+    "skipped": 0
+  },
+  "faultSuiteAfterPositiveCanaryControls": {
+    "passed": 10,
+    "failed": 0,
+    "skipped": 0
+  },
+  "liveDocker": {
+    "status": "passed",
+    "checks": {
+      "unpaused": {
+        "passed": true,
+        "code": "capsule_not_quiescent"
+      },
+      "actualProcessIdentity": {
+        "passed": true
+      },
+      "hostProcessRejected": {
+        "passed": true,
+        "code": "capsule_process_identity"
+      },
+      "wrongContainerProcessRejected": {
+        "passed": true,
+        "code": "capsule_process_identity"
+      },
+      "injectedIdentityChangeBeforeAdmission": {
+        "passed": true,
+        "code": "capsule_container_changed"
+      },
+      "unowned": {
+        "passed": true,
+        "code": "capsule_container_identity"
+      },
+      "ownedPausedCapture": {
+        "passed": true,
+        "manifestSha256": "57a8ba1d4dec55bf1d971cddac1ded379a884e2b57e53052a9978f3586ccf9b1"
+      },
+      "readOnlyExecutableRoundTrip": {
+        "passed": true
+      },
+      "ordinaryEvidenceStillRejectsLinks": {
+        "passed": true,
+        "code": "artifact_special_or_link"
+      },
+      "wrongJob": {
+        "passed": true,
+        "code": "capsule_job_identity"
+      },
+      "realUnpauseBeforeAdmission": {
+        "passed": true,
+        "code": "capsule_not_quiescent"
+      },
+      "changedInputBeforeCreate": {
+        "passed": true,
+        "code": "capsule_tree_changed"
+      }
+    },
+    "helperSha256": "dfee94e7eb13a599662cc7613c89be286e44e02b58cacce1d5bc65d330666bf0",
+    "workerSha256": "b5e5d671d07f14302786f9858cdc923c0575a565e971ad90cd02bacf435172ae",
+    "probeSha256": "7b192803291ad3e2860b24e3bdb7b13accda013113b25ef96822659b60885744",
+    "remainingOwnedContainers": 0
+  },
+  "sourceSha256": {
+    "scripts/improve-worker.cjs": "b5e5d671d07f14302786f9858cdc923c0575a565e971ad90cd02bacf435172ae",
+    "scripts/improve-worker-capsule.py": "dfee94e7eb13a599662cc7613c89be286e44e02b58cacce1d5bc65d330666bf0",
+    "tests/contracts/improve-worker-capsule.test.js": "85dfd522bf8df4bf29f4058777f68bb8c1456e302aa6a5d46ec4f4de07420ddb",
+    "tests/integration/improve-worker-capsule.test.js": "bd64b17b6e3f133ea55354d2a14680b7265bf861eeba5aa9f67a72eea7ca4649",
+    "tests/contracts/improve-worker-install.test.js": "e36e744839e4be20822f607d3a8fe3741efa912f3646e7cd0cdce61a19e2b77e"
+  },
+  "remaining": [
+    "Independent native implementation review",
+    "CI on final commit",
+    "Portable live qualification harness and acceptance evidence review",
+    "Parent176 real dependency acquisition/build/backend recipe",
+    "Real-product171 single cycle and172 bounded multi-cycle"
+  ]
+}

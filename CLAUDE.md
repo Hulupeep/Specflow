@@ -104,6 +104,7 @@ Right: `docs/contracts/feature_my_feature.yml`
 | `feature_improve_memory` | Repo-scoped decision memory, selection consumption, authenticated resolution and separate verdicts | I-MEMORY-001 through I-MEMORY-006 |
 | `feature_improve_profiles` | Owner-private repo registry, actionable non-inference preflight and fresh caller-bound protected operations | I-PROFILES-001 through I-PROFILES-005 |
 | `feature_improve_controller` | Durable bounded admission, shared limits, precise stops and disabled schedule activation | I-CONTROLLER-001 through I-CONTROLLER-008 |
+| `feature_input_capsule` | Complete sealed dependency trees, bounded capture, durable admission and job-owned read-only reuse | I-CAPSULE-001 through I-CAPSULE-004 |
 | `feature_improve_worker` | Confined execution, independent role provenance and durable historical recovery | I-WORKER-001 through I-WORKER-007 |
 | `feature_specflow_project` | Project structure & code quality | PROJ-001 through PROJ-004 |
 | `security_defaults` | OWASP baseline patterns | SEC-001 through SEC-005 |
