@@ -1,0 +1,32 @@
+{
+  "scope": "Filesystem primitive only; not worker-owned capture, isolated installation or product Improve",
+  "issue": 282,
+  "preparation": {
+    "duoRun": "1793270331865-facbce5e",
+    "verified": 5,
+    "total": 5,
+    "canonicalPromotion": "build-ready",
+    "workerBaselineTests": 73,
+    "preparationChecks": 8
+  },
+  "capsuleTests": {
+    "executed": 26,
+    "passed": 26,
+    "failed": 0,
+    "skipped": 0
+  },
+  "largeLayout": {
+    "helperSha256": "4d8b515ab9f764a907a5a44d401835e22a1a613ab838302dd7e24f7051c52ecd",
+    "elapsedSeconds": 76.214,
+    "manifestSha256": "d203676315fd8564d0bf56e61420109b145a22d5b245160a6bf4c31d9ca3ae49",
+    "entries": 35210,
+    "bytes": 494313394,
+    "binding": "synthetic fixture identity; no actual container claimed"
+  },
+  "remaining": [
+    "Engine-bound staging and admission with paused/PID revalidation",
+    "Actual source/destination race and interruption controls",
+    "Read-only worker consumption and pinned helper closure",
+    "Live Docker qualification, independent implementation review and full CI"
+  ]
+}
