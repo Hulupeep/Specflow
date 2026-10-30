@@ -1415,7 +1415,8 @@ async function build(runDir, options = {}) {
     fs.writeFileSync(path.join(inputDir, 'workspace.patch'), diff?.patch || '');
     fs.writeFileSync(path.join(inputDir, 'builder-summary.md'), finalText);
     fs.writeFileSync(path.join(inputDir, 'direction-memory.json'), JSON.stringify(rounds.filter((r) => r.peer).slice(-3).map((r) => ({ round: r.round, peer: r.peer, builder_claim: r.claim })), null, 2));
-    copyInto(inputDir, { 'practice-checks': dev.dir, 'UX_REFINEMENT_PROFILE.md': RUBRIC });
+    require('./improve-review-evidence.cjs').copyVerificationEvidence(dev.dir,path.join(inputDir,'practice-checks'));
+    copyInto(inputDir, { 'UX_REFINEMENT_PROFILE.md': RUBRIC });
     const prompt = [
       duoDirection.prompt,
       `Specflow improve, run ${run.run_id}, round ${round}; progress-aware continuation within the recorded session horizon and explicit limits. Files: contract.json (frozen), workspace.patch, builder-summary.md, practice-checks/ (in-sample results and screenshots), direction-memory.json, UX_REFINEMENT_PROFILE.md.`,
@@ -1501,7 +1502,7 @@ function judge(runDir, options = {}) {
   fs.copyFileSync(RUBRIC, path.join(inputDir, 'UX_REFINEMENT_PROFILE.md'));
   for (const phase of ['baseline', 'after']) {
     const src = runPaths(runDir).phaseDir(phase);
-    if (fs.existsSync(src)) fs.cpSync(src, path.join(inputDir, 'verification', phase), { recursive: true, filter: (f) => !/server\.log$/.test(f) });
+    if (fs.existsSync(src)) require('./improve-review-evidence.cjs').copyVerificationEvidence(src,path.join(inputDir,'verification',phase));
   }
   untrusted.fenceInputTree(inputDir);
   const promptPath = path.join(runDir, 'adapters', `${role}.prompt.md`);
