@@ -1176,6 +1176,33 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
    expect(improve.events(runDir).some(e=>['holdout_consumed','verification_receipt','baseline_recorded','evidence_added'].includes(e.event))).toBe(false);
   }finally{fs.rmSync(f.root,{recursive:true,force:true});}
  }));
+ test.each(['cleaned','cleanup-failed','open-failed','evidence-failed'])('managed failure retains original terminal and reports cleanup separately: %s',quiet(async failureMode=>{
+  const cleanupFails=failureMode==='cleanup-failed';
+  const f=fixture(),generation=require('../../scripts/improve-backend-generation.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs');
+  const backendTerminal={phase:'cleaned',cause:'backend_lease_expired',resources:[]};
+  const terminal={state:'cleaned',cause:'backend_lease_expired',credentialEnvelopeRemoved:true,resources:[]};
+  const spies=[jest.spyOn(generation,'freezeBinding').mockReturnValue({sha256:'4'.repeat(64)}),
+   jest.spyOn(generation,'open').mockImplementation(async()=>{if(failureMode==='open-failed'){const error=Error('backend_service_died');error.backendGeneration={attempt:{attemptId:'fixture'},terminal,backendTerminal,originalCause:'backend_lease_expired'};throw error;}return {};}),jest.spyOn(generation,'access').mockReturnValue({session:{},context:{}}),
+   jest.spyOn(runtime,'admitBackend').mockRejectedValue(Error('backend_service_died')),
+   jest.spyOn(generation,'close').mockImplementation(async()=>{if(cleanupFails)throw Error('backend_cleanup_unconfirmed');return {attempt:{attemptId:'fixture'},terminal,backendTerminal,originalCause:'backend_lease_expired'};})];
+  if(failureMode==='evidence-failed')spies.push(jest.spyOn(generation,'writeProof').mockImplementation(()=>{throw Error('disk_full');}));
+  try{
+   const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256='2'.repeat(64);
+   const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).toBe('frozen');
+   const result=await improve.verifyPhase(runDir,'baseline',{backendCapability:{}});expect(result.status).toBe('blocked');
+   expect(improve.events(runDir).some(e=>e.event==='verification_receipt')).toBe(false);
+   if(cleanupFails){expect(result.reason).toContain('cleanup: backend_cleanup_unconfirmed');expect(result.backendFailure.cleanup).toBe('unconfirmed');}
+   else if(failureMode==='evidence-failed'){expect(result.backendFailure).toMatchObject({originalCause:'backend_lease_expired',cleanup:'cleaned',evidenceCause:'disk_full'});expect(result.reason).toContain('evidence retention: disk_full');expect(result.reason).not.toContain('cleanup:');}
+   else{
+    expect(result.reason).toBe('Backend generation unavailable: backend_lease_expired');
+    expect(result.backendFailure).toMatchObject({originalCause:'backend_lease_expired',observedCause:'backend_service_died',cleanup:'cleaned'});
+    for(const [key,expected]of [['terminal',terminal],['backendTerminal',backendTerminal]]){
+     const ref=result.backendFailure[key];expect(JSON.parse(fs.readFileSync(ref.path))).toEqual(expected);expect(fs.statSync(ref.path).mode&0o777).toBe(0o600);
+    }
+    expect(improve.events(runDir).find(e=>e.event==='verification_blocked').backendFailure).toEqual(result.backendFailure);
+   }
+  }finally{for(const spy of spies)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
  test('managed declaration cannot freeze without trusted pre-freeze binding',quiet(async()=>{
   const f=fixture();try{const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256='2'.repeat(64);
    const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});

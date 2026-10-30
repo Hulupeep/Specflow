@@ -870,7 +870,7 @@ function assertManagedDispatch(runDir,phase){
 async function withManagedBackend(runDir,phase,capability,ws,gov,dir,execute){
   const generation=require('./improve-backend-generation.cjs'),backend=require('./improve-backend-runtime.cjs');
   const timing=require('./improve-backend-timing.cjs').open(dir,phase);
-  let handle,outcome,backendReceipt,originalCause=null;
+  let handle,outcome,backendReceipt,closedDuringOpen,openCleanupCause,originalCause=null;
   const refresh=()=>{
     const fresh=governingContract(runDir),run=loadRun(runDir);
     const blocked=integrityBlock(runDir,fresh,phase);if(blocked)throw Error('backend_frozen_input_changed');
@@ -896,16 +896,29 @@ async function withManagedBackend(runDir,phase,capability,ws,gov,dir,execute){
     if(binding.digest(timing.sync('identity',()=>inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws,timing)))!==binding.digest(before.identity))throw Error('backend_product_changed');
     await timing.run('continuity',()=>backend.backendContinuity(session,context));
     backendReceipt={product:Object.fromEntries(Object.entries(product).map(([k,ref])=>[k,preserve(ref)])),entry:preserve({path:entry.path,sha256:entry.sha256}),expectedSemanticSha256:context.expectedBackendIdentity,measuredSemanticSha256:entry.manifest.measuredBackendIdentity};
-  }catch(error){originalCause=error.code||error.message;outcome={status:'blocked',reason:'Backend generation unavailable: '+originalCause};}
+  }catch(error){originalCause=error.code||error.message;closedDuringOpen=error.backendGeneration;openCleanupCause=error.cleanupCause;outcome={status:'blocked',reason:'Backend generation unavailable: '+originalCause};}
   finally{
-    if(handle)try{
-      const closed=await timing.run('generation_close',()=>generation.close(handle,originalCause));
-      if(closed.originalCause)throw Error(closed.originalCause);
-      if(backendReceipt){
-        backendReceipt.terminal=generation.writeProof(dir,closed.backendTerminal);
+    let closed;
+    if(handle||closedDuringOpen||openCleanupCause)try{
+      if(openCleanupCause)throw Error(openCleanupCause);
+      closed=closedDuringOpen||await timing.run('generation_close',()=>generation.close(handle,originalCause));
+      // A cleaned terminal may record an execution failure. Retain its proof
+      // independently of a success receipt; do not mislabel that cause as a
+      // cleanup exception or discard it with the private envelope.
+      const terminal=generation.writeProof(dir,closed.terminal);
+      const backendTerminal=closed.backendTerminal?generation.writeProof(dir,closed.backendTerminal):null;
+      if(closed.originalCause){
+        outcome={status:'blocked',reason:'Backend generation unavailable: '+closed.originalCause,
+          backendFailure:{originalCause:closed.originalCause,observedCause:originalCause,cleanup:'cleaned',attempt:closed.attempt,terminal,backendTerminal}};
+        backendReceipt=undefined;
+      }else if(backendReceipt){
+        backendReceipt.terminal=backendTerminal;
         backendReceipt.managed={attempt:closed.attempt,terminal:closed.terminal};
       }
-    }catch(error){outcome={status:'blocked',reason:originalCause?'Backend generation unavailable: '+originalCause+'; cleanup: '+error.message:'Backend cleanup unavailable: '+error.message};}
+    }catch(error){
+      const cause=closed?.originalCause||originalCause;
+      outcome={status:'blocked',reason:closed?'Backend generation unavailable: '+(cause||'backend_evidence_unavailable')+'; evidence retention: '+error.message:originalCause?'Backend generation unavailable: '+originalCause+'; cleanup: '+error.message:'Backend cleanup unavailable: '+error.message,
+        backendFailure:{originalCause:cause,cleanup:closed?'cleaned':'unconfirmed',...(closed?{evidenceCause:error.message}:{cleanupCause:error.message})}};backendReceipt=undefined;}
     timing.close();
   }
   return {outcome,backendReceipt};
@@ -929,7 +942,7 @@ async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {
   const ws = workspaceFor(run, kind);
   if (!fs.existsSync(ws.worktreePath)) prepareWorkspace(runDir, kind);
   const dir = runPaths(runDir).phaseDir(phase);
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   append(runDir, 'verification_started', { phase, attempt, binding_version:1, contract_version: gov.entry.version, workspace: ws.worktreePath });
   const makerClaim = phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline';
   const execute = async ({vars,baseUrl,backendContext,backendSession:managedSession,timing}) => {
@@ -968,7 +981,7 @@ async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {
     const receiptPath=path.join(dir,'binding-'+attempt+'.json');outcome.receiptHash=writeJson(receiptPath,receipt);
     append(runDir,'verification_receipt',{phase,attempt,path:receiptPath,sha256:outcome.receiptHash});
   }
-  if (outcome.status === 'blocked') {append(runDir,'verification_blocked',{phase,attempt,contract_version:gov.entry.version,reason:outcome.reason});return outcome;}
+  if (outcome.status === 'blocked') {append(runDir,'verification_blocked',{phase,attempt,contract_version:gov.entry.version,reason:outcome.reason,...(outcome.backendFailure?{backendFailure:outcome.backendFailure}:{})});return outcome;}
   const summary = Object.fromEntries(outcome.items.map((i) => [i.set === 'dev' ? `dev:${i.criterion}` : i.criterion, i.result]));
   if (phase === 'baseline') {
     const mismatches = gov.contract.acceptance.flatMap(a => [
@@ -991,7 +1004,7 @@ async function devRound(runDir, round, {backendCapability} = {}) {
   if (blocked) return blocked;
   const ws = workspaceFor(run, 'improve');
   const dir = path.join(runDir, 'dev-runs', `round-${round}`);
-  fs.mkdirSync(dir, { recursive: true });
+  fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const execute=({vars,baseUrl,backendSession,backendContext})=>({items:runCheckSet(runDir,{ws,gov,dir,phase:`dev-r${round}`,set:'dev',vars,baseUrl,makerClaim:'dev-round',gates:false,backendSession,backendContext})});
   const outcome=gov.contract.runtime?.backend?.constructionSha256
     ?(await withManagedBackend(runDir,`dev-r${round}`,backendCapability,ws,gov,dir,execute)).outcome

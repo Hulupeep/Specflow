@@ -116,7 +116,7 @@ async function open(token,runDir,phase,refresh){
   state.session=await runtime.startBackend({worker,anchorId:state.consumer.id,root:state.root,request,inputs:template,credentials:{store:c.store,reference:credentialRef},productInput});
   state.context={runId:v.runId,phase,expectedBackendIdentity:v.expectedSemanticSha256,inputManifestSha256:request.inputManifest.sha256};
   state.request=request;return handle;
- }catch(error){try{await close(handle,error.code||error.message);}catch(cleanup){error.cleanupCause=cleanup.message;}throw error;}
+ }catch(error){try{error.backendGeneration=await close(handle,error.code||error.message);}catch(cleanup){error.cleanupCause=cleanup.message;}throw error;}
 }
 function access(handle){const s=sessions.get(handle);need(s&&s.session,'backend_capability_required');return {session:s.session,context:s.context};}
 function selectChecker(handle){const s=sessions.get(handle);need(s&&s.worker);managed.select(s.worker,'checker');}
@@ -128,7 +128,7 @@ async function close(handle,cause=null){
  try{s.worker?.close();}catch(e){cleanupError||=e;}
  try{
   if(cleanupError){attempts.operatorRequired(s.c.store,s.ref);throw cleanupError;}
-  if(backendTerminal?.cause)cause||=backendTerminal.cause;
+  if(backendTerminal?.cause&&(cause===null||cause==='backend_service_died'))cause=backendTerminal.cause;
   // Preserve the original failure diagnosis outside the private envelope. The
   // signed terminal's closed cause vocabulary remains backend-only.
   const originalCause=cause,terminalCause=cause===null?null:/^backend_[a-z_]+$/.test(cause)?cause:'backend_generation_failed';

@@ -44,7 +44,7 @@ test('a binding added after freeze cannot replace the frozen binding hash',async
 test('ledger refusal under reservation records a failed clean terminal and releases only that attempt',async()=>{
  const token=generation.install(config,runDir,()=>{});let calls=0;
  const refresh=()=>{if(++calls===2)throw Error('backend_holdout_consumed');return {bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest};};
- await expect(generation.open(token,runDir,'after',refresh)).rejects.toThrow('backend_holdout_consumed');expect(calls).toBe(2);
+ await expect(generation.open(token,runDir,'after',refresh)).rejects.toMatchObject({message:'backend_holdout_consumed',backendGeneration:{originalCause:'backend_holdout_consumed',terminal:{state:'cleaned',cause:'backend_holdout_consumed'}}});expect(calls).toBe(2);
  const area=path.join(store.root,'backend-attempts'),names=fs.readdirSync(area);
  expect(names.some(n=>n.startsWith('active-'))).toBe(false);expect(names.some(n=>n.startsWith('intent-'))).toBe(false);
  const terminal=JSON.parse(fs.readFileSync(path.join(area,names.find(n=>n.startsWith('terminal-'))))).value;
