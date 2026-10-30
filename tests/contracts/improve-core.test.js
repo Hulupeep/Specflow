@@ -1162,3 +1162,23 @@ describe('EFFORT178: useful subscription work and explicit boundaries',()=>{
   const f=fixture();try{const{built}=await runToImplementation(f,{continuationPolicy:writeTmp(f,'continuation.json',{usageMode:'subscription',maxElapsedMs:1}),peer:[CONTINUE]});expect(built.rounds).toHaveLength(0);expect(built.stop_reason).toMatch(/maxElapsedMs checkpoint/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
  }));
 });
+
+describe('BACKEND293: declared backend cannot silently use the host runtime',()=>{
+ function backendContract(){
+  const doc=contract();delete doc.acceptance[0].dev_check;doc.gates=[];
+  const c=doc.acceptance[0].check;delete c.command;c.artifact='holdout/native.test.js';Object.assign(c,{verification_level:'integration',boundaries:['network','database'],configuration_ids:['confined'],checker_paths:['holdout/native.test.js','holdout/jest.config.cjs'],input_paths:[],rule_paths:[],execution:{adapter:'playwright',test_files:['holdout/native.test.js'],required_case_ids:['default::holdout/native.test.js::required'],optional_case_ids:[],args:['--config','holdout/jest.config.cjs']}});
+  doc.runtime={configuration_id:'confined',backend:{recipeId:'heystax-supabase-v1',expectedSemanticSha256:'1'.repeat(64),inputManifestSha256:'2'.repeat(64)}};return doc;
+ }
+ const oracle=marker=>runDir=>{fs.writeFileSync(path.join(runDir,'holdout/native.test.js'),"require('fs').writeFileSync("+JSON.stringify(marker)+",'host ran');");fs.writeFileSync(path.join(runDir,'holdout/jest.config.cjs'),'module.exports={};');};
+ test.each([undefined,{}])('missing or forged capability blocks before any check: %p',quiet(async backendSession=>{
+  const f=fixture();try{const marker=path.join(f.root,'host-ran'),{runDir,frozen}=await prepare(f,{contractDoc:backendContract(),nativeOracle:oracle(marker)});expect(frozen.status).toBe('frozen');
+   const result=await improve.verifyPhase(runDir,'baseline',{backendSession});expect(result.status).toBe('blocked');expect(fs.existsSync(marker)).toBe(false);
+   expect(improve.events(runDir).some(e=>['holdout_consumed','verification_receipt','baseline_recorded','evidence_added'].includes(e.event))).toBe(false);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test.each(['unknown-recipe','unknown-field','host-setup','host-serve','command-gate'])('invalid backend declaration fails freezing: %s',quiet(async kind=>{
+  const f=fixture();try{const doc=backendContract();if(kind==='unknown-recipe')doc.runtime.backend.recipeId='anything';if(kind==='unknown-field')doc.runtime.backend.command=['node'];if(kind==='host-setup')doc.runtime.setup=[['node','-e','process.exit(0)']];if(kind==='host-serve')doc.runtime.serve={command:['node','server.js'],port:3000};if(kind==='command-gate')doc.gates=[{id:'bad',command:['node','-e','process.exit(0)']}];
+   const {frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).not.toBe('frozen');expect(JSON.stringify(frozen)).toContain('runtime.backend');
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+});

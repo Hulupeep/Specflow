@@ -1,0 +1,38 @@
+contract_meta:
+  id: feature_confined_backend
+  version: 1
+  created_from_spec: "GitHub #293; docs/specs/improve-worker/backend-design.md"
+  covers_reqs: [AC-BACKEND-01, AC-BACKEND-02, AC-BACKEND-03, AC-BACKEND-04, AC-BACKEND-05, AC-BACKEND-06, AC-BACKEND-07]
+  owner: specflow-core
+llm_policy:
+  enforce: true
+  llm_may_modify_non_negotiables: false
+  override_phrase: "override_contract: feature_confined_backend"
+invariants_referenced:
+  - "feature_improve_worker:I-WORKER-001"
+  - "feature_improve_worker:I-WORKER-003"
+  - "feature_improve_worker:I-WORKER-004"
+  - "feature_improve_worker:I-WORKER-005"
+  - "feature_improve_worker:I-WORKER-006"
+  - "feature_improve_worker:I-WORKER-007"
+rules:
+  non_negotiable:
+    - id: AC-BACKEND-01
+      behavior: "Only exact pinned recipe inputs may create a fresh owned backend. Reject unknown fields, missing or mutated migrations/configuration/images, foreign ownership and unavailable readiness before product execution."
+    - id: AC-BACKEND-02
+      behavior: "Real ordinary-user Auth, owner write/read and foreign-user RLS denial preserve every original row field. No mock, browser service-role key or auth bypass qualifies."
+    - id: AC-BACKEND-03
+      behavior: "Real app journeys at 1280 and 360 prove sign-in, action save/reload, visible wrong-user denial and owner readback."
+    - id: AC-BACKEND-04
+      behavior: "Actual positive and negative controls enforce host/cross-job/production/internet IPv4/IPv6/DNS, credentials, Docker, immutable inputs and namespace confinement."
+    - id: AC-BACKEND-05
+      behavior: "Finite aggregate resources and original deadlines cover all slots. Controller/service loss, lease expiry and storage/output overflow yield named failure, no successful receipt and only owned cleanup. Interrupted state cannot become a fresh baseline."
+    - id: AC-BACKEND-06
+      behavior: "Freeze expected backend semantics before deciding checks; independently measure each fresh phase. Existing core validates live ownership and identity and binds raw manifests in its receipt; unequal state rejects without invoking the deciding checks. Product identity stays separately bound."
+    - id: AC-BACKEND-07
+      behavior: "Repository contracts/integration, actual confinement and both journeys, exact-head CI and independent review precede merge. Prototype and product improvement claims remain distinct."
+test_hooks:
+  tests:
+    - file: tests/contracts/improve-backend.test.js
+    - file: tests/integration/improve-backend.test.js
+    - file: tests/e2e/journey_confined_backend.spec.cjs

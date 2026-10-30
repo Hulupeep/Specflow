@@ -1,0 +1,261 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "jobId",
+    "phase",
+    "generation",
+    "state",
+    "namedCause",
+    "expectedBackendIdentity",
+    "measuredBackendIdentity",
+    "manifest",
+    "productBuildReceiptSha256",
+    "supervisorJournal",
+    "deadlineEpochMs",
+    "cleanup",
+    "checks"
+  ],
+  "properties": {
+    "schema": {
+      "const": "specflow.backend-receipt/v1"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "phase": {
+      "enum": [
+        "baseline",
+        "after"
+      ]
+    },
+    "generation": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "state": {
+      "enum": [
+        "qualified",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "namedCause": {
+      "enum": [
+        null,
+        "backend_input_invalid",
+        "backend_input_changed",
+        "backend_identity_mismatch",
+        "backend_readiness_failed",
+        "backend_controller_died",
+        "backend_service_died",
+        "backend_lease_expired",
+        "backend_storage_limit",
+        "backend_output_limit",
+        "backend_cleanup_failed",
+        "backend_restart_invalid"
+      ]
+    },
+    "expectedBackendIdentity": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "measuredBackendIdentity": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "manifest": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "productBuildReceiptSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "supervisorJournal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "deadlineEpochMs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "complete",
+        "ownedRemoved",
+        "remainingOwned"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "ownedRemoved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "remainingOwned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executed",
+        "failed",
+        "skipped"
+      ],
+      "properties": {
+        "executed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "qualified"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namedCause": {
+            "type": "null"
+          },
+          "measuredBackendIdentity": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "manifest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "cleanup": {
+            "properties": {
+              "complete": {
+                "const": true
+              },
+              "remainingOwned": {
+                "const": 0
+              }
+            }
+          },
+          "checks": {
+            "properties": {
+              "executed": {
+                "minimum": 1
+              },
+              "failed": {
+                "const": 0
+              },
+              "skipped": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "failed",
+              "interrupted"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namedCause": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

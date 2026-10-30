@@ -38,3 +38,12 @@ test.each(['inside','symlink','unfrozen','correctness','competing-command'])('NA
 });
 
 test('NATIVE178: actual exit-zero process without native report is unavailable',()=>{const{check,options}=setup('missing-report'),r=native.executeFrozen(check,options);expect(r).toMatchObject({result:'blocked',exit_code:0,summary:{collected:0}});expect(r.reason).toContain('native_report_missing_or_corrupt');});
+
+// Backend declarations never fall back to the host native subprocess.
+test('BACKEND293: a forged backend session cannot execute the native oracle on the host',()=>{
+ const {check,options}=setup('pass','playwright');const marker=path.join(oracle,'host-executed');
+ fs.writeFileSync(path.join(oracle,check.execution.test_files[0]),"require('fs').writeFileSync("+JSON.stringify(marker)+",'bad');");
+ options.frozenFiles[check.execution.test_files[0]]=hash(path.join(oracle,check.execution.test_files[0]));
+ options.backendSession={ready:true,coreBinding:{}};options.backendContext={runId:'forged'};
+ const receipt=native.executeFrozen(check,options);expect(receipt.result).toBe('blocked');expect(receipt.reason).toContain('backend_input_invalid');expect(fs.existsSync(marker)).toBe(false);
+});

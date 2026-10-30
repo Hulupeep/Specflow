@@ -171,7 +171,11 @@ function frozenBinding(check,contract,options) {
  const configuration=options.configurationId;
  if(!unique(check.configuration_ids)||!check.configuration_ids.includes(configuration))throw Error('select a declared frozen oracle configuration_id');
  return{version:1,mode:'frozen-oracle',contract_sha256:outcome.hashValue(contract),source_sha256:require('./duo-build.cjs').fingerprint(root),oracle_root:oracle,files,
-  configuration_id:configuration,environment:options.environment||'unknown',env_sha256:outcome.hashValue(options.env),framework:framework(oracle,check.execution.adapter)};
+  configuration_id:configuration,environment:options.environment||'unknown',env_sha256:outcome.hashValue(options.env),framework:frozenFramework(check,options)};
+}
+function frozenFramework(check,options){
+ if(options.backendSession!==undefined){if(check.execution.adapter!=='playwright')throw Error('confined backend supports the qualified Playwright adapter only');return require('./improve-backend-runtime.cjs').backendNativeFramework(options.backendSession,options.backendContext);}
+ return framework(options.oracleRoot,check.execution.adapter);
 }
 function execute(check,options={}) {return executeNative(check,options,false);}
 function executeFrozen(check,options={}) {return executeNative(check,options,true);}
@@ -192,7 +196,7 @@ function executeNative(check,options={},frozenOracle=false) {
    const unproven=seams.data_seams.filter(s=>selectedSeams.some(selected=>selected.id===s.id)&&s.compatibility!=='compatible');
    if(!seams.ok||unproven.length)throw Error(`data seam compatibility blocked: ${[...seams.errors,...unproven.flatMap(s=>s.errors)].join('; ')}`);
   }
-  before=bind();identity=framework(executionRoot,check.execution.adapter);
+  before=bind();identity=frozenOracle?before.framework:framework(executionRoot,check.execution.adapter);
   dir=privateDirectory(root,options.runDir||path.join(root,'.specflow/runs/native'));
  }catch(error){return{executable:false,result:'blocked',reason:`native execution unavailable: ${error.message}`};}
  const reportPath=path.join(dir,'native-report.json'),stdoutPath=path.join(dir,'stdout.txt'),stderrPath=path.join(dir,'stderr.txt'),observationsPath=path.join(dir,'observations.json');
@@ -200,12 +204,14 @@ function executeNative(check,options={},frozenOracle=false) {
  const nativeEnv={...(frozenOracle?options.env:process.env),PLAYWRIGHT_JSON_OUTPUT_FILE:reportPath,PLAYWRIGHT_JSON_OUTPUT_NAME:'',PLAYWRIGHT_JSON_OUTPUT_DIR:'',PLAYWRIGHT_HTML_OPEN:'never',SPECFLOW_OBSERVATIONS_PATH:comparisons.length?observationsPath:'',SPECFLOW_CONFIGURATION_ID:before.configuration_id,SPECFLOW_ENVIRONMENT:before.environment};
  // A new Playwright CLI is not running inside its caller's Jest worker.
  if(check.execution.adapter==='playwright')delete nativeEnv.JEST_WORKER_ID;
- const startedAt=new Date().toISOString(),res=cp.spawnSync(process.execPath,args,{cwd:executionRoot,env:nativeEnv,encoding:'utf8',timeout:(check.timeout_seconds||120)*1000,maxBuffer:16*1024*1024});
+ const startedAt=new Date().toISOString();let res;
+ try{res=frozenOracle&&options.backendSession!==undefined?require('./improve-backend-runtime.cjs').backendNativeLaunch(options.backendSession,options.backendContext,{check,options,dir,args,env:nativeEnv}):cp.spawnSync(process.execPath,args,{cwd:executionRoot,env:nativeEnv,encoding:'utf8',timeout:(check.timeout_seconds||120)*1000,maxBuffer:16*1024*1024});}
+ catch(error){res={status:null,stdout:'',stderr:'',error:{code:/^backend_[a-z_]+$/.test(error.message)?error.message:'backend_execution_unavailable'}};}
  fs.writeFileSync(stdoutPath,res.stdout||'',{mode:0o600});fs.writeFileSync(stderrPath,res.stderr||'',{mode:0o600});
  let result,reportBytes,after,observationBytes;
  try {
   reportBytes=artifactBytes(reportPath);
-  result=reconcile(parse(JSON.parse(reportBytes.toString('utf8')),check.execution.adapter,executionRoot),check.execution);
+  result=reconcile(parse(JSON.parse(reportBytes.toString('utf8')),check.execution.adapter,res.reportRoot||executionRoot),check.execution);
  }catch(error){result={result:'blocked',cases:[],errors:[`native_report_missing_or_corrupt: ${error.code||error.message}`],summary:{collected:0,passed:0,failed:0,skipped:0}};}
  if(comparisons.length) {
   try {
@@ -217,12 +223,12 @@ function executeNative(check,options={},frozenOracle=false) {
  }
  try {
   after=bind();
-  const nextFramework=framework(executionRoot,check.execution.adapter);
+  const nextFramework=frozenOracle?after.framework:framework(executionRoot,check.execution.adapter);
   if(outcome.hashValue(before)!==outcome.hashValue(after)||identity.entry_sha256!==nextFramework.entry_sha256||identity.version!==nextFramework.version){result.result='blocked';result.errors.push('stale: source, contract, input, checker, environment or framework changed during native execution');}
  }catch(error){result.result='blocked';result.errors.push(`stale: ${error.message}`);}
  if(res.error){result.result='blocked';result.errors.push(`native_process_error: ${res.error.code||'execution unavailable'} (timeout_seconds: ${check.timeout_seconds||120})`);}
  else if(res.status!==0&&result.result==='pass'){result.result='fail';result.errors.push(`native_process_failed: exit ${res.status}`);}
- const receipt={version:1,attempt_id:path.basename(dir),executable:true,...result,reason:result.errors.join('; ')||null,check_id:check.id,verification_level:check.verification_level,boundaries:[...check.boundaries],command:[process.execPath,...args],root,...(frozenOracle?{oracle_root:executionRoot}:{}),
+ const receipt={version:1,attempt_id:path.basename(dir),executable:true,...result,reason:result.errors.join('; ')||null,check_id:check.id,verification_level:check.verification_level,boundaries:[...check.boundaries],command:res.command||[process.execPath,...args],root,...(frozenOracle?{oracle_root:executionRoot}:{}),
   started_at:startedAt,finished_at:new Date().toISOString(),exit_code:res.status,framework:identity,host:{platform:process.platform,arch:process.arch,node:process.version},binding_before:before,binding_after:after||null,
   claim_kind:check.execution.claim_kind||'behaviour',
   ...(seams?{data_seams:seams.data_seams,interface_scope:seams.scope}:{}),
