@@ -8,6 +8,16 @@ function fixture(){const root=fs.mkdtempSync(path.join(os.tmpdir(),'backend-atte
 function childBegin(root,leaveMutation=false){return new Promise((resolve,reject)=>{const child=cp.spawn(process.execPath,['-e',`const {DurableStore}=require('./scripts/improve-worker.cjs'),a=require('./scripts/improve-backend-attempt.cjs');try{const ref=a.begin(new DurableStore({root:process.argv[1],sourceRoot:process.argv[1]}),JSON.parse(process.argv[2]));if(process.argv[3]==='interrupt')require('fs').mkdirSync(require('path').join(process.argv[1],'backend-attempts','mutation-'+ref.attemptId),{mode:0o700});console.log('reserved')}catch(e){console.log(e.message);process.exitCode=1}`,root,JSON.stringify(input()),leaveMutation?'interrupt':'normal'],{cwd:path.resolve(__dirname,'../..'),stdio:['ignore','pipe','pipe']});let out='',err='';child.stdout.on('data',b=>out+=b);child.stderr.on('data',b=>err+=b);child.on('error',reject);child.on('close',code=>resolve({code,out:out.trim(),err}));});}
 const intent=()=>({slot:'build',expectedConfigSha256:'d'.repeat(64),creator:identity.identity(),supervisor:identity.identity()});
 describe('managed attempt fencing (#293)',()=>{
+ test('cleanup contention never steals an abandoned mutation lock',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input());attempts.intent(f.store,ref,intent());
+  attempts.resourceEvent(f.store,ref,'build',{state:'dispatching',id:null,inspectionSha256:null});
+  attempts.resourceEvent(f.store,ref,'build',{state:'created',id:'a'.repeat(64),inspectionSha256:'b'.repeat(64)});
+  const lock=path.join(f.root,'backend-attempts','mutation-'+ref.attemptId);fs.mkdirSync(lock,{mode:0o700});const inode=fs.statSync(lock).ino,start=performance.now();
+  expect(()=>attempts.resourceEvent(f.store,ref,'build',{state:'removed',id:'a'.repeat(64),inspectionSha256:'b'.repeat(64)})).toThrow('backend_attempt_mutation_busy');
+  expect(performance.now()-start).toBeLessThan(4000);expect(fs.statSync(lock).ino).toBe(inode);
+  expect(attempts.resourceEvents(f.store,ref,'build').some(e=>e.state==='removed')).toBe(false);
+  expect(attempts.read(f.store,ref).attemptId).toBe(ref.attemptId);
+ }finally{f.close();}});
  test.each(['baseline','after','dev-r1','dev-r9007199254740991'])('canonical phase %s',p=>expect(validPhase(p)).toBe(true));
  test.each(['dev-r0','dev-r01','dev-r1\n','dev-r1e3','dev-r9007199254740992',null,1])('reject phase %s',p=>expect(validPhase(p)).toBe(false));
  test('separate processes compete for one durable claim; process exit never unlocks it',async()=>{const f=fixture();try{const results=await Promise.all([childBegin(f.root),childBegin(f.root)]);expect(results.map(r=>r.out).sort()).toEqual(['backend_attempt_active','reserved']);expect(results.map(r=>r.code).sort()).toEqual([0,1]);expect(results.every(r=>r.err==='')).toBe(true);expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');}finally{f.close();}});

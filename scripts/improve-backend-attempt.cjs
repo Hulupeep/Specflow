@@ -104,11 +104,20 @@ function read(store, ref) {
 }
 // Serialize resource admission with sealing. A process killed inside this short
 // critical section leaves a durable fence; another process must not steal it.
-function mutate(store, fd, ref, action) {
+function mutate(store, fd, ref, action, waitMilliseconds = 0) {
   current(store, fd, ref);
   const name = `mutation-${ref.attemptId}`;
-  try { fs.mkdirSync(`/proc/self/fd/${fd}/${name}`, { mode: 0o700 }); }
-  catch (e) { if (e.code === 'EEXIST') throw Error('backend_attempt_mutation_busy'); throw e; }
+  const until = performance.now() + waitMilliseconds;
+  for (;;) {
+    try { fs.mkdirSync(`/proc/self/fd/${fd}/${name}`, { mode: 0o700 }); break; }
+    catch (e) {
+      if (e.code !== 'EEXIST') throw e;
+      if (performance.now() >= until) throw Error('backend_attempt_mutation_busy');
+      // Independent supervisors can finish together. Wait for the holder to
+      // release its own lock; never remove, expire or steal an existing lock.
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
   fs.fsyncSync(fd);
   try { return action(); }
   finally { fs.rmdirSync(`/proc/self/fd/${fd}/${name}`); fs.fsyncSync(fd); }
@@ -206,7 +215,7 @@ function resourceEvent(store, ref, slot, event) {
       slot, intentSha256: hash(canonical(i)), ...event, atMs: Date.now() };
     writeExclusive(store, fd, `resource-${ref.attemptId}-${slot}-${event.state}.json`, value);
     return value;
-  }); } finally { fs.closeSync(fd); }
+  }, ['created','removed','not_dispatched','unconfirmed','foreign'].includes(event.state) ? 2000 : 0); } finally { fs.closeSync(fd); }
 }
 function resourceEvents(store, ref, slot) {
   need(SLOTS.includes(slot)); const fd = area(store);
