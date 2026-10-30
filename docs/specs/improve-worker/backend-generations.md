@@ -1,7 +1,50 @@
 # Managed backend generations — #293 revision
 
-Selected preparation, not implemented/qualified. Original AC-BACKEND-01..07 and
-I-WORKER invariants remain unchanged. No new product UI/schema/RPC/RLS or evaluator.
+Implemented; runtime qualification was executed at `7ec2f671af6a23b225452e58003b35ee41c40f4a`
+on 2026-10-30 UTC. Independent acceptance and merge of
+[PR #294](https://github.com/Hulupeep/Specflow/pull/294) remain separate gates.
+Original AC-BACKEND-01..07 and I-WORKER invariants remain unchanged. No new product
+UI/schema/RPC/RLS or evaluator.
+
+## Evidence and limits
+
+| Claim | Evidence and boundary |
+| --- | --- |
+| Service availability | Pinned local service images started with the admitted configuration and unchanged product migrations in disposable, job-owned backends. Cached images or a successful startup alone do not establish runtime qualification. This is not production-service availability or approval of arbitrary image versions. |
+| Runtime qualification | The real product at `d08c52db4de97d14179f2eb6c442b45f435aca8e` passed 29 Auth/RLS checks, two browser journeys at 1280px and 360px, and 57 isolation controls, with zero failures or skips. Expected and measured backend identities matched, and owned cleanup verified. A deliberate one-row disposable seed mutation was rejected as `backend_identity_mismatch` before any protected check. |
+| Product improvement | Not established by this qualification. The managed lifecycle intentionally exercised a rejecting fixture: baseline failed, development failed then passed, and the once-only held-out check failed. Evaluation returned `REVERT` with no binding errors; finalization retained no candidate commit or branch and left the base unchanged. Real product-value proof remains [#171](https://github.com/Hulupeep/Specflow/issues/171), followed by bounded repeated improvement under [#172](https://github.com/Hulupeep/Specflow/issues/172). |
+
+The lifecycle preserved one holdout consumption and one decision application in a
+verified 35-entry ledger. Each baseline, development and after generation removed
+its nine owned resources, deleted its credential envelope and recorded signed
+release. The original task deadline was not renewed. These are mechanical safety
+and evidence results; passing the development check did not override the failing
+held-out check.
+
+Actual fault qualification covers controller loss before, during and after create,
+anchor removal before a late creation acknowledgement, unavailable readiness,
+output-limit breach, a missing staged migration and a foreign object occupying the
+reserved name. The foreign-name case preserved foreign resources and removed all
+known owned resources, but retained `cleanup_failed` / `operator_required` and its
+private envelope for unresolved dispatch. It is a verified safe rejection, not a
+clean baseline or authority to retry that job. Earlier failed runs and manual
+containment remain in the private history with their original revisions; they were
+not rewritten as successful qualification.
+
+[CI run 41125490725](https://github.com/Hulupeep/Specflow/actions/runs/41125490725)
+passed 3,249 tests in 164 suites at the qualification head, with no failures or
+skips. The actual owner-local qualification uses the drivers in
+`tests/qualification/improve-managed-core.test.cjs`,
+`improve-backend-product.test.cjs`, `improve-backend-admission.test.cjs`,
+`improve-backend-fault.test.cjs` and `improve-backend-operational-fault.test.cjs`.
+Raw native receipts, signed ownership/cleanup records and frozen manifests are
+retained privately; CI success does not substitute for those live runs.
+
+Scope remains the selected owner-local Linux/Docker recipe and admitted product,
+not arbitrary repositories, hosted clouds, production deployment or shared database
+access. Recurring timers and paid fallback remain off. The already published npm
+`0.12.0` predates these runtime changes; a later versioned release and installed
+npm/plugin verification are still required.
 
 ## Closed authority and identities
 
