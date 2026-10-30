@@ -1,10 +1,28 @@
 # Managed backend generations — #293 revision
 
-Implemented; runtime qualification was executed at `7ec2f671af6a23b225452e58003b35ee41c40f4a`
-on 2026-10-30 UTC. Independent acceptance and merge of
+Implemented; runtime qualification was executed on 2026-10-30 UTC across the
+source revisions listed below. Evidence retains its original revision; no single
+head is claimed for every historical probe. Independent acceptance and merge of
 [PR #294](https://github.com/Hulupeep/Specflow/pull/294) remain separate gates.
 Original AC-BACKEND-01..07 and I-WORKER invariants remain unchanged. No new product
 UI/schema/RPC/RLS or evaluator.
+
+## Evidence revisions
+
+| Evidence class | Executed source revision |
+| --- | --- |
+| Six-phase lifecycle, Auth/RLS, browser, isolation and seed-identity mismatch | `7ec2f671af6a23b225452e58003b35ee41c40f4a` |
+| Before-create controller loss | `2814e8b` |
+| During-create controller loss | `33e8752` |
+| After-create controller loss | Original observer fingerprint retained; do not infer a Git revision from the later aggregate report. |
+| Anchor-loss late acknowledgement | `8252f6bb54c56fb7d97917fd73543ab4446d2b42` |
+| Readiness, output limit, missing migration and foreign-name cases | Original per-run observer fingerprints retained; aggregate verification at `7ec2f67` does not relabel those executions. |
+| Original admission negatives | Original 15-case output retained; it lacks a source-bound observer receipt and is not a current-head execution claim. |
+| Four supervisor boundary cases | `28e96a6ffa0b2ec01a1a5ec174c4d9b6269260eb` |
+
+The documentation-only `28e96a6` follow-up preserved the `7ec2f67` runtime and test
+bytes. Later refreshes must retain their own source-bound receipts alongside these
+originals, including failures; they do not replay the consumed lifecycle holdout.
 
 ## Evidence and limits
 
