@@ -102,6 +102,30 @@ function read(store, ref) {
   const fd = area(store);
   try { return current(store, fd, ref); } finally { fs.closeSync(fd); }
 }
+// Serialize resource admission with sealing. A process killed inside this short
+// critical section leaves a durable fence; another process must not steal it.
+function mutate(store, fd, ref, action) {
+  current(store, fd, ref);
+  const name = `mutation-${ref.attemptId}`;
+  try { fs.mkdirSync(`/proc/self/fd/${fd}/${name}`, { mode: 0o700 }); }
+  catch (e) { if (e.code === 'EEXIST') throw Error('backend_attempt_mutation_busy'); throw e; }
+  fs.fsyncSync(fd);
+  try { return action(); }
+  finally { fs.rmdirSync(`/proc/self/fd/${fd}/${name}`); fs.fsyncSync(fd); }
+}
+function seal(store, ref) {
+  const fd = area(store);
+  try { return mutate(store, fd, ref, () => {
+    const attempt = current(store, fd, ref);
+    need(canonical(attempt.owner) === canonical(processIdentity.identity()), 'backend_attempt_owner_unavailable');
+    const name = `sealed-${ref.attemptId}.json`;
+    if (present(fd, name)) return readSigned(store, fd, name);
+    const value = { schema: 'specflow.backend-attempt-seal/v1', attemptId: ref.attemptId,
+      attemptSha256: ref.attemptSha256, atMs: Date.now() };
+    writeExclusive(store, fd, name, value);
+    return value;
+  }); } finally { fs.closeSync(fd); }
+}
 function intent(store, ref, input) {
   exact(input, ['slot', 'expectedConfigSha256', 'creator', 'supervisor']);
   need(SLOTS.includes(input.slot) && digest(input.expectedConfigSha256));
@@ -110,8 +134,9 @@ function intent(store, ref, input) {
     need(processIdentity.state(identity) === 'live' && canonical(processIdentity.identity(identity.pid)) === canonical(identity), 'backend_attempt_owner_unavailable');
   }
   const fd = area(store);
-  try {
+  try { return mutate(store, fd, ref, () => {
     const attempt = current(store, fd, ref);
+    need(!present(fd, `sealed-${ref.attemptId}.json`), 'backend_attempt_sealed');
     need(Date.now() < attempt.deadlineAtMs, 'backend_lease_expired');
     // An operational terminal fences further creation even if the process lives.
     need(!present(fd, `operator-${ref.attemptId}.json`), 'backend_cleanup_unconfirmed');
@@ -120,7 +145,7 @@ function intent(store, ref, input) {
     try { writeExclusive(store, fd, `intent-${ref.attemptId}-${input.slot}.json`, value); }
     catch (e) { if (e.code === 'EEXIST') throw Error('backend_resource_intent_exists'); throw e; }
     return Object.freeze({ name: value.name, slot: value.slot, sha256: hash(canonical(value)) });
-  } finally { fs.closeSync(fd); }
+  }); } finally { fs.closeSync(fd); }
 }
 function intents(store, ref) {
   const fd = area(store);
@@ -137,7 +162,7 @@ function intents(store, ref) {
 }
 function operatorRequired(store, ref) {
   const fd = area(store);
-  try {
+  try { return mutate(store, fd, ref, () => {
     const attempt = current(store, fd, ref);
     const value = { schema: 'specflow.backend-operator-required/v1', attemptId: attempt.attemptId,
       attemptSha256: ref.attemptSha256, state: 'operator_required', cause: 'backend_cleanup_unconfirmed', atMs: Date.now() };
@@ -145,7 +170,7 @@ function operatorRequired(store, ref) {
     try { writeExclusive(store, fd, 'operator-' + ref.attemptId + '.json', value); }
     catch (e) { if (e.code !== 'EEXIST') throw e; return readSigned(store, fd, 'operator-' + ref.attemptId + '.json'); }
     return value;
-  } finally { fs.closeSync(fd); }
+  }); } finally { fs.closeSync(fd); }
 }
 // Only the recorded live supervisor can append a resource event. Records are
 // immutable; an interrupted write is a fence, never a reason to retry creation.
@@ -156,13 +181,15 @@ function resourceEvent(store, ref, slot, event) {
   need(event.id === null || digest(event.id));
   need(event.inspectionSha256 === null || digest(event.inspectionSha256));
   const fd = area(store);
-  try {
+  try { return mutate(store, fd, ref, () => {
     const active = current(store, fd, ref);
     const i = readSigned(store, fd, `intent-${ref.attemptId}-${slot}.json`);
     need(canonical(i.supervisor) === canonical(processIdentity.identity()), 'backend_attempt_owner_unavailable');
     const has = state => present(fd, `resource-${ref.attemptId}-${slot}-${state}.json`);
     if (['dispatching','created','started'].includes(event.state))
       need(!has('unconfirmed') && !has('foreign') && !has('removed'), 'backend_cleanup_unconfirmed');
+    if (['dispatching', 'started'].includes(event.state))
+      need(!present(fd, `sealed-${ref.attemptId}.json`), 'backend_attempt_sealed');
     if (event.state === 'dispatching') {
       need(Date.now() < active.deadlineAtMs && processIdentity.state(i.creator) === 'live', 'backend_lease_expired');
       need(!present(fd, `operator-${ref.attemptId}.json`) && !has('not_dispatched'), 'backend_cleanup_unconfirmed');
@@ -179,7 +206,7 @@ function resourceEvent(store, ref, slot, event) {
       slot, intentSha256: hash(canonical(i)), ...event, atMs: Date.now() };
     writeExclusive(store, fd, `resource-${ref.attemptId}-${slot}-${event.state}.json`, value);
     return value;
-  } finally { fs.closeSync(fd); }
+  }); } finally { fs.closeSync(fd); }
 }
 function resourceEvents(store, ref, slot) {
   need(SLOTS.includes(slot)); const fd = area(store);
@@ -195,4 +222,93 @@ function resourceEvents(store, ref, slot) {
     });
   } finally { fs.closeSync(fd); }
 }
-module.exports = { begin, read, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents };
+// Allocate the only managed host credential envelope before any secret is
+// staged. Its inode is signed; cleanup never accepts an arbitrary caller path.
+function envelope(store, ref) {
+  const fd = area(store);
+  try { return mutate(store, fd, ref, () => {
+    const attempt = current(store, fd, ref);
+    need(canonical(attempt.owner) === canonical(processIdentity.identity()), 'backend_attempt_owner_unavailable');
+    need(!present(fd, `sealed-${ref.attemptId}.json`) && !present(fd, `operator-${ref.attemptId}.json`), 'backend_attempt_sealed');
+    const name = `envelope-${ref.attemptId}`;
+    writeExclusive(store, fd, `${name}-intent.json`, { attemptSha256: ref.attemptSha256 });
+    fs.mkdirSync(`/proc/self/fd/${fd}/${name}`, { mode: 0o700 }); fs.fsyncSync(fd);
+    const child = fs.openSync(`/proc/self/fd/${fd}/${name}`, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+    try {
+      const stat = fs.fstatSync(child);
+      writeExclusive(store, fd, `${name}.json`, { attemptSha256: ref.attemptSha256, dev: stat.dev, ino: stat.ino });
+    } finally { fs.closeSync(child); }
+    return require('path').join(store.root, 'backend-attempts', name);
+  }); } finally { fs.closeSync(fd); }
+}
+function removeEnvelope(store, fd, ref) {
+  const name = `envelope-${ref.attemptId}`;
+  const record = readSigned(store, fd, `${name}.json`);
+  need(record.attemptSha256 === ref.attemptSha256, 'backend_cleanup_unconfirmed');
+  const child = fs.openSync(`/proc/self/fd/${fd}/${name}`, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+  try {
+    const stat = fs.fstatSync(child);
+    need(stat.dev === record.dev && stat.ino === record.ino && stat.uid === process.getuid() && (stat.mode & 0o777) === 0o700, 'backend_cleanup_unconfirmed');
+    const entries = fs.readdirSync(`/proc/self/fd/${child}`);
+    // The runtime envelope is flat. Refuse links, directories and special files;
+    // do not recursively remove a path supplied by a product or caller.
+    for (const entry of entries) {
+      const st = fs.lstatSync(`/proc/self/fd/${child}/${entry}`);
+      need(st.isFile() && st.nlink === 1 && st.uid === process.getuid() && (st.mode & 0o077) === 0, 'backend_cleanup_unconfirmed');
+    }
+    for (const entry of entries) fs.unlinkSync(`/proc/self/fd/${child}/${entry}`);
+    fs.fsyncSync(child);
+    const linked = fs.lstatSync(`/proc/self/fd/${fd}/${name}`);
+    need(linked.dev === stat.dev && linked.ino === stat.ino, 'backend_cleanup_unconfirmed');
+    fs.rmdirSync(`/proc/self/fd/${fd}/${name}`); fs.fsyncSync(fd);
+    need(!present(fd, name), 'backend_cleanup_unconfirmed');
+  } finally { fs.closeSync(child); }
+}
+function finish(store, ref, input) {
+  exact(input, ['cause', 'backendTerminalSha256', 'productReceiptSha256']);
+  need(input.cause === null || (typeof input.cause === 'string' && /^backend_[a-z_]+$/.test(input.cause) && !/\s/.test(input.cause)));
+  need([input.backendTerminalSha256, input.productReceiptSha256].every(v => v === null || digest(v)));
+  if (input.cause === null) need(digest(input.backendTerminalSha256) && digest(input.productReceiptSha256));
+  const fd = area(store);
+  try { return mutate(store, fd, ref, () => {
+    const attempt = current(store, fd, ref);
+    need(canonical(attempt.owner) === canonical(processIdentity.identity()), 'backend_attempt_owner_unavailable');
+    need(!present(fd, `operator-${ref.attemptId}.json`), 'backend_cleanup_unconfirmed');
+    const sealed = readSigned(store, fd, `sealed-${ref.attemptId}.json`);
+    need(sealed.attemptId === ref.attemptId && sealed.attemptSha256 === ref.attemptSha256);
+    const resources = intents(store, ref).map(({ value: i, sha256 }) => {
+      const events = resourceEvents(store, ref, i.slot), by = state => events.find(e => e.state === state);
+      need(!by('unconfirmed') && !by('foreign'), 'backend_cleanup_unconfirmed');
+      const absent = by('not_dispatched'), removed = by('removed'), created = by('created');
+      if (absent) {
+        need(!by('dispatching') && !created && !removed, 'backend_cleanup_unconfirmed');
+        return { slot: i.slot, intentSha256: sha256, id: null, status: 'absent' };
+      }
+      need(removed && created && by('dispatching') && removed.id === created.id &&
+        removed.inspectionSha256 === created.inspectionSha256, 'backend_cleanup_unconfirmed');
+      return { slot: i.slot, intentSha256: sha256, id: removed.id, status: 'removed' };
+    });
+    removeEnvelope(store, fd, ref);
+    const value = { schema: 'specflow.backend-attempt-terminal/v1', attemptId: ref.attemptId,
+      attemptSha256: ref.attemptSha256, phase: attempt.phase, finishedAtMs: Date.now(),
+      state: 'cleaned', ...input, resources, credentialEnvelopeRemoved: true };
+    writeExclusive(store, fd, `terminal-${ref.attemptId}.json`, value);
+    // Once-only release claim survives interruption. Never replay unlink after a
+    // successor has acquired the job; compare the exact active reference first.
+    writeExclusive(store, fd, `release-${ref.attemptId}.json`, { attemptSha256: ref.attemptSha256, terminalSha256: hash(canonical(value)) });
+    current(store, fd, ref);
+    fs.unlinkSync(`/proc/self/fd/${fd}/${activeName(ref.jobId)}`); fs.fsyncSync(fd);
+    return value;
+  }); } finally { fs.closeSync(fd); }
+}
+function terminal(store, ref) {
+  validateReference(ref); const fd = area(store);
+  try {
+    const attempt = validateAttempt(readSigned(store, fd, attemptName(ref.attemptId)));
+    need(canonical(reference(attempt)) === canonical(ref));
+    const value = readSigned(store, fd, `terminal-${ref.attemptId}.json`);
+    need(value.attemptId === ref.attemptId && value.attemptSha256 === ref.attemptSha256 && value.phase === attempt.phase);
+    return value;
+  } finally { fs.closeSync(fd); }
+}
+module.exports = { begin, read, seal, envelope, finish, terminal, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents };

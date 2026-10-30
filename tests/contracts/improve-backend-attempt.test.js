@@ -20,3 +20,91 @@ describe('managed attempt fencing (#293)',()=>{
  test('expired attempt cannot create; unavailable supervisor cannot register',()=>{const f=fixture();try{const ref=attempts.begin(f.store,input());expect(()=>attempts.intent(f.store,ref,{...intent(),supervisor:{...identity.identity(),boot_id:'foreign'}})).toThrow('backend_attempt_owner_unavailable');const clock=jest.spyOn(Date,'now').mockReturnValue(input().deadlineAtMs+1);try{expect(()=>attempts.intent(f.store,ref,intent())).toThrow('backend_lease_expired');}finally{clock.mockRestore();}}finally{f.close();}});
  test('plain store objects cannot create private authority',()=>expect(()=>attempts.begin({root:'/tmp'},input())).toThrow('backend_attempt_authority'));
 });
+
+describe('attempt seal closes resource admission without claiming cleanup',()=>{
+ test('seal survives reopen and rejects new intent without releasing the job',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input()), sealed=attempts.seal(f.store,ref);
+  expect(attempts.seal(new DurableStore({root:f.root,sourceRoot:f.root}),ref)).toEqual(sealed);
+  expect(()=>attempts.intent(f.store,ref,intent())).toThrow('backend_attempt_sealed');
+  expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+ test('intent recorded before seal cannot dispatch, but supervisor can certify not dispatched',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input());attempts.intent(f.store,ref,intent());attempts.seal(f.store,ref);
+  expect(()=>attempts.resourceEvent(f.store,ref,'build',{state:'dispatching',id:null,inspectionSha256:null})).toThrow('backend_attempt_sealed');
+  attempts.resourceEvent(f.store,ref,'build',{state:'not_dispatched',id:null,inspectionSha256:null});
+  expect(attempts.resourceEvents(f.store,ref,'build').map(e=>e.state)).toEqual(['not_dispatched']);
+ }finally{f.close();}});
+ test('in-flight dispatched resource can report creation and exact removal after seal',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input());attempts.intent(f.store,ref,intent());
+  attempts.resourceEvent(f.store,ref,'build',{state:'dispatching',id:null,inspectionSha256:null});attempts.seal(f.store,ref);
+  const object={id:'e'.repeat(64),inspectionSha256:'f'.repeat(64)};
+  attempts.resourceEvent(f.store,ref,'build',{state:'created',...object});
+  expect(()=>attempts.resourceEvent(f.store,ref,'build',{state:'started',...object})).toThrow('backend_attempt_sealed');
+  attempts.resourceEvent(f.store,ref,'build',{state:'removed',...object});
+  expect(attempts.resourceEvents(f.store,ref,'build').map(e=>e.state)).toEqual(['dispatching','created','removed']);
+  expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+ test('interrupted mutation fences sealing and admission; no timeout lock stealing',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input());fs.mkdirSync(path.join(f.root,'backend-attempts','mutation-'+ref.attemptId),{mode:0o700});
+  expect(()=>attempts.seal(f.store,ref)).toThrow('backend_attempt_mutation_busy');
+  expect(()=>attempts.intent(f.store,ref,intent())).toThrow('backend_attempt_mutation_busy');
+  expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+ test('corrupt seal remains a fence and cannot be regenerated',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input());attempts.seal(f.store,ref);
+  fs.writeFileSync(path.join(f.root,'backend-attempts','sealed-'+ref.attemptId+'.json'),'{');
+  expect(()=>attempts.seal(f.store,ref)).toThrow();
+  expect(()=>attempts.intent(f.store,ref,intent())).toThrow('backend_attempt_sealed');
+ }finally{f.close();}});
+});
+
+describe('complete attempt terminal and exact release',()=>{
+ const failure={cause:'backend_worker_failed',backendTerminalSha256:null,productReceiptSha256:null};
+ function prepared(f){const ref=attempts.begin(f.store,input()),dir=attempts.envelope(f.store,ref);fs.writeFileSync(path.join(dir,'private.env'),'disposable-test-fixture',{mode:0o600});return {ref,dir};}
+ test('deletes the owned envelope before durable failure terminal and permits a successor',()=>{const f=fixture();try{
+  const {ref,dir}=prepared(f);attempts.seal(f.store,ref);const t=attempts.finish(f.store,ref,failure);
+  expect(t.cause).toBe(failure.cause);expect(t.credentialEnvelopeRemoved).toBe(true);expect(fs.existsSync(dir)).toBe(false);
+  expect(attempts.terminal(new DurableStore({root:f.root,sourceRoot:f.root}),ref)).toEqual(t);
+  const next=attempts.begin(f.store,input());expect(next.attemptId).not.toBe(ref.attemptId);
+  expect(()=>attempts.finish(f.store,ref,failure)).toThrow('backend_attempt_not_active');
+  expect(attempts.read(f.store,next).attemptId).toBe(next.attemptId);
+ }finally{f.close();}});
+ test('accounts for removed and undispatched resources, preserving original failure',()=>{const f=fixture();try{
+  const {ref}=prepared(f);attempts.intent(f.store,ref,intent());
+  attempts.resourceEvent(f.store,ref,'build',{state:'not_dispatched',id:null,inspectionSha256:null});
+  attempts.intent(f.store,ref,{...intent(),slot:'app'});
+  attempts.resourceEvent(f.store,ref,'app',{state:'dispatching',id:null,inspectionSha256:null});
+  const obj={id:'e'.repeat(64),inspectionSha256:'f'.repeat(64)};
+  attempts.resourceEvent(f.store,ref,'app',{state:'created',...obj});attempts.resourceEvent(f.store,ref,'app',{state:'removed',...obj});
+  attempts.seal(f.store,ref);const t=attempts.finish(f.store,ref,failure);
+  expect(t.resources.map(r=>[r.slot,r.status])).toEqual([['build','absent'],['app','removed']]);
+ }finally{f.close();}});
+ test.each(['intent','dispatching','created','unconfirmed','foreign'])('never releases %s resource',state=>{const f=fixture();try{
+  const {ref,dir}=prepared(f);attempts.intent(f.store,ref,intent());
+  if(['dispatching','created'].includes(state))attempts.resourceEvent(f.store,ref,'build',{state:'dispatching',id:null,inspectionSha256:null});
+  if(state==='created')attempts.resourceEvent(f.store,ref,'build',{state:'created',id:'e'.repeat(64),inspectionSha256:'f'.repeat(64)});
+  if(['unconfirmed','foreign'].includes(state))attempts.resourceEvent(f.store,ref,'build',{state,id:null,inspectionSha256:null});
+  attempts.seal(f.store,ref);expect(()=>attempts.finish(f.store,ref,failure)).toThrow('backend_cleanup_unconfirmed');
+  expect(fs.existsSync(dir)).toBe(true);expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+ test('operator-required marker prevents automatic release even with no resources',()=>{const f=fixture();try{
+  const {ref}=prepared(f);attempts.seal(f.store,ref);attempts.operatorRequired(f.store,ref);
+  expect(()=>attempts.finish(f.store,ref,failure)).toThrow('backend_cleanup_unconfirmed');
+  expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+ test('envelope symlink cannot cause deletion outside the owned directory',()=>{const f=fixture();try{
+  const {ref,dir}=prepared(f),outside=path.join(f.root,'retain');fs.writeFileSync(outside,'retain',{mode:0o600});fs.symlinkSync(outside,path.join(dir,'link'));
+  attempts.seal(f.store,ref);expect(()=>attempts.finish(f.store,ref,failure)).toThrow('backend_cleanup_unconfirmed');
+  expect(fs.readFileSync(outside,'utf8')).toBe('retain');expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+ test('replaced envelope inode is refused and retained',()=>{const f=fixture();try{
+  const {ref,dir}=prepared(f);fs.renameSync(dir,dir+'-original');fs.mkdirSync(dir,{mode:0o700});
+  attempts.seal(f.store,ref);expect(()=>attempts.finish(f.store,ref,failure)).toThrow('backend_cleanup_unconfirmed');
+  expect(fs.existsSync(dir)).toBe(true);expect(fs.existsSync(dir+'-original')).toBe(true);
+ }finally{f.close();}});
+ test('no caller cleaned flag or absent envelope can establish cleanup',()=>{const f=fixture();try{
+  const ref=attempts.begin(f.store,input());attempts.seal(f.store,ref);
+  expect(()=>attempts.finish(f.store,ref,{...failure,credentialEnvelopeRemoved:true})).toThrow();
+  expect(()=>attempts.finish(f.store,ref,failure)).toThrow();expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+ }finally{f.close();}});
+});
