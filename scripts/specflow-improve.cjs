@@ -444,7 +444,9 @@ function validateContract(runDir, contract, selected) {
   }
   const backend=contract?.runtime?.backend;
   if(backend!==undefined){
-    if(!backend||typeof backend!=='object'||Array.isArray(backend)||Object.keys(backend).sort().join(',')!=='expectedSemanticSha256,inputManifestSha256,recipeId'||backend.recipeId!=='heystax-supabase-v1'||!(typeof backend.expectedSemanticSha256==='string'&&/^[a-f0-9]{64}$/.test(backend.expectedSemanticSha256))||!backend.inputManifestSha256||typeof backend.inputManifestSha256!=='object'||Array.isArray(backend.inputManifestSha256)||Object.keys(backend.inputManifestSha256).sort().join(',')!=='after,baseline'||!['baseline','after'].every(p=>typeof backend.inputManifestSha256[p]==='string'&&/^[a-f0-9]{64}$/.test(backend.inputManifestSha256[p]))||backend.inputManifestSha256.baseline===backend.inputManifestSha256.after)errors.push('runtime.backend requires the exact qualified recipe and frozen semantic identity and distinct baseline/after input hashes');
+    const managedBackend=backend&&Object.keys(backend).sort().join(',')==='constructionSha256,expectedSemanticSha256,recipeId';
+    if(managedBackend){if(backend.recipeId!=='heystax-supabase-v1'||![backend.expectedSemanticSha256,backend.constructionSha256].every(v=>typeof v==='string'&&/^[a-f0-9]{64}$/.test(v)&&v.length===64))errors.push('runtime.backend requires the exact managed recipe and frozen construction and semantic identities');}
+    else if(!backend||typeof backend!=='object'||Array.isArray(backend)||Object.keys(backend).sort().join(',')!=='expectedSemanticSha256,inputManifestSha256,recipeId'||backend.recipeId!=='heystax-supabase-v1'||!(typeof backend.expectedSemanticSha256==='string'&&/^[a-f0-9]{64}$/.test(backend.expectedSemanticSha256))||!backend.inputManifestSha256||typeof backend.inputManifestSha256!=='object'||Array.isArray(backend.inputManifestSha256)||Object.keys(backend.inputManifestSha256).sort().join(',')!=='after,baseline'||!['baseline','after'].every(p=>typeof backend.inputManifestSha256[p]==='string'&&/^[a-f0-9]{64}$/.test(backend.inputManifestSha256[p]))||backend.inputManifestSha256.baseline===backend.inputManifestSha256.after)errors.push('runtime.backend requires the exact qualified recipe and frozen semantic identity and distinct baseline/after input hashes');
     if(contract.runtime.setup?.length||contract.runtime.serve||contract.gates?.length)errors.push('runtime.backend owns setup and serving; command gates must be declared as native preservation checks');
     for(const a of acceptance)for(const c of [a.check,a.dev_check].filter(Boolean))if(c.execution?.adapter!=='playwright')errors.push('runtime.backend requires the qualified frozen Playwright check adapter');
   }
@@ -495,6 +497,8 @@ function freezeContract(runDir, file, options = {}) {
   if (previous.length && !nonempty(options.supersede)) throw new Error('A frozen contract exists; a change needs --supersede "<reason>" and creates a new version');
   const contract = readJson(file);
   const validation = validateContract(runDir, contract, selected);
+  let backendBinding=null;
+  if(contract.runtime?.backend?.constructionSha256)try{backendBinding=require('./improve-backend-generation.cjs').freezeBinding(options.backendCapability,runDir,contract.runtime.backend);}catch(error){validation.errors.push('managed backend binding unavailable before freeze: '+error.message);}
   // A distinct reviewer must have said "pursue" for this candidate (#175, D7).
   const critique = evs.filter((e) => e.event === 'critique_recorded' && e.candidate_id === selected.id).slice(-1)[0];
   if (!critique) validation.errors.push('an independent critique of the selected candidate is required before freezing (improve critique)');
@@ -528,6 +532,7 @@ function freezeContract(runDir, file, options = {}) {
     mission_sha256: run.mission.sha256,
     candidate: { id: selected.id, title: selected.title, kind: selected.kind },
     artifact_sha256: artifacts,
+    ...(backendBinding?{backend_binding:backendBinding}:{}),
     oracle_authors: oracle,
     critique: { verdict: critique.verdict, executor: critique.executor },
     contract,
@@ -803,7 +808,7 @@ function inputIdentity(runDir,run,gov,phase,ws) {
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
@@ -815,7 +820,7 @@ function identityDiff(a,b) {
   if(paths.length)parts.push(`workspace (${paths.length}): ${paths.slice(0,8).join(', ')}${paths.length>8?', ...':''}`);
   return parts.join('; ')||'identity digest differs';
 }
-function boundReceipt(runDir,phase,{current=true}={}) {
+function boundReceipt(runDir,phase,{current=true,backendCapability}={}) {
   try {
     const run=loadRun(runDir),gov=governingContract(runDir),evs=events(runDir);
     if(!verifyLedger(runDir).ok)throw Error('ledger integrity failed');
@@ -828,7 +833,8 @@ function boundReceipt(runDir,phase,{current=true}={}) {
       const b=receipt.backend;if(!b||b.expectedSemanticSha256!==declared.expectedSemanticSha256||b.measuredSemanticSha256!==declared.expectedSemanticSha256)throw Error('backend identity mismatch');
       for(const ref of [b.entry,b.terminal,b.product?.source,b.product?.build,b.product?.output])if(!ref||fileSha(ref.path)!==ref.sha256)throw Error('backend manifest changed or missing');
       const entry=readJson(b.entry.path),terminal=readJson(b.terminal.path);
-      if(entry.phase!==phase||entry.expectedBackendIdentity!==b.expectedSemanticSha256||entry.measuredBackendIdentity!==b.measuredSemanticSha256||entry.inputManifestSha256!==declared.inputManifestSha256[phase]||terminal.phase!=='cleaned'||terminal.cause||terminal.jobId!==entry.jobId||terminal.generation!==entry.generation||terminal.resources.some(r=>r.status!=='removed'))throw Error('backend manifest correspondence or cleanup failed');
+      if(entry.phase!==phase||entry.expectedBackendIdentity!==b.expectedSemanticSha256||entry.measuredBackendIdentity!==b.measuredSemanticSha256||(declared.constructionSha256?entry.constructionSha256!==declared.constructionSha256:entry.inputManifestSha256!==declared.inputManifestSha256[phase])||terminal.phase!=='cleaned'||terminal.cause||terminal.jobId!==entry.jobId||terminal.generation!==entry.generation||terminal.resources.some(r=>r.status!=='removed'))throw Error('backend manifest correspondence or cleanup failed');
+      if(declared.constructionSha256)require('./improve-backend-generation.cjs').verifyReceipt(backendCapability,runDir,phase,gov.entry.contract_sha256,b);
     }else if(receipt.backend)throw Error('unexpected backend receipt');
     const evidence=readEvidence(runDir);
     for(const ref of receipt.evidence) {
@@ -850,7 +856,59 @@ function boundReceipt(runDir,phase,{current=true}={}) {
   } catch(error) {return {error:'Evidence binding: '+error.message};}
 }
 
-async function verifyPhase(runDir, phase, {backendSession} = {}) {
+
+function assertManagedDispatch(runDir,phase){
+  const evs=events(runDir);
+  if(!verifyLedger(runDir).ok)throw Error('backend_ledger_invalid');
+  if(phase==='baseline'&&lastEvent(evs,'implementation_started'))throw Error('backend_baseline_after_implementation');
+  if(phase==='after'){
+    if(!lastEvent(evs,'implementation_finished'))throw Error('backend_implementation_unfinished');
+    if(lastEvent(evs,'holdout_consumed')||evs.some(e=>(e.event==='verification_started'&&e.phase==='after'&&e.binding_version!==1)||(e.event==='verification_completed'&&e.phase==='after'&&!e.attempt)||(e.event==='evidence_added'&&e.phase==='after'&&!e.record_sha256)))throw Error('backend_holdout_consumed');
+  }
+}
+async function withManagedBackend(runDir,phase,capability,ws,gov,dir,execute){
+  const generation=require('./improve-backend-generation.cjs'),backend=require('./improve-backend-runtime.cjs');
+  let handle,outcome,backendReceipt,originalCause=null;
+  const refresh=()=>{
+    const fresh=governingContract(runDir),run=loadRun(runDir);
+    const blocked=integrityBlock(runDir,fresh,phase);if(blocked)throw Error('backend_frozen_input_changed');
+    if(fresh.entry.contract_sha256!==gov.entry.contract_sha256)throw Error('backend_frozen_input_changed');
+    assertManagedDispatch(runDir,phase);
+    return {bindingSha256:fresh.doc.backend_binding?.sha256,contractSha256:fresh.entry.contract_sha256,declaration:fresh.contract.runtime.backend,workspace:ws.worktreePath,identity:inputIdentity(runDir,run,fresh,phase,ws)};
+  };
+  const preserve=ref=>generation.retainProof(dir,ref);
+  try{
+    handle=await generation.open(capability,runDir,phase,refresh);
+    const {session,context}=generation.access(handle),entry=await backend.admitBackend(session,context);
+    const before=refresh();
+    const product=backend.bindBackendProduct(session,context,before.identity.workspace);
+    const practice=phase.startsWith('dev-r');
+    const checks=gov.contract.acceptance.flatMap(a=>(practice?[a.dev_check]:phase==='baseline'?[a.check,a.dev_check]:[a.check]).filter(Boolean).map(check=>nativeCheck(a,check))).filter(c=>c.execution);
+    generation.selectChecker(handle);backend.prepareBackendChecks(session,context,{oracleRoot:runDir,frozenFiles:gov.entry.artifact_sha256,checks});
+    await backend.startBackendServer(session,context);
+    // The only final-dispatch authority is the actual ledger under reservation.
+    refresh();
+    const vars=s=>String(s).replace(/\{workspace\}/g,ws.worktreePath).replace(/\{run_dir\}/g,runDir).replace(/\{evidence_dir\}/g,dir).replace(/\{phase\}/g,phase);
+    outcome=await execute({vars,baseUrl:'http://127.0.0.1:3000',backendSession:session,backendContext:context});
+    if(outcome.status==='blocked')throw Error(outcome.reason);
+    if(binding.digest(inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws))!==binding.digest(before.identity))throw Error('backend_product_changed');
+    await backend.backendContinuity(session,context);
+    backendReceipt={product:Object.fromEntries(Object.entries(product).map(([k,ref])=>[k,preserve(ref)])),entry:preserve({path:entry.path,sha256:entry.sha256}),expectedSemanticSha256:context.expectedBackendIdentity,measuredSemanticSha256:entry.manifest.measuredBackendIdentity};
+  }catch(error){originalCause=error.code||error.message;outcome={status:'blocked',reason:'Backend generation unavailable: '+originalCause};}
+  finally{
+    if(handle)try{
+      const closed=await generation.close(handle,originalCause);
+      if(closed.originalCause)throw Error(closed.originalCause);
+      if(backendReceipt){
+        backendReceipt.terminal=generation.writeProof(dir,closed.backendTerminal);
+        backendReceipt.managed={attempt:closed.attempt,terminal:closed.terminal};
+      }
+    }catch(error){outcome={status:'blocked',reason:originalCause?'Backend generation unavailable: '+originalCause+'; cleanup: '+error.message:'Backend cleanup unavailable: '+error.message};}
+  }
+  return {outcome,backendReceipt};
+}
+
+async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {}) {
   if (!['baseline', 'after'].includes(phase)) throw new Error('phase must be baseline or after');
   const run = loadRun(runDir);
   const gov = governingContract(runDir);
@@ -871,11 +929,11 @@ async function verifyPhase(runDir, phase, {backendSession} = {}) {
   fs.mkdirSync(dir, { recursive: true });
   append(runDir, 'verification_started', { phase, attempt, binding_version:1, contract_version: gov.entry.version, workspace: ws.worktreePath });
   const makerClaim = phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline';
-  const execute = async ({vars,baseUrl,backendContext}) => {
+  const execute = async ({vars,baseUrl,backendContext,backendSession:managedSession}) => {
     let identity;
     try {identity=inputIdentity(runDir,run,gov,phase,ws);}catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
-    if(phase==='after')append(runDir,'holdout_consumed',{attempt,contract_version:gov.entry.version});
-    const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim,backendSession,backendContext };
+    if(phase==='after'){assertManagedDispatch(runDir,phase);append(runDir,'holdout_consumed',{attempt,contract_version:gov.entry.version});}
+    const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim,backendSession:managedSession||backendSession,backendContext };
     const items = runCheckSet(runDir, { ...ctx, set: 'holdout', gates: true });
     if (phase === 'baseline') items.push(...runCheckSet(runDir, { ...ctx, set: 'dev', gates: false }));
     try {const after=inputIdentity(runDir,run,gov,phase,ws);if(binding.digest(after)!==binding.digest(identity))throw Error('inputs changed during verification: '+identityDiff(identity,after));}
@@ -883,7 +941,10 @@ async function verifyPhase(runDir, phase, {backendSession} = {}) {
     return {items,identity};
   };
   let outcome,backendReceipt;
-  if(gov.contract.runtime?.backend){
+  if(gov.contract.runtime?.backend?.constructionSha256){
+    if(backendSession!==undefined)outcome={status:'blocked',reason:'Serialized or legacy session cannot replace managed generation authority'};
+    else {const result=await withManagedBackend(runDir,phase,backendCapability,ws,gov,dir,execute);outcome=result.outcome;backendReceipt=result.backendReceipt;}
+  }else if(gov.contract.runtime?.backend){
     const backend=require('./improve-backend-runtime.cjs'),decl=gov.contract.runtime.backend;
     const context={runId:run.run_id,phase,expectedBackendIdentity:decl.expectedSemanticSha256,inputManifestSha256:decl.inputManifestSha256[phase]};
     try{
@@ -920,7 +981,7 @@ async function verifyPhase(runDir, phase, {backendSession} = {}) {
 }
 
 // Builder-visible practice run inside a Duo round: dev checks only.
-async function devRound(runDir, round) {
+async function devRound(runDir, round, {backendCapability} = {}) {
   const run = loadRun(runDir);
   const gov = governingContract(runDir);
   const blocked = integrityBlock(runDir, gov, `dev-r${round}`);
@@ -928,9 +989,10 @@ async function devRound(runDir, round) {
   const ws = workspaceFor(run, 'improve');
   const dir = path.join(runDir, 'dev-runs', `round-${round}`);
   fs.mkdirSync(dir, { recursive: true });
-  const outcome = await withRuntime(runDir, ws, gov.contract, dir, `dev-r${round}`, ({ vars, baseUrl }) => ({
-    items: runCheckSet(runDir, { ws, gov, dir, phase: `dev-r${round}`, set: 'dev', vars, baseUrl, makerClaim: 'dev-round', gates: false }),
-  }));
+  const execute=({vars,baseUrl,backendSession,backendContext})=>({items:runCheckSet(runDir,{ws,gov,dir,phase:`dev-r${round}`,set:'dev',vars,baseUrl,makerClaim:'dev-round',gates:false,backendSession,backendContext})});
+  const outcome=gov.contract.runtime?.backend?.constructionSha256
+    ?(await withManagedBackend(runDir,`dev-r${round}`,backendCapability,ws,gov,dir,execute)).outcome
+    :await withRuntime(runDir,ws,gov.contract,dir,`dev-r${round}`,execute);
   if (outcome.status === 'blocked') return outcome;
   const summary = Object.fromEntries(outcome.items.map((i) => [i.criterion, i.result]));
   append(runDir, 'dev_round_checked', { round, summary });
@@ -1257,7 +1319,7 @@ async function build(runDir, options = {}) {
   if (gov.tampered || gov.artifactErrors.length) throw new Error('Frozen contract integrity failed; implementation blocked');
   const latestAttempt=lastEvent(evs,'baseline_attempted');
   const matching=latestAttempt&&latestAttempt.contract_version===gov.entry.version&&latestAttempt.contract_sha256===gov.entry.contract_sha256&&latestAttempt.base_commit===run.base_commit;
-  const baselineProof=matching?boundReceipt(runDir,'baseline'):{error:'No baseline for the current governing contract'};
+  const baselineProof=matching?boundReceipt(runDir,'baseline',{backendCapability:options.backendCapability}):{error:'No baseline for the current governing contract'};
   const baseline=matching&&!baselineProof.error&&baselineProof.receipt.attempt===latestAttempt.attempt;
   const baselineBlocked=matching&&!baseline;
   if (!baseline && !(baselineBlocked && nonempty(options.acceptBaselineBlocker))) {
@@ -1315,7 +1377,7 @@ async function build(runDir, options = {}) {
     append(runDir, 'builder_round', record);
     if (!['gate_rerun_required', 'dry_run'].includes(result.status)) { stop = `builder ${result.status}`; rounds.push(record); break; }
 
-    const dev = await devRound(runDir, round);
+    const dev = await devRound(runDir, round, {backendCapability:options.backendCapability});
     if (dev.status === 'blocked') { stop = `practice checks blocked: ${dev.reason}`; rounds.push(record); break; }
     const diff = workspaceDiff(run,gov.contract);
     const inputDir = path.join(runDir, 'peer-input', `round-${round}`);
@@ -1484,7 +1546,7 @@ function decide(state) {
   return { decision: 'KEEP', reasons: ['all declared mandatory gains established by matched holdout evidence; all mandatory criteria and required gates passed; scope and safety held'] };
 }
 
-function evaluate(runDir) {
+function evaluate(runDir,{backendCapability}={}) {
   const run = loadRun(runDir);
   const evs = events(runDir);
   if (lastEvent(evs, 'decision_made')) throw new Error('This run already has a decision; decisions are not re-rolled');
@@ -1492,8 +1554,8 @@ function evaluate(runDir) {
   if (!started) throw new Error('Nothing to evaluate: no implementation attempt was recorded');
   const gov = governingContract(runDir);
   const evidence = readEvidence(runDir);
-  const afterBinding = boundReceipt(runDir, 'after');
-  let baselineBinding = boundReceipt(runDir, 'baseline', { current: false });
+  const afterBinding = boundReceipt(runDir, 'after',{backendCapability});
+  let baselineBinding = boundReceipt(runDir, 'baseline', { current: false,backendCapability });
   if (baselineBinding.receipt && baselineBinding.receipt.attempt !== lastEvent(evs, 'baseline_attempted')?.attempt) {
     baselineBinding = { error: 'Evidence binding: baseline receipt was superseded by a newer attempt' };
   }
@@ -1615,7 +1677,7 @@ function evaluate(runDir) {
 // ---------------------------------------------------------------------------
 // finalize: apply the decision without touching base (AC-04-3)
 
-function finalize(runDir) {
+function finalize(runDir,{backendCapability}={}) {
   const run = loadRun(runDir);
   const evs = events(runDir);
   const made = lastEvent(evs, 'decision_made');
@@ -1635,7 +1697,7 @@ function finalize(runDir) {
   if (decision.decision === 'KEEP' && diff && diff.files.length) {
     const title = readJson(governingContract(runDir).entry.path).candidate.title;
     const msg = `improve(${run.run_id}): ${title}\n\nSpecflow improve --once decision KEEP. Contract v${decision.contract.version} sha256 ${decision.contract.sha256}.`;
-    const proof=boundReceipt(runDir,'after');
+    const proof=boundReceipt(runDir,'after',{backendCapability});
     if(proof.error||binding.digest(proof.receipt.identity.git)!==binding.digest(decision.workspace.verified_git))throw Error(proof.error||'Verified Git tree changed after evaluation');
     applied.commit = binding.retain(ws.worktreePath,proof.receipt.identity.git,msg);
     applied.branch_retained = true;

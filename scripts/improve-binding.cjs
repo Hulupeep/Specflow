@@ -137,13 +137,18 @@ function tree(root,options={}) {
   if(selected.length)git(root,['--literal-pathspecs','add','-A','--pathspec-from-file=-','--pathspec-file-nul'],{input:selected.join('\0')+'\0'});
   const raw=spawnSync('git',['ls-files','--stage','-z'],{cwd:root,encoding:'utf8',maxBuffer:64*1024*1024});
   if(raw.status!==0)throw Error('Git index identity unavailable');
+  const objectFormat=git(root,['rev-parse','--show-object-format']);
+  if(!['sha1','sha256'].includes(objectFormat))throw Error('Unsupported Git object format');
   for(const line of raw.stdout.split('\0').filter(Boolean)) {
     const match=/^(\d+) ([a-f0-9]+) (\d)\t([\s\S]*)$/.exec(line);
     if(!match||match[3]!=='0'||!['100644','100755','120000'].includes(match[1]))throw Error('Unsupported Git index entry');
     const file=path.join(root,match[4]),stat=fs.lstatSync(file);
     const bytes=stat.isSymbolicLink()?Buffer.from(fs.readlinkSync(file)):fs.readFileSync(file);
     const mode=stat.isSymbolicLink()?'120000':stat.mode&0o111?'100755':'100644';
-    if(mode!==match[1]||git(root,['hash-object','--no-filters','--stdin'],{input:bytes})!==match[2])throw Error('Git content transformation differs from verified bytes');
+    // Hash exactly the raw Git blob (no filters), keeping the index comparison
+    // while avoiding one confined runtime launch per product file.
+    const blob=crypto.createHash(objectFormat).update(Buffer.from('blob '+bytes.length+'\0')).update(bytes).digest('hex');
+    if(mode!==match[1]||blob!==match[2])throw Error('Git content transformation differs from verified bytes');
   }
   return {tree:git(root,['write-tree']),parent:git(root,['rev-parse','HEAD']),branch:git(root,['symbolic-ref','HEAD'])};
 }

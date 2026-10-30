@@ -1368,6 +1368,24 @@ function curatedText(root, { files = null, maxBytes = 256 * 1024, omitRuntimeMet
   else visit('');
   return out.join('\n');
 }
+function builderText(root, config) {
+  if (!config.backendJobBinding) return curatedText(root, { files: ['server.cjs', 'package.json'] });
+  need(Array.isArray(config.allowed) && Array.isArray(config.protected), 'role_scope_missing');
+  const files = ['package.json']; let visited = 0;
+  const allowed = config.allowed.map(core.globToRegex), protectedPaths = config.protected.map(core.globToRegex);
+  function visit(rel) {
+    need(++visited <= 50000, 'role_input_limit');
+    const parts = rel.split('/');
+    if (parts.some(p => ['.git', '.specflow', 'node_modules', '.next', 'holdout'].includes(p) || p.startsWith('.env'))) return;
+    if (protectedPaths.some(re => re.test(rel))) return;
+    const file = path.join(root, rel), stat = fs.lstatSync(file);
+    need(!stat.isSymbolicLink(), 'role_input_link');
+    if (stat.isDirectory()) for (const name of fs.readdirSync(file).sort()) visit(rel ? rel + '/' + name : name);
+    else if (allowed.some(re => re.test(rel))) { need(stat.isFile(), 'role_input_special'); files.push(rel); }
+  }
+  for (const name of fs.readdirSync(root).sort()) visit(name);
+  return curatedText(root, { files: [...new Set(files)] });
+}
 function pinnedLauncher({ directory, config, mode }) {
   privateDir(directory);
   const cfg = path.join(directory, 'job.json');
@@ -1484,7 +1502,7 @@ async function command(configFile, mode) {
     need(schema, 'role_schema_missing');
     let data =
       role === 'builder'
-        ? curatedText(process.cwd(), { files: ['server.cjs', 'package.json'] })
+        ? builderText(process.cwd(), cfg)
         : curatedText(process.cwd(), { omitRuntimeMetadata: true });
     const images = [];
     if (role === 'judge') {
@@ -1521,6 +1539,7 @@ Object.assign(module.exports, {
   runBrowserCheck,
   roleCall,
   curatedText,
+  builderText,
   pinnedLauncher,
   command,
   controlledEnvironment
@@ -1644,6 +1663,13 @@ async function coreStage(config, stage, args) {
     });
     return { status: 0, stdout: out.raw, stderr: '' };
   };
+  args=[...args];
+  if(config.backendJobBinding&&['freezeContract','verifyPhase','build','evaluate','finalize'].includes(stage)){
+    const index=['freezeContract','verifyPhase'].includes(stage)?2:1,options=args[index]||{};
+    need(!Object.hasOwn(options,'backendCapability')&&!Object.hasOwn(options,'backendSession'),'backend_capability_required');
+    const capability=require('./improve-backend-generation.cjs').install(config,args[0],()=>currentAuthority(config));
+    args[index]={...options,backendCapability:capability};
+  }
   if (stage === 'critique' || stage === 'build') args[1] = { ...(args[1] || {}), invokePeer: peer };
   return await core[stage](...args);
 }

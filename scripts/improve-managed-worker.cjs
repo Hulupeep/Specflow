@@ -46,7 +46,7 @@ function waitFile(file,b,child,deadline){for(;;){try{return readFile(file);}catc
 function create(worker,raw){
  const b=bindings.get(worker);if(!b)return null;
  b.authorize();const attempt=attempts.read(b.store,b.attempt),slot=b.slot;need(slots.includes(slot));b.slot=null;
- const plan=validatePlan(raw),root=fs.mkdtempSync(path.join(worker.stateRoot,'managed-create-'));fs.chmodSync(root,0o700);
+ const plan=validatePlan(raw),root=fs.mkdtempSync(path.join(attempts.envelope(b.store,b.attempt),'managed-create-'));fs.chmodSync(root,0o700);
  const end=Math.min(attempt.deadlineAtMs,Date.now()+plan.phaseMilliseconds);
  const value={schema:'specflow.managed-worker/v1',storeRoot:b.store.root,sourceRoot:b.store.sourceRoot,attempt:b.attempt,slot,plan,controller:identity.identity(),root,deadlineAtMs:end};
  write(path.join(root,'descriptor.json'),{value,mac:b.store.mac(JSON.parse(canonical(value)))});

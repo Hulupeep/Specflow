@@ -45,8 +45,9 @@ describe('managed supervisor spawn failure (#293)',()=>{
    expect(()=>managed.create(worker,plan())).toThrow('backend_attempt_owner_unavailable');
    expect(probe.mock.calls.some(args=>args.length===1&&args[0]===undefined)).toBe(false);
    expect(a.intents(store,ref)).toEqual([]);
-   for(const name of fs.readdirSync(root).filter(n=>n.startsWith('managed-create-')))
-    expect(fs.existsSync(path.join(root,name,'dispatch.json'))).toBe(false);
+   const envelope=a.envelope(store,ref),created=fs.readdirSync(envelope).filter(n=>n.startsWith('managed-create-'));
+   expect(created).toHaveLength(1);
+   for(const name of created)expect(fs.existsSync(path.join(envelope,name,'dispatch.json'))).toBe(false);
   }finally{probe.mockRestore();spawn.mockRestore();fs.rmSync(root,{recursive:true,force:true});}
  });
 });

@@ -1176,6 +1176,13 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
    expect(improve.events(runDir).some(e=>['holdout_consumed','verification_receipt','baseline_recorded','evidence_added'].includes(e.event))).toBe(false);
   }finally{fs.rmSync(f.root,{recursive:true,force:true});}
  }));
+ test('managed declaration cannot freeze without trusted pre-freeze binding',quiet(async()=>{
+  const f=fixture();try{const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256='2'.repeat(64);
+   const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});
+   expect(frozen.status).toBe('rejected');expect(JSON.stringify(frozen)).toContain('managed backend binding unavailable before freeze');
+   expect(improve.events(runDir).some(e=>e.event==='contract_frozen')).toBe(false);expect(fs.existsSync(path.join(f.root,'host-ran'))).toBe(false);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
  test.each(['legacy-single','missing-after','same-generation','extra-phase','invalid-after'])('phase manifest declaration fails closed: %s',quiet(async kind=>{
   const f=fixture();try{const doc=backendContract(),b=doc.runtime.backend;
    if(kind==='legacy-single')b.inputManifestSha256='2'.repeat(64);
