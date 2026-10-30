@@ -803,13 +803,14 @@ function identityOptions(contract) {
   const id=contract?.runtime?.identity||{};
   return {limits:{...(id.max_bytes?{max_bytes:id.max_bytes}:{}),...(id.max_entries?{max_entries:id.max_entries}:{})},outputs:list(id.disposable_outputs),mutableOutputs:list(id.mutable_outputs)};
 }
-function inputIdentity(runDir,run,gov,phase,ws) {
-  const gitTree=binding.tree(ws.worktreePath,identityOptions(gov.contract));
+function inputIdentity(runDir,run,gov,phase,ws,timing) {
+  const measured=(step,fn)=>timing?timing.sync(step,fn):fn();
+  const gitTree=measured('git_identity',()=>binding.tree(ws.worktreePath,identityOptions(gov.contract)));
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
-    git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-backend-timing.cjs','improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    git:gitTree,workspace:measured('workspace_identity',()=>binding.workspace(ws.worktreePath,identityOptions(gov.contract)))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
 function identityDiff(a,b) {
@@ -868,42 +869,44 @@ function assertManagedDispatch(runDir,phase){
 }
 async function withManagedBackend(runDir,phase,capability,ws,gov,dir,execute){
   const generation=require('./improve-backend-generation.cjs'),backend=require('./improve-backend-runtime.cjs');
+  const timing=require('./improve-backend-timing.cjs').open(dir,phase);
   let handle,outcome,backendReceipt,originalCause=null;
   const refresh=()=>{
     const fresh=governingContract(runDir),run=loadRun(runDir);
     const blocked=integrityBlock(runDir,fresh,phase);if(blocked)throw Error('backend_frozen_input_changed');
     if(fresh.entry.contract_sha256!==gov.entry.contract_sha256)throw Error('backend_frozen_input_changed');
     assertManagedDispatch(runDir,phase);
-    return {bindingSha256:fresh.doc.backend_binding?.sha256,contractSha256:fresh.entry.contract_sha256,declaration:fresh.contract.runtime.backend,workspace:ws.worktreePath,identity:inputIdentity(runDir,run,fresh,phase,ws)};
+    return {bindingSha256:fresh.doc.backend_binding?.sha256,contractSha256:fresh.entry.contract_sha256,declaration:fresh.contract.runtime.backend,workspace:ws.worktreePath,identity:timing.sync('identity',()=>inputIdentity(runDir,run,fresh,phase,ws,timing))};
   };
   const preserve=ref=>generation.retainProof(dir,ref);
   try{
-    handle=await generation.open(capability,runDir,phase,refresh);
-    const {session,context}=generation.access(handle),entry=await backend.admitBackend(session,context);
+    handle=await timing.run('generation_open',()=>generation.open(capability,runDir,phase,refresh));
+    const {session,context}=generation.access(handle),entry=await timing.run('admit',()=>backend.admitBackend(session,context));
     const before=refresh();
-    const product=backend.bindBackendProduct(session,context,before.identity.workspace);
+    const product=timing.sync('product_binding',()=>backend.bindBackendProduct(session,context,before.identity.workspace));
     const practice=phase.startsWith('dev-r');
     const checks=gov.contract.acceptance.flatMap(a=>(practice?[a.dev_check]:phase==='baseline'?[a.check,a.dev_check]:[a.check]).filter(Boolean).map(check=>nativeCheck(a,check))).filter(c=>c.execution);
-    generation.selectChecker(handle);backend.prepareBackendChecks(session,context,{oracleRoot:runDir,frozenFiles:gov.entry.artifact_sha256,checks});
-    await backend.startBackendServer(session,context);
+    generation.selectChecker(handle);timing.sync('checker_prepare',()=>backend.prepareBackendChecks(session,context,{oracleRoot:runDir,frozenFiles:gov.entry.artifact_sha256,checks}));
+    await timing.run('server_start',()=>backend.startBackendServer(session,context));
     // The only final-dispatch authority is the actual ledger under reservation.
     refresh();
     const vars=s=>String(s).replace(/\{workspace\}/g,ws.worktreePath).replace(/\{run_dir\}/g,runDir).replace(/\{evidence_dir\}/g,dir).replace(/\{phase\}/g,phase);
-    outcome=await execute({vars,baseUrl:'http://127.0.0.1:3000',backendSession:session,backendContext:context});
+    outcome=await timing.run('checks',()=>execute({vars,baseUrl:'http://127.0.0.1:3000',backendSession:session,backendContext:context,timing}));
     if(outcome.status==='blocked')throw Error(outcome.reason);
-    if(binding.digest(inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws))!==binding.digest(before.identity))throw Error('backend_product_changed');
-    await backend.backendContinuity(session,context);
+    if(binding.digest(timing.sync('identity',()=>inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws,timing)))!==binding.digest(before.identity))throw Error('backend_product_changed');
+    await timing.run('continuity',()=>backend.backendContinuity(session,context));
     backendReceipt={product:Object.fromEntries(Object.entries(product).map(([k,ref])=>[k,preserve(ref)])),entry:preserve({path:entry.path,sha256:entry.sha256}),expectedSemanticSha256:context.expectedBackendIdentity,measuredSemanticSha256:entry.manifest.measuredBackendIdentity};
   }catch(error){originalCause=error.code||error.message;outcome={status:'blocked',reason:'Backend generation unavailable: '+originalCause};}
   finally{
     if(handle)try{
-      const closed=await generation.close(handle,originalCause);
+      const closed=await timing.run('generation_close',()=>generation.close(handle,originalCause));
       if(closed.originalCause)throw Error(closed.originalCause);
       if(backendReceipt){
         backendReceipt.terminal=generation.writeProof(dir,closed.backendTerminal);
         backendReceipt.managed={attempt:closed.attempt,terminal:closed.terminal};
       }
     }catch(error){outcome={status:'blocked',reason:originalCause?'Backend generation unavailable: '+originalCause+'; cleanup: '+error.message:'Backend cleanup unavailable: '+error.message};}
+    timing.close();
   }
   return {outcome,backendReceipt};
 }
@@ -929,14 +932,14 @@ async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {
   fs.mkdirSync(dir, { recursive: true });
   append(runDir, 'verification_started', { phase, attempt, binding_version:1, contract_version: gov.entry.version, workspace: ws.worktreePath });
   const makerClaim = phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline';
-  const execute = async ({vars,baseUrl,backendContext,backendSession:managedSession}) => {
+  const execute = async ({vars,baseUrl,backendContext,backendSession:managedSession,timing}) => {
     let identity;
-    try {identity=inputIdentity(runDir,run,gov,phase,ws);}catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
+    try {identity=inputIdentity(runDir,run,gov,phase,ws,timing);}catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
     if(phase==='after'){assertManagedDispatch(runDir,phase);append(runDir,'holdout_consumed',{attempt,contract_version:gov.entry.version});}
     const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim,backendSession:managedSession||backendSession,backendContext };
     const items = runCheckSet(runDir, { ...ctx, set: 'holdout', gates: true });
     if (phase === 'baseline') items.push(...runCheckSet(runDir, { ...ctx, set: 'dev', gates: false }));
-    try {const after=inputIdentity(runDir,run,gov,phase,ws);if(binding.digest(after)!==binding.digest(identity))throw Error('inputs changed during verification: '+identityDiff(identity,after));}
+    try {const after=inputIdentity(runDir,run,gov,phase,ws,timing);if(binding.digest(after)!==binding.digest(identity))throw Error('inputs changed during verification: '+identityDiff(identity,after));}
     catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
     return {items,identity};
   };
