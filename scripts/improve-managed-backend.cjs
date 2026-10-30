@@ -45,7 +45,8 @@ class ManagedBackendJournal extends BackendJournal {
   const slot=this.snapshot().resources.find(r=>r.role===role);
   // Only the acknowledged object with the recorded complete configuration can
   // be removed. A name match or a currently absent delayed create is insufficient.
-  need(c&&c.Id===created.id&&(c.Config.Hostname===slot.anchor.hostname||(slot.status==='created'&&c.Config.Hostname===''))&&fingerprint(c,true,slot.anchor.hostname)===created.inspectionSha256);
+  need(c&&c.Id===created.id&&created.inspectionSha256===slot.createdFingerprint&&
+   fingerprint(c)===(slot.status==='created'?slot.createdFingerprint:slot.runningFingerprint));
   return super.cleanupTarget(role,c);
  }
  removed(role,observedAbsent){

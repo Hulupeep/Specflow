@@ -56,7 +56,7 @@ class BackendJournal {
  reserve(role){
   this.#active();need(roles.includes(role)&&!this.#state.resources.some(r=>r.role===role),'backend_input_invalid');
   const reservation=crypto.randomUUID(),name=this.#attemptId?'specflow-'+this.#attemptId+'-'+role:'sf-backend-'+hash(canonical({job:this.#state.jobId,generation:this.#state.generation,role,reservation})).slice(0,40);
-  const slot={role,image:imageFor(role),name,reservation,id:null,status:'reserved',createdFingerprint:null,runningFingerprint:null,outputBytes:0};
+  const slot={role,image:imageFor(role),name,reservation,id:null,status:'reserved',createdFingerprint:null,startupFingerprint:null,runningFingerprint:null,outputBytes:0};
   this.#state.resources.push(slot);this.#persist();return clone(slot);
  }
  #slot(role){const slot=this.#state.resources.find(r=>r.role===role);need(slot,'backend_input_invalid');return slot;}
@@ -71,11 +71,14 @@ class BackendJournal {
    h.Memory===limits.memoryBytes&&h.MemorySwap===limits.memorySwapBytes&&h.NanoCpus===limits.cpus*1e9&&h.PidsLimit===limits.pids&&
    /^container:[a-f0-9]{64}$/.test(h.NetworkMode)&&!h.PidMode&&h.IpcMode!=='host'&&
    !Object.keys(h.PortBindings||{}).length&&!c.State.Running,'backend_input_changed');
-  slot.id=c.Id;slot.anchor={id:anchor.Id,hostname:anchor.Config.Hostname};slot.createdFingerprint=fingerprint(c,true,slot.anchor.hostname);slot.status='created';this.#persist();
+  slot.id=c.Id;slot.anchor={id:anchor.Id,hostname:anchor.Config.Hostname};
+  // Sign the exact acknowledged object, including Docker's pre-start hostname.
+  // Normalization belongs only to the checked create -> running transition.
+  slot.createdFingerprint=fingerprint(c);slot.startupFingerprint=fingerprint(c,true,slot.anchor.hostname);slot.status='created';this.#persist();
  }
  started(role,c){
   this.#active();const slot=this.#slot(role);need(slot.status==='created'&&owned(c,this.#state,slot)&&
-   !c.State.Paused&&c.Config.Hostname===slot.anchor.hostname&&fingerprint(c,true)===slot.createdFingerprint,'backend_input_changed');
+   !c.State.Paused&&c.Config.Hostname===slot.anchor.hostname&&fingerprint(c,true)===slot.startupFingerprint,'backend_input_changed');
   const completed=role==='authMigration'&&c.State.Status==='exited'&&!c.State.OOMKilled&&c.State.ExitCode===0&&
    Number.isFinite(Date.parse(c.State.StartedAt))&&Date.parse(c.State.StartedAt)>=this.#state.startedEpochMs&&Date.parse(c.State.FinishedAt)>=Date.parse(c.State.StartedAt);
   need(c.State.Running||completed,'backend_service_died');
