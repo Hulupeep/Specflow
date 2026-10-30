@@ -22,7 +22,9 @@ async function stage(configFile,name,args,history){
  const result=await w.awaitStage(w.startAuthorizedStage(configFile,name,args),{timeout:Math.max(1,deadline-Date.now())});
  const base=path.join(history,Date.now()+'-'+name);fs.writeFileSync(base+'.stdout',result.stdout,{mode:0o600});fs.writeFileSync(base+'.stderr',result.stderr,{mode:0o600});
  assert.equal(result.status,0,'core_'+name+'_failed; inspect private stage output');
- const parsed=w.strictJSON(result.stdout.trim().split('\n').at(-1));write(base+'.result.json',parsed);return parsed;
+ // Core results include fractional telemetry; canonical() is for integer-only
+ // build inputs and signed authority records, not these retained observations.
+ const parsed=w.strictJSON(result.stdout.trim().split('\n').at(-1));fs.writeFileSync(base+'.result.json',JSON.stringify(parsed),{mode:0o600,flag:'wx'});return parsed;
 }
 async function prepare(descriptorFile){
  const descriptor=read(descriptorFile),inputs=bound(descriptor.inputs),admission=bound(descriptor.admission),old=bound(descriptor.recipe);
