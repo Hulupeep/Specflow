@@ -11,7 +11,9 @@
     "inputsTemplate",
     "dependencies",
     "sourceRecipeSha256",
-    "resourceProfileSha256"
+    "resourceProfileSha256",
+    "dependencySource",
+    "deadlineAtMs"
   ],
   "properties": {
     "schema": {
@@ -118,6 +120,34 @@
     "resourceProfileSha256": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "dependencySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageSha256",
+        "lockSha256",
+        "manifestSha256"
+      ],
+      "properties": {
+        "packageSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        },
+        "lockSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "deadlineAtMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#"

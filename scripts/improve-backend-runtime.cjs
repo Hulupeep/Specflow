@@ -61,9 +61,10 @@ test "$count" -eq 156
 touch /work/replay-ready
 echo MIGRATIONS_APPLIED:156
 while :; do sleep 1; done`;
-function stageInputs(root,admitted){
+function stageInputs(root,admitted,managed){
  const {request:r,credentials:c,files,migrations}=admitted;
- const stage=fs.mkdtempSync(path.join(root,'backend-stage-'));fs.chmodSync(stage,0o700);
+ const envelope=managed?require('./improve-backend-attempt.cjs').envelope(managed.store,managed.attempt):root;
+ const stage=fs.mkdtempSync(path.join(envelope,'backend-stage-'));fs.chmodSync(stage,0o700);
  try{
   fs.mkdirSync(path.join(stage,'migrations'),{mode:0o755});for(const f of migrations)write(stage,'migrations/'+f.name,f.bytes);
   write(stage,'bootstrap.sql',files.bootstrap);write(stage,'supabase',files.supabaseCli,0o555);write(stage,'seed.sql',files.seed);
@@ -76,7 +77,7 @@ function stageInputs(root,admitted){
   write(stage,'gateway.json',canonical(gateway(c.anonKey,serverKey)));
   env('gateway.env',{KONG_DATABASE:'off',KONG_DECLARATIVE_CONFIG:'/inputs/gateway.json',KONG_PROXY_LISTEN:'127.0.0.1:54321',KONG_ADMIN_LISTEN:'off',KONG_STATUS_LISTEN:'off',KONG_PREFIX:'/work',KONG_NGINX_WORKER_PROCESSES:1,KONG_NGINX_DAEMON:'off',KONG_PROXY_ACCESS_LOG:'off',KONG_PROXY_ERROR_LOG:'/dev/stderr',KONG_PLUGINS:'cors,key-auth',KONG_ANONYMOUS_REPORTS:'off'});
   return {stage,serverKey};
- }catch(e){fs.rmSync(stage,{recursive:true,force:true});throw e;}
+ }catch(e){if(!managed)fs.rmSync(stage,{recursive:true,force:true});throw e;}
 }
 // All Docker argv below are constructed here from pinned roles and coordinator-
 // owned stage files. Neither this function nor a generic call is exported.
@@ -197,7 +198,7 @@ async function runSupervisor(descriptor){
  finally{
   terminal=await monitoring;for(const s of streams)s.kill('SIGKILL');
   // Cleanup must also work without closeBackend in the controller.
-  if(terminal.phase==='cleaned')try{fs.rmSync(stage,{recursive:true,force:true});}catch{terminal=journal.cleanupFailed();}
+  if(terminal.phase==='cleaned'&&!managed)try{fs.rmSync(stage,{recursive:true,force:true});}catch{terminal=journal.cleanupFailed();}
   fs.writeFileSync(path.join(root,'terminal.json'),canonical(terminal),{mode:0o600,flag:'wx'});
   journal.close();reply({type:'terminal',phase:terminal.phase,cause:terminal.cause,successReceipt:false});if(process.connected)process.disconnect();
  }
@@ -225,7 +226,7 @@ async function startBackend({worker,anchorId,root,request,inputs,credentials,pro
  // Consume before service creation. Failures retain this append-only reservation.
  const consumption=credentialAuthority.consume(credentials.store,credentials.reference,request);
  const anchor=JSON.parse(worker.call(['inspect',anchorId]).stdout)[0];need(anchor.HostConfig.NetworkMode==='none'&&!Object.keys(anchor.HostConfig.PortBindings||{}).length,'backend_input_changed');
- const {stage,serverKey}=stageInputs(root,admitted);const journalRoot=fs.mkdtempSync(path.join(root,'backend-journal-'));fs.chmodSync(journalRoot,0o700);
+ const {stage,serverKey}=stageInputs(root,admitted,managed);const journalRoot=fs.mkdtempSync(path.join(root,'backend-journal-'));fs.chmodSync(journalRoot,0o700);
  const descriptor={root:journalRoot,inputRoot:root,stage,request:admitted.request,inputs:admitted.manifest,anchor,controller:identity.identity(),...(managed?{managed:{storeRoot:managed.store.root,sourceRoot:managed.store.sourceRoot,attempt:managed.attempt}}:{})};
  fs.writeFileSync(path.join(journalRoot,'credential-consumption.json'),canonical(consumption),{mode:0o600,flag:'wx'});
  // Secrets remain in private stage files; child descriptor carries no key.
@@ -234,7 +235,7 @@ async function startBackend({worker,anchorId,root,request,inputs,credentials,pro
  const capability=Object.freeze({});const data={child,journalRoot,stage,serverKey,managed:!!managed,request:admitted.request,admitted,root,worker,anchorId,ready:false,terminal:null,measurement:null,coreBinding:null,productInput:JSON.parse(canonical(productInput)),productReceipt:JSON.parse(canonical(productReceipt)),server:null};sessionData.set(capability,data);
  const readiness=new Promise((resolve,reject)=>{child.on('message',m=>{if(m?.type==='ready'){data.ready=true;resolve(capability);}if(m?.type==='terminal'){data.terminal=m;if(!data.ready)reject(Error(m.cause||'backend_readiness_failed'));}});child.on('error',()=>reject(Error('backend_readiness_failed')));child.on('exit',()=>{if(!data.ready)reject(Error('backend_readiness_failed'));});});
  child.send(managed?{value:descriptor,mac:managed.store.mac(JSON.parse(canonical(descriptor)))}:descriptor);try{return await readiness;}catch(e){if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
-  if(fs.existsSync(path.join(journalRoot,'terminal.json'))&&strict(fs.readFileSync(path.join(journalRoot,'terminal.json'))).phase==='cleaned')fs.rmSync(stage,{recursive:true,force:true});data.serverKey='';sessionData.delete(capability);throw e;}
+  if(!managed&&fs.existsSync(path.join(journalRoot,'terminal.json'))&&strict(fs.readFileSync(path.join(journalRoot,'terminal.json'))).phase==='cleaned')fs.rmSync(stage,{recursive:true,force:true});data.serverKey='';sessionData.delete(capability);throw e;}
 }
 
 function exchange(s,type,reply=type){
@@ -402,7 +403,7 @@ async function closeBackend(capability){
  if(!s.terminal&&s.child.connected)s.child.send({type:'close'});
  if(s.child.exitCode===null&&s.child.signalCode===null)await new Promise(resolve=>s.child.once('exit',resolve));
  const terminal=strict(fs.readFileSync(path.join(s.journalRoot,'terminal.json')));need(terminal.phase==='cleaned','backend_cleanup_failed');
- fs.rmSync(s.stage,{recursive:true,force:true});s.serverKey='';sessionData.delete(capability);return terminal;
+ if(!s.managed)fs.rmSync(s.stage,{recursive:true,force:true});s.serverKey='';sessionData.delete(capability);return terminal;
 }
 module.exports={readInputs,startBackend,closeBackend,observeBackend,admitBackend,backendContinuity,prepareBackendChecks,bindBackendProduct,startBackendServer,backendNativeFramework,backendNativeLaunch};
 if(require.main===module){process.once('message',d=>runSupervisor(d).catch(()=>{process.exitCode=1;if(process.connected)process.disconnect();}));}

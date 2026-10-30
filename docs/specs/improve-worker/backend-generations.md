@@ -142,3 +142,34 @@ create before ID receipt; supervisor/controller loss gives operator_required; fo
 same-name object survives. A fake-Docker asynchronous fixture is preparation only.
 Live implementation/CI/independent review and the unchanged two-width real-backend
 journey remain mandatory. No prototype result is a product-improvement verdict.
+
+## Binding input correction — dependency provenance and original deadline
+
+This supplements the existing closed authority and deadline rules; it does not
+change AC-BACKEND-01..07 or grant implementation readiness.
+
+The signed pre-freeze job binding also requires `dependencySource`, exactly
+`{packageSha256, lockSha256, manifestSha256}`, using the admitted offline-input
+provenance. Before issuing credentials or creating a resource, validate that its
+canonical SHA-256 equals `dependencies.expected.identity.sourceInputSha256` and
+that the capsule's exact receipt matches the binding. Preserve the provenance
+preimage at admission; never reconstruct it from a digest or search unrelated
+jobs for a matching value. Each selected source must still have matching package
+and lock bytes under the existing production builder. Missing or mismatched
+provenance fails `build_dependency_source` without fetching dependencies.
+
+The binding requires `deadlineAtMs`, a positive safe integer UTC epoch millisecond
+value taken from the trusted task admission's original absolute deadline. Task
+admission must persist that deadline before freezing/signing the binding. If no
+original deadline exists, reject admission rather than create a phase-relative
+replacement. Every baseline, practice and after generation copies this exact
+value into its attempt; all phase ceilings are additionally capped by it. Re-read
+it at dispatch. An expired deadline fails `backend_lease_expired` before issue or
+create; malformed, missing or authority-mismatched binding fails admission. Resume,
+credential refresh, a new round or an edited caller argument cannot renew it.
+
+Preparation tests: generation-preparation-checks.py validates the closed shapes,
+missing fields, unsafe/fractional deadline values, provenance correspondence and
+expiry/nonrenewal examples. These tests establish the specification only. Runtime
+qualification must additionally prove tampered provenance rejection before create,
+expired admission, and unchanged deadlines across actual baseline/dev/after runs.

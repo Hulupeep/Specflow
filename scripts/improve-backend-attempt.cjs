@@ -231,6 +231,13 @@ function envelope(store, ref) {
     need(canonical(attempt.owner) === canonical(processIdentity.identity()), 'backend_attempt_owner_unavailable');
     need(!present(fd, `sealed-${ref.attemptId}.json`) && !present(fd, `operator-${ref.attemptId}.json`), 'backend_attempt_sealed');
     const name = `envelope-${ref.attemptId}`;
+    if (present(fd, `${name}.json`)) {
+      const saved = readSigned(store, fd, `${name}.json`);
+      const owned = fs.openSync(`/proc/self/fd/${fd}/${name}`, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+      try { const stat = fs.fstatSync(owned); need(saved.attemptSha256 === ref.attemptSha256 && stat.dev === saved.dev && stat.ino === saved.ino && stat.uid === process.getuid() && (stat.mode & 0o777) === 0o700, 'backend_cleanup_unconfirmed'); }
+      finally { fs.closeSync(owned); }
+      return require('path').join(store.root, 'backend-attempts', name);
+    }
     writeExclusive(store, fd, `${name}-intent.json`, { attemptSha256: ref.attemptSha256 });
     fs.mkdirSync(`/proc/self/fd/${fd}/${name}`, { mode: 0o700 }); fs.fsyncSync(fd);
     const child = fs.openSync(`/proc/self/fd/${fd}/${name}`, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
@@ -249,15 +256,30 @@ function removeEnvelope(store, fd, ref) {
   try {
     const stat = fs.fstatSync(child);
     need(stat.dev === record.dev && stat.ino === record.ino && stat.uid === process.getuid() && (stat.mode & 0o777) === 0o700, 'backend_cleanup_unconfirmed');
-    const entries = fs.readdirSync(`/proc/self/fd/${child}`);
-    // The runtime envelope is flat. Refuse links, directories and special files;
-    // do not recursively remove a path supplied by a product or caller.
-    for (const entry of entries) {
-      const st = fs.lstatSync(`/proc/self/fd/${child}/${entry}`);
-      need(st.isFile() && st.nlink === 1 && st.uid === process.getuid() && (st.mode & 0o077) === 0, 'backend_cleanup_unconfirmed');
+    let count = 0;
+    function tree(dir, remove, depth = 0) {
+      need(depth <= 16, 'backend_cleanup_unconfirmed');
+      for (const entry of fs.readdirSync(`/proc/self/fd/${dir}`)) {
+        need(++count <= 20000, 'backend_cleanup_unconfirmed');
+        const file = `/proc/self/fd/${dir}/${entry}`, st = fs.lstatSync(file);
+        need(st.uid === process.getuid() && st.dev === stat.dev && !(st.mode & 0o022), 'backend_cleanup_unconfirmed');
+        if (st.isDirectory()) {
+          const nested = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
+          try {
+            const observed = fs.fstatSync(nested); need(observed.ino === st.ino && observed.dev === st.dev, 'backend_cleanup_unconfirmed');
+            tree(nested, remove, depth + 1);
+            if (remove) { const linked = fs.lstatSync(file); need(linked.ino === st.ino && linked.dev === st.dev, 'backend_cleanup_unconfirmed'); fs.rmdirSync(file); }
+          } finally { fs.closeSync(nested); }
+        } else {
+          need(st.isFile() && st.nlink === 1, 'backend_cleanup_unconfirmed');
+          if (remove) fs.unlinkSync(file);
+        }
+      }
+      if (remove) fs.fsyncSync(dir);
     }
-    for (const entry of entries) fs.unlinkSync(`/proc/self/fd/${child}/${entry}`);
-    fs.fsyncSync(child);
+    // Validate the complete private tree before deleting anything. Readable
+    // mounts are allowed inside the 0700 envelope; writable peers and links are not.
+    tree(child, false); count = 0; tree(child, true);
     const linked = fs.lstatSync(`/proc/self/fd/${fd}/${name}`);
     need(linked.dev === stat.dev && linked.ino === stat.ino, 'backend_cleanup_unconfirmed');
     fs.rmdirSync(`/proc/self/fd/${fd}/${name}`); fs.fsyncSync(fd);
@@ -299,7 +321,10 @@ function finish(store, ref, input) {
     current(store, fd, ref);
     fs.unlinkSync(`/proc/self/fd/${fd}/${activeName(ref.jobId)}`); fs.fsyncSync(fd);
     return value;
-  }); } finally { fs.closeSync(fd); }
+  }); } catch (error) {
+    try { operatorRequired(store, ref); } catch { /* A corrupt/stale reservation remains fenced. */ }
+    throw error;
+  } finally { fs.closeSync(fd); }
 }
 function terminal(store, ref) {
   validateReference(ref); const fd = area(store);
@@ -311,4 +336,23 @@ function terminal(store, ref) {
     return value;
   } finally { fs.closeSync(fd); }
 }
-module.exports = { begin, read, seal, envelope, finish, terminal, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents };
+// Report a stopped owner explicitly without stealing a lock or declaring its
+// asynchronous daemon requests absent. This is observation/fencing, not recovery
+// authority to release or recreate a resource.
+function reconcileStopped(store, jobId) {
+  need(id(jobId)); const fd = area(store);
+  try {
+    const ref = readSigned(store, fd, activeName(jobId)), active = current(store, fd, ref);
+    const ownerState = processIdentity.state(active.owner);
+    if (ownerState === 'live') return { state: 'active', attempt: ref };
+    const name = `operator-${ref.attemptId}.json`;
+    if (!present(fd, name)) writeExclusive(store, fd, name, {
+      schema: 'specflow.backend-operator-required/v1', attemptId: ref.attemptId,
+      attemptSha256: ref.attemptSha256, state: 'operator_required',
+      cause: 'backend_cleanup_unconfirmed', atMs: Date.now()
+    });
+    readSigned(store, fd, name);
+    return { state: 'operator_required', cause: 'backend_cleanup_unconfirmed', attempt: ref, ownerState };
+  } finally { fs.closeSync(fd); }
+}
+module.exports = { begin, read, seal, envelope, finish, terminal, reconcileStopped, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents };
