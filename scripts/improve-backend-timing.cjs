@@ -2,7 +2,7 @@
 // Diagnostic timing only: fixed labels, no arguments, output, or exception text.
 // A trace never grants admission, extends a lease, or supplies check evidence.
 const fs=require('fs'),path=require('path'),crypto=require('crypto');
-const steps=new Set(['generation_open','identity','git_identity','workspace_identity','admit','product_binding','checker_prepare','server_start','checks','continuity','generation_close']);
+const steps=new Set(['generation_open','identity','git_identity','workspace_identity','admit','product_binding','checker_prepare','server_start','checks','continuity','generation_shutdown','generation_close']);
 function open(directory,phase){
  if(!/^(baseline|after|dev-r[1-9][0-9]*)$/.test(phase))throw Error('backend_timing_phase_invalid');
  const file=path.join(directory,'backend-timing-'+crypto.randomUUID()+'.jsonl');

@@ -341,6 +341,16 @@ function bindBackendProduct(capability,context,workspace){
  return {source:{path:path.join(inputs[0].target,'manifest.json'),sha256:inputs[0].receipt.manifestSha256},build:{path:path.join(s.root,s.request.productBuildReceipt.path),sha256:s.request.productBuildReceipt.sha256},output:{path:path.join(inputs[2].target,'manifest.json'),sha256:inputs[2].receipt.manifestSha256}};
 }
 
+// Only the process-local managed session selects the cheaper native source
+// binding. Full Git correspondence belongs to its reserved outer core phase;
+// every native check still hashes current product bytes before and after running.
+function backendNativeSource(capability,context,root,identity={}){
+ const s=sessionData.get(capability);need(s&&s.coreBinding&&canonical(s.coreBinding)===canonical(context),'backend_input_invalid');
+ if(!s.managed)return null;
+ const options={limits:{...(identity.max_bytes?{max_bytes:identity.max_bytes}:{}),...(identity.max_entries?{max_entries:identity.max_entries}:{})},outputs:identity.disposable_outputs||[],mutableOutputs:identity.mutable_outputs||[]};
+ return require('./improve-binding.cjs').workspace(root,options).sha256;
+}
+
 function backendNativeFramework(capability,context){
  const s=executionSession(capability,context); // inspectProduction already verifies the entire software layer.
  const layer=s.worker.layer.directories.find(x=>x.destination==='/deps/node_modules/@playwright/test'&&x.roles.includes('checker'));
@@ -405,5 +415,5 @@ async function closeBackend(capability){
  const terminal=strict(fs.readFileSync(path.join(s.journalRoot,'terminal.json')));need(terminal.phase==='cleaned','backend_cleanup_failed');
  if(!s.managed)fs.rmSync(s.stage,{recursive:true,force:true});s.serverKey='';sessionData.delete(capability);return terminal;
 }
-module.exports={readInputs,startBackend,closeBackend,observeBackend,admitBackend,backendContinuity,prepareBackendChecks,bindBackendProduct,startBackendServer,backendNativeFramework,backendNativeLaunch};
+module.exports={readInputs,startBackend,closeBackend,observeBackend,admitBackend,backendContinuity,prepareBackendChecks,bindBackendProduct,startBackendServer,backendNativeSource,backendNativeFramework,backendNativeLaunch};
 if(require.main===module){process.once('message',d=>runSupervisor(d).catch(()=>{process.exitCode=1;if(process.connected)process.disconnect();}));}

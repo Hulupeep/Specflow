@@ -170,7 +170,7 @@ function frozenBinding(check,contract,options) {
  }
  const configuration=options.configurationId;
  if(!unique(check.configuration_ids)||!check.configuration_ids.includes(configuration))throw Error('select a declared frozen oracle configuration_id');
- return{version:1,mode:'frozen-oracle',contract_sha256:outcome.hashValue(contract),source_sha256:require('./duo-build.cjs').fingerprint(root),oracle_root:oracle,files,
+ return{version:1,mode:'frozen-oracle',contract_sha256:outcome.hashValue(contract),source_sha256:(options.backendSession!==undefined?require('./improve-backend-runtime.cjs').backendNativeSource(options.backendSession,options.backendContext,root,contract.contract?.runtime?.identity):null)||require('./duo-build.cjs').fingerprint(root),oracle_root:oracle,files,
   configuration_id:configuration,environment:options.environment||'unknown',env_sha256:outcome.hashValue(options.env),framework:frozenFramework(check,options)};
 }
 function frozenFramework(check,options){

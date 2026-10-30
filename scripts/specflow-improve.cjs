@@ -803,9 +803,9 @@ function identityOptions(contract) {
   const id=contract?.runtime?.identity||{};
   return {limits:{...(id.max_bytes?{max_bytes:id.max_bytes}:{}),...(id.max_entries?{max_entries:id.max_entries}:{})},outputs:list(id.disposable_outputs),mutableOutputs:list(id.mutable_outputs)};
 }
-function inputIdentity(runDir,run,gov,phase,ws,timing) {
+function inputIdentity(runDir,run,gov,phase,ws,timing,selectedGit) {
   const measured=(step,fn)=>timing?timing.sync(step,fn):fn();
-  const gitTree=measured('git_identity',()=>binding.tree(ws.worktreePath,identityOptions(gov.contract)));
+  const gitTree=selectedGit||measured('git_identity',()=>binding.tree(ws.worktreePath,identityOptions(gov.contract)));
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
@@ -870,32 +870,44 @@ function assertManagedDispatch(runDir,phase){
 async function withManagedBackend(runDir,phase,capability,ws,gov,dir,execute){
   const generation=require('./improve-backend-generation.cjs'),backend=require('./improve-backend-runtime.cjs');
   const timing=require('./improve-backend-timing.cjs').open(dir,phase);
-  let handle,outcome,backendReceipt,closedDuringOpen,openCleanupCause,originalCause=null;
-  const refresh=()=>{
+  let handle,outcome,backendReceipt,selectedIdentity,closedDuringOpen,openCleanupCause,originalCause=null;
+  const refresh=({metadataOnly=false,live=false}={})=>{
+    if(handle)generation.validate(handle);
     const fresh=governingContract(runDir),run=loadRun(runDir);
     const blocked=integrityBlock(runDir,fresh,phase);if(blocked)throw Error('backend_frozen_input_changed');
     if(fresh.entry.contract_sha256!==gov.entry.contract_sha256)throw Error('backend_frozen_input_changed');
     assertManagedDispatch(runDir,phase);
-    return {bindingSha256:fresh.doc.backend_binding?.sha256,contractSha256:fresh.entry.contract_sha256,declaration:fresh.contract.runtime.backend,workspace:ws.worktreePath,identity:timing.sync('identity',()=>inputIdentity(runDir,run,fresh,phase,ws,timing))};
+    const metadata={bindingSha256:fresh.doc.backend_binding?.sha256,contractSha256:fresh.entry.contract_sha256,declaration:fresh.contract.runtime.backend,workspace:ws.worktreePath};
+    return metadataOnly?metadata:{...metadata,identity:timing.sync('identity',()=>inputIdentity(runDir,run,fresh,phase,ws,timing,live?selectedIdentity.git:undefined))};
   };
   const preserve=ref=>generation.retainProof(dir,ref);
   try{
     handle=await timing.run('generation_open',()=>generation.open(capability,runDir,phase,refresh));
-    const {session,context}=generation.access(handle),entry=await timing.run('admit',()=>backend.admitBackend(session,context));
-    const before=refresh();
+    const {session,context,identity}=generation.access(handle);selectedIdentity=identity;
+    const entry=await timing.run('admit',()=>backend.admitBackend(session,context));
+    const before=refresh({live:true});
+    if(binding.digest(before.identity)!==binding.digest(selectedIdentity))throw Error('backend_product_changed');
     const product=timing.sync('product_binding',()=>backend.bindBackendProduct(session,context,before.identity.workspace));
     const practice=phase.startsWith('dev-r');
     const checks=gov.contract.acceptance.flatMap(a=>(practice?[a.dev_check]:phase==='baseline'?[a.check,a.dev_check]:[a.check]).filter(Boolean).map(check=>nativeCheck(a,check))).filter(c=>c.execution);
     generation.selectChecker(handle);timing.sync('checker_prepare',()=>backend.prepareBackendChecks(session,context,{oracleRoot:runDir,frozenFiles:gov.entry.artifact_sha256,checks}));
     await timing.run('server_start',()=>backend.startBackendServer(session,context));
     // The only final-dispatch authority is the actual ledger under reservation.
-    refresh();
+    const dispatch=refresh({live:true});
+    if(binding.digest(dispatch.identity)!==binding.digest(selectedIdentity))throw Error('backend_product_changed');
     const vars=s=>String(s).replace(/\{workspace\}/g,ws.worktreePath).replace(/\{run_dir\}/g,runDir).replace(/\{evidence_dir\}/g,dir).replace(/\{phase\}/g,phase);
-    outcome=await timing.run('checks',()=>execute({vars,baseUrl:'http://127.0.0.1:3000',backendSession:session,backendContext:context,timing}));
+    outcome=await timing.run('checks',()=>execute({vars,baseUrl:'http://127.0.0.1:3000',backendSession:session,backendContext:context,timing,managedIdentity:selectedIdentity}));
     if(outcome.status==='blocked')throw Error(outcome.reason);
-    if(binding.digest(timing.sync('identity',()=>inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws,timing)))!==binding.digest(before.identity))throw Error('backend_product_changed');
+    if(binding.digest(timing.sync('identity',()=>inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws,timing,selectedIdentity.git)))!==binding.digest(selectedIdentity))throw Error('backend_product_changed');
     await timing.run('continuity',()=>backend.backendContinuity(session,context));
     backendReceipt={product:Object.fromEntries(Object.entries(product).map(([k,ref])=>[k,preserve(ref)])),entry:preserve({path:entry.path,sha256:entry.sha256}),expectedSemanticSha256:context.expectedBackendIdentity,measuredSemanticSha256:entry.manifest.measuredBackendIdentity};
+    await timing.run('generation_shutdown',()=>generation.shutdown(handle));
+    // Full Git correspondence is still mandatory, but does not keep services
+    // alive. Reservation and authority remain held until close below.
+    if(!verifyLedger(runDir).ok)throw Error('backend_ledger_invalid');
+    const finalIdentity=timing.sync('identity',()=>inputIdentity(runDir,loadRun(runDir),governingContract(runDir),phase,ws,timing));
+    generation.validate(handle);
+    if(binding.digest(finalIdentity)!==binding.digest(selectedIdentity))throw Error('backend_product_changed');
   }catch(error){originalCause=error.code||error.message;closedDuringOpen=error.backendGeneration;openCleanupCause=error.cleanupCause;outcome={status:'blocked',reason:'Backend generation unavailable: '+originalCause};}
   finally{
     let closed;
@@ -945,14 +957,14 @@ async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   append(runDir, 'verification_started', { phase, attempt, binding_version:1, contract_version: gov.entry.version, workspace: ws.worktreePath });
   const makerClaim = phase === 'after' ? (lastEvent(evs, 'maker_claim')?.claim || 'unknown') : 'baseline';
-  const execute = async ({vars,baseUrl,backendContext,backendSession:managedSession,timing}) => {
+  const execute = async ({vars,baseUrl,backendContext,backendSession:managedSession,timing,managedIdentity}) => {
     let identity;
-    try {identity=inputIdentity(runDir,run,gov,phase,ws,timing);}catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
+    try {identity=managedIdentity||inputIdentity(runDir,run,gov,phase,ws,timing);}catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
     if(phase==='after'){assertManagedDispatch(runDir,phase);append(runDir,'holdout_consumed',{attempt,contract_version:gov.entry.version});}
     const ctx = { ws, gov, dir, phase, vars, baseUrl, makerClaim,backendSession:managedSession||backendSession,backendContext };
     const items = runCheckSet(runDir, { ...ctx, set: 'holdout', gates: true });
     if (phase === 'baseline') items.push(...runCheckSet(runDir, { ...ctx, set: 'dev', gates: false }));
-    try {const after=inputIdentity(runDir,run,gov,phase,ws,timing);if(binding.digest(after)!==binding.digest(identity))throw Error('inputs changed during verification: '+identityDiff(identity,after));}
+    try {const after=inputIdentity(runDir,run,gov,phase,ws,timing,managedIdentity?.git);if(binding.digest(after)!==binding.digest(identity))throw Error('inputs changed during verification: '+identityDiff(identity,after));}
     catch(error){return {status:'blocked',reason:'Evidence binding unavailable: '+error.message};}
     return {items,identity};
   };

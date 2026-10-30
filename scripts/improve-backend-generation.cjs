@@ -77,12 +77,14 @@ function sourceBundle(workspace,identity){
 const RECONSTRUCT="const fs=require('fs'),p=require('path'),s=JSON.parse(fs.readFileSync('/inputs/source.json'));fs.mkdirSync('/work/app');for(const f of s.files){const target=p.join('/work/app',f.path);fs.mkdirSync(p.dirname(target),{recursive:true});fs.writeFileSync(target,Buffer.from(f.contentBase64,'base64'),{flag:'wx',mode:f.mode});}for(const n of ['node_modules','.next'])fs.mkdirSync('/work/app/'+n);";
 async function open(token,runDir,phase,refresh){
  need(require('./improve-backend-phase.cjs').validPhase(phase));
- const c=current(token,runDir),v=c.admitted.value,initial=refresh();declaration(token,runDir,initial.declaration);need(initial.bindingSha256===c.config.backendJobBinding.sha256,'backend_binding_invalid');
+ const c=current(token,runDir),v=c.admitted.value,initial=refresh({metadataOnly:true});declaration(token,runDir,initial.declaration);need(initial.bindingSha256===c.config.backendJobBinding.sha256,'backend_binding_invalid');
  const ref=attempts.begin(c.store,{jobId:v.jobId,runId:v.runId,phase,contractSha256:initial.contractSha256,constructionSha256:v.constructionSha256,authoritySha256:hash(canonical(c.config.authority)),deadlineAtMs:v.deadlineAtMs});
- const state={c,ref,worker:null,session:null,consumer:null,root:null,product:null,context:null};const handle=Object.freeze({});sessions.set(handle,state);
+ const state={c,token,ref,worker:null,session:null,consumer:null,root:null,product:null,context:null};const handle=Object.freeze({});sessions.set(handle,state);
  try{
   state.root=attempts.envelope(c.store,ref);
-  const selected=refresh();need(canonical(selected)===canonical(initial),'backend_input_changed');current(token,runDir);
+  const selected=refresh();
+  const metadata=({identity,...rest})=>rest;
+  need(canonical(metadata(selected))===canonical(metadata(initial)),'backend_input_changed');current(token,runDir);state.identity=selected.identity;
   const {DockerWorker}=require('./improve-worker.cjs');
   const worker=new DockerWorker({...c.config.worker,gitArea:null});state.worker=worker;
   managed.bind(worker,{store:c.store,attempt:ref,authorize:()=>current(token,runDir)});
@@ -118,25 +120,39 @@ async function open(token,runDir,phase,refresh){
   state.request=request;return handle;
  }catch(error){try{error.backendGeneration=await close(handle,error.code||error.message);}catch(cleanup){error.cleanupCause=cleanup.message;}throw error;}
 }
-function access(handle){const s=sessions.get(handle);need(s&&s.session,'backend_capability_required');return {session:s.session,context:s.context};}
-function selectChecker(handle){const s=sessions.get(handle);need(s&&s.worker);managed.select(s.worker,'checker');}
-async function close(handle,cause=null){
- const s=sessions.get(handle);need(s,'backend_capability_required');let backendTerminal=null,cleanupError;
- try{attempts.seal(s.c.store,s.ref);}catch(e){cleanupError=e;}
- try{if(s.session)backendTerminal=await runtime.closeBackend(s.session);}catch(e){cleanupError||=e;}
- try{if(s.consumer)s.consumer.close();}catch(e){cleanupError||=e;}
- try{s.worker?.close();}catch(e){cleanupError||=e;}
- try{
+function access(handle){const s=sessions.get(handle);need(s&&s.session&&!s.stopping,'backend_capability_required');return {session:s.session,context:s.context,identity:s.identity};}
+function selectChecker(handle){const s=sessions.get(handle);need(s&&s.worker&&!s.stopping);managed.select(s.worker,'checker');}
+function validate(handle){const s=sessions.get(handle);need(s,'backend_capability_required');current(s.token,s.c.runDir);}
+// Stop live resources once, but retain the sealed reservation until the core's
+// final Git/verifier identity is checked. Shutdown never issues a success receipt.
+async function shutdown(handle){
+ const s=sessions.get(handle);need(s,'backend_capability_required');
+ if(s.shutdown)return s.shutdown;
+ s.stopping=true;
+ s.shutdown=(async()=>{
+  let backendTerminal=null,cleanupError;
+  try{attempts.seal(s.c.store,s.ref);}catch(e){cleanupError=e;}
+  try{if(s.session)backendTerminal=await runtime.closeBackend(s.session);}catch(e){cleanupError||=e;}
+  try{if(s.consumer)s.consumer.close();}catch(e){cleanupError||=e;}
+  try{s.worker?.close();}catch(e){cleanupError||=e;}
   if(cleanupError){attempts.operatorRequired(s.c.store,s.ref);throw cleanupError;}
+  return backendTerminal;
+ })();return s.shutdown;
+}
+async function close(handle,cause=null){
+ const s=sessions.get(handle);need(s,'backend_capability_required');
+ try{
+  const backendTerminal=await shutdown(handle);
   if(backendTerminal?.cause&&(cause===null||cause==='backend_service_died'))cause=backendTerminal.cause;
-  // Preserve the original failure diagnosis outside the private envelope. The
-  // signed terminal's closed cause vocabulary remains backend-only.
+  // Cleanup is always allowed, but elapsed task time or revoked authority can
+  // never become a successful terminal after expensive final bookkeeping.
+  if(cause===null)try{validate(handle);}catch(error){cause=error.code||error.message;}
   const originalCause=cause,terminalCause=cause===null?null:/^backend_[a-z_]+$/.test(cause)?cause:'backend_generation_failed';
   const terminal=attempts.finish(s.c.store,s.ref,{cause:terminalCause,backendTerminalSha256:backendTerminal?hash(canonical(backendTerminal)):null,productReceiptSha256:s.product?.sha256||null});
   return {attempt:s.ref,terminal,backendTerminal,originalCause};
  }finally{sessions.delete(handle);}
 }
-module.exports={install,open,access,selectChecker,close,declaration};
+module.exports={install,open,access,selectChecker,validate,shutdown,close,declaration};
 
 function verifyReceipt(token,runDir,phase,contractSha256,receipt){
  const c=current(token,runDir,false),v=c.admitted.value,m=receipt.managed;
