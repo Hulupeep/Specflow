@@ -37,6 +37,7 @@ function bind(worker,{store,attempt,authorize}){
  need(!bindings.has(worker));authorize();attempts.read(store,attempt);
  bindings.set(worker,{store,attempt,authorize,slot:null});handles.set(worker,new Map());
 }
+function context(worker){const b=bindings.get(worker);if(!b)return null;b.authorize();attempts.read(b.store,b.attempt);return Object.freeze({store:b.store,attempt:JSON.parse(canonical(b.attempt))});}
 function select(worker,slot){const b=bindings.get(worker);need(b&&slots.includes(slot)&&b.slot===null);b.authorize();b.slot=slot;}
 function readFile(file){const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);try{const s=fs.fstatSync(fd);need(s.isFile()&&s.uid===process.getuid()&&s.nlink===1&&(s.mode&0o777)===0o600&&s.size<=65536);return require('./improve-worker.cjs').strictJSON(fs.readFileSync(fd,'utf8'));}finally{fs.closeSync(fd);}}
 function write(file,value){const fd=fs.openSync(file,fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);try{fs.writeFileSync(fd,canonical(value));fs.fsyncSync(fd);}finally{fs.closeSync(fd);}const parent=fs.openSync(path.dirname(file),fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW);try{fs.fsyncSync(parent);}finally{fs.closeSync(parent);}}
@@ -68,7 +69,7 @@ function destroy(worker,id){
  need(attempts.resourceEvents(b.store,b.attempt,h.slot).some(e=>e.state==='removed'&&e.id===id),'backend_cleanup_unconfirmed');
  handles.get(worker).delete(id);return true;
 }
-module.exports={bind,select,create,destroy,validatePlan,createArgs};
+module.exports={bind,context,select,create,destroy,validatePlan,createArgs};
 
 // Invoked only by the watchdog's separate intent mode. The supervisor owns the
 // create response for its lifetime; a controller exit cannot cancel that response.

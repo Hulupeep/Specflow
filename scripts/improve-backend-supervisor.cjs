@@ -28,15 +28,18 @@ function owned(c,state,slot) {
  c.Config.Labels['specflow.backend.reservation']===slot.reservation&&c.Config.Labels['specflow.backend.role']===slot.role;
 }
 class BackendJournal {
- #fd; #state; #monoStart; #phaseMono; #closed=false;
- constructor({root,jobId,generation,controller}) {
+ #fd; #state; #monoStart; #phaseMono; #closed=false; #attemptId;
+ constructor({root,jobId,generation,controller,attemptId,deadlineAtMs}) {
+  if(attemptId!==undefined)need(typeof attemptId==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(attemptId)&&attemptId.length===36,'backend_input_invalid');
+  if(deadlineAtMs!==undefined)need(Number.isSafeInteger(deadlineAtMs)&&deadlineAtMs>Date.now(),'backend_lease_expired');
+  this.#attemptId=attemptId;
   need(validId(jobId)&&validId(generation)&&processIdentity.state(controller)==='live','backend_input_invalid');
   this.#fd=directory(root);
   try {
    const stat=fs.fstatSync(this.#fd);need(stat.uid===process.getuid()&&!(stat.mode&0o077),'backend_input_invalid');
    this.#monoStart=this.#phaseMono=performance.now();const now=Date.now();
    this.#state={schema:'specflow.backend-journal/v1',jobId,generation,controller:clone(controller),startedEpochMs:now,
-    deadlineEpochMs:now+PROFILE.time.totalMilliseconds,phaseDeadlineEpochMs:now+phaseLimits.initializing,
+    deadlineEpochMs:Math.min(now+PROFILE.time.totalMilliseconds,deadlineAtMs??Infinity),phaseDeadlineEpochMs:Math.min(now+phaseLimits.initializing,deadlineAtMs??Infinity),
     phase:'initializing',cause:null,resources:[],outputBytes:0,successReceipt:false};
    const initial=fs.openSync(this.#at('journal.json'),fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);
    try{fs.writeFileSync(initial,canonical(this.#state));fs.fsyncSync(initial);}finally{fs.closeSync(initial);}fs.fsyncSync(this.#fd);
@@ -52,13 +55,13 @@ class BackendJournal {
  #active(){need(!this.#closed&&!['failing','cleaned','cleanup_failed'].includes(this.#state.phase));}
  reserve(role){
   this.#active();need(roles.includes(role)&&!this.#state.resources.some(r=>r.role===role),'backend_input_invalid');
-  const reservation=crypto.randomUUID(),name='sf-backend-'+hash(canonical({job:this.#state.jobId,generation:this.#state.generation,role,reservation})).slice(0,40);
+  const reservation=crypto.randomUUID(),name=this.#attemptId?'specflow-'+this.#attemptId+'-'+role:'sf-backend-'+hash(canonical({job:this.#state.jobId,generation:this.#state.generation,role,reservation})).slice(0,40);
   const slot={role,image:imageFor(role),name,reservation,id:null,status:'reserved',createdFingerprint:null,runningFingerprint:null,outputBytes:0};
   this.#state.resources.push(slot);this.#persist();return clone(slot);
  }
  #slot(role){const slot=this.#state.resources.find(r=>r.role===role);need(slot,'backend_input_invalid');return slot;}
  created(role,c,anchor){
-  this.#active();const slot=this.#slot(role);need(slot.status==='reserved'&&owned(c,this.#state,slot),'backend_input_changed');
+  if(!(this.#attemptId&&this.#state.phase==='failing'))this.#active();const slot=this.#slot(role);need(slot.status==='reserved'&&owned(c,this.#state,slot),'backend_input_changed');
   const h=c.HostConfig,limits=PROFILE.slots[role];
   need(anchor&&/^[a-f0-9]{64}$/.test(anchor.Id)&&anchor.State?.Running&&
    typeof anchor.Config?.Hostname==='string'&&/^[A-Za-z0-9.-]{1,64}$/.test(anchor.Config.Hostname)&&
@@ -140,7 +143,7 @@ module.exports={BackendJournal,fingerprint};
 // Closed host operations. No caller-selected executable, Docker arguments or env.
 async function dockerRead(kind, target, timeoutMs) {
  need(['inspect','remove'].includes(kind)&&typeof target==='string'&&
-  (/^[a-f0-9]{64}$/.test(target)||/^sf-backend-[a-f0-9]{40}$/.test(target)),'backend_input_invalid');
+  (/^[a-f0-9]{64}$/.test(target)||(/^sf-backend-[a-f0-9]{40}$/.test(target)||/^specflow-[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}-(database|authMigration|auth|rest|gateway)$/.test(target))),'backend_input_invalid');
  const {spawn}=require('child_process');
  const args=['--host','unix:///var/run/docker.sock',...(kind==='inspect'?['container','inspect',target]:['container','rm','--force',target])];
  return new Promise((resolve,reject)=>{

@@ -2,7 +2,7 @@
 // Trusted, closed local recipe. Never accepts Docker flags, commands, environment
 // or mount destinations from a repository. This is not a core success receipt.
 const fs=require('fs'),path=require('path'),crypto=require('crypto'),cp=require('child_process');
-const {RECIPE,PROFILE,validateInputs,validateRequest,readBoundFile}=require('./improve-backend.cjs');
+const {RECIPE,PROFILE,validateInputs,validateRequest,validateManagedRequest,readBoundFile}=require('./improve-backend.cjs');
 const {canonical}=require('./improve-production-build.cjs');
 const {directory}=require('./improve-offline-cache.cjs');
 const identity=require('./improve-process-identity.cjs');
@@ -20,9 +20,9 @@ const sessionData=new WeakMap();
 function reply(message){if(process.connected)process.send(message,()=>{});}
 function strict(bytes){return require('./improve-worker.cjs').strictJSON(bytes.toString());}
 function credential(bytes,request){return require('./improve-backend-credentials.cjs').validate(strict(bytes),request);}
-function readInputsInternal(root,request,raw){
+function readInputsInternal(root,request,raw,managed=false){
  need(typeof root==='string'&&path.isAbsolute(root)&&!/[,\r\n\0]/.test(root));
- const r=validateRequest(request),m=validateInputs(raw);need(m.jobId===r.jobId,'backend_input_changed');
+ const r=(managed?validateManagedRequest:validateRequest)(request),m=validateInputs(raw);need(m.jobId===r.jobId,'backend_input_changed');
  need(hash(readBoundFile(root,r.inputManifest))===hash(Buffer.from(canonical(m))),'backend_input_changed');
  for(const k of Object.keys(pins))need(m[k].sha256===pins[k],'backend_input_changed');
  const files={};for(const k of ['bootstrap','supabaseCli','seed','credentialBinding','runtimeLayer','configuration','resourceProfile'])files[k]=readBoundFile(root,m[k],k==='supabaseCli'?128*1024*1024:PROFILE.output.maxFileBytes);
@@ -36,7 +36,7 @@ function readInputsInternal(root,request,raw){
  for(const f of m.migrations)migrations.push({name:f.name,bytes:readBoundFile(root,{path:m.migrationRoot+'/'+f.name,sha256:f.sha256})});
  return {request:r,manifest:m,files,migrations,credentials:c};
 }
-function readInputs(root,request,raw){try{return readInputsInternal(root,request,raw);}catch(e){throw Error(e.message==='backend_input_changed'?'backend_input_changed':'backend_input_invalid');}}
+function readInputs(root,request,raw,managed=false){try{return readInputsInternal(root,request,raw,managed);}catch(e){throw Error(e.message==='backend_input_changed'?'backend_input_changed':'backend_input_invalid');}}
 function write(root,name,bytes,mode=0o444){fs.writeFileSync(path.join(root,name),bytes,{mode,flag:'wx'});}
 function issueServer(c,r){const enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url'),now=Math.floor(Date.now()/1000);
  const unsigned=enc({alg:'HS256',typ:'JWT'})+'.'+enc({role:'service_role',aud:'authenticated',iss:'supabase',job:r.jobId,generation:r.generation,iat:now,exp:now+600});
@@ -97,17 +97,27 @@ function argsFor(slot,state,anchor,stage){
 }
 function active(j){const s=j.check();need(!s.cause,s.cause||'backend_lease_expired');return s;}
 async function runSupervisor(descriptor){
+ let managed=null;
+ if(descriptor?.value?.managed){
+  const {DurableStore}=require('./improve-worker.cjs'),m=descriptor.value.managed;
+  const store=new DurableStore({root:m.storeRoot,sourceRoot:m.sourceRoot});
+  need(typeof descriptor.mac==='string'&&/^[a-f0-9]{64}$/.test(descriptor.mac)&&descriptor.mac.length===64);
+  need(crypto.timingSafeEqual(Buffer.from(descriptor.mac,'hex'),Buffer.from(store.mac(JSON.parse(canonical(descriptor.value))),'hex')));
+  managed={store,attempt:m.attempt};descriptor=descriptor.value;
+ }
  const {root,stage,request,anchor,controller,inputs,inputRoot}=descriptor;
- const credentialMaterial=readInputs(inputRoot,request,inputs).credentials;
- const journal=new BackendJournal({root,jobId:request.jobId,generation:request.generation,controller});
+ const credentialMaterial=readInputs(inputRoot,request,inputs,!!managed).credentials;
+ const Journal=managed?require('./improve-managed-backend.cjs').ManagedBackendJournal:BackendJournal;
+ const journal=new Journal({root,jobId:request.jobId,generation:request.generation,controller,...(managed||{})});
  const streams=new Set(),pending=new Set();
  const monitoring=monitorJournal(journal,{beforeCleanup:()=>Promise.allSettled([...pending])});let terminal,operation='admission';
  let measuredManifest=null;
  const stageHashes=()=>{const files={};function visit(rel){const p=path.join(stage,rel),stat=fs.lstatSync(p);need(!stat.isSymbolicLink(),'backend_input_changed');if(stat.isDirectory())for(const name of fs.readdirSync(p).sort())visit(rel?rel+'/'+name:name);else{need(stat.isFile()&&stat.nlink===1,'backend_input_changed');files[rel]=hash(fs.readFileSync(p));}}visit('');return files;};
  const initialStage=stageHashes();
  const diagnostic=event=>fs.appendFileSync(path.join(root,'operations.jsonl'),JSON.stringify(event)+'\n',{mode:0o600});
- async function call(args,{allowFailure=false}={}){
-  const s=active(journal),timeout=Math.max(1,Math.min(10000,s.phaseDeadlineEpochMs-Date.now()));
+ async function call(args,{allowFailure=false,cleanup=false}={}){
+  const s=cleanup&&managed?journal.snapshot():active(journal);need(!['cleaned','cleanup_failed'].includes(s.phase),'backend_cleanup_unconfirmed');
+  const timeout=Math.max(1,Math.min(10000,s.phaseDeadlineEpochMs-Date.now()));
   const promise=new Promise((resolve,reject)=>{
    const child=cp.spawn('/usr/bin/docker',['--host','unix:///var/run/docker.sock',...args],{env:dockerEnv,stdio:['ignore','pipe','pipe']});let out='',err='',size=0,failed=false;
    const t=setTimeout(()=>{failed=true;child.kill('SIGKILL');},timeout);
@@ -116,17 +126,19 @@ async function runSupervisor(descriptor){
   });
   pending.add(promise);try{return await promise;}finally{pending.delete(promise);}
  }
- const inspect=async id=>JSON.parse((await call(['inspect',id])).out)[0];
- async function start(role){
-  active(journal);operation='create_'+role;const slot=journal.reserve(role);
+ const inspect=async (id,cleanup=false)=>JSON.parse((await call(['inspect',id],{cleanup})).out)[0];
+ async function start(role){const operation=startService(role);pending.add(operation);try{return await operation;}finally{pending.delete(operation);}}
+ async function startService(role){
+  active(journal);operation='create_'+role;const slot=managed?journal.reserve(role,slot=>argsFor(slot,journal.snapshot(),anchor,stage)):journal.reserve(role);
   const image=JSON.parse((await call(['image','inspect',slot.image])).out)[0];need(image.Id===slot.image&&!Object.keys(image.Config.Volumes||{}).length,'backend_input_changed');
-  const id=(await call(argsFor(slot,journal.snapshot(),anchor,stage))).out.trim();need(/^[a-f0-9]{64}$/.test(id),'backend_input_changed');
-  journal.created(role,await inspect(id),await inspect(anchor.Id));active(journal);
+  const createArgs=argsFor(slot,journal.snapshot(),anchor,stage);if(managed)journal.dispatch(role,createArgs);
+  const id=(await call(createArgs)).out.trim();need(/^[a-f0-9]{64}$/.test(id),'backend_input_changed');
+  journal.created(role,await inspect(id,!!managed),await inspect(anchor.Id,!!managed));active(journal);
   const child=cp.spawn('/usr/bin/docker',['--host','unix:///var/run/docker.sock','start','--attach',id],{env:dockerEnv,stdio:['ignore','pipe','pipe']});streams.add(child);
   const done=new Promise(resolve=>{child.on('error',()=>{if(!journal.snapshot().cause)journal.fail('backend_readiness_failed');});child.on('close',code=>{streams.delete(child);resolve(code);});});
   for(const stream of [child.stdout,child.stderr])stream.on('data',b=>{try{journal.output(role,b.length);}catch{/* Terminal journal cannot regain authority. */}});
   for(;;){active(journal);const c=await inspect(id);if(c.State.Running||(role==='authMigration'&&c.State.Status==='exited')){journal.started(role,c);break;}await sleep(25);}
-  if(role==='authMigration'){const code=await done;need(code===0,'backend_readiness_failed');const c=await inspect(id);if(journal.snapshot().resources.find(r=>r.role===role).status==='running')journal.observe(role,c);}
+  if(role==='authMigration'){if(managed)while(streams.has(child)){active(journal);await sleep(25);}const code=await done;need(code===0,'backend_readiness_failed');const c=await inspect(id);if(journal.snapshot().resources.find(r=>r.role===role).status==='running')journal.observe(role,c);}
   return id;
  }
  async function marker(id,name){
@@ -193,7 +205,14 @@ async function runSupervisor(descriptor){
 }
 async function startBackend({worker,anchorId,root,request,inputs,credentials,productInput}){
  need(worker instanceof require('./improve-worker.cjs').DockerWorker&&worker.jobId===request.jobId,'backend_input_changed');
- const admitted=readInputs(root,request,inputs);worker.inspectProduction(anchorId);
+ const managed=require('./improve-managed-worker.cjs').context(worker);
+ const admitted=readInputs(root,request,inputs,!!managed);worker.inspectProduction(anchorId);
+ if(managed){
+  const active=require('./improve-backend-attempt.cjs').read(managed.store,managed.attempt);
+  need(active.jobId===request.jobId&&active.phase===request.phase&&active.constructionSha256===request.constructionSha256,'backend_input_changed');
+  const bound=strict(readBoundFile(root,request.attempt));
+  need(bound&&canonical(bound.value)===canonical(active)&&bound.mac===managed.store.mac(JSON.parse(canonical(active))),'backend_input_changed');
+ }
  const credentialAuthority=require('./improve-backend-credentials.cjs');
  need(credentials&&credentials.store instanceof require('./improve-worker.cjs').DurableStore&&fs.realpathSync(credentials.store.root)===fs.realpathSync(worker.stateRoot),'backend_input_invalid');
  const issued=credentialAuthority.read(credentials.store,credentials.reference);
@@ -207,14 +226,14 @@ async function startBackend({worker,anchorId,root,request,inputs,credentials,pro
  const consumption=credentialAuthority.consume(credentials.store,credentials.reference,request);
  const anchor=JSON.parse(worker.call(['inspect',anchorId]).stdout)[0];need(anchor.HostConfig.NetworkMode==='none'&&!Object.keys(anchor.HostConfig.PortBindings||{}).length,'backend_input_changed');
  const {stage,serverKey}=stageInputs(root,admitted);const journalRoot=fs.mkdtempSync(path.join(root,'backend-journal-'));fs.chmodSync(journalRoot,0o700);
- const descriptor={root:journalRoot,inputRoot:root,stage,request:admitted.request,inputs:admitted.manifest,anchor,controller:identity.identity()};
+ const descriptor={root:journalRoot,inputRoot:root,stage,request:admitted.request,inputs:admitted.manifest,anchor,controller:identity.identity(),...(managed?{managed:{storeRoot:managed.store.root,sourceRoot:managed.store.sourceRoot,attempt:managed.attempt}}:{})};
  fs.writeFileSync(path.join(journalRoot,'credential-consumption.json'),canonical(consumption),{mode:0o600,flag:'wx'});
  // Secrets remain in private stage files; child descriptor carries no key.
  // A controller group kill must leave the identity-fenced cleanup owner alive.
  const child=cp.fork(__filename,[],{env:dockerEnv,detached:true,stdio:['ignore','ignore','ignore','ipc']});
- const capability=Object.freeze({});const data={child,journalRoot,stage,serverKey,request:admitted.request,admitted,root,worker,anchorId,ready:false,terminal:null,measurement:null,coreBinding:null,productInput:JSON.parse(canonical(productInput)),productReceipt:JSON.parse(canonical(productReceipt)),server:null};sessionData.set(capability,data);
+ const capability=Object.freeze({});const data={child,journalRoot,stage,serverKey,managed:!!managed,request:admitted.request,admitted,root,worker,anchorId,ready:false,terminal:null,measurement:null,coreBinding:null,productInput:JSON.parse(canonical(productInput)),productReceipt:JSON.parse(canonical(productReceipt)),server:null};sessionData.set(capability,data);
  const readiness=new Promise((resolve,reject)=>{child.on('message',m=>{if(m?.type==='ready'){data.ready=true;resolve(capability);}if(m?.type==='terminal'){data.terminal=m;if(!data.ready)reject(Error(m.cause||'backend_readiness_failed'));}});child.on('error',()=>reject(Error('backend_readiness_failed')));child.on('exit',()=>{if(!data.ready)reject(Error('backend_readiness_failed'));});});
- child.send(descriptor);try{return await readiness;}catch(e){if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
+ child.send(managed?{value:descriptor,mac:managed.store.mac(JSON.parse(canonical(descriptor)))}:descriptor);try{return await readiness;}catch(e){if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
   if(fs.existsSync(path.join(journalRoot,'terminal.json'))&&strict(fs.readFileSync(path.join(journalRoot,'terminal.json'))).phase==='cleaned')fs.rmSync(stage,{recursive:true,force:true});data.serverKey='';sessionData.delete(capability);throw e;}
 }
 
@@ -228,7 +247,7 @@ function exchange(s,type,reply=type){
 async function observeBackend(capability){
  const s=sessionData.get(capability);need(s&&s.ready&&!s.measurement,'backend_input_invalid');
  // This returns an observation for preparation. It never admits deciding checks.
- readInputs(s.root,s.request,s.admitted.manifest);s.worker.inspectProduction(s.anchorId);
+ readInputs(s.root,s.request,s.admitted.manifest,s.managed);s.worker.inspectProduction(s.anchorId);
  const response=await exchange(s,'measure','measurement');s.measurement=response.manifest;need(hash(fs.readFileSync(path.join(s.journalRoot,'entry-manifest.json')))===hash(canonical(s.measurement)),'backend_input_changed');
  return JSON.parse(JSON.stringify(s.measurement));
 }
@@ -246,7 +265,7 @@ async function admitBackend(capability,context){
 }
 async function backendContinuity(capability,context){
  const s=sessionData.get(capability);need(s&&s.coreBinding&&canonical(s.coreBinding)===canonical(context),'backend_input_invalid');
- readInputs(s.root,s.request,s.admitted.manifest);need(hash(fs.readFileSync(path.join(s.journalRoot,'entry-manifest.json')))===hash(canonical(s.measurement)),'backend_input_changed');s.worker.inspectProduction(s.anchorId);await exchange(s,'continuity');
+ readInputs(s.root,s.request,s.admitted.manifest,s.managed);need(hash(fs.readFileSync(path.join(s.journalRoot,'entry-manifest.json')))===hash(canonical(s.measurement)),'backend_input_changed');s.worker.inspectProduction(s.anchorId);await exchange(s,'continuity');
  // Recheck late server failures/deadline without repeating the full production
  // tree inspection already performed before this continuity exchange.
  need(!s.server?.failure,s.server?.failure||'backend_service_died');
