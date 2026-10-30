@@ -79,3 +79,23 @@ test('selected source preserves the inert public env template but rejects privat
  expect(()=>generation.sourceBundle(src,{entries:[{path:'nested/.env.local',kind:'file',sha256:hash('private')}]})).toThrow('backend_source_invalid');
  fs.symlinkSync('/etc/passwd',path.join(src,'linked'));expect(()=>generation.sourceBundle(src,{entries:[{path:'linked',kind:'file',sha256:hash('private')}]})).toThrow('backend_source_invalid');
 });
+
+test('checked-in Specflow configuration stays inert source data without becoming a capability',()=>{
+ const src=path.join(root,'workspace');fs.mkdirSync(path.join(src,'.specflow'),{recursive:true});
+ const contents='{"authority":"untrusted repository data"}';fs.writeFileSync(path.join(src,'.specflow','adapter-routing.json'),contents);
+ const bundled=generation.sourceBundle(src,{entries:[{path:'.specflow/adapter-routing.json',kind:'file',sha256:hash(contents)}]});
+ expect(Buffer.from(bundled.files[0].contentBase64,'base64').toString()).toBe(contents);
+ expect(()=>generation.declaration(JSON.parse(contents),runDir,{})).toThrow('backend_capability_required');
+});
+
+test('capability snapshot preserves the admitted software-layer byte ordering',async()=>{
+ const workerModule=require('../../scripts/improve-worker.cjs'),production=require('../../scripts/improve-production-build.cjs');
+ const files=[{source:'/fixture/tool',destination:'/node/bin/node',sha256:digest}],directories=[];
+ config.worker.image='sha256:'+digest;config.worker.layer={files,directories,sha256:hash(JSON.stringify({files,directories}))};
+ const expected=production.runtimeIdentity(config.worker),token=generation.install(config,runDir,()=>{});let captured;
+ const spy=jest.spyOn(workerModule,'DockerWorker').mockImplementation(value=>{captured=value;throw Error('qualification_constructor_stop');});
+ try{
+  await expect(generation.open(token,runDir,'baseline',()=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest}))).rejects.toThrow('qualification_constructor_stop');
+  expect(production.runtimeIdentity(captured)).toBe(expected);
+ }finally{spy.mockRestore();}
+});

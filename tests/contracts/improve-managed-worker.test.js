@@ -51,3 +51,14 @@ describe('managed supervisor spawn failure (#293)',()=>{
   }finally{probe.mockRestore();spawn.mockRestore();fs.rmSync(root,{recursive:true,force:true});}
  });
 });
+
+describe('shared-network hostname transition is exact (#293)',()=>{
+ const specimen=()=>({Id:'a'.repeat(64),Image:'sha256:'+'b'.repeat(64),Config:{Hostname:'a'.repeat(12),Env:['HOME=/tmp']},HostConfig:{NetworkMode:'container:'+'c'.repeat(64),OomKillDisable:null},Mounts:[],State:{Status:'created'}});
+ test('only the initial own-ID hostname may transition to the inspected anchor hostname',()=>{
+  const before=specimen(),after=JSON.parse(JSON.stringify(before));after.Config.Hostname='c'.repeat(12);after.State.Status='running';after.HostConfig.OomKillDisable=false;
+  expect(managed.workerFingerprint(before,'c'.repeat(12))).toBe(managed.workerFingerprint(after,'c'.repeat(12)));
+  after.Config.Env.push('UNTRUSTED=1');expect(managed.workerFingerprint(before,'c'.repeat(12))).not.toBe(managed.workerFingerprint(after,'c'.repeat(12)));
+ });
+ test.each(['created','running','exited'])('rejects unrelated hostname in %s state',status=>{const c=specimen();c.State.Status=status;c.Config.Hostname='foreign';expect(()=>managed.workerFingerprint(c,'c'.repeat(12))).toThrow('backend_input_changed');});
+ test('running checker cannot retain the pre-start hostname or normalize a different network mode',()=>{const c=specimen();c.State.Status='running';expect(()=>managed.workerFingerprint(c,'c'.repeat(12))).toThrow();c.State.Status='created';c.HostConfig.NetworkMode='none';expect(()=>managed.workerFingerprint(c,'c'.repeat(12))).toThrow();});
+});

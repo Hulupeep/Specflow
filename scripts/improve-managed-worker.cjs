@@ -31,6 +31,14 @@ function createArgs(p,name){
  ...p.mounts.flatMap(m=>['--mount',`type=bind,src=${m.source},dst=${m.destination}${m.writable?'':',readonly'}`]),
  ...p.tmpfs.flatMap(t=>['--tmpfs',`${t.path}:rw,nosuid,nodev,noexec,size=${t.bytes},mode=0700,uid=${p.uid},gid=${p.uid}`]),p.image,'-e','setInterval(()=>{},1000)'];
 }
+function workerFingerprint(c,expectedHostname){
+ if(expectedHostname!==undefined){
+  need(/^container:[a-f0-9]{64}$/.test(c.HostConfig?.NetworkMode||'')&&typeof expectedHostname==='string'&&/^[a-zA-Z0-9_.-]{1,64}$/.test(expectedHostname),'backend_input_changed');
+  const initial=c.State?.Status==='created'&&/^[a-f0-9]{64}$/.test(c.Id||'')&&c.Config?.Hostname===c.Id.slice(0,12);
+  need(c.Config?.Hostname===expectedHostname||initial,'backend_input_changed');
+ }
+ return require('./improve-backend-supervisor.cjs').fingerprint(c,true,expectedHostname);
+}
 function bind(worker,{store,attempt,authorize}){
  const {DockerWorker,DurableStore}=require('./improve-worker.cjs');
  need(worker instanceof DockerWorker&&store instanceof DurableStore&&worker.jobId===attempt.jobId&&typeof authorize==='function');
@@ -71,7 +79,7 @@ function destroy(worker,id){
  need(attempts.resourceEvents(b.store,b.attempt,h.slot).some(e=>e.state==='removed'&&e.id===id),'backend_cleanup_unconfirmed');
  handles.get(worker).delete(id);return true;
 }
-module.exports={bind,context,select,create,destroy,validatePlan,createArgs};
+module.exports={bind,context,select,create,destroy,validatePlan,createArgs,workerFingerprint};
 
 // Invoked only by the watchdog's separate intent mode. The supervisor owns the
 // create response for its lifetime; a controller exit cannot cancel that response.
@@ -93,7 +101,7 @@ async function runIntent(file){
  const live=()=>identity.state(d.controller)==='live'&&Date.now()<executionEnd&&performance.now()<monoEnd-10000;
  const event=(state,id=null,inspectionSha256=null)=>attempts.resourceEvent(store,d.attempt,d.slot,{state,id,inspectionSha256});
  const output=(name,value)=>write(path.join(d.root,name+'.json'),value);
- let id=null,anchor=null,dispatched=false,unknown=false;
+ let id=null,anchor=null,expectedHostname,dispatched=false,unknown=false;
  const sleep=()=>new Promise(resolve=>setTimeout(resolve,20));
  async function docker(args){
   return new Promise((resolve,reject)=>{
@@ -104,8 +112,8 @@ async function runIntent(file){
   });
  }
  const inspect=async target=>{const r=await docker(['container','inspect',target]);if(r.code===1&&/No such (container|object)/i.test(r.err))return null;need(r.code===0,'backend_cleanup_unconfirmed');const list=JSON.parse(r.out);need(Array.isArray(list)&&list.length===1);return list[0];};
- const fingerprint=c=>require('./improve-backend-supervisor.cjs').fingerprint(c,true);
- const owned=c=>c&&c.Id===id&&c.Name==='/'+intent.name&&c.Image===p.image&&c.Config?.Labels?.['specflow.worker']==='owned'&&fingerprint(c)===anchor;
+ const fingerprint=c=>workerFingerprint(c,expectedHostname);
+ const owned=c=>{try{return c&&c.Id===id&&c.Name==='/'+intent.name&&c.Image===p.image&&c.Config?.Labels?.['specflow.worker']==='owned'&&fingerprint(c)===anchor;}catch{return false;}};
  try{
   output('ready',{state:'ready',supervisor:self,planSha256:hash(p)});
   while(live()){
@@ -115,6 +123,11 @@ async function runIntent(file){
   if(!live()){event('not_dispatched');output('terminal',{state:'not_dispatched',id:null});return;}
   // Recheck operator fencing immediately before dispatch. A recorded dispatch
   // with no returned ID is unknown even when inspect currently reports absence.
+  if(p.network.startsWith('container:')){
+   const networkId=p.network.slice('container:'.length),networkOwner=await inspect(networkId);
+   need(networkOwner?.Id===networkId&&networkOwner.State.Running&&!networkOwner.State.Paused,'backend_service_died');
+   expectedHostname=networkOwner.Config.Hostname;
+  }
   event('dispatching');dispatched=true;
   const created=await docker(createArgs(p,intent.name));
   if(created.code!==0||!(/^[a-f0-9]{64}$/.test(created.out.trim()))){unknown=true;throw Error('backend_cleanup_unconfirmed');}

@@ -16,7 +16,10 @@ const dir=p=>{fs.mkdirSync(p,{recursive:true,mode:0o700});fs.chmodSync(p,0o700);
 function write(p,value){const bytes=canonical(value);fs.writeFileSync(p,bytes,{mode:0o600,flag:'wx'});return {path:p,sha256:hash(bytes)};}
 function time(admission,remaining=1){assert(Number.isSafeInteger(admission.deadlineAtMs)&&Date.now()+remaining<admission.deadlineAtMs,'backend_lease_expired');}
 async function stage(configFile,name,args,history){
- const result=await w.awaitStage(w.startAuthorizedStage(configFile,name,args));
+ const deadline=read(configFile).deadlineAtMs;assert(Number.isSafeInteger(deadline)&&deadline>Date.now(),'backend_lease_expired');
+ // A build contains multiple fresh generations. Its observation bound is the
+ // original admitted task deadline, not a new per-stage ten-minute deadline.
+ const result=await w.awaitStage(w.startAuthorizedStage(configFile,name,args),{timeout:Math.max(1,deadline-Date.now())});
  const base=path.join(history,Date.now()+'-'+name);fs.writeFileSync(base+'.stdout',result.stdout,{mode:0o600});fs.writeFileSync(base+'.stderr',result.stderr,{mode:0o600});
  assert.equal(result.status,0,'core_'+name+'_failed; inspect private stage output');
  const parsed=w.strictJSON(result.stdout.trim().split('\n').at(-1));write(base+'.result.json',parsed);return parsed;
@@ -85,13 +88,25 @@ async function prepare(descriptorFile){
  write(path.join(root,'qualification.json'),state);console.log(JSON.stringify({status:'prepared',qualification:path.join(root,'qualification.json'),originalDeadlineAtMs:admission.deadlineAtMs,preFreezeSemanticSha256:expectedSemanticSha256,remainingOwned:0}));
 }
 async function phase(stateFile,name){
- const s=read(stateFile);time(bound(s.admission));assert(['baseline','after','evaluate'].includes(name));
- const args=name==='evaluate'?[s.runDir]:[s.runDir,name],result=await stage(s.configFile,name==='evaluate'?'evaluate':'verifyPhase',args,s.history);
+ const s=read(stateFile);time(bound(s.admission));assert(['baseline','build','after','evaluate','finalize'].includes(name));
+ let args=[s.runDir],operation=name;
+ if(name==='baseline'||name==='after'){operation='verifyPhase';args.push(name);}
+ if(name==='build'){
+  const cfg=read(s.configFile),policyFile=path.join(s.root,'builder-policy.json');
+  write(policyFile,{adapter_policy:{id:'managed-core-builder',provider:'claude-print',command:cfg.launcher,role:'implementer',args:['role','builder','-p'],model:'sonnet',requested_model:'sonnet',timeout_seconds:300,max_iterations:1,allowed_tools:[],denied_tools:['Read','Write','Edit','Bash'],transcript_path:'.specflow/runs/<slug>/adapters/builder.jsonl',output_path:'.specflow/runs/<slug>/adapters/builder.final.txt',never_without_human:['git push','open PR','merge','--no-verify','override contract','production deploy']}});
+  args.push({policy:policyFile});
+ }
+ const result=await stage(s.configFile,operation,args,s.history);
  if(name==='evaluate'){
   assert.equal(result.schema,'specflow.improve.decision/v1');
   assert.equal(result.decision,'REVERT','Known failing fixture must never earn KEEP');
   assert.deepEqual(result.binding_errors,[],'Lifecycle proof requires valid baseline/after binding');
- }else assert.equal(result.status,name==='baseline'?'baseline_recorded':'verified',JSON.stringify(result));
+ }else if(name==='build'){
+  assert.equal(result.status,'built');assert(result.rounds.length>=2,'Both practice generations must execute');
+  assert.equal(result.rounds[0].dev?.['AC-1'],'fail');assert.equal(result.rounds[1].dev?.['AC-1'],'pass');
+  assert(result.rounds.every(r=>!r.invalid),'Native peer responses must validate');
+ }else if(name==='finalize')assert.equal(result.decision,'REVERT');
+ else assert.equal(result.status,name==='baseline'?'baseline_recorded':'verified',JSON.stringify(result));
  if(result.status==='blocked')throw Error(result.reason);console.log(JSON.stringify({status:'passed',phase:name,result,qualification:stateFile,scope:s.scope}));
 }
 if(require.main===module){const [mode,file]=process.argv.slice(2);(mode==='prepare'?prepare(file):phase(file,mode)).catch(e=>{console.error(JSON.stringify({status:'failed',cause:e.code||e.message,frames:(e.stack||'').split('\n').filter(line=>/^\s+at /.test(line)).slice(0,5)}));process.exitCode=1;});}

@@ -45,7 +45,9 @@ function install(config,runDir,authorize){
  const run=json(fs.readFileSync(path.join(root,'run.json')));
  const store=new DurableStore({root:config.worker.stateRoot,sourceRoot:config.worker.stateRoot});
  const admitted=binding(config,store,run.run_id),token=Object.freeze({});
- capabilities.set(token,{config:JSON.parse(canonical(config)),runDir:root,runId:run.run_id,store,admitted,authorize});return token;
+ // Preserve existing order-sensitive software-layer digests in the private copy.
+ // Canonicalization is for explicit signed fields, not a configuration rewrite.
+ capabilities.set(token,{config:JSON.parse(JSON.stringify(config)),runDir:root,runId:run.run_id,store,admitted,authorize});return token;
 }
 function current(token,runDir,execution=true){
  const c=capabilities.get(token);need(c&&fs.realpathSync(runDir)===c.runDir,'backend_capability_required');
@@ -60,7 +62,10 @@ function sourceBundle(workspace,identity){
  for(const entry of identity.entries){
   if(['node_modules','.next'].some(p=>entry.path===p||entry.path.startsWith(p+'/')))continue;
   if(entry.kind==='directory'||entry.kind==='mutable-output')continue;
-  need(entry.kind==='file'&&entry.path.split('/').every(p=>p&&p!=='.'&&p!=='..'&&!['.git','.specflow'].includes(p)&&(!p.startsWith('.env')||p==='.env.example')),'backend_source_invalid');
+  // Checked-in framework configuration is inert product data. The private run
+  // and signed binding live outside this workspace; repository JSON never
+  // becomes the process-local capability installed by coreStage.
+  need(entry.kind==='file'&&entry.path.split('/').every(p=>p&&p!=='.'&&p!=='..'&&p!=='.git'&&(!p.startsWith('.env')||p==='.env.example')),'backend_source_invalid');
   let at=workspace;for(const part of entry.path.split('/')){at=path.join(at,part);need(!fs.lstatSync(at).isSymbolicLink(),'backend_source_invalid');}
   const fd=fs.openSync(at,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|fs.constants.O_NONBLOCK);let bytes,stat;
   try{stat=fs.fstatSync(fd);need(stat.isFile()&&stat.nlink===1&&stat.size<=256*1024*1024-total,'backend_source_invalid');bytes=fs.readFileSync(fd);}finally{fs.closeSync(fd);}
