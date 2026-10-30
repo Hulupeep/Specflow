@@ -203,3 +203,18 @@ test.each([
   if(kind==='staged-capture-interruption')expect(fs.existsSync(root+'/output')).toBe(false);
  } finally {callSpy?.mockRestore();worker.close();fs.rmSync(root,{recursive:true,force:true});}
 },120000);
+
+// Reproduces the real generated-output mode that prevented managed cleanup.
+test('live build seals generated group-writable output before capsule identity is frozen', () => {
+ const {root,worker,input,build}=faultFixture("const f=require('fs');f.writeFileSync('/app/.next/BUILD_ID','fixture');f.chmodSync('/app/.next/BUILD_ID',0o664);f.mkdirSync('/app/.next/generated');f.chmodSync('/app/.next/generated',0o775);f.writeFileSync('/app/.next/generated/executable','content');f.chmodSync('/app/.next/generated/executable',0o775)");
+ try {
+  const built=build.runProductionBuild(worker,input,root+'/output');
+  const manifest=JSON.parse(fs.readFileSync(built.target+'/manifest.json'));
+  expect(manifest.entries.find(e=>e.path==='BUILD_ID').mode).toBe(0o644);
+  expect(manifest.entries.find(e=>e.path==='generated').mode).toBe(0o755);
+  expect(manifest.entries.find(e=>e.path==='generated/executable').mode).toBe(0o755);
+  expect(fs.readFileSync(built.target+'/tree/generated/executable','utf8')).toBe('content');
+  expect(build.verifyProductionOutput(worker,input,built.receipt,built.target)).toBeTruthy();
+  expect(worker.containers.size).toBe(0);
+ }finally{worker.close();fs.rmSync(root,{recursive:true,force:true});}
+},120000);

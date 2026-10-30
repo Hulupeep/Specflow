@@ -202,6 +202,26 @@ function verifyProductionOutput(worker, input, receipt, target) {
   requireThat(buildId(worker, target, receipt.output) === receipt.buildIdSha256, 'build_output_changed');
   return bound;
 }
+// Seal permissions while output is still confined and before its capsule
+// manifest is frozen. Generated files can inherit group-write bits from tools.
+// Never chmod through a link or repair an already admitted capsule.
+const SEAL_OUTPUT_PERMISSIONS = `
+const fs=require('fs'),assert=require('assert');let count=0;
+const limits=JSON.parse(process.argv[1]);
+function visit(file,depth=0){
+ assert(++count<=limits.maxEntries&&depth<=limits.maxDepth);
+ const stat=fs.lstatSync(file);if(stat.isSymbolicLink())return;
+ assert(stat.uid===process.getuid()&&(stat.isDirectory()||stat.isFile()));
+ const fd=fs.openSync(file,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW|(stat.isDirectory()?fs.constants.O_DIRECTORY:fs.constants.O_NONBLOCK));
+ try{const current=fs.fstatSync(fd);assert(current.dev===stat.dev&&current.ino===stat.ino);
+  if(stat.isDirectory())for(const name of fs.readdirSync('/proc/self/fd/'+fd))visit('/proc/self/fd/'+fd+'/'+name,depth+1);
+  else assert(current.nlink===1);
+  fs.fchmodSync(fd,(current.mode&0o777)&~0o022);
+ }finally{fs.closeSync(fd);}
+}
+visit('/app/.next');
+`;
+
 function runProductionBuild(worker, input, destination) {
   const { WorkerError } = require('./improve-worker.cjs');
   destination = worker.capsuleLocation(destination);
@@ -237,6 +257,7 @@ function runProductionBuild(worker, input, destination) {
       } else if (/No such (container|object)/i.test(observed.stderr || '')) code = 'build_process_lost';
       throw new WorkerError(code, 'production-build');
     }
+    worker.exec(id, ['/node/bin/node', '-e', SEAL_OUTPUT_PERMISSIONS, JSON.stringify(PROFILE.captureLimits)], { cwd: PROFILE.cwd });
     requireThat(inputIdentity(worker, input).inputSha256 === bound.inputSha256, 'build_input_changed');
     const processIdentity = worker.inspectProduction(id);
     const producerIdentity = { containerId: id, image: worker.image, runtimeSha256: bound.input.runtimeSha256, process: processIdentity };
