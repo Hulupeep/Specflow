@@ -277,17 +277,21 @@ async function backendContinuity(capability,context){
 
 // Native execution stays owned by test-execution.cjs. These functions provide
 // only the confined transport for its frozen Playwright inventory.
-function executionSession(capability,context){
+function executionState(capability,context){
  const s=sessionData.get(capability);need(s&&s.coreBinding&&canonical(s.coreBinding)===canonical(context),'backend_input_invalid');
  need(!s.server?.failure,s.server?.failure||'backend_service_died');
  const j=strict(fs.readFileSync(path.join(s.journalRoot,'journal.json')));
  need(j.phase==='execution'&&!j.cause&&Date.now()<j.phaseDeadlineEpochMs,j.cause||'backend_lease_expired');
+ return s;
+}
+function executionSession(capability,context){
+ const s=executionState(capability,context);
  s.worker.inspectProduction(s.anchorId);return s;
 }
 // Delivery is closed over the admitted session. Repository/model code cannot
 // supply a credential, program, environment, target container or stdin envelope.
 async function startBackendServer(capability,context){
- const s=executionSession(capability,context);need(!s.server,'backend_restart_invalid');
+ const s=executionState(capability,context);need(!s.server,'backend_restart_invalid');
  const delivery=require('./improve-backend-server.cjs');
  // startBackend already verified the output receipt and bound a private copy of
  // the public environment. Each exec/start independently runs inspectProduction
@@ -352,7 +356,11 @@ function backendNativeSource(capability,context,root,identity={}){
 }
 
 function backendNativeFramework(capability,context){
- const s=executionSession(capability,context); // inspectProduction already verifies the entire software layer.
+ const s=executionState(capability,context);
+ // Metadata reads consume the software layer, not product capsules. Native
+ // launch still inspects the complete product before and after execution;
+ // continuity repeats that guard before any usable receipt. Never cache this.
+ require('./improve-worker.cjs').verifySoftwareLayer(s.worker.layer);
  const layer=s.worker.layer.directories.find(x=>x.destination==='/deps/node_modules/@playwright/test'&&x.roles.includes('checker'));
  need(layer,'backend_input_invalid');const pkg=strict(fs.readFileSync(path.join(layer.source,'package.json')));
  need(pkg.name==='@playwright/test'&&pkg.bin?.playwright==='cli.js','backend_input_invalid');
