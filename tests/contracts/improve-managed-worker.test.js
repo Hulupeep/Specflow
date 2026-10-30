@@ -23,3 +23,30 @@ describe('signed supervisor events are ordered and cannot recover uncertain crea
  test('operator fence blocks dispatch including a dangling marker',()=>{fs.symlinkSync('/missing/marker',path.join(root,'backend-attempts','operator-'+ref.attemptId+'.json'));expect(()=>event('dispatching')).toThrow('backend_cleanup_unconfirmed');});
  test('a supervisor cannot append an event for another live process',()=>{const other=identity.identity(process.ppid);a.intent(store,ref,{slot:'checker',expectedConfigSha256:'d'.repeat(64),creator:identity.identity(),supervisor:other});expect(()=>a.resourceEvent(store,ref,'checker',{state:'dispatching',id:null,inspectionSha256:null})).toThrow('backend_attempt_owner_unavailable');});
 });
+
+
+describe('managed supervisor spawn failure (#293)',()=>{
+ test('missing supervisor PID never defaults to controller identity or dispatches',()=>{
+  const cp=require('child_process'),{DockerWorker}=require('../../scripts/improve-worker.cjs');
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),'managed-no-supervisor-'));
+  const store=new DurableStore({root,sourceRoot:root});
+  const ref=a.begin(store,{jobId:'job',runId:'run',phase:'baseline',contractSha256:'a'.repeat(64),constructionSha256:'b'.repeat(64),authoritySha256:'c'.repeat(64),deadlineAtMs:Date.now()+60000});
+  const worker=new DockerWorker({image:'sha256:'+'a'.repeat(64),layer:{},stateRoot:root,jobId:'job'});
+  managed.bind(worker,{store,attempt:ref,authorize:()=>{}});managed.select(worker,'build');
+  const spawn=jest.spyOn(cp,'spawn').mockReturnValue({pid:undefined,on(){return this;},unref(){}});
+  const original=identity.identity;
+  const probe=jest.spyOn(identity,'identity').mockImplementation(function(pid){
+   // Fail immediately if the unsafe one-argument default is reached, avoiding a
+   // misleading 60-second wait on the still-live controller in this regression.
+   if(arguments.length===1&&pid===undefined)throw Error('supervisor_identity_defaulted_to_controller');
+   return original(pid);
+  });
+  try{
+   expect(()=>managed.create(worker,plan())).toThrow('backend_attempt_owner_unavailable');
+   expect(probe.mock.calls.some(args=>args.length===1&&args[0]===undefined)).toBe(false);
+   expect(a.intents(store,ref)).toEqual([]);
+   for(const name of fs.readdirSync(root).filter(n=>n.startsWith('managed-create-')))
+    expect(fs.existsSync(path.join(root,name,'dispatch.json'))).toBe(false);
+  }finally{probe.mockRestore();spawn.mockRestore();fs.rmSync(root,{recursive:true,force:true});}
+ });
+});

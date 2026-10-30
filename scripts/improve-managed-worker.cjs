@@ -51,7 +51,9 @@ function create(worker,raw){
  const value={schema:'specflow.managed-worker/v1',storeRoot:b.store.root,sourceRoot:b.store.sourceRoot,attempt:b.attempt,slot,plan,controller:identity.identity(),root,deadlineAtMs:end};
  write(path.join(root,'descriptor.json'),{value,mac:b.store.mac(JSON.parse(canonical(value)))});
  const child=cp.spawn(process.execPath,[path.join(__dirname,'improve-worker-watchdog.cjs'),'--intent',path.join(root,'descriptor.json')],{env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent'},stdio:'ignore',detached:true});
- child.on('error',()=>{});child.unref();const childIdentity=identity.identity(child.pid);need(childIdentity,'backend_attempt_owner_unavailable');
+ child.on('error',()=>{});child.unref();
+ need(Number.isSafeInteger(child.pid)&&child.pid>1,'backend_attempt_owner_unavailable');
+ const childIdentity=identity.identity(child.pid);need(childIdentity,'backend_attempt_owner_unavailable');
  const ready=waitFile(path.join(root,'ready.json'),b,childIdentity,end);
  need(ready.state==='ready'&&ready.planSha256===hash(plan)&&canonical(ready.supervisor)===canonical(childIdentity));
  b.authorize();write(path.join(root,'dispatch.json'),{attemptId:b.attempt.attemptId,slot});
