@@ -10,21 +10,21 @@
     "expectedBackendIdentity",
     "productBuildReceipt",
     "inputManifest",
-    "resourceProfile"
+    "resourceProfile",
+    "attempt",
+    "constructionSha256"
   ],
   "properties": {
     "schema": {
-      "const": "specflow.backend-request/v1"
+      "const": "specflow.backend-request/v2"
     },
     "jobId": {
       "type": "string",
       "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
     },
     "phase": {
-      "enum": [
-        "baseline",
-        "after"
-      ]
+      "type": "string",
+      "pattern": "^(?:baseline|after|dev-r(?:[1-9][0-9]{0,14}|[1-8][0-9]{15}|900[0-6][0-9]{12}|90070[0-9]{11}|90071[0-8][0-9]{10}|900719[0-8][0-9]{9}|9007199[0-1][0-9]{8}|90071992[0-4][0-9]{7}|900719925[0-3][0-9]{6}|9007199254[0-6][0-9]{5}|90071992547[0-3][0-9]{4}|9007199254740[0-8][0-9]{2}|90071992547409[0-8][0-9]{1}|9007199254740990|9007199254740991))$(?![\\s\\S])"
     },
     "recipeId": {
       "const": "heystax-supabase-v1"
@@ -77,6 +77,29 @@
     },
     "resourceProfile": {
       "const": "heystax-backend-v1"
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "constructionSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
     }
   },
   "$schema": "http://json-schema.org/draft-07/schema#"

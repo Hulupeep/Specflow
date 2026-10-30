@@ -770,10 +770,14 @@ class DockerWorker {
       '-e',
       'setInterval(()=>{},1000)'
     ];
-    const id = this.call(args).stdout.trim();
+    const managed = require('./improve-managed-worker.cjs');
+    const managedId = managed.create(this, { image: this.image, uid: this.uid, network, memory,
+      mounts: [...selected, ...mounts].map(m => ({ source: m.source, destination: m.destination, writable: m.writable === true })),
+      tmpfs, phaseMilliseconds: resources.phaseMilliseconds || this.maxMilliseconds });
+    const id = managedId || this.call(args).stdout.trim();
     need(/^[a-f0-9]{64}$/.test(id), 'worker_container_identity');
     this.containers.add(id);
-    const watchdog = spawn(
+    const watchdog = !managedId && spawn(
       process.execPath,
       [
         path.join(__dirname, 'improve-worker-watchdog.cjs'),
@@ -784,7 +788,7 @@ class DockerWorker {
       ],
       { env: this.env, stdio: 'ignore', detached: true }
     );
-    this.watchdogs.set(id, watchdog);
+    if (watchdog) this.watchdogs.set(id, watchdog);
     const inspect = JSON.parse(this.call(['inspect', id]).stdout)[0];
     const expected = {
       image: this.image,
@@ -970,6 +974,10 @@ class DockerWorker {
   }
   destroy(id) {
     if (!this.containers.has(id)) return;
+    if (require('./improve-managed-worker.cjs').destroy(this, id)) {
+      this.containers.delete(id);
+      return;
+    }
     const r = this.call(['rm', '-f', id], { allowFailure: true, timeout: 20000 });
     need(r.status === 0 || /No such (container|object)/i.test(r.stderr || ''), 'worker_termination_failed');
     this.containers.delete(id);

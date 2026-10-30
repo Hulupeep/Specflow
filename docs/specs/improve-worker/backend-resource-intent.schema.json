@@ -1,0 +1,106 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "attemptId",
+    "slot",
+    "name",
+    "expectedConfigSha256",
+    "creator",
+    "supervisor",
+    "deadlineAtMs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "specflow.backend-resource-intent/v1"
+    },
+    "attemptId": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$(?![\\s\\S])"
+    },
+    "slot": {
+      "enum": [
+        "source-producer",
+        "build",
+        "app",
+        "checker",
+        "database",
+        "authMigration",
+        "auth",
+        "rest",
+        "gateway",
+        "seed"
+      ]
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^specflow-[a-f0-9-]{36}-[A-Za-z][A-Za-z-]{0,31}$(?![\\s\\S])"
+    },
+    "expectedConfigSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "creator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boot_id",
+        "pid",
+        "start",
+        "group"
+      ],
+      "properties": {
+        "boot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^[0-9]+$(?![\\s\\S])"
+        },
+        "group": {
+          "type": "integer",
+          "minimum": 2
+        }
+      }
+    },
+    "supervisor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "boot_id",
+        "pid",
+        "start",
+        "group"
+      ],
+      "properties": {
+        "boot_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pid": {
+          "type": "integer",
+          "minimum": 2
+        },
+        "start": {
+          "type": "string",
+          "pattern": "^[0-9]+$(?![\\s\\S])"
+        },
+        "group": {
+          "type": "integer",
+          "minimum": 2
+        }
+      }
+    },
+    "deadlineAtMs": {
+      "type": "integer",
+      "minimum": 1
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}

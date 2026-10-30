@@ -8,7 +8,7 @@ const { canonical } = require('./improve-production-build.cjs');
 const hash = value => crypto.createHash('sha256').update(value).digest('hex');
 const need = (ok, code = 'backend_credentials_invalid') => { if (!ok) throw Error(code); };
 const id = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value);
-const phaseOK = phase => ['baseline', 'after'].includes(phase);
+const { validPhase: phaseOK } = require('./improve-backend-phase.cjs');
 const secret = value => typeof value === 'string' && /^[a-f0-9]{64}$/.test(value);
 const LIFETIME_SECONDS = 3600;
 
