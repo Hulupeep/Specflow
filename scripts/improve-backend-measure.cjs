@@ -6,13 +6,15 @@ const {directory}=require('./improve-offline-cache.cjs');
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const need=(x,c='backend_identity_mismatch')=>{if(!x)throw Error(c);};
 const env={PATH:'/usr/bin:/bin',HOME:'/nonexistent',DOCKER_CONFIG:'/nonexistent'};
-function expectedSemantic(inputs,state){
+function expectedSemantic(inputs,state,credentials,request){
  const {canonical}=require('./improve-production-build.cjs');
  // No physical path, process, generation or token byte becomes cross-phase identity.
- // All construction bytes (including stable private credential binding) stay bound.
- const refs=['bootstrap','supabaseCli','seed','credentialBinding','runtimeLayer','configuration','resourceProfile'];
+ // Retain every construction hash except the validated generation credential projection.
+ const credentialProjection=require('./improve-backend-semantics.cjs').projection(credentials,request);
+ need(inputs.jobId===request.jobId&&inputs.credentialBinding.sha256===hash(canonical(credentials)));
+ const refs=['bootstrap','supabaseCli','seed','runtimeLayer','configuration','resourceProfile'];
  const fields={recipeId:RECIPE.id,jobId:inputs.jobId,images:inputs.images,migrationRevision:inputs.migrationRevision,migrations:inputs.migrations,
-  inputs:Object.fromEntries(refs.map(k=>[k,inputs[k].sha256])),state};
+  inputs:Object.fromEntries(refs.map(k=>[k,inputs[k].sha256])),credentialProjection,state};
  return hash(canonical(fields));
 }
 async function measureSnapshot({journal,root}){

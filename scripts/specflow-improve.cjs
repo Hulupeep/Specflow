@@ -444,7 +444,7 @@ function validateContract(runDir, contract, selected) {
   }
   const backend=contract?.runtime?.backend;
   if(backend!==undefined){
-    if(!backend||typeof backend!=='object'||Array.isArray(backend)||Object.keys(backend).sort().join(',')!=='expectedSemanticSha256,inputManifestSha256,recipeId'||backend.recipeId!=='heystax-supabase-v1'||!['expectedSemanticSha256','inputManifestSha256'].every(k=>typeof backend[k]==='string'&&/^[a-f0-9]{64}$/.test(backend[k])))errors.push('runtime.backend requires the exact qualified recipe and frozen semantic/input hashes');
+    if(!backend||typeof backend!=='object'||Array.isArray(backend)||Object.keys(backend).sort().join(',')!=='expectedSemanticSha256,inputManifestSha256,recipeId'||backend.recipeId!=='heystax-supabase-v1'||!(typeof backend.expectedSemanticSha256==='string'&&/^[a-f0-9]{64}$/.test(backend.expectedSemanticSha256))||!backend.inputManifestSha256||typeof backend.inputManifestSha256!=='object'||Array.isArray(backend.inputManifestSha256)||Object.keys(backend.inputManifestSha256).sort().join(',')!=='after,baseline'||!['baseline','after'].every(p=>typeof backend.inputManifestSha256[p]==='string'&&/^[a-f0-9]{64}$/.test(backend.inputManifestSha256[p]))||backend.inputManifestSha256.baseline===backend.inputManifestSha256.after)errors.push('runtime.backend requires the exact qualified recipe and frozen semantic identity and distinct baseline/after input hashes');
     if(contract.runtime.setup?.length||contract.runtime.serve||contract.gates?.length)errors.push('runtime.backend owns setup and serving; command gates must be declared as native preservation checks');
     for(const a of acceptance)for(const c of [a.check,a.dev_check].filter(Boolean))if(c.execution?.adapter!=='playwright')errors.push('runtime.backend requires the qualified frozen Playwright check adapter');
   }
@@ -828,7 +828,7 @@ function boundReceipt(runDir,phase,{current=true}={}) {
       const b=receipt.backend;if(!b||b.expectedSemanticSha256!==declared.expectedSemanticSha256||b.measuredSemanticSha256!==declared.expectedSemanticSha256)throw Error('backend identity mismatch');
       for(const ref of [b.entry,b.terminal,b.product?.source,b.product?.build,b.product?.output])if(!ref||fileSha(ref.path)!==ref.sha256)throw Error('backend manifest changed or missing');
       const entry=readJson(b.entry.path),terminal=readJson(b.terminal.path);
-      if(entry.phase!==phase||entry.expectedBackendIdentity!==b.expectedSemanticSha256||entry.measuredBackendIdentity!==b.measuredSemanticSha256||entry.inputManifestSha256!==declared.inputManifestSha256||terminal.phase!=='cleaned'||terminal.cause||terminal.jobId!==entry.jobId||terminal.generation!==entry.generation||terminal.resources.some(r=>r.status!=='removed'))throw Error('backend manifest correspondence or cleanup failed');
+      if(entry.phase!==phase||entry.expectedBackendIdentity!==b.expectedSemanticSha256||entry.measuredBackendIdentity!==b.measuredSemanticSha256||entry.inputManifestSha256!==declared.inputManifestSha256[phase]||terminal.phase!=='cleaned'||terminal.cause||terminal.jobId!==entry.jobId||terminal.generation!==entry.generation||terminal.resources.some(r=>r.status!=='removed'))throw Error('backend manifest correspondence or cleanup failed');
     }else if(receipt.backend)throw Error('unexpected backend receipt');
     const evidence=readEvidence(runDir);
     for(const ref of receipt.evidence) {
@@ -885,7 +885,7 @@ async function verifyPhase(runDir, phase, {backendSession} = {}) {
   let outcome,backendReceipt;
   if(gov.contract.runtime?.backend){
     const backend=require('./improve-backend-runtime.cjs'),decl=gov.contract.runtime.backend;
-    const context={runId:run.run_id,phase,expectedBackendIdentity:decl.expectedSemanticSha256,inputManifestSha256:decl.inputManifestSha256};
+    const context={runId:run.run_id,phase,expectedBackendIdentity:decl.expectedSemanticSha256,inputManifestSha256:decl.inputManifestSha256[phase]};
     try{
       const entry=await backend.admitBackend(backendSession,context);
       const productBinding=backend.bindBackendProduct(backendSession,context,inputIdentity(runDir,run,gov,phase,ws).workspace);

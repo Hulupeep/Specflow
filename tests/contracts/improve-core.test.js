@@ -1167,13 +1167,23 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
  function backendContract(){
   const doc=contract();delete doc.acceptance[0].dev_check;doc.gates=[];
   const c=doc.acceptance[0].check;delete c.command;c.artifact='holdout/native.test.js';Object.assign(c,{verification_level:'integration',boundaries:['network','database'],configuration_ids:['confined'],checker_paths:['holdout/native.test.js','holdout/jest.config.cjs'],input_paths:[],rule_paths:[],execution:{adapter:'playwright',test_files:['holdout/native.test.js'],required_case_ids:['default::holdout/native.test.js::required'],optional_case_ids:[],args:['--config','holdout/jest.config.cjs']}});
-  doc.runtime={configuration_id:'confined',backend:{recipeId:'heystax-supabase-v1',expectedSemanticSha256:'1'.repeat(64),inputManifestSha256:'2'.repeat(64)}};return doc;
+  doc.runtime={configuration_id:'confined',backend:{recipeId:'heystax-supabase-v1',expectedSemanticSha256:'1'.repeat(64),inputManifestSha256:{baseline:'2'.repeat(64),after:'3'.repeat(64)}}};return doc;
  }
  const oracle=marker=>runDir=>{fs.writeFileSync(path.join(runDir,'holdout/native.test.js'),"require('fs').writeFileSync("+JSON.stringify(marker)+",'host ran');");fs.writeFileSync(path.join(runDir,'holdout/jest.config.cjs'),'module.exports={};');};
  test.each([undefined,{}])('missing or forged capability blocks before any check: %p',quiet(async backendSession=>{
   const f=fixture();try{const marker=path.join(f.root,'host-ran'),{runDir,frozen}=await prepare(f,{contractDoc:backendContract(),nativeOracle:oracle(marker)});expect(frozen.status).toBe('frozen');
    const result=await improve.verifyPhase(runDir,'baseline',{backendSession});expect(result.status).toBe('blocked');expect(fs.existsSync(marker)).toBe(false);
    expect(improve.events(runDir).some(e=>['holdout_consumed','verification_receipt','baseline_recorded','evidence_added'].includes(e.event))).toBe(false);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test.each(['legacy-single','missing-after','same-generation','extra-phase','invalid-after'])('phase manifest declaration fails closed: %s',quiet(async kind=>{
+  const f=fixture();try{const doc=backendContract(),b=doc.runtime.backend;
+   if(kind==='legacy-single')b.inputManifestSha256='2'.repeat(64);
+   if(kind==='missing-after')delete b.inputManifestSha256.after;
+   if(kind==='same-generation')b.inputManifestSha256.after=b.inputManifestSha256.baseline;
+   if(kind==='extra-phase')b.inputManifestSha256.retry='4'.repeat(64);
+   if(kind==='invalid-after')b.inputManifestSha256.after='not-a-hash';
+   const {frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).not.toBe('frozen');expect(JSON.stringify(frozen)).toContain('runtime.backend');
   }finally{fs.rmSync(f.root,{recursive:true,force:true});}
  }));
  test.each(['unknown-recipe','unknown-field','host-setup','host-serve','command-gate'])('invalid backend declaration fails freezing: %s',quiet(async kind=>{

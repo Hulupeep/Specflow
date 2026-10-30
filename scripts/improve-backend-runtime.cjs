@@ -8,6 +8,7 @@ const {directory}=require('./improve-offline-cache.cjs');
 const identity=require('./improve-process-identity.cjs');
 const {BackendJournal,monitorJournal,fingerprint}=require('./improve-backend-supervisor.cjs');
 const {measureSnapshot,expectedSemantic}=require('./improve-backend-measure.cjs');
+const semantics=require('./improve-backend-semantics.cjs');
 const need=(x,c='backend_input_invalid')=>{if(!x)throw Error(c);};
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const pins={bootstrap:'3a9f39fb79d67d4fb2f5e54638dca1d06894a3e1a57419bc188e4ee09c72556f',supabaseCli:'3132b218461bf90d4cd5983b27b44031cd9b6c797c259a431b2e2520b5f7bdce'};
@@ -18,14 +19,7 @@ const sessionData=new WeakMap();
 // controller must not turn a late reply into an unhandled IPC error.
 function reply(message){if(process.connected)process.send(message,()=>{});}
 function strict(bytes){return require('./improve-worker.cjs').strictJSON(bytes.toString());}
-function credential(bytes,jobId){
- const c=strict(bytes);need(c&&Object.keys(c).sort().join(',')==='anonKey,databasePassword,jobId,jwtSecret,schema,sodium');
- need(c.schema==='specflow.backend-credentials/v1'&&c.jobId===jobId&&/^[a-f0-9]{64}$/.test(c.databasePassword)&&/^[a-f0-9]{64}$/.test(c.sodium)&&typeof c.jwtSecret==='string'&&/^[A-Za-z0-9_-]{32,256}$/.test(c.jwtSecret));
- need(typeof c.anonKey==='string'&&/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(c.anonKey));
- const [a,b,s]=c.anonKey.split('.'),h=strict(Buffer.from(a,'base64url')),payload=strict(Buffer.from(b,'base64url'));
- need(h.alg==='HS256'&&payload.role==='anon'&&Number.isSafeInteger(payload.exp)&&payload.exp*1000>Date.now()+PROFILE.time.totalMilliseconds);
- need(crypto.timingSafeEqual(Buffer.from(s,'base64url'),crypto.createHmac('sha256',c.jwtSecret).update(a+'.'+b).digest()));return c;
-}
+function credential(bytes,request){return require('./improve-backend-credentials.cjs').validate(strict(bytes),request);}
 function readInputsInternal(root,request,raw){
  need(typeof root==='string'&&path.isAbsolute(root)&&!/[,\r\n\0]/.test(root));
  const r=validateRequest(request),m=validateInputs(raw);need(m.jobId===r.jobId,'backend_input_changed');
@@ -34,7 +28,7 @@ function readInputsInternal(root,request,raw){
  const files={};for(const k of ['bootstrap','supabaseCli','seed','credentialBinding','runtimeLayer','configuration','resourceProfile'])files[k]=readBoundFile(root,m[k],k==='supabaseCli'?128*1024*1024:PROFILE.output.maxFileBytes);
  need(canonical(strict(files.resourceProfile))===canonical(PROFILE),'backend_input_changed');
  need(canonical(strict(files.configuration))===canonical({recipeId:RECIPE.id}),'backend_input_changed');
- const c=credential(files.credentialBinding,r.jobId);const migrations=[];
+ const c=credential(files.credentialBinding,r);const migrations=[];
  // Enumerate through an anchored no-follow descriptor, including hidden extras.
  let fd=directory(root);try{for(const part of m.migrationRoot.split('/')){const next=fs.openSync(`/proc/self/fd/${fd}/${part}`,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW);fs.closeSync(fd);fd=next;}
   need(canonical(fs.readdirSync(`/proc/self/fd/${fd}`).sort())===canonical(RECIPE.migrations.map(x=>x.name).sort()),'backend_input_changed');
@@ -103,7 +97,8 @@ function argsFor(slot,state,anchor,stage){
 }
 function active(j){const s=j.check();need(!s.cause,s.cause||'backend_lease_expired');return s;}
 async function runSupervisor(descriptor){
- const {root,stage,request,anchor,controller,inputs}=descriptor;
+ const {root,stage,request,anchor,controller,inputs,inputRoot}=descriptor;
+ const credentialMaterial=readInputs(inputRoot,request,inputs).credentials;
  const journal=new BackendJournal({root,jobId:request.jobId,generation:request.generation,controller});
  const streams=new Set(),pending=new Set();
  const monitoring=monitorJournal(journal,{beforeCleanup:()=>Promise.allSettled([...pending])});let terminal,operation='admission';
@@ -156,7 +151,7 @@ async function runSupervisor(descriptor){
     const config=JSON.parse(JSON.stringify(c.Config)),host=JSON.parse(JSON.stringify(c.HostConfig));
     need(config.Hostname===anchor.Config.Hostname&&host.NetworkMode==='container:'+anchor.Id,'backend_input_changed');
     config.Hostname='owned-job-anchor';for(const key of ['specflow.backend.generation','specflow.backend.reservation'])delete config.Labels[key];
-    config.Env=config.Env.map(value=>({sha256:hash(value)}));host.NetworkMode='owned-job-anchor';
+    config.Env=semantics.environment(slot.role,config.Env,credentialMaterial,request);host.NetworkMode='owned-job-anchor';
     for(const mount of host.Mounts||[]){need(mount.Type==='bind'&&mount.ReadOnly&&mount.Source.startsWith(stage+'/'),'backend_input_changed');mount.Source='private-stage/'+path.relative(stage,mount.Source);}
     const mounts=c.Mounts.map(m=>{need(m.Type==='bind'&&!m.RW&&m.Source.startsWith(stage+'/'),'backend_input_changed');return {...m,Source:'private-stage/'+path.relative(stage,m.Source)};}).sort((a,b)=>a.Destination.localeCompare(b.Destination));
     services.push({role:slot.role,id:slot.id,rawInspectionSha256:fingerprint(c),semantic:{image:c.Image,config,host,mounts}});
@@ -171,14 +166,9 @@ async function runSupervisor(descriptor){
      if(message.type==='measure'){
       need(!measuredManifest,'backend_restart_invalid');journal.phase('measured');operation='phase_measurement';const services=await continuity();
       const measured=await measureSnapshot({journal,root});
-      const rawGateway=JSON.parse(fs.readFileSync(path.join(stage,'gateway.json')));const token=rawGateway.consumers.find(x=>x.username==='server').keyauth_credentials[0].key;
-      const [header,payload,signature]=token.split('.'),claims=strict(Buffer.from(payload,'base64url'));
-      need(claims.job===request.jobId&&claims.generation===request.generation&&claims.role==='service_role'&&claims.aud==='authenticated'&&claims.iss==='supabase'&&claims.exp-claims.iat===600&&claims.exp*1000>Date.now(),'backend_identity_mismatch');
-      const authEnv=fs.readFileSync(path.join(stage,'auth.env'),'utf8').split('\n'),key=authEnv.find(x=>x.startsWith('GOTRUE_JWT_SECRET=')).slice(18);
-      need(crypto.createHmac('sha256',key).update(header+'.'+payload).digest('base64url')===signature,'backend_identity_mismatch');
-      rawGateway.consumers.find(x=>x.username==='server').keyauth_credentials[0].key={kind:'job-generation-server-token',job:claims.job,role:claims.role,aud:claims.aud,iss:claims.iss,lifetimeSeconds:600,algorithm:'HS256'};
+      const rawGateway=semantics.gateway(JSON.parse(fs.readFileSync(path.join(stage,'gateway.json'))),credentialMaterial,request);
       const configSemantic={services:services.map(x=>({role:x.role,...x.semantic})),gateway:rawGateway};
-      const semanticSha256=hash(canonical({construction:expectedSemantic(inputs,measured.state),configuration:configSemantic}));
+      const semanticSha256=hash(canonical({construction:expectedSemantic(inputs,measured.state,credentialMaterial,request),configuration:configSemantic}));
       measuredManifest={schema:'specflow.backend-entry/v1',jobId:request.jobId,phase:request.phase,generation:request.generation,expectedBackendIdentity:request.expectedBackendIdentity,measuredBackendIdentity:semanticSha256,inputManifestSha256:request.inputManifest.sha256,state:measured.state,counts:measured.counts,snapshotProtocol:measured.snapshotProtocol,schemaArtifact:measured.schema,services,configuration:configSemantic,stageHashes:initialStage};
       fs.writeFileSync(path.join(root,'entry-manifest.json'),canonical(measuredManifest),{mode:0o600,flag:'wx'});reply({type:'measurement',manifest:measuredManifest});
      }else if(message.type==='execution'){need(measuredManifest,'backend_restart_invalid');journal.phase('execution');reply({type:'execution'});}
@@ -199,12 +189,24 @@ async function runSupervisor(descriptor){
  }
  return terminal;
 }
-async function startBackend({worker,anchorId,root,request,inputs}){
+async function startBackend({worker,anchorId,root,request,inputs,credentials,productInput}){
  need(worker instanceof require('./improve-worker.cjs').DockerWorker&&worker.jobId===request.jobId,'backend_input_changed');
  const admitted=readInputs(root,request,inputs);worker.inspectProduction(anchorId);
+ const credentialAuthority=require('./improve-backend-credentials.cjs');
+ need(credentials&&credentials.store instanceof require('./improve-worker.cjs').DurableStore&&fs.realpathSync(credentials.store.root)===fs.realpathSync(worker.stateRoot),'backend_input_invalid');
+ const issued=credentialAuthority.read(credentials.store,credentials.reference);
+ need(canonical(issued)===canonical(admitted.credentials),'backend_input_changed');
+ const production=require('./improve-production-build.cjs'),ownedInputs=worker.receipts.get(anchorId).expected.productionInputs;
+ const productReceipt=strict(readBoundFile(root,request.productBuildReceipt));
+ need(productInput?.environment?.NEXT_PUBLIC_SUPABASE_ANON_KEY===issued.anonKey&&productInput.environment.NEXT_PUBLIC_SUPABASE_URL==='http://127.0.0.1:54321','backend_input_changed');
+ production.verifyProductionOutput(worker,productInput,productReceipt,ownedInputs[2].target);
+ need(canonical(productInput.source)===canonical(ownedInputs[0])&&canonical(productInput.dependencies)===canonical(ownedInputs[1])&&canonical(productReceipt.output)===canonical(ownedInputs[2].receipt),'backend_input_changed');
+ // Consume before service creation. Failures retain this append-only reservation.
+ const consumption=credentialAuthority.consume(credentials.store,credentials.reference,request);
  const anchor=JSON.parse(worker.call(['inspect',anchorId]).stdout)[0];need(anchor.HostConfig.NetworkMode==='none'&&!Object.keys(anchor.HostConfig.PortBindings||{}).length,'backend_input_changed');
  const {stage,serverKey}=stageInputs(root,admitted);const journalRoot=fs.mkdtempSync(path.join(root,'backend-journal-'));fs.chmodSync(journalRoot,0o700);
- const descriptor={root:journalRoot,stage,request:admitted.request,inputs:admitted.manifest,anchor,controller:identity.identity()};
+ const descriptor={root:journalRoot,inputRoot:root,stage,request:admitted.request,inputs:admitted.manifest,anchor,controller:identity.identity()};
+ fs.writeFileSync(path.join(journalRoot,'credential-consumption.json'),canonical(consumption),{mode:0o600,flag:'wx'});
  // Secrets remain in private stage files; child descriptor carries no key.
  // A controller group kill must leave the identity-fenced cleanup owner alive.
  const child=cp.fork(__filename,[],{env:dockerEnv,detached:true,stdio:['ignore','ignore','ignore','ipc']});
