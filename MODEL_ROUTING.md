@@ -200,6 +200,13 @@ invoice. Missing usage remains unknown. Historical journals and pinned runtimes
 retain their original policy. This change does not remove the legacy Improve core's
 four-round limit; that separately tracked #178 work precedes product qualification.
 
+Claude streaming usage comes from the terminal `result`, not partial assistant
+messages. An interrupted stream without that result has unknown run usage. Its
+cache-read and cache-creation input tokens are reported separately and included
+once in the derived total alongside input and output tokens; a provider-supplied
+total takes precedence. Overlapping message, iteration and model summaries are
+not added together. Codex retains its own token semantics.
+
 ## Why Confirmation Is Mandatory
 
 Route confirmation binds the selected execution policy and permission scope.
