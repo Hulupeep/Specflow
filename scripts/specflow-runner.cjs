@@ -1950,6 +1950,10 @@ function buildAdapterCommand(policy, promptPath) {
   const deniedTools = policy.denied_tools || [];
   if (policy.provider === 'claude-print') {
     const args = policy.args.length ? [...policy.args] : ['-p', '--output-format', 'stream-json'];
+    // Claude print mode requires verbose events for stream-json (#177 D1).
+    const streams = args.some((arg, i) => arg === '--output-format=stream-json'
+      || (arg === '--output-format' && args[i + 1] === 'stream-json'));
+    if (streams && !args.includes('--verbose')) args.push('--verbose');
     if (policy.effort) {
       const existing = args.flatMap((arg, i) => arg === '--effort' ? [args[i + 1]] : arg.startsWith('--effort=') ? [arg.slice(9)] : []);
       if (existing.length > 1 || existing.some(e => e !== policy.effort)) throw Error('Conflicting Claude effort flags');
