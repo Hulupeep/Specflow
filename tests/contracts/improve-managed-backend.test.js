@@ -18,6 +18,32 @@ describe('managed backend service ownership (state tests, not live qualification
  test('unknown dispatch cannot be converted to absence and requires operator',()=>{reserve('database');dispatch('database');journal.fail('backend_controller_died');expect(()=>journal.removed('database',true)).toThrow('backend_cleanup_unconfirmed');expect(journal.finishCleanup().phase).toBe('cleanup_failed');expect(()=>attempts.intent(store,ref,{slot:'app',expectedConfigSha256:'d'.repeat(64),creator:identity.identity(),supervisor:identity.identity()})).toThrow('backend_cleanup_unconfirmed');});
  test.each(['','aaaaaaaaaaaa'])('late create acknowledgment with hostname %j remains owned for removal',hostname=>{const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=hostname;dispatch('database');journal.fail('backend_controller_died');journal.created('database',c,anchor);expect(journal.cleanupTarget('database',c)).toBe(c.Id);journal.removed('database',true);expect(journal.finishCleanup()).toMatchObject({phase:'cleaned',cause:'backend_controller_died'});expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching','created','removed']);});
  test('created hostname mutation cannot hide behind startup normalization',()=>{const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=c.Id.slice(0,12);dispatch('database');journal.created('database',c,anchor);journal.fail('backend_controller_died');c.Config.Hostname=anchor.Config.Hostname;expect(()=>journal.cleanupTarget('database',c)).toThrow('backend_cleanup_unconfirmed');});
+ test.each(['before-inspection','during-inspection'])('removed anchor at %s still permits cleanup acknowledgment, never startup',async ordering=>{
+  const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=c.Id.slice(0,12);dispatch('database');
+  if(ordering==='before-inspection')journal.fail('backend_controller_died');
+  let inspections=0;
+  const inspectAnchor=async()=>{inspections++;journal.fail('backend_controller_died');throw Error('backend_readiness_failed');};
+  await expect(journal.acknowledgeCreated('database',c,anchor,inspectAnchor)).rejects.toThrow('backend_controller_died');
+  expect(inspections).toBe(ordering==='before-inspection'?0:1);
+  expect(journal.cleanupTarget('database',c)).toBe(c.Id);journal.removed('database',true);
+  expect(journal.finishCleanup()).toMatchObject({phase:'cleaned',cause:'backend_controller_died',successReceipt:false});
+  expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching','created','removed']);
+ });
+ test('healthy startup cannot use an old anchor when current inspection fails',async()=>{
+  const slot=reserve('database'),c=inspect(slot);dispatch('database');
+  await expect(journal.acknowledgeCreated('database',c,anchor,async()=>{throw Error('backend_readiness_failed');})).rejects.toThrow('backend_readiness_failed');
+  expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching']);
+ });
+ test('healthy acknowledgment reads the current anchor',async()=>{
+  const slot=reserve('database'),c=inspect(slot);dispatch('database');let read=false;
+  await journal.acknowledgeCreated('database',c,anchor,async()=>{read=true;return anchor;});
+  expect(read).toBe(true);expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching','created']);
+ });
+ test('cleanup-only acknowledgment still rejects a foreign namespace',async()=>{
+  const slot=reserve('database'),c=inspect(slot);dispatch('database');journal.fail('backend_controller_died');c.HostConfig.NetworkMode='container:'+'c'.repeat(64);
+  await expect(journal.acknowledgeCreated('database',c,anchor,async()=>anchor)).rejects.toThrow('backend_input_changed');
+  expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching']);
+ });
  test('signed acknowledgment retains raw configuration across the checked startup transition',()=>{const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=c.Id.slice(0,12);const raw=fingerprint(c);dispatch('database');journal.created('database',c,anchor);expect(attempts.resourceEvents(store,ref,'database').find(e=>e.state==='created').inspectionSha256).toBe(raw);c.Config.Hostname=anchor.Config.Hostname;c.HostConfig.OomKillDisable=null;c.State.Running=true;journal.started('database',c);journal.fail('backend_controller_died');expect(journal.cleanupTarget('database',c)).toBe(c.Id);journal.removed('database',true);expect(attempts.resourceEvents(store,ref,'database').find(e=>e.state==='removed').inspectionSha256).toBe(raw);expect(journal.finishCleanup().phase).toBe('cleaned');});
  test.each(['name','hostname','memory'])('changed %s object cannot authorize removal',field=>{const slot=reserve('database'),c=inspect(slot);dispatch('database');journal.created('database',c,anchor);c.Config.Hostname=anchor.Config.Hostname;c.HostConfig.OomKillDisable=null;c.State.Running=true;journal.started('database',c);journal.fail('backend_controller_died');if(field==='name')c.Name='/foreign';if(field==='hostname')c.Config.Hostname='foreign';if(field==='memory')c.HostConfig.Memory++;expect(()=>journal.cleanupTarget('database',c)).toThrow();expect(journal.finishCleanup().phase).toBe('cleanup_failed');});
  test('changed dispatch plan is rejected before a dispatch event',()=>{reserve('database');expect(()=>journal.dispatch('database',['changed'])).toThrow('backend_input_changed');expect(attempts.resourceEvents(store,ref,'database')).toEqual([]);});

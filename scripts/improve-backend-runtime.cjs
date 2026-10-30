@@ -134,7 +134,10 @@ async function runSupervisor(descriptor){
   const image=JSON.parse((await call(['image','inspect',slot.image])).out)[0];need(image.Id===slot.image&&!Object.keys(image.Config.Volumes||{}).length,'backend_input_changed');
   const createArgs=argsFor(slot,journal.snapshot(),anchor,stage);if(managed)journal.dispatch(role,createArgs);
   const id=(await call(createArgs)).out.trim();need(/^[a-f0-9]{64}$/.test(id),'backend_input_changed');
-  journal.created(role,await inspect(id,!!managed),await inspect(anchor.Id,!!managed));active(journal);
+  const created=await inspect(id,!!managed);
+  if(managed)await journal.acknowledgeCreated(role,created,anchor,()=>inspect(anchor.Id,true));
+  else journal.created(role,created,await inspect(anchor.Id));
+  active(journal);
   const child=cp.spawn('/usr/bin/docker',['--host','unix:///var/run/docker.sock','start','--attach',id],{env:dockerEnv,stdio:['ignore','pipe','pipe']});streams.add(child);
   const done=new Promise(resolve=>{child.on('error',()=>{if(!journal.snapshot().cause)journal.fail('backend_readiness_failed');});child.on('close',code=>{streams.delete(child);resolve(code);});});
   for(const stream of [child.stdout,child.stderr])stream.on('data',b=>{try{journal.output(role,b.length);}catch{/* Terminal journal cannot regain authority. */}});

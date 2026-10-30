@@ -3,16 +3,16 @@
 // operations execute; only a supervisor scheduling barrier is added by this test.
 const fs=require('fs'),path=require('path'),cp=require('child_process'),assert=require('assert'),crypto=require('crypto');
 const identity=require('../../scripts/improve-process-identity.cjs');
-const SCENARIOS=['before-create','during-create','after-create'];
+const SCENARIOS=['before-create','during-create','during-create-anchor-loss','after-create'];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms)),read=p=>JSON.parse(fs.readFileSync(p));
 const docker=args=>cp.spawnSync('/usr/bin/docker',['--host','unix:///var/run/docker.sock',...args],{encoding:'utf8',timeout:10000,env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',DOCKER_CONFIG:'/nonexistent'}});
 function write(root,name,value){fs.writeFileSync(path.join(root,name),JSON.stringify(value),{mode:0o600,flag:'wx'});}
 if(process.argv[2]==='--supervisor'){
  const [target,scenario,root]=process.argv.slice(3);assert(SCENARIOS.includes(scenario));
  const spawn=cp.spawn;let paused=false;
- function barrier(operation){
+ function barrier(operation,extra={}){
   if(paused)return;paused=true;
-  write(root,'barrier.json',{scenario,pid:process.pid,identity:identity.identity(),operation});
+  write(root,'barrier.json',{scenario,pid:process.pid,identity:identity.identity(),operation,...extra});
   process.kill(process.pid,'SIGSTOP');
  }
  if(scenario==='after-create'){
@@ -22,9 +22,10 @@ if(process.argv[2]==='--supervisor'){
  cp.spawn=function(file,args,options){
   if(file==='/usr/bin/docker'&&!paused){
    if(scenario==='before-create'&&args[2]==='image'&&args[3]==='inspect')barrier('image-inspect-after-reservation-before-create');
-   if(scenario==='during-create'&&args[2]==='create'){
+   if(scenario.startsWith('during-create')&&args[2]==='create'){
     const child=spawn.call(this,file,args,options),emit=child.emit;
-    child.emit=function(event,...values){if(event==='close'&&values[0]===0)barrier('real-create-completed-before-close-acknowledgment');return emit.call(this,event,...values);};
+    let output='';child.stdout.on('data',b=>{assert(output.length+b.length<=256);output+=b;});
+    child.emit=function(event,...values){if(event==='close'&&values[0]===0){assert(/^[a-f0-9]{64}$/.test(output.trim()));barrier('real-create-completed-before-close-acknowledgment',{createdId:output.trim()});}return emit.call(this,event,...values);};
     return child;
    }
   }
@@ -69,11 +70,17 @@ if(process.argv[2]==='--supervisor'){
    const active=attempts.reconcileStopped(store,q.jobId);assert.equal(active.state,'active');const ref=active.attempt;
    const envelope=path.join(store.root,'backend-attempts','envelope-'+ref.attemptId),journals=fs.readdirSync(envelope).filter(n=>n.startsWith('backend-journal-'));assert.equal(journals.length,1);
    const journalRoot=path.join(envelope,journals[0]),before=read(path.join(journalRoot,'journal.json'));
-   assert.equal(before.resources.length,1);assert.equal(before.resources[0].role,'database');assert.equal(before.resources[0].status,scenario==='after-create'?'created':'reserved');assert.deepEqual(attempts.resourceEvents(store,ref,'database').map(e=>e.state),scenario==='before-create'?[]:scenario==='during-create'?['dispatching']:['dispatching','created']);
+   assert.equal(before.resources.length,1);assert.equal(before.resources[0].role,'database');assert.equal(before.resources[0].status,scenario==='after-create'?'created':'reserved');assert.deepEqual(attempts.resourceEvents(store,ref,'database').map(e=>e.state),scenario==='before-create'?[]:scenario.startsWith('during-create')?['dispatching']:['dispatching','created']);
    write(root,'before-kill.json',{controller,supervisor:barrier.identity,attempt:ref,journal:before});
    assert(require('../../scripts/improve-controller-watchdog.cjs').signalGroup(controller));
+   const cleanupEnd=Date.now()+60000;
+   if(scenario==='during-create-anchor-loss'){
+    while(!attempts.resourceEvents(store,ref,'app').some(e=>e.state==='removed')){assert(Date.now()<cleanupEnd,'app cleanup before late acknowledgment timeout');await sleep(50);}
+    const app=attempts.resourceEvents(store,ref,'app').find(e=>e.state==='created'),gone=docker(['inspect',app.id]);assert.notEqual(gone.status,0);assert.match(gone.stderr,/No such (object|container)/i);
+    write(root,'anchor-removed-before-ack.json',{anchorId:app.id,createdId:barrier.createdId,appRemoved:true,supervisorStillPaused:true});
+   }
    process.kill(barrier.pid,'SIGCONT');
-   const terminalFile=path.join(journalRoot,'terminal.json'),cleanupEnd=Date.now()+60000;
+   const terminalFile=path.join(journalRoot,'terminal.json');
    while(!fs.existsSync(terminalFile)){assert(Date.now()<cleanupEnd,'backend cleanup timeout');await sleep(50);}
    const terminal=read(terminalFile);assert.equal(terminal.phase,'cleaned');assert.equal(terminal.cause,'backend_controller_died');assert.equal(terminal.successReceipt,false);assert(terminal.resources.every(r=>r.status==='removed'));
    assert.deepEqual(attempts.resourceEvents(store,ref,'database').map(e=>e.state),scenario==='before-create'?['not_dispatched']:['dispatching','created','removed']);

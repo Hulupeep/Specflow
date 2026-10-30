@@ -34,6 +34,20 @@ class ManagedBackendJournal extends BackendJournal {
   const slot=this.snapshot().resources.find(r=>r.role===role);
   this.#event(role,'created',c.Id,slot.createdFingerprint);
  }
+ async acknowledgeCreated(role,c,admittedAnchor,inspectAnchor){
+  // The independently cleaned app may disappear while Docker create is in
+  // flight. In a failing attempt the admitted anchor is ownership context
+  // only: acknowledge the exact created object for cleanup, never startup.
+  const current=()=>{const state=this.snapshot();return state.cause?state:this.check();};
+  let anchor;
+  if(current().cause)anchor=admittedAnchor;
+  else {
+   try{anchor=await inspectAnchor();}
+   catch(error){if(!current().cause)throw error;anchor=admittedAnchor;}
+  }
+  this.created(role,c,anchor);
+  const state=current();need(!state.cause,state.cause);
+ }
  started(role,c){
   super.started(role,c);
   const created=this.#events(role).find(e=>e.state==='created');
