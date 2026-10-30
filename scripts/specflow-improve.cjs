@@ -803,7 +803,7 @@ function inputIdentity(runDir,run,gov,phase,ws) {
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:binding.workspace(ws.worktreePath,identityOptions(gov.contract))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
@@ -891,6 +891,7 @@ async function verifyPhase(runDir, phase, {backendSession} = {}) {
       const productBinding=backend.bindBackendProduct(backendSession,context,inputIdentity(runDir,run,gov,phase,ws).workspace);
       const checks=gov.contract.acceptance.flatMap(a=>[nativeCheck(a,a.check),...(phase==='baseline'&&a.dev_check?[nativeCheck(a,a.dev_check)]:[])].filter(c=>c.execution));
       backend.prepareBackendChecks(backendSession,context,{oracleRoot:runDir,frozenFiles:gov.entry.artifact_sha256,checks});
+      await backend.startBackendServer(backendSession,context);
       const vars=s=>String(s).replace(/\{workspace\}/g,ws.worktreePath).replace(/\{run_dir\}/g,runDir).replace(/\{evidence_dir\}/g,dir).replace(/\{phase\}/g,phase);
       outcome=await execute({vars,baseUrl:'http://127.0.0.1:3000',backendContext:context});
       if(outcome.status!=='blocked'){await backend.backendContinuity(backendSession,context);backendReceipt={product:productBinding,entry:{path:entry.path,sha256:entry.sha256},expectedSemanticSha256:decl.expectedSemanticSha256,measuredSemanticSha256:entry.manifest.measuredBackendIdentity};}

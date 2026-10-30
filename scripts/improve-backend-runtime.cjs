@@ -162,7 +162,7 @@ async function runSupervisor(descriptor){
    let busy=false;
    const timer=setInterval(()=>{if(['cleaned','cleanup_failed'].includes(journal.snapshot().phase)){clearInterval(timer);resolve();}},100);
    process.on('message',async message=>{
-    try{need(message&&Object.keys(message).length===1&&['measure','execution','continuity','fail_identity','close'].includes(message.type));need(!busy,'backend_restart_invalid');busy=true;
+    try{need(message&&Object.keys(message).length===1&&['measure','execution','continuity','fail_identity','fail_service','fail_output','close'].includes(message.type));need(!busy,'backend_restart_invalid');busy=true;
      if(message.type==='measure'){
       need(!measuredManifest,'backend_restart_invalid');journal.phase('measured');operation='phase_measurement';const services=await continuity();
       const measured=await measureSnapshot({journal,root});
@@ -174,6 +174,8 @@ async function runSupervisor(descriptor){
      }else if(message.type==='execution'){need(measuredManifest,'backend_restart_invalid');journal.phase('execution');reply({type:'execution'});}
      else if(message.type==='continuity'){await continuity();reply({type:'continuity'});}
      else if(message.type==='fail_identity')journal.fail('backend_identity_mismatch');
+     else if(message.type==='fail_service')journal.fail('backend_service_died');
+     else if(message.type==='fail_output')journal.fail('backend_output_limit');
      else{if(journal.snapshot().phase==='readiness')journal.phase('measured');if(journal.snapshot().phase==='measured')journal.phase('execution');journal.phase('quiescing');}
     }catch(e){diagnostic({operation,event:message?.type,cause:/^backend_[a-z_]+$/.test(e.message)?e.message:'backend_restart_invalid'});if(!['cleaned','cleanup_failed'].includes(journal.snapshot().phase))journal.fail(require('./improve-backend.cjs').FAILURE_CAUSES.includes(e.message)?e.message:'backend_restart_invalid');}
     finally{busy=false;}
@@ -210,7 +212,7 @@ async function startBackend({worker,anchorId,root,request,inputs,credentials,pro
  // Secrets remain in private stage files; child descriptor carries no key.
  // A controller group kill must leave the identity-fenced cleanup owner alive.
  const child=cp.fork(__filename,[],{env:dockerEnv,detached:true,stdio:['ignore','ignore','ignore','ipc']});
- const capability=Object.freeze({});const data={child,journalRoot,stage,serverKey,request:admitted.request,admitted,root,worker,anchorId,ready:false,terminal:null,measurement:null,coreBinding:null};sessionData.set(capability,data);
+ const capability=Object.freeze({});const data={child,journalRoot,stage,serverKey,request:admitted.request,admitted,root,worker,anchorId,ready:false,terminal:null,measurement:null,coreBinding:null,productInput:JSON.parse(canonical(productInput)),productReceipt:JSON.parse(canonical(productReceipt)),server:null};sessionData.set(capability,data);
  const readiness=new Promise((resolve,reject)=>{child.on('message',m=>{if(m?.type==='ready'){data.ready=true;resolve(capability);}if(m?.type==='terminal'){data.terminal=m;if(!data.ready)reject(Error(m.cause||'backend_readiness_failed'));}});child.on('error',()=>reject(Error('backend_readiness_failed')));child.on('exit',()=>{if(!data.ready)reject(Error('backend_readiness_failed'));});});
  child.send(descriptor);try{return await readiness;}catch(e){if(child.exitCode===null&&child.signalCode===null)await new Promise(resolve=>child.once('exit',resolve));
   if(fs.existsSync(path.join(journalRoot,'terminal.json'))&&strict(fs.readFileSync(path.join(journalRoot,'terminal.json'))).phase==='cleaned')fs.rmSync(stage,{recursive:true,force:true});data.serverKey='';sessionData.delete(capability);throw e;}
@@ -245,6 +247,11 @@ async function admitBackend(capability,context){
 async function backendContinuity(capability,context){
  const s=sessionData.get(capability);need(s&&s.coreBinding&&canonical(s.coreBinding)===canonical(context),'backend_input_invalid');
  readInputs(s.root,s.request,s.admitted.manifest);need(hash(fs.readFileSync(path.join(s.journalRoot,'entry-manifest.json')))===hash(canonical(s.measurement)),'backend_input_changed');s.worker.inspectProduction(s.anchorId);await exchange(s,'continuity');
+ // Recheck late server failures/deadline without repeating the full production
+ // tree inspection already performed before this continuity exchange.
+ need(!s.server?.failure,s.server?.failure||'backend_service_died');
+ const live=strict(fs.readFileSync(path.join(s.journalRoot,'journal.json')));
+ need(live.phase==='execution'&&!live.cause&&Date.now()<live.phaseDeadlineEpochMs,live.cause||'backend_lease_expired');
  return {entryManifestSha256:hash(fs.readFileSync(path.join(s.journalRoot,'entry-manifest.json')))};
 }
 
@@ -252,10 +259,54 @@ async function backendContinuity(capability,context){
 // only the confined transport for its frozen Playwright inventory.
 function executionSession(capability,context){
  const s=sessionData.get(capability);need(s&&s.coreBinding&&canonical(s.coreBinding)===canonical(context),'backend_input_invalid');
+ need(!s.server?.failure,s.server?.failure||'backend_service_died');
  const j=strict(fs.readFileSync(path.join(s.journalRoot,'journal.json')));
  need(j.phase==='execution'&&!j.cause&&Date.now()<j.phaseDeadlineEpochMs,j.cause||'backend_lease_expired');
  s.worker.inspectProduction(s.anchorId);return s;
 }
+// Delivery is closed over the admitted session. Repository/model code cannot
+// supply a credential, program, environment, target container or stdin envelope.
+async function startBackendServer(capability,context){
+ const s=executionSession(capability,context);need(!s.server,'backend_restart_invalid');
+ const delivery=require('./improve-backend-server.cjs');
+ // startBackend already verified the output receipt and bound a private copy of
+ // the public environment. Each exec/start independently runs inspectProduction
+ // over its sealed inputs. Do not duplicate that whole-tree guard around it.
+ await backendContinuity(capability,context);
+ const raw=strict(fs.readFileSync(path.join(s.stage,'gateway.json')));
+ semantics.gateway(raw,s.admitted.credentials,s.request);
+ need(raw.consumers.find(c=>c.username==='server').keyauth_credentials[0].key===s.serverKey,'backend_input_changed');
+ const claims=strict(Buffer.from(s.serverKey.split('.')[1],'base64url'));
+ const issued=Date.now(),expires=claims.exp*1000;need(expires>issued+30000,'backend_credentials_expired');
+ const directory='/tmp/sf-secret-'+crypto.randomBytes(16).toString('hex');
+ const envelope={job:s.request.jobId,generation:s.request.generation,container:s.anchorId,nonce:crypto.randomUUID(),issued,expires,key:s.serverKey};
+ const bytes=canonical(envelope),expected={job:envelope.job,generation:envelope.generation,container:envelope.container,nonce:envelope.nonce,envelopeSha256:hash(bytes)};
+ const state={started:false,closing:false,failure:null,bytes:0,tails:{stdout:'',stderr:''},child:null};s.server=state;
+ const fail=(cause,type)=>{if(state.failure)return;state.failure=cause;if(s.child.connected&&!s.terminal)s.child.send({type},()=>{});};
+ try{
+  const delivered=s.worker.exec(s.anchorId,delivery.writerArgv(directory),{cwd:'/tmp',input:bytes,timeout:5000,maxBuffer:8192});
+  need(delivered.status===0&&delivered.stdout==='delivered','backend_input_invalid');
+  state.child=s.worker.start(s.anchorId,delivery.launcherArgv(directory,expected),{cwd:'/app',env:s.productInput.environment});
+  const needles=delivery.secretForms(s.serverKey);
+  const tailLength=Math.max(...needles.map(n=>n.length));
+  for(const name of ['stdout','stderr'])state.child[name].on('data',chunk=>{
+   state.bytes+=chunk.length;const text=state.tails[name]+chunk.toString();
+   if(needles.some(n=>text.includes(n)))fail('backend_server_secret_exposed','fail_identity');
+   if(state.bytes>PROFILE.output.perServiceBytes)fail('backend_output_limit','fail_output');
+   state.tails[name]=text.slice(-tailLength);
+  });
+  state.child.once('error',()=>fail('backend_service_died','fail_service'));
+  state.child.once('exit',()=>{if(!state.closing)fail('backend_service_died','fail_service');});
+  const ready="(async()=>{for(let i=0;i<100;i++){try{const r=await fetch('http://127.0.0.1:3000/attention',{signal:AbortSignal.timeout(1000)});await r.arrayBuffer();if(r.ok){process.stdout.write('ready');return;}}catch{}await new Promise(r=>setTimeout(r,100));}process.exit(2)})()";
+  const result=s.worker.exec(s.anchorId,['/node/bin/node','-e',ready],{cwd:'/tmp',timeout:15000,maxBuffer:8192,allowFailure:true});
+  await new Promise(resolve=>setImmediate(resolve));
+  need(!state.failure,state.failure||'backend_service_died');need(result.status===0&&result.stdout==='ready','backend_readiness_failed');
+  const absent=s.worker.exec(s.anchorId,['/node/bin/node','-e',"if(require('fs').existsSync(process.argv[1]))process.exit(1)",directory],{cwd:'/tmp',timeout:5000,maxBuffer:8192});
+  need(absent.status===0,'backend_input_invalid');state.started=true;
+  return Object.freeze({started:true,entrypoint:'next-start',secretDelivery:'stdin-unlinked-envelope'});
+ }catch(error){fail(require('./improve-backend.cjs').FAILURE_CAUSES.includes(error.message)?error.message:'backend_input_invalid','fail_service');throw Error(state.failure);}
+}
+
 function bindBackendProduct(capability,context,workspace){
  const s=executionSession(capability,context),inputs=s.worker.receipts.get(s.anchorId).expected.productionInputs;
  const receipt=strict(readBoundFile(s.root,s.request.productBuildReceipt));
@@ -285,7 +336,15 @@ function prepareBackendChecks(capability,context,{oracleRoot,frozenFiles,checks}
  const stage=fs.mkdtempSync(path.join(s.root,'backend-oracle-'));fs.chmodSync(stage,0o700);
  try{
   let bytes=0;for(const file of files){const data=readBoundFile(oracleRoot,{path:file,sha256:frozenFiles[file]},PROFILE.output.maxFileBytes);bytes+=data.length;need(bytes<=PROFILE.output.captureBytes,'backend_output_limit');const target=path.join(stage,file);fs.mkdirSync(path.dirname(target),{recursive:true,mode:0o700});fs.writeFileSync(target,data,{mode:0o400,flag:'wx'});}
-  s.checker=s.worker.create({role:'checker',network:'container:'+s.anchorId,mounts:[{source:stage,destination:'/oracle'}],tmpfs:[{path:'/output',bytes:64*1024*1024}]});
+  const mounts=[{source:stage,destination:'/oracle'}];
+  // Preserve the accepted product journey's /inputs/public.json interface.
+  // The alias exposes only the same frozen public input already under /oracle.
+  if(files.includes('inputs/public.json')){
+   const publicConfig=strict(fs.readFileSync(path.join(stage,'inputs/public.json')));
+   need(Object.keys(publicConfig).sort().join(',')==='anonKey,url'&&publicConfig.anonKey===s.admitted.credentials.anonKey&&publicConfig.url==='http://127.0.0.1:54321','backend_input_changed');
+   mounts.push({source:path.join(stage,'inputs/public.json'),destination:'/inputs/public.json'});
+  }
+  s.checker=s.worker.create({role:'checker',network:'container:'+s.anchorId,mounts,tmpfs:[{path:'/output',bytes:64*1024*1024}]});
   s.oracle={stage,root:oracleRoot,frozenFiles:{...frozenFiles},checks:checks.map(c=>hash(canonical(c)))};
   backendNativeFramework(capability,context);
  }catch(e){if(s.checker)s.worker.destroy(s.checker);s.checker=null;fs.rmSync(stage,{recursive:true,force:true});throw e;}
@@ -309,11 +368,16 @@ function backendNativeLaunch(capability,context,{check,options,dir,args,env}){
   result=s.worker.exec(s.checker,['/node/bin/node',...actualArgs],{cwd:'/oracle',env:actualEnv,timeout:Math.max(1,Math.min((check.timeout_seconds||120)*1000,strict(fs.readFileSync(path.join(s.journalRoot,'journal.json'))).phaseDeadlineEpochMs-Date.now())),allowFailure:true,maxBuffer:16*1024*1024});
   s.worker.pause(s.checker);s.worker.capture(s.checker,output,dir,{maxBytes:64*1024*1024});
  }finally{if(s.worker.containers.has(s.checker))s.worker.call(['unpause',s.checker],{allowFailure:true});}
- executionSession(capability,context);return {...result,command:['/node/bin/node',...actualArgs],reportRoot:'/oracle'};
+ const delivery=require('./improve-backend-server.cjs');
+ const needles=delivery.secretForms(s.serverKey);
+ need(!needles.some(n=>(result.stdout||'').includes(n)||(result.stderr||'').includes(n)),'backend_server_secret_exposed');
+ const serverCanaryScan=delivery.scanArtifacts(dir,s.serverKey);
+ executionSession(capability,context);return {...result,serverCanaryScan,command:['/node/bin/node',...actualArgs],reportRoot:'/oracle'};
 }
 
 async function closeBackend(capability){
  const s=sessionData.get(capability);need(s,'backend_input_invalid');
+ if(s.server){s.server.closing=true;s.server.tails={stdout:'',stderr:''};}
  if(s.checker){s.worker.destroy(s.checker);s.checker=null;}
  if(s.oracle)fs.rmSync(s.oracle.stage,{recursive:true,force:true});
  if(!s.terminal&&s.child.connected)s.child.send({type:'close'});
@@ -321,5 +385,5 @@ async function closeBackend(capability){
  const terminal=strict(fs.readFileSync(path.join(s.journalRoot,'terminal.json')));need(terminal.phase==='cleaned','backend_cleanup_failed');
  fs.rmSync(s.stage,{recursive:true,force:true});s.serverKey='';sessionData.delete(capability);return terminal;
 }
-module.exports={readInputs,startBackend,closeBackend,observeBackend,admitBackend,backendContinuity,prepareBackendChecks,bindBackendProduct,backendNativeFramework,backendNativeLaunch};
+module.exports={readInputs,startBackend,closeBackend,observeBackend,admitBackend,backendContinuity,prepareBackendChecks,bindBackendProduct,startBackendServer,backendNativeFramework,backendNativeLaunch};
 if(require.main===module){process.once('message',d=>runSupervisor(d).catch(()=>{process.exitCode=1;if(process.connected)process.disconnect();}));}

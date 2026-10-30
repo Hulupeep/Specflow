@@ -10,10 +10,10 @@ function assertReplayWindow(key,now=Date.now()){
 async function main(){
  const d=JSON.parse(fs.readFileSync(process.argv[2])),original=read(d.request),m=read(d.manifest),product=read(d.product),pi=read(product.inputs),pr=read(product.request),built=read(product.built),cfg=read(pi.workerConfig);
  const selected=process.argv[3],historyPath=process.argv[4];assert(!selected||['baseline','after'].includes(selected));if(selected)assert(historyPath&&path.isAbsolute(historyPath));
- const mutation=process.argv[5];assert(!mutation||['admit','schema','seed','env-input'].includes(mutation));if(mutation)assert.equal(selected,'after');const negative=mutation&&mutation!=='admit';let rejection;
+ const mutation=process.argv[5];assert(!mutation||['admit','server','schema','seed','env-input'].includes(mutation));if(mutation)assert.equal(selected,'after');const negative=mutation&&!['admit','server'].includes(mutation);let rejection;
  let history;if(selected==='after'){const fd=fs.openSync(historyPath,fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);try{const stat=fs.fstatSync(fd);assert.equal(stat.mode&0o777,0o600);assert.equal(stat.uid,process.getuid());assert.equal(stat.nlink,1);history=JSON.parse(fs.readFileSync(fd));}finally{fs.closeSync(fd);}assert.equal(history.jobId,pr.jobId);assert.equal(history.phase,'baseline');}
- if(history&&!negative)assertReplayWindow(history.oldKey);
- let oldKey=history?.oldKey;const reports=history?.reports||[],cleanups=history?.cleanups||[],builds=history?.builds||[],observations=history?.observations||[];const store=new (require(repo+'/scripts/improve-worker.cjs').DurableStore)({root:pi.root,sourceRoot:pi.root});
+ if(history&&!negative&&mutation!=='server')assertReplayWindow(history.oldKey);
+ let oldKey=mutation==='server'?undefined:history?.oldKey;const reports=history?.reports||[],cleanups=history?.cleanups||[],builds=history?.builds||[],observations=history?.observations||[];const store=new (require(repo+'/scripts/improve-worker.cjs').DurableStore)({root:pi.root,sourceRoot:pi.root});
  for(const phase of (selected?[selected]:['baseline','after'])){
   const reference=credentialAuthority.issue(store,{jobId:pr.jobId,phase}),issued=credentialAuthority.read(store,reference);
   const root=fs.mkdtempSync(path.join(pi.root,'generation-'));fs.chmodSync(root,0o700);
@@ -38,19 +38,21 @@ async function main(){
    if(mutation==='env-input'){const stage=fs.readdirSync(root).find(n=>n.startsWith('backend-stage-')),file=path.join(root,stage,'auth.env'),text=fs.readFileSync(file,'utf8');assert(text.includes('GOTRUE_LOG_LEVEL=info'));fs.writeFileSync(file,text.replace('GOTRUE_LOG_LEVEL=info','GOTRUE_LOG_LEVEL=debug'));}
    const context={runId:'phase-mutation-qualification',phase,expectedBackendIdentity:r.expectedBackendIdentity,inputManifestSha256:r.inputManifest.sha256};
    if(negative){const expected=mutation==='env-input'?'backend_input_changed':'backend_identity_mismatch';await assert.rejects(runtime.admitBackend(session,context),error=>{rejection=error.message;return rejection===expected;});continue;}
-   if(selected){const observed=mutation==='admit'?(await runtime.admitBackend(session,context)).manifest:await runtime.observeBackend(session);observations.push({phase,semantic:observed.measuredBackendIdentity,inputManifestSha256:observed.inputManifestSha256,state:observed.state,counts:observed.counts});if(mutation==='admit')await runtime.backendContinuity(session,context);}
+   if(selected){const observed=['admit','server'].includes(mutation)?(await runtime.admitBackend(session,context)).manifest:await runtime.observeBackend(session);observations.push({phase,semantic:observed.measuredBackendIdentity,inputManifestSha256:observed.inputManifestSha256,state:observed.state,counts:observed.counts});if(['admit','server'].includes(mutation))await runtime.backendContinuity(session,context);if(mutation==='server'){const started=await runtime.startBackendServer(session,context);assert.equal(started.started,true);console.log(JSON.stringify({scope:'Actual unchanged Next server in the admitted production consumer',server:started}));}}
 
    const stages=fs.readdirSync(root).filter(n=>n.startsWith('backend-stage-')&&!previous.has(n));assert.equal(stages.length,1);
    const gateway=JSON.parse(fs.readFileSync(path.join(root,stages[0],'gateway.json'))),key=name=>gateway.consumers.find(c=>c.username===name).keyauth_credentials[0].key,current=key('server');
    const cases={current:{apikey:current,bearer:current}};
-   if(oldKey){assertReplayWindow(oldKey);assert.notEqual(current,oldKey);cases.oldKey={apikey:oldKey,bearer:oldKey};cases.oldBearerWithCurrentAnon={apikey:key('anon'),bearer:oldKey};}
+   if(oldKey){assertReplayWindow(oldKey);assert(current!==oldKey,'generation_key_reused');cases.oldKey={apikey:oldKey,bearer:oldKey};cases.oldBearerWithCurrentAnon={apikey:key('anon'),bearer:oldKey};}
    checker=worker.create({role:'checker',network:'container:'+consumer.id});
    const result=worker.exec(checker,['/node/bin/node','-e','('+probe.toString()+')()'],{cwd:'/tmp',input:JSON.stringify({cases}),timeout:20000,maxBuffer:4096});
    const report=JSON.parse(result.stdout);assert.equal(report.current,200);reports.push(report);oldKey=current;
+   if(mutation==='server'){worker.destroy(checker);checker=null;await require('./fixtures/backend-server-journey.cjs').runServerJourney({root,session,context,anonKey:issued.anonKey,serverKey:current,staticRoot:path.join(freshBuild.target,'tree','static')});}
   }finally{
    try{if(checker)worker.destroy(checker);}finally{try{if(session){const t=await runtime.closeBackend(session);assert.equal(t.phase,'cleaned');assert.equal(t.cause,negative?(mutation==='env-input'?'backend_input_changed':'backend_identity_mismatch'):null);assert(t.resources.every(r=>r.status==='removed'));cleanups.push({phase:t.phase,cause:t.cause,ownedRemoved:t.resources.length});}}finally{if(consumer)consumer.close();worker.close();}}
   }
  }
+ if(mutation==='server'){console.log(JSON.stringify({scope:'Actual current-generation server and desktop/mobile journeys only; rotation replay is a separate required check',cleanup:cleanups.at(-1),freshBuild:builds.at(-1)}));return;}
  if(negative){console.log(JSON.stringify({scope:'Live disposable backend mutation rejection before deciding checks',mutation,rejection,decidingChecksExecuted:0,cleanup:cleanups.at(-1),freshBuild:builds.at(-1)}));assert(rejection);return;}
  if(selected==='baseline'){fs.writeFileSync(historyPath,production.canonical({jobId:pr.jobId,phase:selected,oldKey,reports,cleanups,builds,observations}),{mode:0o600,flag:'wx'});console.log(JSON.stringify({scope:'Disposable baseline observation only; no deciding checks or frozen core acceptance',reports,cleanups,builds,observations}));return;}
  if(selected==='after'){console.log(JSON.stringify({scope:'Actual measured phase equivalence diagnostic, not core acceptance',observations}));assert.equal(observations.length,2);assert.notEqual(observations[0].inputManifestSha256,observations[1].inputManifestSha256);assert.equal(observations[0].semantic,observations[1].semantic,'credential_only_phase_semantics_differ');assert.deepEqual(observations[0].state,observations[1].state);}
