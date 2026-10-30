@@ -1950,6 +1950,10 @@ function buildAdapterCommand(policy, promptPath) {
   const deniedTools = policy.denied_tools || [];
   if (policy.provider === 'claude-print') {
     const args = policy.args.length ? [...policy.args] : ['-p', '--output-format', 'stream-json'];
+    // Claude print mode requires verbose events for stream-json (#177 D1).
+    const streams = args.some((arg, i) => arg === '--output-format=stream-json'
+      || (arg === '--output-format' && args[i + 1] === 'stream-json'));
+    if (streams && !args.includes('--verbose')) args.push('--verbose');
     if (policy.effort) {
       const existing = args.flatMap((arg, i) => arg === '--effort' ? [args[i + 1]] : arg.startsWith('--effort=') ? [arg.slice(9)] : []);
       if (existing.length > 1 || existing.some(e => e !== policy.effort)) throw Error('Conflicting Claude effort flags');
@@ -2045,6 +2049,27 @@ function mergeUsage(current, event) {
   };
 }
 
+// Claude's assistant events can contain partial per-message usage. Only its
+// result is a run total; summing messages, iterations or modelUsage double-counts
+// overlapping observations. Cache input is separate from input_tokens in Claude.
+function claudeTerminalUsage(event) {
+  const raw = event.usage || {};
+  const usage = {};
+  for (const key of ['input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens']) {
+    const value = pickFirstNumber(raw[key]);
+    if (value !== null && value >= 0) usage[key] = value;
+  }
+  const total = pickFirstNumber(raw.total_tokens, event.total_tokens);
+  if (total !== null && total >= 0) usage.total_tokens = total;
+  else if (usage.input_tokens !== undefined && usage.output_tokens !== undefined) {
+    usage.total_tokens = usage.input_tokens + usage.output_tokens
+      + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0);
+  }
+  const cost = pickFirstNumber(event.total_cost_usd, raw.cost_usd, raw.estimated_cost_usd, event.cost_usd, event.estimated_cost_usd);
+  if (cost !== null && cost >= 0) usage.estimated_cost_usd = cost;
+  return usage;
+}
+
 function parseProviderEvents(provider, text) {
   const events = [];
   const errors = [];
@@ -2082,8 +2107,10 @@ function parseProviderEvents(provider, text) {
       event.error?.reason,
       event.error?.message,
     );
-    usage = mergeUsage(usage, event);
     const type = String(event.type || event.event || event.kind || '');
+    if (provider === 'claude-print') {
+      if (type === 'result') usage = claudeTerminalUsage(event);
+    } else usage = mergeUsage(usage, event);
     if (/error/i.test(type) || event.error) errors.push(event.error || event);
     if (event.tool || event.tool_call || event.toolCall || /tool|command|exec/i.test(type)) toolEvents.push(event);
     // Native Claude embeds invocation blocks inside assistant messages. Results

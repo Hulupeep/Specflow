@@ -8,6 +8,7 @@ adapter_policy:
     - -p
     - --output-format
     - stream-json
+    - --verbose
     - --permission-mode
     - default
   model: sonnet
