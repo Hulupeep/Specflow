@@ -1920,8 +1920,15 @@ function recordRole(runDir, role) {
   loadRun(runDir);
   for (const f of ['role', 'executor']) if (!nonempty(role?.[f])) throw new Error(`role.${f} is required`);
   return append(runDir, 'role_recorded', {
-    role: role.role, executor: role.executor, requested_model: role.requested_model || null,
-    observed_model: role.observed_model || 'unknown', cost_usd: typeof role.cost_usd === 'number' ? role.cost_usd : null,
+    role: role.role, executor: role.executor,
+    policy_id: role.policy_id || null, provider: role.provider || null,
+    configured_provider: role.configured_provider || null,
+    requested_provider: role.requested_provider || null, observed_provider: role.observed_provider || null,
+    configured_model: role.configured_model || null, requested_model: role.requested_model || null,
+    observed_model: role.observed_model || 'unknown', fallback_model: role.fallback_model || null,
+    input_tokens: Number.isSafeInteger(role.input_tokens) && role.input_tokens >= 0 ? role.input_tokens : null,
+    output_tokens: Number.isSafeInteger(role.output_tokens) && role.output_tokens >= 0 ? role.output_tokens : null,
+    cost_usd: typeof role.cost_usd === 'number' ? role.cost_usd : null,
     cost_status: typeof role.cost_usd === 'number' ? 'estimate' : 'unknown', note: role.note || null,
   });
 }
