@@ -28,6 +28,7 @@ test('PREBUILD blocked baseline can be honestly abandoned after deadline without
   const request=f.recoveryCommand({cycle_id:attempted.cycle.id,reason:'Frozen baseline does not justify an implementation; retain its failure.'},'abandon-prebuild-1');
   const reconciled=f.service().reconcilePrebuild(request);
   expect(reconciled.allowed).toBe(true);
+  expect(f.service().store.read().history.filter(e=>e.event==='prebuild_abandoned').at(-1).adopted_prior).toBe(false);
   const completed=f.service().status(f.req).runs[0];
   expect(completed.deadline_ms).toBe(stopped.deadline_ms);
   expect(completed.consumed_cycles).toBe(stopped.consumed_cycles);
@@ -276,6 +277,7 @@ test('PREBUILD owner can adopt a core-only disposition after unrelated main adva
  fs.writeFileSync(path.join(f.repo,'later-work'),'later');f.git('add','later-work');f.git('commit','-m','later work');
  f.profile.repository.refs[0].commit=f.git('rev-parse','main');require('../../scripts/improve-profiles.cjs').registerProfile(f.registry,f.profile,{lockTool:f.recovery.lockTool});
  expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);
+ expect(f.service().store.read().history.filter(e=>e.event==='prebuild_abandoned').at(-1).adopted_prior).toBe(true);
 },45000);
 
 test('PREBUILD an integrity-blocked baseline cannot turn corrupt frozen checks into valid evidence',async()=>{
@@ -384,4 +386,28 @@ test('PREBUILD same core disposition retry does not inspect subsequently configu
  const x=await stoppedFixture(),request={reason:'Preserve baseline.',requestSha256:'a'.repeat(64)};
  core.abandonBeforeBuild(x.runDir,request);f.git('config','filter.later.clean','false');
  expect(()=>core.abandonBeforeBuild(x.runDir,request)).not.toThrow();
+},45000);
+
+
+test.each([
+ ['managed-to-host',{backend:{constructionSha256:'a'.repeat(64)}},{}],
+ ['server-to-host',{serve:['node','server.js']},{}],
+ ['host-to-managed',{}, {backend:{constructionSha256:'a'.repeat(64)}}]
+])('PREBUILD runtime supersession cannot hide earlier obligations: %s',(name,first,last)=>{
+ const docs=[first,last].map(runtime=>Buffer.from(JSON.stringify({contract:{runtime}}))),events=docs.map((b,i)=>({event:'contract_frozen',version:i+1,contract_sha256:require('crypto').createHash('sha256').update(b).digest('hex')}));
+ expect(()=>core.prebuildRuntimeHistory(events,n=>docs[Number(/v(\d+)/.exec(n)[1])-1])).toThrow('prebuild_runtime_history_changed');
+});
+test('PREBUILD actual superseding runtime declaration retains controller ownership',async()=>{
+ const x=await stoppedFixture(),g=core.governingContract(x.runDir),contract={...g.contract,runtime:{identity:{mutable_outputs:['new-output']}}},file=path.join(f.root,'superseding-contract.json');fs.writeFileSync(file,JSON.stringify(contract));
+ expect(core.freezeContract(x.runDir,file,{supersede:'Runtime declaration changed before implementation.'}).status).toBe('frozen');
+ await core.verifyPhase(x.runDir,'baseline');
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_runtime_history_changed');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+},45000);
+test('PREBUILD interrupted direct exec records its start and blocks abandonment',async()=>{
+ const x=await stoppedFixture();
+ const program=`const runner=require(${JSON.stringify(require.resolve('../../scripts/specflow-runner.cjs'))}),core=require(${JSON.stringify(require.resolve('../../scripts/specflow-improve.cjs'))});const original=runner.appendLedger;runner.appendLedger=(file,entry)=>{const r=original(file,entry);if(entry.event==='command_started')process.exit(23);return r;};core.cli(['exec',process.argv[1],'--','node','-e','process.exit(0)']);`;
+ expect(cp.spawnSync(process.execPath,['-e',program,x.runDir],{timeout:10000}).status).toBe(23);
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
 },45000);

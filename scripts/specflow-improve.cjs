@@ -242,6 +242,8 @@ function guardedSpawn(runDir, role, argv, options = {}) {
     return { status: 'blocked', blocked, exit_code: null, stdout: '', stderr: '' };
   }
   const { env, removed } = scrubbedEnv(options.env);
+  const commandId=crypto.randomUUID();
+  append(runDir,'command_started',{command_id:commandId,role,argv,cwd:options.cwd||null});
   const r = spawnSync(argv[0], argv.slice(1), {
     cwd: options.cwd,
     env,
@@ -250,7 +252,7 @@ function guardedSpawn(runDir, role, argv, options = {}) {
     maxBuffer: 32 * 1024 * 1024,
   });
   const timedOut = r.error && /ETIMEDOUT/.test(r.error.code || r.error.message);
-  append(runDir, 'command_run', { role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), env_removed: removed });
+  append(runDir, 'command_run', { command_id:commandId, role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), env_removed: removed });
   return {
     status: r.error ? (timedOut ? 'timeout' : 'error') : 'ran',
     exit_code: r.status,
@@ -748,7 +750,10 @@ function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerCla
         environment:gov.contract.runtime?.environment||'isolated-improve',frozenFiles:gov.entry.artifact_sha256,
         ...(backendSession!==undefined?{backendSession,backendContext}:{}),
         env:scrubbedEnv({BASE_URL:baseUrl||'',IMPROVE_EVIDENCE_DIR:dir,IMPROVE_PHASE:phase,IMPROVE_CRITERION:a.id,IMPROVE_WORKSPACE:ws.worktreePath,IMPROVE_SET:set}).env};
+      const commandId=crypto.randomUUID();
+      append(runDir,'command_started',{command_id:commandId,role:'verifier',native:true,phase,attempt: lastEvent(events(runDir),'verification_started')?.attempt,criterion:a.id});
       const receipt=nativeExecution.executeFrozen(check,options),owned=nativeExecution.ownsFrozen(receipt,check,gov.doc,options);
+      append(runDir,'command_run',{command_id:commandId,role:'verifier',native:true,phase,exit_code:receipt.exit_code??null,timed_out:(receipt.errors||[]).some(e=>String(e).includes('ETIMEDOUT'))});
       if(receipt.evidence_path)outPath=receipt.evidence_path;
       else fs.writeFileSync(outPath,JSON.stringify({result:'unavailable',reason:receipt.reason}));
       const result=owned&&['pass','fail'].includes(receipt.result)?receipt.result:'unavailable';
@@ -1802,7 +1807,20 @@ function prebuildBaseline(evs, frozen) {
   return {attempt:attempt.attempt,event:outcome?.event||'interrupted',seq:outcome?.seq??attempt.seq};
 }
 
+function prebuildRuntimeHistory(evs, readContract) {
+  let runtime;
+  for(const frozen of evs.filter(e=>e.event==='contract_frozen')){
+    if(!Number.isSafeInteger(frozen.version)||frozen.version<1)throw Error('prebuild_integrity_failed');
+    const bytes=readContract(`improvement-contract.v${frozen.version}.json`);
+    if(sha256(bytes)!==frozen.contract_sha256)throw Error('prebuild_integrity_failed');
+    const value=canonical(JSON.parse(bytes).contract.runtime||{});
+    if(runtime!==undefined&&runtime!==value)throw Error('prebuild_runtime_history_changed');
+    runtime=value;
+  }
+}
+
 function prebuildHostQuiescence(evs, contract) {
+  if(evs.some(start=>start.event==='command_started'&&!evs.some(e=>e.event==='command_run'&&e.seq>start.seq&&e.command_id===start.command_id)))throw Error('prebuild_descendants_unproven');
   if(contract.runtime?.backend)return;
   const started=evs.filter(e=>e.event==='verification_started'&&e.phase==='baseline');
   const unresolved=started.some(start=>!evs.some(e=>e.seq>start.seq&&e.attempt===start.attempt&&e.contract_version===start.contract_version&&
@@ -1820,6 +1838,7 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
   if(prior && (prior.record.contract.sha256!==gov.entry.contract_sha256 || (prior.request_sha256!==requestSha256&&!adoptPrior)))throw Error('prebuild_request_conflict');
   const revalidate=!prior||prior.request_sha256!==requestSha256;
   if(lastEvent(evs,'decision_made')&&!prior)throw Error('prebuild_decision_exists');
+  prebuildRuntimeHistory(evs,name=>fs.readFileSync(path.join(runDir,name)));
   const baseline=prebuildBaseline(evs,gov.entry);
   const readGit=(args,cwd,{allowAbsent=false}={})=>{
     const result=spawnSync('/usr/bin/git',['--no-optional-locks','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{cwd,encoding:'utf8',timeout:10000,maxBuffer:1024*1024,env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0'}});
@@ -2223,6 +2242,7 @@ module.exports = {
   abandonBeforeBuild,
   prebuildBaseline,
   prebuildHostQuiescence,
+  prebuildRuntimeHistory,
   status,
   writeReport,
   verifyLedger,

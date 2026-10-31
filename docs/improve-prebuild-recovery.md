@@ -47,8 +47,9 @@ Only after the archive is durable does the controller release that run's ownersh
 Reuse the same request ID for an identical retry. The core disposition identity
 is bound to the run, cycle and frozen contract, so a replacement request after a
 lost acknowledgement can finish the same disposition. A core-only prior record
-can be adopted by the trusted owner only after validating its captured unchanged
-base proof and rechecking the workspaces and baseline evidence. Later movement of
+can be adopted by the trusted owner after validating its captured unchanged
+base proof and baseline evidence. An identical binding reuses its captured
+workspace proof; adoption under a different binding rechecks the workspaces. Later movement of
 main does not invalidate that captured proof. Authenticated archive adoption uses
 the captured proof, retains the original identity and records the new owner request. All original reasons and the new owner request remain
 in the audit trail. Retried acknowledgements
@@ -97,3 +98,16 @@ for this recovery operation and remain blocked before Git status can recurse.
 Retries using an already captured unchanged-workspace proof do not run Git status
 or inspect subsequently added drivers. An abandoned outcome cannot acquire either
 an experiment verdict or a delivered-proposal observation.
+
+All frozen contract versions are hash-checked during live recovery and archive
+adoption. If their runtime declarations differ, recovery remains blocked as
+`prebuild_runtime_history_changed`; changing runtime cannot erase earlier cleanup
+obligations. This operation does not yet reconcile mixed-runtime histories.
+
+Guarded commands and native checks record a command start before execution and a
+matching result afterward. An unmatched start blocks recovery, including commands
+outside a baseline. Historical records without these starts cannot retroactively
+prove command-level quiescence; controller recovery still requires sealed terminal
+receipts for every issued operation. Normally exiting commands that intentionally
+leave detached children are not independently proven clean by the parent PID;
+managed resources require the separate signed backend cleanup proof.

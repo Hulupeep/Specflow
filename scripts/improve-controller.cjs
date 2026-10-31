@@ -1250,6 +1250,7 @@ function createControllerService({
       catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_backend_proof_unavailable',error.record&&/^[a-z]+-[a-f0-9.-]+$/.test(error.record)?'Inspect retained backend record '+error.record+'; its run identity cannot be authenticated. Do not discard it.':undefined);}
     }
     const requestSha256=digest({kind:'reconcile_prebuild',run_id:r.id,cycle_id:cycle.id,...cycle.binding,contract_sha256:governing.entry.contract_sha256});
+    const adoptedPrior=!!proof||core.events(runDir).some(e=>e.event==='prebuild_abandonment_started');
     let disposition=proof?{request_sha256:proof.core_diagnosis.request_sha256}:null;
     if(!proof){
       try{disposition=core.abandonBeforeBuild(runDir,{reason:req.reason,requestSha256,adoptPrior:true});}
@@ -1265,7 +1266,7 @@ function createControllerService({
     r.last_completed_action='abandoned_before_build:'+cycle.id;r.evidence.push(proof.manifest_sha256);
     // Original reasons, consumption, limits and deadline remain untouched.
     need(s.owners[r.canonical_repo]===r.id,'run_ownership_unavailable');delete s.owners[r.canonical_repo];
-    event(s,'prebuild_abandoned',r.id,{cycle_id:cycle.id,manifest_sha256:proof.manifest_sha256,request_sha256:digest(req),binding_sha256:requestSha256,reason:req.reason,adopted_prior:disposition.request_sha256!==requestSha256});
+    event(s,'prebuild_abandoned',r.id,{cycle_id:cycle.id,manifest_sha256:proof.manifest_sha256,request_sha256:digest(req),binding_sha256:requestSha256,reason:req.reason,adopted_prior:adoptedPrior});
     return {allowed:true,run_id:r.id,cycle_id:cycle.id,disposition:'abandoned_before_build',manifest_sha256:proof.manifest_sha256,duplicate:false};
   }
   const recoveryService = require('./improve-recovery-controller.cjs').attach({ store, access, ownerPrincipal, now, recovery, abandonPrebuild, applyReceipt:(s,r,op,doc)=>{
@@ -1416,6 +1417,10 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
       const contractEntry=receipt.files.find(f=>f.path===`improvement-contract.v${frozen.version}.json`);
       const contractBytes=fs.readFileSync(privatePath(path.join(store.root,'blobs',contractEntry.sha256)));
       need(sha(contractBytes)===frozen.contract_sha256,'prebuild_integrity_failed');
+      core.prebuildRuntimeHistory(events.filter(e=>e.seq<start.seq),name=>{
+        const entry=receipt.files.find(f=>f.path===name);need(entry,'prebuild_integrity_failed');
+        const data=fs.readFileSync(privatePath(path.join(store.root,'blobs',entry.sha256)));need(sha(data)===entry.sha256,'prebuild_integrity_failed');return data;
+      });
       core.prebuildHostQuiescence(events.filter(e=>e.seq<start.seq),JSON.parse(contractBytes).contract);
       need(start&&canonical(events.filter(e=>e.seq>start.seq).map(e=>e.event))===canonical(['decision_made','decision_applied']),'prebuild_disposition_invalid');
       need(d.decision==='INCONCLUSIVE'&&d.implementation_attempted===false&&
