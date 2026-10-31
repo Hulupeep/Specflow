@@ -1370,7 +1370,7 @@ function curatedText(root, { files = null, maxBytes = 256 * 1024, omitRuntimeMet
       if (omitRuntimeMetadata && ['execution.json', 'playwright.config.cjs'].includes(path.basename(rel))) return;
       const b = regular(f);
       total += b.length;
-      need(total <= maxBytes && !b.includes(0), 'role_input_limit');
+      if(total > maxBytes || b.includes(0)) throw new WorkerError('role_input_limit','model',`Evidence ${rel} exceeds the ${maxBytes}-byte text allowance or contains binary data.`,false,'Preserve originals and the failed review. Summarize recognized infrastructure metadata only; never truncate required reports, reset the deadline or rerun a consumed holdout.');
       out.push(untrusted.fenceUntrusted(b.toString(), { source: rel }));
     }
   }
@@ -1443,7 +1443,7 @@ function pinnedLauncher({ directory, config, mode }) {
     JSON.stringify(cfg) +
     ',' +
     JSON.stringify(mode) +
-    ").catch(e=>{process.stderr.write(JSON.stringify({code:e.code||'worker_failure',stage:e.stage||'worker',next_action:e.next_action||'Inspect private diagnostics.'})+'\\n');process.exitCode=2;});\n";
+    ").catch(e=>{process.stderr.write(JSON.stringify({code:e.code||'worker_failure',stage:e.stage||'worker',observed:e.observed||e.code||'worker_failure',next_action:e.next_action||'Inspect private diagnostics.'})+'\\n');process.exitCode=2;});\n";
   fs.writeFileSync(filename, code, { mode: 0o700, flag: 'wx' });
   return filename;
 }
@@ -1674,7 +1674,7 @@ async function coreStage(config, stage, args) {
     return { status: 0, stdout: out.raw, stderr: '' };
   };
   args=[...args];
-  if(config.backendJobBinding&&['freezeContract','verifyPhase','build','evaluate','finalize'].includes(stage)){
+  if(config.backendJobBinding&&['freezeContract','verifyPhase','build','judge','evaluate','finalize'].includes(stage)){
     const index=['freezeContract','verifyPhase'].includes(stage)?2:1,options=args[index]||{};
     need(!Object.hasOwn(options,'backendCapability')&&!Object.hasOwn(options,'backendSession'),'backend_capability_required');
     const capability=require('./improve-backend-generation.cjs').install(config,args[0],()=>currentAuthority(config));

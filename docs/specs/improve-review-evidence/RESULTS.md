@@ -1,0 +1,19 @@
+# #304 verification
+
+Red before fix: original regression8cases,6passed2failed (oversized binding; practice-image attribution). A native backend shape regression then caught the services-array mismatch. The judge retry regression reproduced a failed second adapter recording a stale successful judgment (expected0, received1). All failures remain in private logs.
+
+After correction: relevant core/worker/presentation253/253; final capsule/metadata integration27/27. Full current-suite CI still required. No browser UI is changed; no skipped UI journey is used as evidence.
+
+Actual retained before/after envelope:84originalfiles unchanged,16acceptanceframes retained,6practice-only screenshots omitted with hash references and text reports retained. All service/configuration values remain visible; only exact duplicate service projections and validated digest inventories are summarized. Unknown/mutated shapes and duplicate JSON keys remain complete. Text bound is unchanged256KiB before fencing; assembled prompt271572bytes includes outer fences. Images retain the existing16distinct-frame limit.
+
+Installed qualification: local npm pack/prepack/install, packaged-byte parity, installed evidence copier/curatedText/image handling and actual Opus5.5 tool-free role call returned a bound UX judgment. Provenance and output: evidence/review-evidence-304/{proof,native-output}.json. No original product acceptance or old ledger was rerun/modified. This qualifies presentation and native transport; the canonical judge state machine (unique attempt paths, failed output rejection, precise failure code, verifier input binding) is separately exercised by integration/contracts, not falsely attributed to that native call.
+
+After native qualification, the capsule guard was tightened to reject unknown entry fields and mismatched byte totals. Real-bundle file outputs are identical after normalizing only random fence nonces; proof.json carries the comparison manifest. This evidence composition is explicit rather than relabelling the old native run as a new one.
+
+Independent review round1: REV-304-001 permissive shape recognition; REV-304-002 stale retry output/provenance; REV-304-003 native proof absent in its snapshot; REV-304-004 precise failure hidden by adapter status. Changes address001 by validation+retaining nested service data,002 by unique attempt artifacts and success-only judgment parsing,003 by the installed proof above,004 by structured safe code/observed/next-action return. All findings remain in advisory history for re-review. No clean review/CI/merge claim yet.
+
+## Receipt-bound follow-up
+
+Round2 native review was protocol-invalid (cited unread content); it is retained and is not a completed assurance result. Its diagnostic response exposed REV-304-005, loose practice-image classification. The code now uses core-validated phase receipts, digest-bound evidence items, native receipt hashes and acceptance-overlap protection. Loose finding files cannot authorize image removal. Further outer-envelope recognition checks cover attempt IDs, phase, version, hashes and Git identity.
+
+Executed follow-up:193/193 core+presentation tests, then40/40 final presentation tests including outer envelopes and receipt mutation. Native package qualification of this revision is pending; earlier installed evidence remains explicitly historical. Full local suite and canonical CI remain pending.

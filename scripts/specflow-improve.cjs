@@ -809,7 +809,7 @@ function inputIdentity(runDir,run,gov,phase,ws,timing,selectedGit) {
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-worker.cjs','improve-backend-timing.cjs','improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-profiles.cjs','improve-backend-journeys-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'improve-review-evidence.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-worker.cjs','improve-backend-timing.cjs','improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-profiles.cjs','improve-backend-journeys-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:measured('workspace_identity',()=>binding.workspace(ws.worktreePath,identityOptions(gov.contract)))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
@@ -1492,8 +1492,10 @@ function judge(runDir, options = {}) {
   if (!lastEvent(evs, 'verification_completed')) throw new Error('Run the after-phase verification before independent judgment');
   const gov = governingContract(runDir);
   const role = options.role || 'ux-evaluator';
+  if(!/^[a-z][a-z0-9-]{0,63}$/.test(role))throw Error('Invalid judgment role');
+  const attempt=crypto.randomUUID(),attemptRole=role+'-'+attempt;
   const raw = loadPolicy(options.policy);
-  const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, role);
+  const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, attemptRole);
   // Reuse the #100 isolation rule: the evaluator policy must differ from the builder's.
   runner.resolveVerifierPolicy({ ...policy, id: builderEntry.executor, transcript_path: path.join(runDir, 'adapters', 'builder.transcript.jsonl'), output_path: path.join(runDir, 'adapters', 'builder.final.md'), verifier_policy: policy });
   const diff = workspaceDiff(run,gov.contract);
@@ -1505,26 +1507,39 @@ function judge(runDir, options = {}) {
   const criteria = options.criteria || gov.contract.acceptance.filter((a) => a.required_level >= 3).map((a) => a.id);
   // The judge works in a directory holding only artifact, contract, rubric and
   // runtime evidence — never the builder transcript (#100 assembleVerifierInput).
-  const inputDir = path.join(runDir, `judge-input-${role}`);
-  fs.rmSync(inputDir, { recursive: true, force: true });
+  const inputDir = path.join(runDir, `judge-input-${attemptRole}`);
   fs.mkdirSync(inputDir, { recursive: true });
   fs.copyFileSync(gov.entry.path, path.join(inputDir, path.basename(gov.entry.path)));
   fs.copyFileSync(path.join(runDir, 'workspace.patch'), path.join(inputDir, 'workspace.patch'));
   fs.copyFileSync(RUBRIC, path.join(inputDir, 'UX_REFINEMENT_PROFILE.md'));
   for (const phase of ['baseline', 'after']) {
     const src = runPaths(runDir).phaseDir(phase);
-    if (fs.existsSync(src)) require('./improve-review-evidence.cjs').copyVerificationEvidence(src,path.join(inputDir,'verification',phase));
+    if (fs.existsSync(src)) {
+      const proof=boundReceipt(runDir,phase,{current:false,backendCapability:options.backendCapability});
+      if(proof.error)throw Error(proof.error);
+      const ids=new Set(proof.receipt.evidence.map(e=>e.id));
+      require('./improve-review-evidence.cjs').copyVerificationEvidence(src,path.join(inputDir,'verification',phase),{omitPracticeImages:true,phaseEvidence:readEvidence(runDir).filter(e=>ids.has(e.id)),phaseReceipt:{path:proof.entry.path,sha256:proof.entry.sha256}});
+    }
   }
   untrusted.fenceInputTree(inputDir);
-  const promptPath = path.join(runDir, 'adapters', `${role}.prompt.md`);
+  const promptPath = path.join(runDir, 'adapters', `${attemptRole}.prompt.md`);
   fs.writeFileSync(promptPath, judgePrompt(runDir, role, criteria, gov));
   const judgePolicy = { ...policy, denied_tools: [...policy.denied_tools, `Read(/${path.join(runDir, 'adapters')}/**)`, 'Edit', 'Write', 'Bash'] };
   const { env } = scrubbedEnv({}, { keepProvider: true });
   const result = runner.runAdapter(judgePolicy, { promptPath, stage: `improve.${role}`, dryRun: options.dryRun, cwd: inputDir, env });
   const provenance = roleProvenance(judgePolicy, result);
   const peeked = toolCommands(judgePolicy.transcript_path).some((t) => /adapters\/builder\./.test(JSON.stringify(t.input || {})));
-  append(runDir, 'judgment_run', { role, executor: policy.id, verifier_input: input, input_dir: inputDir, provenance, adapter_status: result.status, maker_trace_accessed: peeked });
+  append(runDir, 'judgment_run', { role, attempt, executor: policy.id, verifier_input: input, input_dir: inputDir, transcript_path:policy.transcript_path, output_path:policy.output_path, prompt_path:promptPath, provenance, adapter_status: result.status, maker_trace_accessed: peeked });
   if (peeked) return { status: 'blocked', reason: 'judge accessed the builder transcript; judgments not recorded', provenance };
+  if(result.status!=='gate_rerun_required'||result.entry?.exit_code!==0) {
+    let failure={code:'judge_adapter_failed',stage:'judge',next_action:'Inspect the retained attempt transcript; preserve original acceptance and do not replay a consumed holdout.'};
+    const rawFailure=result.entry?.failure;
+    if(typeof rawFailure==='string'&&rawFailure.length<=16384)for(const line of rawFailure.split('\n')) {
+      try{const detail=JSON.parse(line);if(['role_input_limit','role_image_limit','role_image_invalid'].includes(detail.code))failure={code:detail.code,stage:'model',observed:typeof detail.observed==='string'?detail.observed.slice(0,1024):detail.code,next_action:'Repair the bounded evidence presentation while preserving required evidence, original receipts and the original deadline. Do not replay a consumed holdout.'};}catch{}
+    }
+    append(runDir,'judgment_failed',{role,attempt,failure});
+    return {status:result.status,recorded:0,attempt,failure,provenance};
+  }
   const parsed = lastJsonLine(fs.existsSync(policy.output_path) ? fs.readFileSync(policy.output_path, 'utf8') : '');
   const recorded = [];
   for (const j of list(parsed?.judgments)) {
