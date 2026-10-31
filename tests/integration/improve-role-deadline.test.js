@@ -77,3 +77,19 @@ test('failed spawn with no pid never defaults to the worker identity or signals 
   expect(i).not.toHaveBeenCalled();expect(kill).not.toHaveBeenCalled();
  }finally{i.mockRestore();kill.mockRestore();}
 });
+
+test('real failed spawn reports not-started without a later unhandled error',async()=>{
+ let child;
+ expect(()=>require('../../scripts/improve-worker.cjs').roleCall({role:'oracle',model:'opus',effectiveModel:'fixture',prompt:'test',schema:{type:'object',properties:{}},cwd:root,evidence:path.join(root,'evidence'),claude:process.execPath,deadlineAtMs:Date.now()+5000,authorizeStart:()=>{child=require('child_process').spawn(path.join(root,'missing-executable'),[],{stdio:'ignore',detached:true});return child;}})).toThrow(expect.objectContaining({code:'role_not_started'}));
+ expect(child.listenerCount('error')).toBeGreaterThan(0);
+ await new Promise(resolve=>setImmediate(resolve));expect(child.pid).toBeUndefined();
+});
+test('relay timeout retains its record and kills native process-group grandchildren',async()=>{
+ const marker=path.join(root,'grandchild.json');
+ const body=`const child=require('child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});require('fs').writeFileSync(${JSON.stringify(marker)},JSON.stringify({pid:child.pid}));setInterval(()=>{},1000);`;
+ const result=invoke(Date.now()+600,body);expect(result.done).toMatchObject({error:'ETIMEDOUT'});
+ const pid=JSON.parse(fs.readFileSync(marker)).pid,until=Date.now()+3000;
+ const alive=()=>{try{const stat=fs.readFileSync('/proc/'+pid+'/stat','utf8');return !['Z','X'].includes(stat.slice(stat.lastIndexOf(')')+2).split(' ')[0]);}catch(e){if(e.code==='ENOENT')return false;throw e;}};
+ while(alive()&&Date.now()<until)await new Promise(r=>setTimeout(r,20));
+ expect(alive()).toBe(false);
+});

@@ -1256,8 +1256,9 @@ function roleCall({
   need(path.isAbsolute(claude), 'role_tool_unavailable');
   let managedDeadline = null;
   if (deadlineAtMs === null) {
-    try { managedDeadline = require('./improve-controller-provider.cjs').gatewayDeadline(claude); }
-    catch { throw new WorkerError('role_deadline_required', 'model', 'A direct CLI call needs an explicit deadline; only a verified controller gateway supplies its own job deadline.'); }
+    if (path.basename(claude) !== 'controller-provider' || !fs.existsSync(path.join(path.dirname(claude), 'controller-context.json')))
+      throw new WorkerError('role_deadline_required', 'model', 'A direct CLI call needs an explicit deadline; only a verified controller gateway supplies its own job deadline.');
+    managedDeadline = require('./improve-controller-provider.cjs').gatewayDeadline(claude);
     need(managedDeadline > Date.now(), 'role_deadline', 'model');
     // Transport-only grace lets the controller persist its original deadline's
     // interruption receipt. This cannot authorize a later provider start.
@@ -1343,6 +1344,9 @@ function roleCall({
       detached: true
     });
   const child = authorizeStart ? authorizeStart(launch) : launch();
+  // Node reports launch errors on the next tick after returning a pid-less handle.
+  // The structured guard below owns the diagnosis; never leave an unhandled event.
+  child?.on?.('error', () => {});
   need(Number.isSafeInteger(child?.pid) && child.pid > 1, 'role_not_started', 'model');
   const relayIdentity = require('./improve-process-identity.cjs').identity(child.pid);
   const completionUnknown = () => new WorkerError('role_completion_unknown', 'model',
@@ -1367,7 +1371,7 @@ function roleCall({
   const result = strictJSON(regular(relay.done).toString());
   const raw = regular(relay.raw).toString();
   if (result.error === 'not_started_deadline') throw new WorkerError('role_deadline', 'model', 'The explicit deadline expired before the native process started.', false);
-  if (result.error === 'ETIMEDOUT') throw completionUnknown();
+  if (result.error) throw completionUnknown();
   if (result.status !== 0)
     throw new WorkerError(
       'role_unavailable',

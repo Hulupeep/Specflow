@@ -33,7 +33,7 @@ test.each(['cancel','deadline'])('REC-RECEIPT real gateway %s stops the local na
 },25000);
 test('ROLE-DEADLINE modified gateway bytes cannot supply implicit deadline authority',()=>{
  const {ctx,call}=setup('success');const executable=path.join(f.root,'gateway','controller-provider');fs.appendFileSync(executable,'\n// modified after generation\n');
- expect(call).toThrow(expect.objectContaining({code:'role_deadline_required'}));
+ expect(call).toThrow(expect.objectContaining({code:'provider_gateway_mismatch'}));
  expect(f.serviceV2().status(f.req).runs[0].consumed_attempts).toBe(0);
  expect(fs.existsSync(path.join(f.root,'provider-started.json'))).toBe(false);
 });
@@ -69,3 +69,11 @@ test('ROLE-DEADLINE actual observer loss retains the live operation and refuses 
   if(provider)expect(proc.state(provider)).toBe('dead');
  }
 },25000);
+
+test('ROLE-DEADLINE managed observer survives a compressed legacy interval within the original job',()=>{
+ const {call}=setup('success',{limits:{maxCycles:2,maxWallMs:600000}}),base=Date.now();let reads=0;
+ const clock=jest.spyOn(Date,'now').mockImplementation(()=>base+(reads++?300000:0));
+ try{expect(call().provenance.model).toBe('fixture-builder');}
+ finally{clock.mockRestore();}
+ const run=f.serviceV2().status(f.req).runs[0];expect(run.consumed_attempts).toBe(1);expect(run.operations[0].state).toBe('complete');
+});

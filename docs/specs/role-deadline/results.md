@@ -17,3 +17,9 @@ All private raw native/receipt evidence and failed attempts remain retained. No 
 After the second advisory review (no P0/P1, five P2 groups), the final focused run passed147 tests across5 suites with0 failures/skips/flaky cases; native report accounting also passed. It includes actual managed observer loss, refusal of a duplicate provider start, cancellation cleanup, original-deadline wiring, spawn failure, unavailable identity and the terminal-record race.
 
 The final local installed gateway/worker check passed with real process supervision and a sealed completion: original deadline unchanged,30000ms transport grace, exactly1 attempt. Its CLI is explicitly a protocol fixture, not a live provider. A separately installed real-subscription run with250seconds artificial transport latency and a third advisory review are still pending. Canonical CI on the final commit remains required.
+
+## Diagnostic follow-up
+
+The final diagnostic delta passed37 tests in the two affected suites,0 failures/skips/flaky cases, with native report reconciliation. This includes a real failed spawn, managed compressed-clock survival within the original job and a real native grandchild terminated on relay timeout. One prior test run failed because the test called an unexported process helper; the corrected test inspects actual process state. The implementation was not changed to make that assertion easier.
+
+The third installed snapshot passed the250second artificial-latency plus real subscription response in254082ms. Final edits since that snapshot handle launch-error events, preserve specific gateway failures, classify other transport errors as unknown completion and narrow the cleanup claim to process-group members. A fresh installed smoke check covers these final packaged bytes; its result and final advisory/CI status are reported on the PR before merge. Neither arbitrary copied gateway paths nor cleanup of descendants that create separate sessions is claimed.

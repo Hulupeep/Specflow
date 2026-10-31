@@ -33,7 +33,7 @@ function run(requestFile) {
     flag: 'wx'
   });
   fs.renameSync(temp, req.done);
-  // Retain the interruption record first, then remove all local descendants.
+  // Retain the interruption record first, then remove local process-group members.
   // The independently supervised controller operation retains its own deadline.
   if (result.error?.code === 'ETIMEDOUT')
     require('./improve-controller-watchdog.cjs').signalGroup(identity);
