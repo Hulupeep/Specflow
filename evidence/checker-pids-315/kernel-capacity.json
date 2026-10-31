@@ -1,0 +1,39 @@
+{
+  "status": "passed",
+  "scope": "kernel task capacity, not browser/product acceptance",
+  "results": [
+    {
+      "mode": "ordinary",
+      "profile": "heystax-backend-journeys-v1",
+      "pidsLimit": 128,
+      "requested": 160,
+      "created": 120,
+      "capacityDenied": true
+    },
+    {
+      "mode": "ordinary",
+      "profile": "heystax-backend-journeys-v2",
+      "pidsLimit": 256,
+      "requested": 160,
+      "created": 160,
+      "capacityDenied": false
+    },
+    {
+      "mode": "managed",
+      "profile": "heystax-backend-journeys-v1",
+      "pidsLimit": 128,
+      "requested": 160,
+      "created": 120,
+      "capacityDenied": true
+    },
+    {
+      "mode": "managed",
+      "profile": "heystax-backend-journeys-v2",
+      "pidsLimit": 256,
+      "requested": 160,
+      "created": 160,
+      "capacityDenied": false
+    }
+  ],
+  "cleanupConfirmed": true
+}

@@ -9,7 +9,9 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=p=>w.stri
 const bound=ref=>{const b=fs.readFileSync(ref.path);assert.equal(hash(b),ref.sha256);return w.strictJSON(b.toString());};
 function write(root,name,value){const b=Buffer.isBuffer(value)?value:Buffer.from(canonical(value)),file=path.join(root,name);fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});fs.writeFileSync(file,b,{flag:'wx',mode:0o600});return{path:file,sha256:hash(b)};}
 async function main(){
- const inputs=read(process.argv[2]),descriptor=read(process.argv[3]),old=bound(descriptor.recipe),profileId='heystax-backend-journeys-v1';
+ const profileId=process.argv[5]??'heystax-backend-journeys-v1';
+ profiles.workerLimits(profileId,'app');
+ const inputs=read(process.argv[2]),descriptor=read(process.argv[3]),old=bound(descriptor.recipe);
  const root=fs.mkdtempSync(path.join(inputs.root,'profile-298-'));fs.chmodSync(root,0o700);
  const startedAtMs=Date.now(),deadlineAtMs=process.argv[4]===undefined?startedAtMs+7200000:Number(process.argv[4]);
  assert(Number.isSafeInteger(deadlineAtMs)&&deadlineAtMs>startedAtMs&&deadlineAtMs<=startedAtMs+7200000,'qualification_deadline_invalid');
@@ -44,7 +46,7 @@ async function main(){
  finally{
   attempts.seal(store,attempt);
   try{if(session){terminal=await runtime.closeBackend(session);assert.equal(terminal.phase,'cleaned');assert.equal(terminal.cause,null);}}
-  finally{try{if(consumer)consumer.close();}finally{try{worker.close();}finally{fs.unlinkSync(secret.path);}}}
+  finally{try{if(consumer)consumer.close();}finally{try{worker.close();}finally{try{fs.unlinkSync(secret.path);}catch(e){if(e.code!=='ENOENT')throw e;}}}}
  }
  const finished=attempts.finish(store,attempt,{cause:error?'backend_qualification_failed':null,backendTerminalSha256:terminal?hash(canonical(terminal)):null,productReceiptSha256:built?hash(canonical(built.receipt)):null});
  if(error)throw error;

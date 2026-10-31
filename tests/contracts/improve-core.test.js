@@ -1252,7 +1252,7 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
    expect(improve.events(runDir).find(e=>e.event==='verification_blocked').backendFailure.admission).toEqual(admission);
   }finally{for(const spy of spies)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
  }));
- test.each(['unchanged','before-dispatch','oracle-before-dispatch','ledger-before-dispatch','during-check','after-shutdown','branch-after-shutdown','authority-after-shutdown','profile-registry-during-check','journey-profile-during-check','worker-during-check','review-evidence-during-check'])('managed identity boundaries reject mutation without live Git: %s',quiet(async mutation=>{
+ test.each(['unchanged','before-dispatch','oracle-before-dispatch','ledger-before-dispatch','during-check','after-shutdown','branch-after-shutdown','authority-after-shutdown','profile-registry-during-check','journey-profile-during-check','journey-v2-profile-during-check','worker-during-check','review-evidence-during-check'])('managed identity boundaries reject mutation without live Git: %s',quiet(async mutation=>{
   const f=fixture(),generation=require('../../scripts/improve-backend-generation.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs'),binding=require('../../scripts/improve-binding.cjs'),native=require('../../scripts/test-execution.cjs');
   let selected,frozenRun,phase='outside',workspace,revoked=false,checks=0;const gitPhases=[];
   const touch=()=>fs.appendFileSync(path.join(workspace,'README.md'),'changed');
@@ -1271,7 +1271,7 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
    jest.spyOn(generation,'close').mockImplementation(async(handle,cause)=>({attempt:{attemptId:'fixture'},terminal:{...terminal,cause},backendTerminal,originalCause:cause})),
    jest.spyOn(native,'ownsFrozen').mockReturnValue(true),
    jest.spyOn(native,'executeFrozen').mockImplementation((check,options)=>{checks++;if(mutation==='during-check')touch();if(profileFile)fs.appendFileSync(profileCopy,' ');const evidence_path=path.join(options.runDir,'fixture-native.json');fs.writeFileSync(evidence_path,'{}');return {result:'fail',executable:true,exit_code:1,evidence_path,framework:{},artifacts:{},cases:[],errors:[],summary:{passed:0,failed:1,skipped:0}};})];
-  const profileFile=mutation==='profile-registry-during-check'?'improve-backend-profiles.cjs':mutation==='journey-profile-during-check'?'improve-backend-journeys-profile.json':mutation==='worker-during-check'?'improve-worker.cjs':mutation==='review-evidence-during-check'?'improve-review-evidence.cjs':null;
+  const profileFile=mutation==='profile-registry-during-check'?'improve-backend-profiles.cjs':mutation==='journey-profile-during-check'?'improve-backend-journeys-profile.json':mutation==='journey-v2-profile-during-check'?'improve-backend-journeys-v2-profile.json':mutation==='worker-during-check'?'improve-worker.cjs':mutation==='review-evidence-during-check'?'improve-review-evidence.cjs':null;
   const profileCopy=path.join(f.root,'selected-profile');
   if(profileFile){
    fs.copyFileSync(path.join(__dirname,'../../scripts',profileFile),profileCopy);

@@ -46,7 +46,7 @@ function gateway(raw, credentials, request) {
     claims = strictJSON(Buffer.from(payload, 'base64url').toString());
   } catch { throw Error('backend_identity_mismatch'); }
   need(Number.isSafeInteger(claims.iat) && Number.isSafeInteger(claims.exp));
-  const extended=request.resourceProfile==='heystax-backend-journeys-v1';
+  const extended=['heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(request.resourceProfile);
   const lifetimeSeconds=extended?require('./improve-backend-profiles.cjs').workerLimits(request.resourceProfile,'app').phaseMilliseconds/1000:600;
   need(extended?(claims.exp>claims.iat&&claims.exp<=claims.iat+lifetimeSeconds&&claims.exp<=credentials.expiresAt):claims.exp===claims.iat+600);
   need(canonical(claims) === canonical({ role: 'service_role', aud: 'authenticated', iss: 'supabase', job: request.jobId, generation: request.generation, iat: claims.iat, exp: claims.exp }));
