@@ -123,7 +123,13 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       }
     }, 100);
     try {
-      const result = await awaitQualifiedStage(child),
+      // The supervisor/watchdog enforces the admitted work deadline. Keep its
+      // observer alive briefly afterward so it can seal the terminal receipt;
+      // the standalone worker's ten-minute default must not kill it early.
+      // This grace authorizes no work and never resets the original deadline.
+      const result = await awaitQualifiedStage(child, {
+          timeout: Math.max(1, bound.deadline_ms - Date.now() + 30000)
+        }),
         prefix = path.join(evidenceDir, child.controllerOperation);
       fs.writeFileSync(prefix + '.stdout', result.stdout || '', { mode: 0o600, flag: 'wx' });
       fs.writeFileSync(prefix + '.stderr', result.stderr || '', { mode: 0o600, flag: 'wx' });
