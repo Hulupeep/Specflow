@@ -11,11 +11,12 @@ function write(root,name,value){const b=Buffer.isBuffer(value)?value:Buffer.from
 async function main(){
  const profileId=process.argv[5]??'heystax-backend-journeys-v1';
  profiles.workerLimits(profileId,'app');
+ const label=profileId==='heystax-backend-journeys-v2'?'profile-315':'profile-298';
  const inputs=read(process.argv[2]),descriptor=read(process.argv[3]),old=bound(descriptor.recipe);
- const root=fs.mkdtempSync(path.join(inputs.root,'profile-298-'));fs.chmodSync(root,0o700);
+ const root=fs.mkdtempSync(path.join(inputs.root,label+'-'));fs.chmodSync(root,0o700);
  const startedAtMs=Date.now(),deadlineAtMs=process.argv[4]===undefined?startedAtMs+7200000:Number(process.argv[4]);
  assert(Number.isSafeInteger(deadlineAtMs)&&deadlineAtMs>startedAtMs&&deadlineAtMs<=startedAtMs+7200000,'qualification_deadline_invalid');
- write(root,'admission.json',{scope:'Disposable #298 infrastructure qualification; no product gain or production access',jobId:inputs.jobId,sourceRevision:inputs.sourceRevision,profileId,startedAtMs,deadlineAtMs});
+ write(root,'admission.json',{scope:'Disposable '+label+' infrastructure qualification; no product gain or production access',jobId:inputs.jobId,sourceRevision:inputs.sourceRevision,profileId,startedAtMs,deadlineAtMs});
  const store=new w.DurableStore({root:inputs.root,sourceRoot:inputs.root}),phase='dev-r1',cfg={...bound(inputs.workerConfig),stateRoot:inputs.root,gitArea:null,jobId:inputs.jobId,maxMilliseconds:600000};
  const recipe=path.join(root,'recipe');fs.mkdirSync(recipe,{mode:0o700});
  const template=JSON.parse(canonical(old));template.jobId=inputs.jobId;
@@ -26,7 +27,7 @@ async function main(){
  for(const m of old.migrations)write(recipe,old.migrationRoot+'/'+m.name,admission.readBoundFile(descriptor.recipeRoot,{path:old.migrationRoot+'/'+m.name,sha256:m.sha256}));
  const credentialRef=credentials.issue(store,{jobId:inputs.jobId,phase}),issued=credentials.read(store,credentialRef);
  const normalized=JSON.parse(canonical(template));normalized.credentialBinding.sha256=semantics.projection(issued,issued);const constructionSha256=hash(canonical(normalized));
- const attempt=attempts.begin(store,{jobId:inputs.jobId,runId:'profile-298-preflight',phase,contractSha256:hash('profile-298-observation-only'),constructionSha256,authoritySha256:hash('authorized-disposable-qualification'),deadlineAtMs});
+ const attempt=attempts.begin(store,{jobId:inputs.jobId,runId:label+'-preflight',phase,contractSha256:hash(label+'-observation-only'),constructionSha256,authoritySha256:hash('authorized-disposable-qualification'),deadlineAtMs});
  const authority=()=>{assert(Date.now()<deadlineAtMs,'original_qualification_deadline_expired');};
  const worker=new w.DockerWorker(cfg);managed.bind(worker,{store,attempt,authorize:authority});
  const request={schema:'specflow.backend-request/v2',jobId:inputs.jobId,phase,recipeId:admission.RECIPE.id,generation:credentialRef.generation,expectedBackendIdentity:'0'.repeat(64),resourceProfile:profileId,constructionSha256};

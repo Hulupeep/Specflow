@@ -16,9 +16,10 @@ async function main(){
  const store=new w.DurableStore({root:inputs.root,sourceRoot:inputs.root}),workspace=path.join(inputs.source.target,'tree');
  const contract=read(draftFile);
  // Fail missing fixture inputs before allocating the expensive backend.
- for(const a of contract.acceptance)for(const k of ['check','dev_check'])if(a[k])for(const name of a[k].checker_paths){
+ for(const a of contract.acceptance)for(const k of ['check','dev_check'])if(a[k])for(const name of [...a[k].checker_paths,...(a[k].input_paths||[]),...(a[k].rule_paths||[])]){
   assert(!path.isAbsolute(name)&&name.split('/').every(x=>x&&x!=='.'&&x!=='..'));
-  assert(fs.statSync(path.join(oracleSource,name)).isFile(),'oracle_input_not_file');
+  let isFile=false;try{isFile=fs.statSync(path.join(oracleSource,name)).isFile();}catch{}
+  if(!isFile)throw Error('oracle_input_not_file');
  }
 
  const contractRef=write(root,'unfrozen-check-inventory.json',contract),contractSha256=hash(canonical(contract));
@@ -39,7 +40,7 @@ async function main(){
   const envelope=path.dirname(planRef.path),oracle=path.join(root,'oracle');fs.mkdirSync(oracle,{mode:0o700});
   const checks=['check','dev_check'].flatMap(key=>contract.acceptance.filter(a=>a[key]).map(a=>({...a[key],id:a.id,required:a.mandatory})));
   const files={};
-  for(const c of checks)for(const name of c.checker_paths){assert(!path.isAbsolute(name)&&name.split('/').every(x=>x&&x!=='.'&&x!=='..'));files[name]=fs.readFileSync(path.join(oracleSource,name));}
+  for(const c of checks)for(const name of [...c.checker_paths,...(c.input_paths||[]),...(c.rule_paths||[])]){assert(!path.isAbsolute(name)&&name.split('/').every(x=>x&&x!=='.'&&x!=='..'));files[name]=fs.readFileSync(path.join(oracleSource,name));}
   for(const [name,bytes]of Object.entries(files))write(oracle,name,bytes);
   const frozenFiles=Object.fromEntries(Object.entries(files).map(([name,b])=>[name,hash(b)]));write(root,'frozen-artifacts.json',frozenFiles);
   generation.selectChecker(handle);runtime.prepareBackendChecks(session,context,{oracleRoot:oracle,frozenFiles,checks});
