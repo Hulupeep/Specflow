@@ -99,3 +99,69 @@ test('capability snapshot preserves the admitted software-layer byte ordering',a
   expect(production.runtimeIdentity(captured)).toBe(expected);
  }finally{spy.mockRestore();}
 });
+
+// Orchestration unit controls: substitute Docker/build/backend operations only.
+// The capability, credential issue/read, durable reservation and terminal are real.
+// Live owned-resource removal is covered by the separate qualification drivers.
+describe('GENERATION293 reservation ordering and failure terminals',()=>{
+ afterEach(()=>jest.restoreAllMocks());
+ function staged(stage){
+  const workerModule=require('../../scripts/improve-worker.cjs');
+  const admission=require('../../scripts/improve-backend.cjs'),credentials=require('../../scripts/improve-backend-credentials.cjs');
+  const semantics=require('../../scripts/improve-backend-semantics.cjs'),managed=require('../../scripts/improve-managed-worker.cjs');
+  const production=require('../../scripts/improve-production-build.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs');
+  const workspace=path.join(root,'workspace');fs.mkdirSync(workspace);
+  const entries=['package.json','pnpm-lock.yaml'].map(name=>{const bytes='fixture '+name;fs.writeFileSync(path.join(workspace,name),bytes);return {path:name,kind:'file',sha256:hash(bytes)};});
+  value.dependencySource.packageSha256=entries[0].sha256;value.dependencySource.lockSha256=entries[1].sha256;
+  value.dependencies.expected.identity.sourceInputSha256=hash(canonical(value.dependencySource));
+  const template=JSON.parse(fs.readFileSync(value.inputsTemplate.path));
+  const prior=credentials.read(store,credentials.issue(store,{jobId:'job',phase:'after'}));
+  const normalized=JSON.parse(canonical(template));normalized.credentialBinding.sha256=semantics.projection(prior,prior);value.constructionSha256=hash(canonical(normalized));sign();
+  const read=admission.readBoundFile;
+  jest.spyOn(admission,'readBoundFile').mockImplementation((dir,ref,...args)=>{
+   if(dir===root&&[...['bootstrap','supabaseCli','seed','runtimeLayer','configuration','resourceProfile'].map(k=>template[k].path),...template.migrations.map(x=>'migrations/'+x.name)].includes(ref.path))return Buffer.from('substituted inert build input');
+   return read(dir,ref,...args);
+  });
+  const calls=[],fail=at=>{calls.push(at);if(stage===at)throw Error('backend_'+at+'_failed');};
+  const begin=attempts.begin;let reservation;
+  jest.spyOn(attempts,'begin').mockImplementation((...args)=>{reservation=begin(...args);calls.push('reserved');return reservation;});
+  const issue=credentials.issue;
+  jest.spyOn(credentials,'issue').mockImplementation((...args)=>{
+   expect(reservation).toBeDefined();expect(attempts.read(store,reservation).attemptId).toBe(reservation.attemptId);
+   const claimed=JSON.parse(fs.readFileSync(path.join(store.root,'backend-attempts','attempt-'+reservation.attemptId+'.json'))).value;
+   expect(()=>begin(store,Object.fromEntries(['jobId','runId','phase','contractSha256','constructionSha256','authoritySha256','deadlineAtMs'].map(k=>[k,claimed[k]])))).toThrow('backend_attempt_active');
+   fail('issue');return issue(...args);
+  });
+  const worker={containers:new Set(),capsuleMount:()=>{},create:()=> 'producer',exec:()=>{},pause:()=>{},captureCapsule:()=>({target:'/substituted/source',identity:{},manifestSha256:digest}),destroy:()=>{},close:()=>{calls.push('worker-close');}};
+  jest.spyOn(workerModule,'DockerWorker').mockImplementation(()=>worker);
+  jest.spyOn(managed,'bind').mockImplementation(()=>{});jest.spyOn(managed,'select').mockImplementation(()=>{});
+  jest.spyOn(production,'runtimeIdentity').mockReturnValue(digest);
+  jest.spyOn(production,'runProductionBuild').mockImplementation(()=>{fail('build');return {receipt:{fixture:'substituted build'},target:'/substituted/build'};});
+  jest.spyOn(production,'createProductionConsumer').mockReturnValue({id:'substituted-app',close:()=>calls.push('consumer-close')});
+  jest.spyOn(runtime,'startBackend').mockImplementation(async()=>{fail('start');return {};});
+  jest.spyOn(runtime,'closeBackend').mockImplementation(async()=>{fail('close');return {phase:'cleaned',cause:null};});
+  const token=generation.install(config,runDir,()=>{});
+  const refresh=({metadataOnly}={})=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,workspace,...(metadataOnly?{}:{identity:{workspace:{entries}}})});
+  return {calls,open:()=>generation.open(token,runDir,'dev-r1',refresh),reservation:()=>reservation};
+ }
+ test.each(['issue','build','start'])('failure at %s preserves cause and cleans exact durable attempt',async stage=>{
+  const f=staged(stage);let error;try{await f.open();}catch(e){error=e;}
+  expect(error?.message).toBe('backend_'+stage+'_failed');
+  expect(error.backendGeneration.terminal).toMatchObject({attemptId:f.reservation().attemptId,state:'cleaned',cause:error.message,credentialEnvelopeRemoved:true});
+  expect(f.calls.indexOf('reserved')).toBeLessThan(f.calls.indexOf('issue'));
+  expect(fs.readdirSync(path.join(store.root,'backend-attempts')).some(n=>n.startsWith('active-'))).toBe(false);
+ });
+ test('check failure retains named failed terminal instead of success',async()=>{
+  const f=staged('check'),handle=await f.open(),result=await generation.close(handle,'backend_check_failed');
+  expect(result.terminal).toMatchObject({attemptId:f.reservation().attemptId,state:'cleaned',cause:'backend_check_failed',credentialEnvelopeRemoved:true});
+  expect(f.calls).toEqual(['reserved','issue','build','start','close','consumer-close','worker-close']);
+ });
+ test('close failure fences successor with operator_required and keeps private envelope',async()=>{
+  const f=staged('close'),handle=await f.open(),envelope=attempts.envelope(store,f.reservation());await expect(generation.close(handle)).rejects.toThrow('backend_close_failed');
+  const ref=f.reservation(),area=path.join(store.root,'backend-attempts');
+  expect(JSON.parse(fs.readFileSync(path.join(area,'operator-'+ref.attemptId+'.json'))).value.state).toBe('operator_required');
+  expect(fs.readdirSync(area).some(n=>n.startsWith('active-'))).toBe(true);
+  expect(fs.existsSync(envelope)).toBe(true);
+  expect(f.calls).toEqual(['reserved','issue','build','start','close','consumer-close','worker-close']);
+ });
+});

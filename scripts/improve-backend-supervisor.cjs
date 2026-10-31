@@ -179,7 +179,7 @@ async function cleanupJournal(journal) {
  }));
  return journal.finishCleanup();
 }
-async function monitorJournal(journal,{beforeCleanup=async()=>{}}={}) {
+async function monitorJournal(journal,{beforeCleanup=async()=>{},observeStorage=async()=>{}}={}) {
  async function cleanup(){await beforeCleanup();return cleanupJournal(journal);}
  // This loop belongs in the independent supervisor process. Its journal retains
  // the controller's boot/PID/starttime identity; a reused PID does not renew it.
@@ -191,6 +191,7 @@ async function monitorJournal(journal,{beforeCleanup=async()=>{}}={}) {
   for(const slot of s.resources.filter(r=>r.status==='running')){
    try{const c=await dockerRead('inspect',slot.id,Math.min(2000,s.phaseDeadlineEpochMs-Date.now()));
     if(journal.snapshot().phase==='failing')break;journal.observe(slot.role,c);
+    if(journal.snapshot().phase!=='failing'&&c?.State?.Running)await observeStorage(slot);
    }catch(error){
     if(journal.snapshot().phase!=='failing')journal.check();
     if(journal.snapshot().phase!=='failing')journal.fail('backend_readiness_failed','inspect_'+slot.role+'_'+(error.message||'unknown'));

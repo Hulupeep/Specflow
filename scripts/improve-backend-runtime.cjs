@@ -9,6 +9,7 @@ const identity=require('./improve-process-identity.cjs');
 const {BackendJournal,monitorJournal,fingerprint}=require('./improve-backend-supervisor.cjs');
 const {measureSnapshot,expectedSemantic}=require('./improve-backend-measure.cjs');
 const semantics=require('./improve-backend-semantics.cjs');
+const storage=require('./improve-backend-storage.cjs');
 const need=(x,c='backend_input_invalid')=>{if(!x)throw Error(c);};
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const pins={bootstrap:'3a9f39fb79d67d4fb2f5e54638dca1d06894a3e1a57419bc188e4ee09c72556f',supabaseCli:'3132b218461bf90d4cd5983b27b44031cd9b6c797c259a431b2e2520b5f7bdce'};
@@ -111,7 +112,7 @@ async function runSupervisor(descriptor){
  const Journal=managed?require('./improve-managed-backend.cjs').ManagedBackendJournal:BackendJournal;
  const journal=new Journal({root,jobId:request.jobId,generation:request.generation,controller,...(managed||{})});
  const streams=new Set(),pending=new Set();
- const monitoring=monitorJournal(journal,{beforeCleanup:()=>Promise.allSettled([...pending])});let terminal,operation='admission';
+ const monitoring=monitorJournal(journal,{beforeCleanup:()=>Promise.allSettled([...pending]),observeStorage});let terminal,operation='admission';
  let measuredManifest=null;
  const stageHashes=()=>{const files={};function visit(rel){const p=path.join(stage,rel),stat=fs.lstatSync(p);need(!stat.isSymbolicLink(),'backend_input_changed');if(stat.isDirectory())for(const name of fs.readdirSync(p).sort())visit(rel?rel+'/'+name:name);else{need(stat.isFile()&&stat.nlink===1,'backend_input_changed');files[rel]=hash(fs.readFileSync(p));}}visit('');return files;};
  const initialStage=stageHashes();
@@ -126,6 +127,13 @@ async function runSupervisor(descriptor){
    child.on('error',()=>{failed=true;});child.on('close',code=>{clearTimeout(t);if(failed||(!allowFailure&&code!==0))return reject(Error('backend_readiness_failed'));resolve({code,out});});
   });
   pending.add(promise);try{return await promise;}finally{pending.delete(promise);}
+ }
+ async function observeStorage(slot){
+  const mounts=storage.mounts(slot.role);if(!mounts.length)return;
+  const result=await call(['exec',slot.id,'df','-Pk',...mounts]);
+  const exhausted=storage.parse(slot.role,result.out).find(row=>row.availableBlocks===0);
+  if(exhausted){diagnostic({operation:'storage_capacity',role:slot.role,...exhausted});journal.fail('backend_storage_limit');}
+  active(journal);
  }
  const inspect=async (id,cleanup=false)=>JSON.parse((await call(['inspect',id],{cleanup})).out)[0];
  async function start(role){const operation=startService(role);pending.add(operation);try{return await operation;}finally{pending.delete(operation);}}
@@ -164,6 +172,7 @@ async function runSupervisor(descriptor){
    for(const slot of journal.snapshot().resources){const c=await inspect(slot.id);
     need(fingerprint(c)===slot.runningFingerprint,'backend_input_changed');
     need(slot.role==='authMigration'?c.State.Status==='exited'&&c.State.ExitCode===0&&!c.State.OOMKilled:c.State.Running&&!c.State.Paused,'backend_service_died');
+    await observeStorage(slot);
     const config=JSON.parse(JSON.stringify(c.Config)),host=JSON.parse(JSON.stringify(c.HostConfig));
     need(config.Hostname===anchor.Config.Hostname&&host.NetworkMode==='container:'+anchor.Id,'backend_input_changed');
     config.Hostname='owned-job-anchor';for(const key of ['specflow.backend.generation','specflow.backend.reservation'])delete config.Labels[key];
@@ -187,7 +196,7 @@ async function runSupervisor(descriptor){
       const semanticSha256=hash(canonical({construction:expectedSemantic(inputs,measured.state,credentialMaterial,request),configuration:configSemantic}));
       measuredManifest={schema:'specflow.backend-entry/v1',jobId:request.jobId,phase:request.phase,generation:request.generation,expectedBackendIdentity:request.expectedBackendIdentity,measuredBackendIdentity:semanticSha256,inputManifestSha256:request.inputManifest.sha256,...(managed?{constructionSha256:request.constructionSha256,attemptSha256:managed.attempt.attemptSha256}:{}),state:measured.state,counts:measured.counts,snapshotProtocol:measured.snapshotProtocol,schemaArtifact:measured.schema,services,configuration:configSemantic,stageHashes:initialStage};
       fs.writeFileSync(path.join(root,'entry-manifest.json'),canonical(measuredManifest),{mode:0o600,flag:'wx'});reply({type:'measurement',manifest:measuredManifest});
-     }else if(message.type==='execution'){need(measuredManifest,'backend_restart_invalid');journal.phase('execution');reply({type:'execution'});}
+     }else if(message.type==='execution'){need(measuredManifest,'backend_restart_invalid');await continuity();journal.phase('execution');reply({type:'execution'});}
      else if(message.type==='continuity'){await continuity();reply({type:'continuity'});}
      else if(message.type==='fail_identity')journal.fail('backend_identity_mismatch');
      else if(message.type==='fail_service')journal.fail('backend_service_died');

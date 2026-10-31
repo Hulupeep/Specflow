@@ -9,7 +9,9 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex'),read=p=>worker
 const bound=ref=>{const bytes=fs.readFileSync(ref.path);assert.equal(hash(bytes),ref.sha256);return workerModule.strictJSON(bytes.toString());};
 function write(root,name,value){const file=path.join(root,name),bytes=production.canonical(value);fs.mkdirSync(path.dirname(file),{recursive:true,mode:0o700});fs.writeFileSync(file,bytes,{mode:0o600,flag:'wx'});return {path:name,sha256:hash(bytes)};}
 async function live(file,mode,targetsFile){
- assert(['auth','journey','isolation','identity-mismatch'].includes(mode));
+ assert(['auth','journey','isolation','identity-mismatch','schema-mismatch','env-mismatch'].includes(mode));
+ const negative=['identity-mismatch','schema-mismatch','env-mismatch'].includes(mode);
+ const expectedRejection=negative?(mode==='env-mismatch'?'backend_input_changed':'backend_identity_mismatch'):null;
  const d=read(file),inputs=bound(d.inputs),admission=bound(d.admission),template=bound(d.recipe),expected=bound(d.expectation);
  const time=remaining=>assert(Date.now()+remaining<admission.deadlineAtMs,'backend_lease_expired');
  time(300000);assert.equal(inputs.sourceRevision,admission.productRevision);
@@ -35,8 +37,16 @@ async function live(file,mode,targetsFile){
   consumer=production.createProductionConsumer(worker,productInput,built.receipt,built.target);
   session=await runtime.startBackend({worker,anchorId:consumer.id,root,request,inputs:manifest,credentials:{store,reference},productInput});
   const context={runId:'product-'+mode+'-'+reference.generation,phase:request.phase,expectedBackendIdentity:request.expectedBackendIdentity,inputManifestSha256:request.inputManifest.sha256};
-  if(mode==='identity-mismatch'){
-   // Deliberately change only this disposable generation's real seed data,
+  if(mode==='env-mismatch'){
+   const stages=fs.readdirSync(root).filter(n=>n.startsWith('backend-stage-'));assert.equal(stages.length,1);
+   const envFile=path.join(root,stages[0],'auth.env'),before=fs.readFileSync(envFile,'utf8');
+   assert.equal(before.split('GOTRUE_LOG_LEVEL=info').length,2);
+   fs.writeFileSync(envFile,before.replace('GOTRUE_LOG_LEVEL=info','GOTRUE_LOG_LEVEL=debug'));
+   assert.notEqual(hash(fs.readFileSync(envFile)),hash(before));
+   await assert.rejects(runtime.admitBackend(session,context),error=>error.message===expectedRejection);
+   result={status:'passed',expectedRejection,environmentInputChanged:true,protectedChecksExecuted:0,skipped:0};
+  }else if(negative){
+   // Deliberately change only this disposable generation's schema or seed data,
    // after readiness and before any protected check can be admitted.
    const journals=fs.readdirSync(root).filter(n=>n.startsWith('backend-journal-'));
    assert.equal(journals.length,1);
@@ -46,15 +56,23 @@ async function live(file,mode,targetsFile){
    assert.equal(actual.Config.Labels['specflow.backend.job'],request.jobId);
    assert.equal(actual.Config.Labels['specflow.backend.generation'],request.generation);
    assert.equal(actual.Config.Labels['specflow.backend.reservation'],database.reservation);
-   const mutation=worker.call(['exec',database.id,'psql','-h','/work','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-Atc',
+   if(mode==='schema-mismatch'){
+    worker.call(['exec',database.id,'psql','-h','/work','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-c','CREATE TABLE public.specflow_mutation_canary (id integer PRIMARY KEY)']);
+    const present=worker.call(['exec',database.id,'psql','-h','/work','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-Atc',"SELECT to_regclass('public.specflow_mutation_canary') IS NOT NULL"]);
+    assert.equal(present.stdout.trim(),'t');
+   }else{
+    const mutation=worker.call(['exec',database.id,'psql','-h','/work','-U','supabase_admin','-d','postgres','-v','ON_ERROR_STOP=1','-Atc',
     "WITH changed AS (UPDATE public.stax SET name = name || ' identity probe' WHERE id=(SELECT id FROM public.stax ORDER BY id LIMIT 1) RETURNING 1) SELECT count(*) FROM changed"]);
-   assert.equal(mutation.stdout.trim(),'1');
+    assert.equal(mutation.stdout.trim(),'1');
+   }
    const measured=await runtime.observeBackend(session);
    assert.notEqual(measured.measuredBackendIdentity,context.expectedBackendIdentity);
    assert.notDeepEqual(measured.state,manifest.expectedState);
-   await assert.rejects(runtime.admitBackend(session,context),/backend_identity_mismatch/);
+   if(mode==='schema-mismatch')assert.notEqual(measured.state.schemaSha256,manifest.expectedState.schemaSha256);
+   else assert.notEqual(measured.state.tablesSha256,manifest.expectedState.tablesSha256);
+   await assert.rejects(runtime.admitBackend(session,context),error=>error.message===expectedRejection);
    admitted={manifest:measured};
-   result={status:'passed',expectedRejection:'backend_identity_mismatch',seedMutationRows:1,protectedChecksExecuted:0,skipped:0};
+   result={status:'passed',expectedRejection,...(mode==='schema-mismatch'?{schemaMutationTables:1}:{seedMutationRows:1}),protectedChecksExecuted:0,skipped:0};
   }else admitted=await runtime.admitBackend(session,context);
   if(mode==='auth'){
    const publicRoot=path.join(root,'public');fs.mkdirSync(publicRoot,{mode:0o700});fs.writeFileSync(path.join(publicRoot,'public.json'),JSON.stringify({anonKey:issued.anonKey}),{mode:0o400});
@@ -73,14 +91,14 @@ async function live(file,mode,targetsFile){
    result=await require('./fixtures/backend-boundary-probe.cjs').run({worker,anchor:consumer.id,base:inputs.root,workerConfig,jobId:inputs.jobId,productionTargets:read(targetsFile)});
    assert.equal(result.status,'passed');assert.equal(result.failed,0);assert.equal(result.skipped,0);assert.equal(result.executed,result.checks.length);assert(result.executed>=51);
   }
-  if(mode!=='identity-mismatch')await runtime.backendContinuity(session,context);time(0);
+  if(!negative)await runtime.backendContinuity(session,context);time(0);
  }finally{
   try{if(checker)worker.destroy(checker);}finally{
-   try{if(session){terminal=await runtime.closeBackend(session);assert.equal(terminal.phase,'cleaned');assert.equal(terminal.cause,mode==='identity-mismatch'?'backend_identity_mismatch':null);assert(terminal.resources.every(r=>r.status==='removed'));}}
+   try{if(session){terminal=await runtime.closeBackend(session);assert.equal(terminal.phase,'cleaned');assert.equal(terminal.cause,expectedRejection);assert(terminal.resources.every(r=>r.status==='removed'));}}
    finally{try{if(consumer)consumer.close();}finally{worker.close();fs.unlinkSync(path.join(root,manifest.credentialBinding.path));}}
   }
  }
- const report={status:'passed',mode,root,result,sourceRevision:inputs.sourceRevision,sourceManifestSha256:inputs.source.receipt.manifestSha256,buildIdSha256:built.receipt.buildIdSha256,expectedBackendIdentity:request.expectedBackendIdentity,measuredBackendIdentity:admitted.manifest.measuredBackendIdentity,cleanup:{phase:terminal.phase,cause:terminal.cause,resources:terminal.resources.length},originalDeadlineAtMs:admission.deadlineAtMs,scope:mode==='identity-mismatch'?'Actual disposable seed mutation and admission rejection before protected checks; direct runtime identity proof, not a successful product verdict.':'Actual fresh-build product probe with ordinary-user assertions; direct runtime qualification, not managed-core/failure-matrix/product-improvement proof.'};
+ const report={status:'passed',mode,root,result,sourceRevision:inputs.sourceRevision,sourceManifestSha256:inputs.source.receipt.manifestSha256,buildIdSha256:built.receipt.buildIdSha256,expectedBackendIdentity:request.expectedBackendIdentity,measuredBackendIdentity:admitted?.manifest.measuredBackendIdentity??null,cleanup:{phase:terminal.phase,cause:terminal.cause,resources:terminal.resources.length},originalDeadlineAtMs:admission.deadlineAtMs,scope:negative?'Actual disposable schema, seed or environment input mutation and admission rejection before protected checks; direct runtime identity proof, not a successful product verdict.':'Actual fresh-build product probe with ordinary-user assertions; direct runtime qualification, not managed-core/failure-matrix/product-improvement proof.'};
  fs.writeFileSync(path.join(root,'qualification-result.json'),JSON.stringify(report),{mode:0o600});return report;
 }
 module.exports={live};
