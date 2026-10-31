@@ -32,6 +32,13 @@ test('new profile refuses impossible inventory before reservation or resources',
  await expect(generation.open(token,runDir,'dev-r1',()=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,contractJSON:JSON.stringify(contract)}))).rejects.toMatchObject({code:'backend_inventory_exceeds_profile',requiredMilliseconds:621000,availableMilliseconds:600000});
  expect(fs.existsSync(path.join(store.root,'backend-attempts'))).toBe(false);
 });
+test('legacy profile cannot bypass inventory admission before reservation',async()=>{
+ value.deadlineAtMs=Date.now()+2000000;config.deadlineAtMs=value.deadlineAtMs;sign();
+ const token=generation.install(config,runDir,()=>{});
+ await expect(generation.open(token,runDir,'dev-r1',()=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,contractJSON:JSON.stringify(journeyContract())}))).rejects.toMatchObject({code:'backend_inventory_exceeds_profile',requiredMilliseconds:220000,availableMilliseconds:120000});
+ expect(fs.existsSync(path.join(store.root,'backend-attempts'))).toBe(false);
+ expect(fs.existsSync(path.join(store.root,'backend-credentials'))).toBe(false);
+});
 test('changed signed profile bytes are rejected before capability installation',()=>{
  journeyProfile();fs.appendFileSync(path.join(root,'profile'),' ');expect(()=>generation.install(config,runDir,()=>{})).toThrow('backend_input_changed');
  expect(fs.existsSync(path.join(store.root,'backend-attempts'))).toBe(false);
@@ -59,8 +66,10 @@ test('a binding added after freeze cannot replace the frozen binding hash',async
  await expect(generation.open(token,runDir,'baseline',()=>({bindingSha256:'b'.repeat(64),declaration:declaration()}))).rejects.toThrow('backend_binding_invalid');expect(fs.existsSync(path.join(store.root,'backend-attempts'))).toBe(false);
 });
 test('ledger refusal under reservation records a failed clean terminal and releases only that attempt',async()=>{
+ journeyProfile();
+ const contract=journeyContract();contract.acceptance[0].check=contract.acceptance[0].dev_check;
  const token=generation.install(config,runDir,()=>{});let calls=0;
- const refresh=()=>{if(++calls===2)throw Error('backend_holdout_consumed');return {bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest};};
+ const refresh=()=>{if(++calls===2)throw Error('backend_holdout_consumed');return {bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,contractJSON:JSON.stringify(contract)};};
  await expect(generation.open(token,runDir,'after',refresh)).rejects.toMatchObject({message:'backend_holdout_consumed',backendGeneration:{originalCause:'backend_holdout_consumed',terminal:{state:'cleaned',cause:'backend_holdout_consumed'}}});expect(calls).toBe(2);
  const area=path.join(store.root,'backend-attempts'),names=fs.readdirSync(area);
  expect(names.some(n=>n.startsWith('active-'))).toBe(false);expect(names.some(n=>n.startsWith('intent-'))).toBe(false);
@@ -106,13 +115,14 @@ test('checked-in Specflow configuration stays inert source data without becoming
 });
 
 test('capability snapshot preserves the admitted software-layer byte ordering',async()=>{
+ journeyProfile();
  const workerModule=require('../../scripts/improve-worker.cjs'),production=require('../../scripts/improve-production-build.cjs');
  const files=[{source:'/fixture/tool',destination:'/node/bin/node',sha256:digest}],directories=[];
  config.worker.image='sha256:'+digest;config.worker.layer={files,directories,sha256:hash(JSON.stringify({files,directories}))};
  const expected=production.runtimeIdentity(config.worker),token=generation.install(config,runDir,()=>{});let captured;
  const spy=jest.spyOn(workerModule,'DockerWorker').mockImplementation(value=>{captured=value;throw Error('qualification_constructor_stop');});
  try{
-  await expect(generation.open(token,runDir,'baseline',()=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest}))).rejects.toThrow('qualification_constructor_stop');
+  await expect(generation.open(token,runDir,'baseline',()=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,contractJSON:JSON.stringify(journeyContract())}))).rejects.toThrow('qualification_constructor_stop');
   expect(production.runtimeIdentity(captured)).toBe(expected);
  }finally{spy.mockRestore();}
 });
@@ -122,8 +132,8 @@ test('capability snapshot preserves the admitted software-layer byte ordering',a
 // Live owned-resource removal is covered by the separate qualification drivers.
 describe('GENERATION293 reservation ordering and failure terminals',()=>{
  afterEach(()=>jest.restoreAllMocks());
- function staged(stage,extended=false){
-  if(extended)journeyProfile();
+ function staged(stage,extended=true){
+  journeyProfile();
   const workerModule=require('../../scripts/improve-worker.cjs');
   const admission=require('../../scripts/improve-backend.cjs'),credentials=require('../../scripts/improve-backend-credentials.cjs');
   const semantics=require('../../scripts/improve-backend-semantics.cjs'),managed=require('../../scripts/improve-managed-worker.cjs');

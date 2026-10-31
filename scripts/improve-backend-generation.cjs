@@ -84,7 +84,9 @@ async function open(token,runDir,phase,refresh){
  need(require('./improve-backend-phase.cjs').validPhase(phase));
  const c=current(token,runDir),v=c.admitted.value,initial=refresh({metadataOnly:true});declaration(token,runDir,initial.declaration);need(initial.bindingSha256===c.config.backendJobBinding.sha256,'backend_binding_invalid');
  const extended=c.admitted.profileId!==admission.PROFILE.id;
- const phasePlan=extended?profiles.planPhase({phase,contract:json(Buffer.from(initial.contractJSON)),profileId:c.admitted.profileId,deadlineAtMs:v.deadlineAtMs}):null;
+ // Every new managed admission must fit its selected profile; legacy selection
+ // is not an escape hatch. Already running, pinned workers keep their bytes.
+ const phasePlan=profiles.planPhase({phase,contract:json(Buffer.from(initial.contractJSON)),profileId:c.admitted.profileId,deadlineAtMs:v.deadlineAtMs});
  const ref=attempts.begin(c.store,{jobId:v.jobId,runId:v.runId,phase,contractSha256:initial.contractSha256,constructionSha256:v.constructionSha256,authoritySha256:hash(canonical(c.config.authority)),deadlineAtMs:v.deadlineAtMs});
  const state={c,token,ref,phasePlan:phasePlan?{...phasePlan,contractSha256:initial.contractSha256}:null,worker:null,session:null,consumer:null,root:null,product:null,context:null};const handle=Object.freeze({});sessions.set(handle,state);
  try{
@@ -165,7 +167,7 @@ module.exports={install,open,access,selectChecker,validate,shutdown,close,declar
 
 function verifyReceipt(token,runDir,phase,contractSha256,receipt,contract){
  const c=current(token,runDir,false),v=c.admitted.value,m=receipt.managed;
- if(c.admitted.profileId!==admission.PROFILE.id){
+ {
   const expected=profiles.planPhase({phase,contract,profileId:c.admitted.profileId,deadlineAtMs:v.deadlineAtMs,nowMs:0});
   need(canonical(json(absolute(receipt.plan)))===canonical({...expected,contractSha256}),'backend_receipt_invalid');
  }
