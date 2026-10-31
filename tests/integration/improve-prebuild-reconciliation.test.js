@@ -349,3 +349,39 @@ test('PREBUILD controller requires cleanup for the exact attempt recorded by the
  expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
  expect(core.events(x.runDir).some(e=>e.event==='prebuild_abandonment_started')).toBe(false);
 },45000);
+
+
+test('PREBUILD later completed baseline cannot hide an earlier interrupted verification',async()=>{
+ const x=await stoppedFixture();
+ const program=`const runner=require(${JSON.stringify(require.resolve('../../scripts/specflow-runner.cjs'))}),core=require(${JSON.stringify(require.resolve('../../scripts/specflow-improve.cjs'))});const original=runner.appendLedger;runner.appendLedger=(file,entry)=>{const r=original(file,entry);if(entry.event==='verification_started')process.exit(23);return r;};core.verifyPhase(process.argv[1],'baseline');`;
+ expect(cp.spawnSync(process.execPath,['-e',program,x.runDir],{timeout:10000}).status).toBe(23);
+ expect((await core.verifyPhase(x.runDir,'baseline')).status).toBe('baseline_blocked');
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+},45000);
+test('PREBUILD timed-out host command remains a descendant uncertainty',async()=>{
+ const x=await stoppedFixture();core.append(x.runDir,'command_run',{role:'baseline',argv:['fixture-timeout'],timed_out:true});
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+},45000);
+test('PREBUILD abandoned work cannot acquire a delivered proposal claim',async()=>{
+ const x=await stoppedFixture();f.service().reconcilePrebuild(x.request);
+ const r=f.service().store.read().runs[f.req.run_id].recovery;
+ f.recovery.resolveAssignment=()=>structuredClone(r.current.assignment);
+ f.recovery.resolveExecution=()=>({...structuredClone(r.current.assignment),generation:r.generation});
+ const outcome=f.service().decisionPack({repo_id:'fixture'}).events.find(e=>e.kind==='outcome');
+ expect(()=>f.service().observeMemory(f.command({outcome_id:outcome.hash,source_revision:'later-claim',evidence:[],observation:{kind:'proposal',state:'merged'}}))).toThrow('memory_proposal_not_attempted');
+},45000);
+
+
+test('PREBUILD Git submodules are rejected before status can inspect their drivers',async()=>{
+ const x=await stoppedFixture(),work=path.join(f.root,'worktrees',x.binding.core_run_id+'-baseline');
+ cp.execFileSync('git',['-C',work,'update-index','--add','--cacheinfo','160000,'+f.git('rev-parse','main')+',nested']);
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_submodule_unavailable');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+},45000);
+test('PREBUILD same core disposition retry does not inspect subsequently configured Git drivers',async()=>{
+ const x=await stoppedFixture(),request={reason:'Preserve baseline.',requestSha256:'a'.repeat(64)};
+ core.abandonBeforeBuild(x.runDir,request);f.git('config','filter.later.clean','false');
+ expect(()=>core.abandonBeforeBuild(x.runDir,request)).not.toThrow();
+},45000);

@@ -70,3 +70,17 @@ test('PREBUILD empty backend history identifies an attempt that was never admitt
  const {store}=fixture();
  expect(()=>attempts.verifyClosedHistory(store,'unadmitted-run','a'.repeat(64))).toThrow('backend_attempt_not_admitted');
 });
+
+
+test.each(['unexpected-entry','attempt-malformed.json'])('PREBUILD unknown record %s is named and retained',name=>{
+ const {store}=fixture(),area=path.join(store.root,'backend-attempts');fs.writeFileSync(path.join(area,name),'unknown',{mode:0o600});
+ try{attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64));throw Error('expected refusal');}catch(e){expect(e.message).toBe('backend_attempt_record_unreadable');expect(e.record).toBe(name);}
+ expect(fs.existsSync(path.join(area,name))).toBe(true);
+});
+
+
+test('PREBUILD invalid authenticated attempt schema names its record',()=>{
+ const {store,ref}=fixture(),name=`attempt-${ref.attemptId}.json`,file=path.join(store.root,'backend-attempts',name),signed=JSON.parse(fs.readFileSync(file));
+ signed.value.schema='invalid';signed.mac=store.mac(signed.value);fs.writeFileSync(file,JSON.stringify(signed));
+ try{attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64));throw Error('expected refusal');}catch(e){expect(e.message).toBe('backend_attempt_record_unreadable');expect(e.record).toBe(name);}
+});

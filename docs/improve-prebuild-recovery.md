@@ -87,3 +87,13 @@ matches every recorded core attempt reference to its authenticated backend histo
 Orphan backend records and missing referenced attempts remain named blockers.
 Recovery rejects configured Git filters and diff/merge drivers before inspecting
 workspace status, so inspection cannot invoke a repository's external driver.
+
+Host quiescence covers every recorded baseline attempt, including earlier attempts
+before a later completed baseline. Any timed-out host command also blocks release;
+parent-PID death does not establish process-group or detached-child cleanup. This
+API supplies no general process-group cleanup proof. The same checks apply when
+adopting a terminal archive. Repositories with indexed submodules are unsupported
+for this recovery operation and remain blocked before Git status can recurse.
+Retries using an already captured unchanged-workspace proof do not run Git status
+or inspect subsequently added drivers. An abandoned outcome cannot acquire either
+an experiment verdict or a delivered-proposal observation.

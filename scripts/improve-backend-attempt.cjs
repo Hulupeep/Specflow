@@ -381,13 +381,13 @@ function verifyClosedHistory(store, runId, contractSha256, expectedAttempts = []
         const match=/^[a-z]+-([a-f0-9-]{36})(?:[-.]|$)/.exec(name);
         if(!match||!presentNames.has(attemptName(match[1])))orphan(name);
         const rows=related.get(match[1])||[];rows.push(name);related.set(match[1],rows);
-      }
+      }else if(!/^attempt-[a-f0-9-]{36}\.json$/.test(name)){const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
     }
 
     for(const name of names.filter(n=>/^attempt-[a-f0-9-]+\.json$/.test(n))){
       let signed;try{signed=readSigned(store,fd,name);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
       if(signed?.runId!==runId)continue;
-      const a=validateAttempt(signed);
+      let a;try{a=validateAttempt(signed);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
       currentContract||=a.contractSha256===contractSha256;
       need(processIdentity.state(a.owner)==='dead','backend_cleanup_unconfirmed');
       need(!present(fd,`operator-${a.attemptId}.json`),'backend_cleanup_unconfirmed');

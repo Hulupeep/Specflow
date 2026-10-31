@@ -1413,6 +1413,10 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
       need(canonical(d.baseline)===canonical(core.prebuildBaseline(events.filter(e=>e.seq<start.seq),frozen)),'prebuild_baseline_unresolved');
       need(d.base?.unchanged===true&&d.base.recorded===r.base_commit&&d.base.current===r.base_commit&&canonical(last('decision_applied')?.base)===canonical(d.base),'prebuild_base_changed');
       need(receipt.files.some(f=>f.path===`improvement-contract.v${frozen.version}.json`&&f.sha256===frozen.contract_sha256)&&Object.entries(frozen.artifact_sha256||{}).every(([name,hash])=>receipt.files.some(f=>f.path===name&&f.sha256===hash)),'prebuild_integrity_failed');
+      const contractEntry=receipt.files.find(f=>f.path===`improvement-contract.v${frozen.version}.json`);
+      const contractBytes=fs.readFileSync(privatePath(path.join(store.root,'blobs',contractEntry.sha256)));
+      need(sha(contractBytes)===frozen.contract_sha256,'prebuild_integrity_failed');
+      core.prebuildHostQuiescence(events.filter(e=>e.seq<start.seq),JSON.parse(contractBytes).contract);
       need(start&&canonical(events.filter(e=>e.seq>start.seq).map(e=>e.event))===canonical(['decision_made','decision_applied']),'prebuild_disposition_invalid');
       need(d.decision==='INCONCLUSIVE'&&d.implementation_attempted===false&&
         last('decision_applied')?.disposition==='abandoned_before_build'&&

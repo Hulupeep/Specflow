@@ -138,6 +138,7 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
       const old=outcome(rows(s,r),req.outcome_id);m.need(m.text(req.source_revision,120),'invalid_memory_observation');
       const o=req.observation;let evidence=[];
       if(o?.kind==='proposal'){
+        m.need(old.data.disposition!=='abandoned_before_build','memory_proposal_not_attempted');
         m.shape(o,['kind','state']);m.need(['pending_delivery','open','merged','closed_unmerged','unknown'].includes(o.state)&&Array.isArray(req.evidence)&&req.evidence.length===0,'invalid_memory_observation');
       }else{
         m.need(old.data.disposition!=='abandoned_before_build','memory_experiment_not_attempted');

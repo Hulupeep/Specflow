@@ -1802,6 +1802,14 @@ function prebuildBaseline(evs, frozen) {
   return {attempt:attempt.attempt,event:outcome?.event||'interrupted',seq:outcome?.seq??attempt.seq};
 }
 
+function prebuildHostQuiescence(evs, contract) {
+  if(contract.runtime?.backend)return;
+  const started=evs.filter(e=>e.event==='verification_started'&&e.phase==='baseline');
+  const unresolved=started.some(start=>!evs.some(e=>e.seq>start.seq&&e.attempt===start.attempt&&e.contract_version===start.contract_version&&
+    (['baseline_blocked','baseline_recorded'].includes(e.event)||(e.event==='verification_blocked'&&e.phase==='baseline'))));
+  if(contract.runtime?.serve||contract.runtime?.setup?.length||unresolved||evs.some(e=>e.event==='command_run'&&e.timed_out===true))throw Error('prebuild_descendants_unproven');
+}
+
 function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false }) {
   if (!nonempty(reason) || reason.length > 2000 || !/^[a-f0-9]{64}$/.test(requestSha256 || '')) throw Error('invalid_prebuild_disposition');
   const run=loadRun(runDir), evs=events(runDir), gov=governingContract(runDir);
@@ -1819,12 +1827,11 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
     if(result.status!==0)throw Error('prebuild_git_unavailable');return result.stdout.trim();
   };
   const safeConfig=cwd=>{if(readGit(['config','--includes','--get-regexp','^(filter|diff|merge)\\.'],cwd,{allowAbsent:true}))throw Error('prebuild_git_config_unsafe');};
-  safeConfig(run.target_repo);
-  const verificationStarted=evs.some(e=>e.event==='verification_started'&&e.phase==='baseline'&&e.attempt===baseline.attempt);
-  if(!gov.contract.runtime?.backend&&((baseline.event==='interrupted'&&verificationStarted)||gov.contract.runtime?.serve||gov.contract.runtime?.setup?.length))throw Error('prebuild_descendants_unproven');
+  prebuildHostQuiescence(evs,gov.contract);
   let base=prior?.record.base;
   if(prior&&(!base?.unchanged||base.recorded!==run.base_commit||base.current!==run.base_commit))throw Error('prebuild_base_changed');
   if(revalidate){
+    safeConfig(run.target_repo);
     if(!prior){
       const current=readGit(['rev-parse','--verify','--end-of-options',run.base_ref+'^{commit}'],run.target_repo);
       base={base_ref:run.base_ref,recorded:run.base_commit,current,unchanged:current===run.base_commit};
@@ -1835,6 +1842,7 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
       if(prepared&&!fs.existsSync(ws.worktreePath))throw Error('prebuild_workspace_missing');
       if(fs.existsSync(ws.worktreePath)){
         safeConfig(ws.worktreePath);
+        if(readGit(['ls-files','--stage','-z'],ws.worktreePath).split('\0').some(row=>row.startsWith('160000 ')))throw Error('prebuild_submodule_unavailable');
         // Honour frozen generated-output exclusions without staging Git changes.
         const outputs=[...identityOptions(gov.contract).outputs,...identityOptions(gov.contract).mutableOutputs];
         for(const rel of outputs){
@@ -2214,6 +2222,7 @@ module.exports = {
   finalize,
   abandonBeforeBuild,
   prebuildBaseline,
+  prebuildHostQuiescence,
   status,
   writeReport,
   verifyLedger,
