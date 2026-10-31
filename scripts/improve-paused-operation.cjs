@@ -15,7 +15,7 @@ async function run(file){
  let data='';
  const permission=await new Promise(resolve=>{const gate=fs.createReadStream(null,{fd:3,autoClose:true});gate.on('data',b=>{data+=b;if(data.length>16){gate.destroy();resolve(false);}});gate.on('end',()=>resolve(data==='RELEASE\n'));gate.on('error',()=>resolve(false));});
  if(!permission){receipts.put({binding:plan.binding,phase:'not_started',result:{exit_code:2,reason_code:'launch_not_released',estimate_usd:null}});return 2;}
- if(plan.inputCheck&&require('./improve-operation-inputs.cjs').stageInput(plan.inputCheck.stage,plan.inputCheck.args,plan.inputCheck.configFile)!==plan.binding.input_sha256){receipts.put({binding:plan.binding,phase:'not_started',result:{exit_code:2,reason_code:'stage_input_changed',estimate_usd:null}});return 2;}
+ if(plan.inputCheck&&require('./improve-operation-inputs.cjs').stageInput(plan.inputCheck.stage,plan.inputCheck.args,plan.inputCheck.configFile,plan.inputCheck.reviewArgs===undefined?undefined:require('./improve-operation-inputs.cjs').reviewInput(plan.inputCheck.stage,plan.inputCheck.reviewArgs))!==plan.binding.input_sha256){receipts.put({binding:plan.binding,phase:'not_started',result:{exit_code:2,reason_code:'stage_input_changed',estimate_usd:null}});return 2;}
  let stdout='',stderr='',error=null,size=0;
  const child=cp.spawn(plan.executable,plan.args,{stdio:['pipe','pipe','pipe'],env:process.env,detached:true});
  const proc=require('./improve-process-identity.cjs'),watch=require('./improve-controller-watchdog.cjs'),identity=proc.identity(child.pid);

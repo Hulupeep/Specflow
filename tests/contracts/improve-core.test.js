@@ -1428,3 +1428,14 @@ test.each(['pass','fail'])('unbound manual %s judgment cannot decide a heuristic
   expect(criterion.status).toBe('missing');expect(criterion.not_counted[0].why).toMatch(/not bound/);expect(decision.decision).toBe('KEEP');
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 }));
+
+test('ORACLE311: a successful retry cannot accept a failed attempt draft',quiet(async()=>{
+ const f=fixture();let spy;try{
+  const {runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'oracle-retry-draft',stateDir:f.state,worktreeRoot:f.worktrees});
+  const prompt=path.join(f.root,'oracle.md');fs.writeFileSync(prompt,'Author scoped checks');const policy=writeTmp(f,'oracle.json',FAKE_BUILDER({id:'independent-oracle'}));let attempt=0;
+  spy=jest.spyOn(runner,'runAdapter').mockImplementation((_policy,options)=>{attempt++;fs.writeFileSync(path.join(options.cwd,'holdout',attempt===1?'rejected.cjs':'accepted.cjs'),String(attempt));return {status:attempt===1?'adapter_failed':'gate_rerun_required',entry:{exit_code:attempt===1?1:0}};});
+  expect(improve.oracle(runDir,{policy,prompt}).status).toBe('blocked');
+  const result=improve.oracle(runDir,{policy,prompt});expect(result.status).toBe('authored');expect(result.files).toEqual(['holdout/accepted.cjs']);expect(fs.existsSync(path.join(runDir,'holdout/rejected.cjs'))).toBe(false);
+  const archived=improve.events(runDir).find(e=>e.event==='oracle_draft_archived');expect(fs.readFileSync(path.join(runDir,archived.path,'draft/holdout/rejected.cjs'),'utf8')).toBe('1');
+ }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));

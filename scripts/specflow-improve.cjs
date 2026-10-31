@@ -1215,6 +1215,7 @@ function publicContract(gov) {
 }
 
 function critique(runDir, options = {}) {
+  require('./improve-review-input.cjs').validateInclude(options.include);
   const spendPolicy = loadPeerPolicy(options.peerPolicy);
   const run = loadRun(runDir);
   const evs = events(runDir);
@@ -1284,6 +1285,11 @@ function oracle(runDir, options = {}) {
   const raw = loadPolicy(options.policy);
   const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, 'oracle-author');
   const draftDir = path.join(runDir, 'oracle-draft');
+  if (fs.existsSync(draftDir)) {
+    const archiveDir = fs.mkdtempSync(path.join(runDir, 'oracle-draft-history-'));
+    fs.renameSync(draftDir, path.join(archiveDir, 'draft'));
+    append(runDir, 'oracle_draft_archived', { path: path.relative(runDir, archiveDir) });
+  }
   fs.mkdirSync(path.join(draftDir, 'holdout'), { recursive: true });
   const promptPath = path.join(runDir, 'adapters', 'oracle-author.prompt.md');
   fs.mkdirSync(path.dirname(promptPath), { recursive: true });
