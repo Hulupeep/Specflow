@@ -1402,7 +1402,7 @@ test.each(['before','during'])('judge rejects workspace drift %s native review w
  }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
 }));
 
-test('judge binds the reviewed patch and selected receipts in persisted evidence',quiet(async()=>{
+test.each([false,true])('judge binds the reviewed patch, receipts and native output (tampered output=%s)',quiet(async tamper=>{
  const f=fixture();let spy;try{
   const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
   spy=jest.spyOn(runner,'runAdapter').mockImplementation(policy=>{
@@ -1414,7 +1414,9 @@ test('judge binds the reviewed patch and selected receipts in persisted evidence
   expect(item.source.binding).toEqual(expect.objectContaining({patch_sha256:expect.stringMatching(/^[a-f0-9]{64}$/),after_receipt_sha256:improve.boundReceipt(runDir,'after').entry.sha256,baseline_receipt_sha256:improve.boundReceipt(runDir,'baseline',{current:false}).entry.sha256}));
   expect(call.judgment_binding).toEqual(item.source.binding);expect(item.source.attempt).toBe(call.attempt);
   improve.submitJudgment(runDir,{criterion:item.criterion,level:item.level,producer_role:item.producer_role,executor:item.executor,rationale:'mismatched patch must not veto',result:'fail',source:{...item.source,binding:{...item.source.binding,patch_sha256:'0'.repeat(64)}}});
-  expect(improve.evaluate(runDir).criteria.find(c=>c.id==='AC-2').status).toBe('satisfied');
+  improve.submitJudgment(runDir,{criterion:item.criterion,level:item.level,producer_role:item.producer_role,executor:item.executor,rationale:'copied binding is not a native result',result:'fail',native_judgment:true,source:item.source});
+  if(tamper)fs.appendFileSync(call.output_path,'\nchanged after judgment');
+  expect(improve.evaluate(runDir).criteria.find(c=>c.id==='AC-2').status).toBe(tamper?'missing':'satisfied');
  }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
 }));
 

@@ -1,12 +1,14 @@
 # Advisory review #304
 
 Purpose: advisory; Gate C decision: pending.
-Execution: completed; scope at execution: current; mode: live; invoked: true.
-Attempt: edfbc2f2-80b5-4382-bd86-4e61e7db974c
-Input snapshot: cb822e6dc88b79b2b6b66e065774af2b4c649db23abaa00809ccc2aaa031dadd
-Diff: 2feefa695ca6158cc074e2c11eb12b54599117a1ade39098b95db411ba38204d
+Execution: invalid; scope at execution: current; mode: live; invoked: true.
+Attempt: a3457917-6544-4086-a0db-1ad4cf61124e
+Input snapshot: 92e770a12109e4188b391b8fcf76d8e3c5120bbdf64f20660f11c3661cc5cce7
+Diff: a508e2166a5c1313189e71c93dcdc6d2e142ca95cff231ddca49fe1e585f4a8c
 Base: 9b6dd41412aa942b0b315e5ad8889aa1d18601cd
 Reviewer: codex-sol-reviewer; requested: gpt-5.6-sol; served: unknown
+
+Cause: Missing native content reads: tree/tests/contracts/improve-core.test.js
 
 - **p1 REV-304-005** scripts/improve-review-evidence.cjs:101: Structurally invalid verifier findings can authorize omission of required images
   Disposition: reported fixed. Image omission no longer trusts verifier findings. Practice roots require a valid phase receipt, an exact receipt-bound evidence-item hash, a matching native execution artifact hash, and the expected phase/version/result metadata. Validation fails closed, and roots shared with holdout or gate evidence are preserved. Frozen integration tests exercise malformed receipts, mutated evidence, loose findings, and overlapping roots.

@@ -28,6 +28,7 @@ const nativeExecution = require('./test-execution.cjs');
 const continuation = require('./review-continuation.cjs');
 
 const DECISIONS = ['KEEP', 'REVERT', 'INCONCLUSIVE'];
+const NATIVE_JUDGMENT = Symbol('native-judge-recording');
 const EVIDENCE_LEVELS = { 1: 'deterministic', 2: 'behavioural-journey', 3: 'heuristic', 4: 'judgment' };
 const MECHANICAL_PRODUCER = 'verifier-mechanical';
 // Same vocabulary as the #102 runtime rail (runner.validateRuntimeChecks).
@@ -1046,7 +1047,7 @@ function addEvidenceItem(runDir, item) {
 
 // Judgments from independent roles (levels 3-4). Level 1-2 evidence only
 // comes from the frozen checks; a submitted "tests passed" is not evidence.
-function submitJudgment(runDir, item) {
+function submitJudgment(runDir, item, authority) {
   loadRun(runDir);
   const errors = [];
   if (![3, 4].includes(item?.level)) errors.push('submitted evidence is limited to level 3 (heuristic) or 4 (judgment)');
@@ -1060,7 +1061,7 @@ function submitJudgment(runDir, item) {
   const gov = governingContract(runDir);
   return {
     status: selfReview ? 'recorded_not_counted' : 'recorded',
-    item: addEvidenceItem(runDir, { ...item, phase: item.phase || 'after', kind: 'judgment', self_review: Boolean(selfReview), contract_version: gov?.entry.version || null }),
+    item: addEvidenceItem(runDir, { ...item, native_judgment: authority === NATIVE_JUDGMENT, phase: item.phase || 'after', kind: 'judgment', self_review: Boolean(selfReview), contract_version: gov?.entry.version || null }),
   };
 }
 
@@ -1539,7 +1540,9 @@ function judge(runDir, options = {}) {
   const result = runner.runAdapter(judgePolicy, { promptPath, stage: `improve.${role}`, dryRun: options.dryRun, cwd: inputDir, env });
   const provenance = roleProvenance(judgePolicy, result);
   const peeked = toolCommands(judgePolicy.transcript_path).some((t) => /adapters\/builder\./.test(JSON.stringify(t.input || {})));
-  append(runDir, 'judgment_run', { role, attempt, judgment_binding:judgmentBinding, executor: policy.id, verifier_input: input, input_dir: inputDir, transcript_path:policy.transcript_path, output_path:policy.output_path, prompt_path:promptPath, provenance, adapter_status: result.status, maker_trace_accessed: peeked });
+  const nativeOutput=result.status==='gate_rerun_required'&&result.entry?.exit_code===0&&fs.existsSync(policy.output_path)?fs.readFileSync(policy.output_path):null;
+  const nativeOutputSha=nativeOutput?sha256(nativeOutput):null;
+  append(runDir, 'judgment_run', { role, attempt, judgment_binding:judgmentBinding, native_output_sha256:nativeOutputSha, executor: policy.id, verifier_input: input, input_dir: inputDir, transcript_path:policy.transcript_path, output_path:policy.output_path, prompt_path:promptPath, provenance, adapter_status: result.status, maker_trace_accessed: peeked });
   if (peeked) return { status: 'blocked', reason: 'judge accessed the builder transcript; judgments not recorded', provenance };
   if(result.status!=='gate_rerun_required'||result.entry?.exit_code!==0) {
     let failure={code:'judge_adapter_failed',stage:'judge',next_action:'Inspect the retained attempt transcript; preserve original acceptance and do not replay a consumed holdout.'};
@@ -1556,10 +1559,10 @@ function judge(runDir, options = {}) {
     if(proof.error||proof.entry.sha256!==proofs[phase].entry.sha256)throw Error(proof.error||'Evidence binding: selected receipt changed during judgment');
   }
   if(workspaceDiff(run,gov.contract)?.sha256!==judgmentBinding.patch_sha256)throw Error('Evidence binding: reviewed patch changed during judgment');
-  const parsed = lastJsonLine(fs.existsSync(policy.output_path) ? fs.readFileSync(policy.output_path, 'utf8') : '');
+  const parsed = lastJsonLine(nativeOutput?.toString('utf8') || '');
   const recorded = [];
   for (const j of list(parsed?.judgments)) {
-    recorded.push(submitJudgment(runDir, { ...j, producer_role: role, executor: policy.id, observed_model: provenance.observed_model, source: { transcript: policy.transcript_path, attempt, binding:judgmentBinding } }));
+    recorded.push(submitJudgment(runDir, { ...j, producer_role: role, executor: policy.id, observed_model: provenance.observed_model, source: { transcript: policy.transcript_path, attempt, binding:judgmentBinding, output_sha256:nativeOutputSha } }, NATIVE_JUDGMENT));
   }
   if (list(parsed?.risks).length) append(runDir, 'risks_reported', { role, risks: parsed.risks });
   return { status: result.status, recorded: recorded.length, provenance };
@@ -1680,7 +1683,9 @@ function evaluate(runDir,{backendCapability}={}) {
   const judgments=evidence.filter(e=>e.kind==='judgment').map(item=>{
     const ref=item.source?.binding;
     const call=evs.find(e=>e.event==='judgment_run'&&e.attempt===item.source?.attempt);
-    const valid=ref?.schema==='specflow.improve.judgment-binding/v1' && !afterBinding.error && !baselineBinding.error
+    let nativeOutputIntact=false;
+    try { nativeOutputIntact=Boolean(call?.native_output_sha256 && call.native_output_sha256===item.source?.output_sha256 && fileSha(call.output_path)===call.native_output_sha256); } catch {}
+    const valid=item.native_judgment===true && nativeOutputIntact && ref?.schema==='specflow.improve.judgment-binding/v1' && !afterBinding.error && !baselineBinding.error
       && ref.patch_sha256===diff.sha256 && ref.after_receipt_sha256===afterBinding.entry.sha256
       && ref.baseline_receipt_sha256===baselineBinding.entry.sha256
       && ref.after_identity_sha256===binding.digest(afterBinding.receipt.identity)
