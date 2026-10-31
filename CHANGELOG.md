@@ -6,6 +6,9 @@
   preserves failure and cleanup evidence, and rejects exhausted storage before
   execution. Cleanup remains bound to acknowledged resources.
 - Frozen oracle authoring is rejected before provider execution or file changes.
+- Explicit review-stage retries retain prior failures and require changed declared
+  input, current authority and the original task limits. Oracle drafts are archived
+  between authoring attempts so stale files cannot enter acceptance.
 - UX review preserves bound receipt evidence, native judgment provenance and
   verified patch identity while reducing presentation overhead.
 - Host scout/contract-writer provenance and native CLI terminal usage are recorded
