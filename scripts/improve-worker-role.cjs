@@ -6,12 +6,21 @@ const fs = require('fs'),
   { spawnSync } = require('child_process');
 function run(requestFile) {
   const req = JSON.parse(fs.readFileSync(requestFile));
-  const result = spawnSync(req.claude, req.args, {
+  const deadline = req.deadlineAtMs;
+  if (!Number.isSafeInteger(deadline) || deadline <= 0 || deadline - Date.now() > 2147483647)
+    throw new Error('role_deadline_invalid');
+  const remaining = deadline - Date.now();
+  // Managed provider gateways own the task deadline and cancellation. No local
+  // quota may kill their observer while a separately supervised call is live.
+  const result = remaining !== null && remaining <= 0
+    ? {status:null,error:{code:'ETIMEDOUT'},stdout:'',stderr:''}
+    : spawnSync(req.claude, req.args, {
     cwd: req.cwd,
     env: process.env,
     input: req.input,
     encoding: 'utf8',
-    timeout: 240000,
+    timeout: remaining,
+    killSignal: 'SIGKILL',
     maxBuffer: 8 * 1024 * 1024
   });
   fs.writeFileSync(req.raw, result.stdout || '', { mode: 0o600, flag: 'wx' });

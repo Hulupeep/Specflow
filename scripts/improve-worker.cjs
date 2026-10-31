@@ -1246,6 +1246,7 @@ function roleCall({
   evidence,
   claude,
   images = [],
+  deadlineAtMs = null,
   authorizeStart = null
 }) {
   need(['oracle', 'builder', 'peer', 'judge', 'critique'].includes(role), 'role_invalid');
@@ -1253,6 +1254,18 @@ function roleCall({
   if (imageInputs.manifest.length)
     prompt += '\n' + untrusted.fenceUntrusted(JSON.stringify(imageInputs.manifest), { source: 'image_manifest' });
   need(path.isAbsolute(claude), 'role_tool_unavailable');
+  let managedDeadline = null;
+  if (deadlineAtMs === null) {
+    try { managedDeadline = require('./improve-controller-provider.cjs').gatewayDeadline(claude); }
+    catch { throw new WorkerError('role_deadline_required', 'model', 'A direct CLI call needs an explicit deadline; only a verified controller gateway supplies its own job deadline.'); }
+    need(managedDeadline > Date.now(), 'role_deadline', 'model');
+    // Transport-only grace lets the controller persist its original deadline's
+    // interruption receipt. This cannot authorize a later provider start.
+    deadlineAtMs = managedDeadline + 30000;
+  }
+  need(Number.isSafeInteger(deadlineAtMs) && deadlineAtMs > 0 && deadlineAtMs - Date.now() <= 2147483647, 'role_deadline_invalid', 'model');
+  if (deadlineAtMs <= Date.now()) throw new WorkerError('role_deadline', 'model');
+
   privateDir(evidence);
   const binding = {
       role,
@@ -1313,6 +1326,7 @@ function roleCall({
   ];
   const relay = {
     claude,
+    deadlineAtMs,
     args,
     cwd,
     input: JSON.stringify({ type: 'user', message: { role: 'user', content } }) + '\n',
@@ -1330,17 +1344,24 @@ function roleCall({
     });
   const child = authorizeStart ? authorizeStart(launch) : launch();
   const relayIdentity = require('./improve-process-identity.cjs').identity(child.pid);
-  const deadline = Date.now() + 245000;
-  while (!fs.existsSync(relay.done) && Date.now() < deadline)
-    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
-  if (!fs.existsSync(relay.done)) {
-    try {
+  const completionUnknown = () => new WorkerError('role_completion_unknown', 'model',
+    'The role observer has no terminal record; provider completion is unknown.', false,
+    'Reconcile the original provider receipt before another invocation. Do not replay the call.');
+  if (!relayIdentity) { child.kill('SIGKILL'); throw completionUnknown(); }
+  while (!fs.existsSync(relay.done)) {
+    const state = require('./improve-process-identity.cjs').state(relayIdentity);
+    if (state !== 'live' || Date.now() > deadlineAtMs + 5000) {
+      if (fs.existsSync(relay.done)) break;
+      // This only stops the identified local observer. Separately supervised
+      // inference still requires its original controller receipt to reconcile.
       require('./improve-controller-watchdog.cjs').signalGroup(relayIdentity);
-    } catch {}
-    throw new WorkerError('role_deadline', 'model');
+      throw completionUnknown();
+    }
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 100);
   }
   const result = strictJSON(regular(relay.done).toString());
   const raw = regular(relay.raw).toString();
+  if (result.error === 'ETIMEDOUT') throw completionUnknown();
   if (result.status !== 0)
     throw new WorkerError(
       result.error === 'ETIMEDOUT' ? 'role_deadline' : 'role_unavailable',
