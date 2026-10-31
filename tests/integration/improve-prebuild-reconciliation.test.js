@@ -418,3 +418,16 @@ test.each(['ENOBUFS','SIGTERM'])('PREBUILD forced termination remains uncertain:
  expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
  expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
 },45000);
+
+
+test.each([true,false])('PREBUILD signed backend cleanup governs only confined native commands: confined=%s',async confined=>{
+ const managed=require('../helpers/improve-prebuild-managed.cjs');
+ const x=await stoppedFixture({prepareFreeze:(f,dir,contract)=>managed.prepareFreeze(f,dir,contract),expectedBaseline:'blocked'});
+ // Native termination is a protocol input here; the backend attempt and signed
+ // cleanup are actual. This does not claim a real Docker native launch failed.
+ core.append(x.runDir,'command_started',{command_id:'native-termination',native:true,confined,role:'verifier'});
+ core.append(x.runDir,'command_run',{command_id:'native-termination',native:true,confined,role:'verifier',terminated:true,process_error:'ENOBUFS',process_signal:'SIGTERM'});
+ f.recovery.resolvePrebuildSource=()=>({runDir:x.runDir,archive:x.archive,backendStore:x.backendStore});
+ if(confined){expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);expect(f.service().store.read().owners[f.repo]).toBeUndefined();}
+ else{expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);}
+},45000);

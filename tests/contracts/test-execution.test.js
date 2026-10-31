@@ -178,3 +178,11 @@ test('TE recovery: native signal termination is structured process evidence',()=
  expect(result.gate).not.toBe('pass');
  expect(result.findings[0].execution).toMatchObject({terminated:true,process_signal:'SIGTERM',process_error:null});
 });
+
+test('TE recovery: native output overflow records forced termination',()=>{
+ const fs=require('fs'),path=require('path');env=fixture();
+ fs.writeFileSync(path.join(env.root,'cli.test.js'),"test('C-CLI-transform',()=>{for(let i=0;i<40;i++)process.stdout.write('x'.repeat(1024*1024))});");env.accept();
+ const result=runner.runVerifierStage({root:env.root,runDir:env.runDir,sliceTags:['integration'],configurationId:'local',environment:'isolated-node'});
+ expect(result.gate).not.toBe('pass');
+ expect(result.findings[0].execution).toMatchObject({terminated:true,process_error:'ENOBUFS'});
+});

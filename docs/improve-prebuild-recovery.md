@@ -122,3 +122,9 @@ Managed baselines interrupted before backend admission are not recoverable throu
 this API. Missing history (`backend_attempt_not_admitted`) or no proof for the
 current contract (`backend_cleanup_unconfirmed`) requires separate audited recovery;
 absence of an attempt record is not promoted to a signed cleanup proof.
+
+Native checks launched through a managed backend are explicitly marked confined.
+For those commands, authenticated signed backend cleanup governs recovery,
+including interrupted or force-terminated checks. Unconfined commands retain the
+host uncertainty rule even within a managed run. Launch failures such as ENOENT
+or EACCES remain process errors but are not labelled forced termination.
