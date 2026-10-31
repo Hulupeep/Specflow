@@ -158,10 +158,10 @@ test.each(['after_start','after_decision'])('PREBUILD retry after %s uses its ca
 },45000);
 
 
-test.each(['missing_workspace','unresolved_baseline'])('PREBUILD denies %s with a specific recovery reason',async kind=>{
+test.each(['missing_workspace','stale_baseline'])('PREBUILD denies %s with a specific recovery reason',async kind=>{
  const x=await stoppedFixture();
  if(kind==='missing_workspace')fs.renameSync(path.join(f.root,'worktrees',x.binding.core_run_id+'-baseline'),path.join(f.root,'retained-baseline'));
- else {const last=core.events(x.runDir).filter(e=>e.event==='baseline_attempted').at(-1);core.append(x.runDir,'baseline_attempted',{attempt:last.attempt+1,contract_sha256:last.contract_sha256,contract_version:last.contract_version});}
+ else {const last=core.events(x.runDir).filter(e=>e.event==='baseline_attempted').at(-1);core.append(x.runDir,'baseline_attempted',{attempt:last.attempt+1,contract_sha256:'f'.repeat(64),contract_version:last.contract_version});}
  expect(()=>f.service().reconcilePrebuild(x.request)).toThrow(kind==='missing_workspace'?'prebuild_workspace_missing':'prebuild_baseline_unresolved');
  expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
  expect(core.events(x.runDir).some(e=>e.event==='prebuild_abandonment_started')).toBe(false);
@@ -254,4 +254,52 @@ test('PREBUILD a later recovery generation can finish an interrupted stable disp
  expect(request.expected_generation).toBeGreaterThan(x.request.expected_generation);
  expect(f.service().reconcilePrebuild(request).allowed).toBe(true);
  expect(core.events(x.runDir).filter(e=>e.event==='prebuild_abandonment_started')).toHaveLength(1);
+},45000);
+
+test('PREBUILD actual verification_blocked baseline can be abandoned without a fictional test result',async()=>{
+ const x=await stoppedFixture();
+ const result=await core.verifyPhase(x.runDir,'baseline',{backendSession:{}});expect(result.status).toBe('blocked');
+ expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);
+ expect(JSON.parse(fs.readFileSync(path.join(x.runDir,'decision.json'))).baseline.event).toBe('verification_blocked');
+},45000);
+
+test('PREBUILD dead process interrupted immediately after baseline_attempted is explicitly untested',async()=>{
+ const x=await stoppedFixture();
+ const program=`const runner=require(${JSON.stringify(require.resolve('../../scripts/specflow-runner.cjs'))}),core=require(${JSON.stringify(require.resolve('../../scripts/specflow-improve.cjs'))});const original=runner.appendLedger;runner.appendLedger=(file,entry)=>{const r=original(file,entry);if(entry.event==='baseline_attempted')process.exit(23);return r;};core.verifyPhase(process.argv[1],'baseline');`;
+ expect(cp.spawnSync(process.execPath,['-e',program,x.runDir],{timeout:10000}).status).toBe(23);
+ expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);
+ expect(JSON.parse(fs.readFileSync(path.join(x.runDir,'decision.json'))).baseline.event).toBe('interrupted');
+},45000);
+
+test('PREBUILD owner can adopt a core-only disposition after unrelated main advancement',async()=>{
+ const x=await stoppedFixture();core.abandonBeforeBuild(x.runDir,{reason:'Original disposition.',requestSha256:'b'.repeat(64)});
+ fs.writeFileSync(path.join(f.repo,'later-work'),'later');f.git('add','later-work');f.git('commit','-m','later work');
+ f.profile.repository.refs[0].commit=f.git('rev-parse','main');require('../../scripts/improve-profiles.cjs').registerProfile(f.registry,f.profile,{lockTool:f.recovery.lockTool});
+ expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);
+},45000);
+
+test('PREBUILD an integrity-blocked baseline cannot turn corrupt frozen checks into valid evidence',async()=>{
+ const x=await stoppedFixture(),g=core.governingContract(x.runDir),artifact=Object.keys(g.entry.artifact_sha256)[0];
+ fs.appendFileSync(path.join(x.runDir,artifact),'\n// changed frozen artifact');
+ expect((await core.verifyPhase(x.runDir,'baseline')).status).toBe('blocked');
+ expect(core.events(x.runDir).at(-1).event).toBe('contract_integrity_failed');
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_integrity_failed');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+},45000);
+
+test.each(['cleaned','inert','missing_release'])('PREBUILD managed contract traverses the actual signed backend bridge: %s',async kind=>{
+ const managed=require('../helpers/improve-prebuild-managed.cjs');
+ const x=await stoppedFixture({prepareFreeze:managed.prepareFreeze,expectedBaseline:'blocked'});
+ expect(core.governingContract(x.runDir).contract.runtime.backend.constructionSha256).toMatch(/^[a-f0-9]{64}$/);
+ expect(core.events(x.runDir).some(e=>e.event==='verification_receipt')).toBe(false);
+ managed.history(x.backendStore,x.runDir,kind);
+ f.recovery.resolvePrebuildSource=()=>({runDir:x.runDir,archive:x.archive,backendStore:x.backendStore});
+ if(kind==='missing_release'){
+  expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('backend_release_incomplete');
+  expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+  expect(core.events(x.runDir).some(e=>e.event==='prebuild_abandonment_started')).toBe(false);
+ }else{
+  expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);
+  expect(f.service().store.read().owners[f.repo]).toBeUndefined();
+ }
 },45000);

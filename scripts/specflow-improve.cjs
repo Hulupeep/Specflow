@@ -1792,6 +1792,16 @@ function requireOpenRun(runDir) {
   if(lastEvent(events(runDir),'prebuild_abandonment_started'))throw Error('prebuild_abandonment_started');
 }
 
+function prebuildBaseline(evs, frozen) {
+  const attempt=lastEvent(evs,'baseline_attempted');
+  if(!attempt||attempt.contract_sha256!==frozen.contract_sha256||attempt.contract_version!==frozen.version)throw Error('prebuild_baseline_unresolved');
+  const outcome=evs.filter(e=>e.seq>attempt.seq&&(
+    (['baseline_blocked','baseline_recorded'].includes(e.event)&&e.attempt===attempt.attempt&&e.contract_sha256===frozen.contract_sha256&&e.contract_version===frozen.version)||
+    (e.event==='verification_blocked'&&e.phase==='baseline'&&e.attempt===attempt.attempt&&e.contract_version===frozen.version)||
+    (e.event==='contract_integrity_failed'&&e.phase==='baseline'))).at(-1);
+  return {attempt:attempt.attempt,event:outcome?.event||'interrupted',seq:outcome?.seq??attempt.seq};
+}
+
 function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false }) {
   if (!nonempty(reason) || reason.length > 2000 || !/^[a-f0-9]{64}$/.test(requestSha256 || '')) throw Error('invalid_prebuild_disposition');
   const run=loadRun(runDir), evs=events(runDir), gov=governingContract(runDir);
@@ -1802,17 +1812,19 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
   if(prior && (prior.record.contract.sha256!==gov.entry.contract_sha256 || (prior.request_sha256!==requestSha256&&!adoptPrior)))throw Error('prebuild_request_conflict');
   const revalidate=!prior||prior.request_sha256!==requestSha256;
   if(lastEvent(evs,'decision_made')&&!prior)throw Error('prebuild_decision_exists');
-  const attempt=lastEvent(evs,'baseline_attempted'),outcome=evs.filter(e=>['baseline_blocked','baseline_recorded'].includes(e.event)).at(-1);
-  if(revalidate && (!attempt||!outcome||outcome.attempt!==attempt.attempt||outcome.contract_sha256!==gov.entry.contract_sha256||outcome.contract_version!==gov.entry.version||outcome.seq<attempt.seq))throw Error('prebuild_baseline_unresolved');
+  const baseline=prebuildBaseline(evs,gov.entry);
   const readGit=(args,cwd)=>{
     const result=spawnSync('/usr/bin/git',['--no-optional-locks','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{cwd,encoding:'utf8',timeout:10000,maxBuffer:1024*1024,env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0'}});
     if(result.status!==0)throw Error('prebuild_git_unavailable');return result.stdout.trim();
   };
   let base=prior?.record.base;
+  if(prior&&(!base?.unchanged||base.recorded!==run.base_commit||base.current!==run.base_commit))throw Error('prebuild_base_changed');
   if(revalidate){
-    const current=readGit(['rev-parse','--verify','--end-of-options',run.base_ref+'^{commit}'],run.target_repo);
-    base={base_ref:run.base_ref,recorded:run.base_commit,current,unchanged:current===run.base_commit};
-    if(!base.unchanged)throw Error('prebuild_base_changed');
+    if(!prior){
+      const current=readGit(['rev-parse','--verify','--end-of-options',run.base_ref+'^{commit}'],run.target_repo);
+      base={base_ref:run.base_ref,recorded:run.base_commit,current,unchanged:current===run.base_commit};
+      if(!base.unchanged)throw Error('prebuild_base_changed');
+    }
     for(const kind of ['baseline','improve']){
       const ws=workspaceFor(run,kind),prepared=evs.some(e=>e.event==='workspace_prepared'&&e.kind===kind);
       if(prepared&&!fs.existsSync(ws.worktreePath))throw Error('prebuild_workspace_missing');
@@ -1833,10 +1845,10 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
     schema:'specflow.improve.decision/v1',run_id:run.run_id,decision:'INCONCLUSIVE',
     disposition:'abandoned_before_build',implementation_attempted:false,request_sha256:requestSha256,
     reasons:[reason],decided_at:now(),contract:{version:gov.entry.version,sha256:gov.entry.contract_sha256,ignored_later_versions:gov.ignoredLaterVersions},
-    baseline:{attempt:outcome.attempt,event:outcome.event,seq:outcome.seq},
+    baseline,
     builder_claim:'not_attempted',divergence:null,base,criteria:evaluateCriteria(gov.contract,[],gov.entry.version),
     gains:[],gates:[],gates_failed:[],gates_missing:[],preexisting_gate_failures:[],regressions:[],binding_errors:[],holdout_exposed:[],scope:scopeCheck(gov.contract,[]),evidence_ids:readEvidence(runDir).filter(e=>e.phase==='baseline'&&e.contract_version===gov.entry.version).map(e=>e.id),
-    baseline_blocker:outcome?.event==='baseline_blocked'?'frozen baseline blocked before implementation':null,
+    baseline_blocker:baseline.event==='baseline_recorded'?null:'Baseline '+baseline.event+' before implementation; no product result inferred',
     workspace:{branch:workspaceFor(run,'improve').branch,files:[],patch_sha256:sha256(''),verified_git:null}
   };
   if(!prior)append(runDir,'prebuild_abandonment_started',{request_sha256:requestSha256,record});
@@ -2195,6 +2207,7 @@ module.exports = {
   evaluate,
   finalize,
   abandonBeforeBuild,
+  prebuildBaseline,
   status,
   writeReport,
   verifyLedger,

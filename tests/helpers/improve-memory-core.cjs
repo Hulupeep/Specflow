@@ -9,7 +9,7 @@ function coreFixture({configure=null}={}){return memoryFixture({configure,affect
 }});}
 const peer=output=>()=>({status:0,stderr:'',stdout:[JSON.stringify({type:'system',subtype:'init',model:'fixture-peer'}),JSON.stringify({type:'result',subtype:'success',structured_output:output,total_cost_usd:0})].join('\n')});
 const write=(file,doc)=>{fs.writeFileSync(file,JSON.stringify(doc,null,2)+'\n',{mode:0o600});return file;};
-async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,consumed=[],afterVerified=null,implementationData=null,stopBeforeBuild=false,generatedOutput=false}={}){
+async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,consumed=[],afterVerified=null,implementationData=null,stopBeforeBuild=false,generatedOutput=false,prepareFreeze=null,expectedBaseline=null}={}){
   const selection=f.selection({id,retry,consumed});
   const selected=f.service().selectMemory(f.command({selection}));if(!selected.allowed)throw Error(selected.reason_code);
   const binding={job_id:'memory-job-'+number,operation_id:'memory-operation-'+number,core_run_id:'memory-core-'+number};
@@ -30,9 +30,10 @@ async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,
     non_goals:['No other changes'],evaluation_method:'Fixed independent before/after executable checks',affected_journey:'J-CONTROLLED-RESUME',scope:{allowed_paths:['journey.json'],max_files:1},ux_profile:{preserve:['input shape']},safety:{external_side_effects:'none'},
     gates:[{id:'input-shape',command:['node','-e','const x=JSON.parse(require("fs").readFileSync("journey.json","utf8"));process.exit(Number.isInteger(x.steps)?0:1)']}]};
   if(generatedOutput)contract.runtime={identity:{mutable_outputs:['baseline-output']}};
-  const frozen=core.freezeContract(runDir,write(path.join(f.root,'contract-'+number+'.json'),contract));if(frozen.status!=='frozen')throw Error(JSON.stringify(frozen));
-  const baseline=await core.verifyPhase(runDir,'baseline');if(baseline.status!==(invalid?'baseline_blocked':'baseline_recorded'))throw Error(JSON.stringify(baseline));
-  if(stopBeforeBuild)return {cycle,binding,runDir,baseline,selection};
+  const extra=prepareFreeze?prepareFreeze(f,runDir,contract):{};
+  const frozen=core.freezeContract(runDir,write(path.join(f.root,'contract-'+number+'.json'),contract),{backendCapability:extra.backendCapability});if(frozen.status!=='frozen')throw Error(JSON.stringify(frozen));
+  const baseline=await core.verifyPhase(runDir,'baseline');if(baseline.status!==(expectedBaseline||(invalid?'baseline_blocked':'baseline_recorded')))throw Error(JSON.stringify(baseline));
+  if(stopBeforeBuild)return {cycle,binding,runDir,baseline,selection,backendStore:extra.backendStore};
   const builder=write(path.join(f.root,'builder-'+number+'.json'),{id:'fixture-builder',provider:'fake',command:'fake',timeout_seconds:10,max_iterations:1,transcript_path:'unused',output_path:'unused',never_without_human:['git push'],fake_stdout:'Fixture implementation'});
   await core.build(runDir,{policy:builder,acceptBaselineBlocker:invalid?CANARY:undefined,
     invokePeer:peer({direction:{assessment:'complete',goal_connection:'Controlled step reduction',next_steps:[],preserve:['input shape']},recommendation:'keep',reason:'Practice check observed'}),

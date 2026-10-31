@@ -21,8 +21,11 @@ The operation requires:
 - A positively dead previous holder and a live trusted recovery operator.
 - Every issued operation completed, authenticated and quiescent; uncertain
   receipts, processes and backend cleanup remain blocking.
-- An intact frozen core ledger with a completed baseline and no implementation,
-  deciding holdout or after verification.
+- An intact frozen core ledger with a baseline attempt and no implementation,
+  deciding holdout or after verification. The latest baseline may be completed,
+  explicitly blocked, or interrupted; an interrupted attempt is recorded as
+  untested, after controller process and receipt quiescence is proven. Corrupt
+  frozen checks still block recovery.
 - On the first attempt, the recorded base and every prepared isolated workspace
   present and unchanged. After a durable abandonment-start record, retries use
   that captured proof; unrelated later changes to main do not strand recovery.
@@ -44,8 +47,10 @@ Only after the archive is durable does the controller release that run's ownersh
 Reuse the same request ID for an identical retry. The core disposition identity
 is bound to the run, cycle and frozen contract, so a replacement request after a
 lost acknowledgement can finish the same disposition. A core-only prior record
-can be adopted by the trusted owner only after rechecking unchanged base/workspace
-and baseline evidence. All original reasons and the new owner request remain
+can be adopted by the trusted owner only after validating its captured unchanged
+base proof and rechecking the workspaces and baseline evidence. Later movement of
+main does not invalidate that captured proof. Authenticated archive adoption uses
+the captured proof, retains the original identity and records the new owner request. All original reasons and the new owner request remain
 in the audit trail. Retried acknowledgements
 cannot release a successor's ownership or create a second memory result. A new
 run needs a separate authorisation; revisiting the same idea still requires fresh
@@ -65,3 +70,11 @@ bound, authenticated archive even if live source files were lost. It retains the
 damaged source unchanged. Missing or corrupt archive evidence still blocks release.
 Frozen generated-output exclusions are respected without staging Git changes;
 tracked source changes and undeclared untracked files remain blocking.
+
+This API requires a version 2 recovery host. Version 1 controller runs need an
+explicit migration path and are not silently upgraded by abandonment.
+
+A signed record for another run is excluded before validating that run's attempt
+schema. An unreadable or unauthenticated record cannot safely be attributed to
+another run; recovery names the offending record and retains ownership. It does
+not ignore unknown records or infer that they cannot own resources.

@@ -371,7 +371,9 @@ function verifyClosedHistory(store, runId, contractSha256) {
   try {
     const names=fs.readdirSync(`/proc/self/fd/${fd}`);need(names.length<=100000,'backend_cleanup_unconfirmed');
     for(const name of names.filter(n=>/^attempt-[a-f0-9-]+\.json$/.test(n))){
-      const a=validateAttempt(readSigned(store,fd,name));if(a.runId!==runId)continue;
+      let signed;try{signed=readSigned(store,fd,name);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
+      if(signed?.runId!==runId)continue;
+      const a=validateAttempt(signed);
       currentContract||=a.contractSha256===contractSha256;
       need(processIdentity.state(a.owner)==='dead','backend_cleanup_unconfirmed');
       need(!present(fd,`operator-${a.attemptId}.json`),'backend_cleanup_unconfirmed');

@@ -1226,7 +1226,7 @@ function createControllerService({
     if(governing.contract.runtime?.backend){
       need(governing.contract.runtime.backend.constructionSha256,'prebuild_legacy_backend_unavailable');
       try{require('./improve-backend-attempt.cjs').verifyClosedHistory(source.backendStore,runRecord.run_id,governing.entry.contract_sha256);}
-      catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_backend_proof_unavailable');}
+      catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_backend_proof_unavailable',error.record&&/^attempt-[a-f0-9-]+\.json$/.test(error.record)?'Inspect retained backend record '+error.record+'; its run identity cannot be authenticated. Do not discard it.':undefined);}
     }
     const requestSha256=digest({kind:'reconcile_prebuild',run_id:r.id,cycle_id:cycle.id,...cycle.binding,contract_sha256:governing.entry.contract_sha256});
     let disposition=proof?{request_sha256:proof.core_diagnosis.request_sha256}:null;
@@ -1387,9 +1387,10 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
     if(d.disposition!=='abandoned_before_build')need(last('implementation_started')&&last('implementation_started').seq<last('decision_made').seq,'terminal_implementation_missing');
     if(d.disposition==='abandoned_before_build'){
       const start=last('prebuild_abandonment_started');
-      const attempt=last('baseline_attempted'),outcome=events.filter(e=>['baseline_blocked','baseline_recorded'].includes(e.event)).at(-1),frozen=last('contract_frozen');
-      need(start&&attempt&&outcome&&outcome.attempt===attempt.attempt&&outcome.seq>attempt.seq&&outcome.seq<start.seq&&outcome.contract_sha256===d.contract.sha256&&outcome.contract_version===d.contract.version&&frozen?.contract_sha256===d.contract.sha256,'prebuild_baseline_unresolved');
-      need(canonical(d.baseline)===canonical({attempt:outcome.attempt,event:outcome.event,seq:outcome.seq})&&frozen.version===d.contract.version,'prebuild_baseline_unresolved');
+      const frozen=last('contract_frozen');
+      need(start&&frozen&&frozen.contract_sha256===d.contract.sha256&&frozen.version===d.contract.version,'prebuild_baseline_unresolved');
+      need(canonical(d.baseline)===canonical(core.prebuildBaseline(events.filter(e=>e.seq<start.seq),frozen)),'prebuild_baseline_unresolved');
+      need(d.base?.unchanged===true&&d.base.recorded===r.base_commit&&d.base.current===r.base_commit&&canonical(last('decision_applied')?.base)===canonical(d.base),'prebuild_base_changed');
       need(receipt.files.some(f=>f.path===`improvement-contract.v${frozen.version}.json`&&f.sha256===frozen.contract_sha256)&&Object.entries(frozen.artifact_sha256||{}).every(([name,hash])=>receipt.files.some(f=>f.path===name&&f.sha256===hash)),'prebuild_integrity_failed');
       need(start&&canonical(events.filter(e=>e.seq>start.seq).map(e=>e.event))===canonical(['decision_made','decision_applied']),'prebuild_disposition_invalid');
       need(d.decision==='INCONCLUSIVE'&&d.implementation_attempted===false&&

@@ -40,3 +40,14 @@ test('PREBUILD a losing attempt with an unexplained mutation fence is not called
  fs.mkdirSync(path.join(area,'mutation-'+name.slice(8,-5)),{mode:0o700});
  expect(()=>attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64))).toThrow('backend_attempt_inert_unproven');
 });
+
+test('PREBUILD authenticated foreign-run schema is not treated as this run history',()=>{
+ const {store}=fixture(),name='attempt-11111111-1111-4111-8111-111111111111.json',value={runId:'foreign-run',schema:'other-version'};
+ fs.writeFileSync(path.join(store.root,'backend-attempts',name),JSON.stringify({value,mac:store.mac(value)}),{mode:0o600});
+ expect(attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64))).toHaveLength(1);
+});
+test('PREBUILD unauthenticated record is named rather than silently assigned to another run',()=>{
+ const {store}=fixture(),name='attempt-11111111-1111-4111-8111-111111111111111.json';
+ fs.writeFileSync(path.join(store.root,'backend-attempts',name),'corrupt',{mode:0o600});
+ try{attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64));throw Error('expected refusal');}catch(e){expect(e.message).toBe('backend_attempt_record_unreadable');expect(e.record).toBe(name);}
+});
