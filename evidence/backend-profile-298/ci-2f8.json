@@ -1,0 +1,21 @@
+{
+  "schema": "specflow.ci-evidence/v1",
+  "repository": "Hulupeep/Specflow",
+  "runId": 41189192981,
+  "conclusion": "success",
+  "headSha": "2f8fb8a1c435bfb7b90e444b03f6c6c2e2e674d1",
+  "status": "completed",
+  "url": "https://github.com/Hulupeep/Specflow/actions/runs/41189192981",
+  "suites": {
+    "passed": 167,
+    "total": 167
+  },
+  "tests": {
+    "passed": 3328,
+    "total": 3328,
+    "failed": 0,
+    "skipped": 0
+  },
+  "logSha256": "a1418f6ae17e85a0e6694b10b6a3b1dea39cb66ed9a0048a463916656ed0e58c",
+  "scope": "Exact admission-fix head before the separate worker-identity addition and evidence follow-up; does not establish product KEEP"
+}

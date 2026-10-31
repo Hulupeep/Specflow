@@ -1,0 +1,21 @@
+{
+  "schema": "specflow.ci-evidence/v1",
+  "repository": "Hulupeep/Specflow",
+  "runId": 41187304022,
+  "url": "https://github.com/Hulupeep/Specflow/actions/runs/41187304022",
+  "headSha": "b17d012f27268ffcca9b07b2f0ef313af162ba19",
+  "status": "completed",
+  "conclusion": "success",
+  "suites": {
+    "passed": 167,
+    "total": 167
+  },
+  "tests": {
+    "passed": 3327,
+    "total": 3327,
+    "failed": 0,
+    "skipped": 0
+  },
+  "logSha256": "849a8ab7b5aea2ef82f127a821401177eb115bf7d68ed2d5070c030d22c949d5",
+  "scope": "Exact implementation head before the evidence-only follow-up; does not establish product KEEP"
+}
