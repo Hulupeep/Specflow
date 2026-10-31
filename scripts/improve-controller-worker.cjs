@@ -23,7 +23,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
   if (cfg.authority?.uid !== process.getuid() || cfg.authority.repo_id !== binding.repo_id)
     throw new ControllerError('host_identity_mismatch');
   fs.mkdirSync(evidenceDir, { recursive: true, mode: 0o700 });
-  function start(stage, args) {
+  function start(stage, args, options = {}) {
     const permitted = [
       'startRun',
       'recordCandidates',
@@ -38,6 +38,9 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       'finalize'
     ];
     if (!permitted.includes(stage) || !Array.isArray(args)) throw new ControllerError('invalid_stage');
+    if (stage === 'critique') require('./improve-review-input.cjs').validateInclude(args[1]?.include);
+    const reviewArgs = bound.policy_version === 2 && ['critique','oracle','judge'].includes(stage) ? structuredClone(args) : undefined;
+    const reviewHash = reviewArgs === undefined ? undefined : require('./improve-operation-inputs.cjs').reviewInput(stage, reviewArgs);
     if (bound.memory_required) {
       const memory = require('./improve-memory.cjs');
       const run = stage === 'startRun' ? args[0] :
@@ -62,7 +65,9 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       }
     }
     const req = { repo_id: binding.repo_id, run_id: binding.run_id, cycle_id: binding.cycle_id, stage };
-    if(bound.policy_version===2) req.input_sha256=require('./improve-operation-inputs.cjs').stageInput(stage,args,configFile);
+    if(bound.policy_version===2) req.input_sha256=require('./improve-operation-inputs.cjs').stageInput(stage,args,configFile,reviewHash);
+    if (reviewHash !== undefined) req.review_input_sha256 = reviewHash;
+    if (options.retry !== undefined) req.retry = options.retry;
     const admitted = service.startStage(req, (entry) => {
       const options={
         cwd: cfg.emptyCwd,
@@ -74,7 +79,7 @@ function createControllerWorker({ service, binding, configFile, evidenceDir }) {
       if(entry.operation.generation){
         const receipt={root:cfg.recovery.receiptRoot||path.join(cfg.controller_store||cfg.store||cfg.recovery.store,'operation-receipts'),registry:cfg.recovery.registry||cfg.authority.registry,lockTool:cfg.recovery.lockTool};
         new (require('./improve-operation-receipts.cjs').OperationReceipts)({...receipt,create:true});
-        child=require('./improve-paused-operation.cjs').spawnOperation({executable:cfg.launcher,args:['stage',stage,JSON.stringify(args)],options,receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'stage',inputCheck:{stage,args,configFile},control:{store:cfg.controller_store||cfg.store||cfg.recovery.store,deadline_ms:entry.deadline_ms}});
+        child=require('./improve-paused-operation.cjs').spawnOperation({executable:cfg.launcher,args:['stage',stage,JSON.stringify(args)],options,receipt,binding:require('./improve-operation-receipts.cjs').forOperation(bound,entry.operation),kind:'stage',inputCheck:{stage,args,configFile,...(reviewArgs===undefined?{}:{reviewArgs})},control:{store:cfg.controller_store||cfg.store||cfg.recovery.store,deadline_ms:entry.deadline_ms}});
       }else child=spawn(cfg.launcher,['stage',stage,JSON.stringify(args)],options);
       const identity = watch.birth(child.pid);
       if (!identity) throw new ControllerError('stage_launch_unconfirmed');
