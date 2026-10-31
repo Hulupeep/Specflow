@@ -1,0 +1,49 @@
+{
+  "schema": "specflow.qualification.unavailable-route/v1",
+  "kind": "explicit-unavailable-preferred-route-qualification",
+  "started_at": "2026-10-31T12:42:38.938Z",
+  "deadline_ms": 1793450858938,
+  "requested_model": "specflow-intentionally-unavailable-qualification-model",
+  "billing": "subscription_cli",
+  "cost_class": "ordinary",
+  "fallback_allowed": false,
+  "api_billing_allowed": false,
+  "product_mutation": false,
+  "installed_source_runtime": "a1397774b03deb021a5b0c35ba1848d10f4f523c",
+  "result": {
+    "status": "failed_as_expected",
+    "code": "role_unavailable",
+    "stage": "model",
+    "next_action": "Inspect the native auth/capacity/approval/transport diagnosis. Do not switch to API billing.",
+    "message": "role_unavailable"
+  },
+  "provider_attempts": 1,
+  "verified_diagnosis": {
+    "checked_at": "2026-10-31T12:43:15.426Z",
+    "native_error": "model_not_found",
+    "native_result_is_error": true,
+    "outer_error": "role_unavailable",
+    "attempts": 1,
+    "fallback": false,
+    "observed_served_model": null,
+    "product_cycle": false
+  },
+  "private_artifact_hashes": [
+    {
+      "name": "f6897404-10a5-4c35-9a82-7e5636b49941.done.json",
+      "sha256": "50734d506f47c1bd19a6a900133d4a6def202cc787d7af2ad797118ccf2dd1b2"
+    },
+    {
+      "name": "f6897404-10a5-4c35-9a82-7e5636b49941.jsonl",
+      "sha256": "e256851435ed46ff6a89eb73f76d7e005953093f969a81fdfac543f0e4a03d18"
+    },
+    {
+      "name": "f6897404-10a5-4c35-9a82-7e5636b49941.request.json",
+      "sha256": "5d1626a2ed05e3b5df4ef33e6dcbf022bc74c08c822e94a8d66c096398c9723f"
+    },
+    {
+      "name": "f6897404-10a5-4c35-9a82-7e5636b49941.stderr",
+      "sha256": "7c8e61d5414289c807b6a9973167fa804d4779c46209fe7c542fe0eeabe6f8d6"
+    }
+  ]
+}
