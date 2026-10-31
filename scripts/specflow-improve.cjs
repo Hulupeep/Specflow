@@ -252,7 +252,7 @@ function guardedSpawn(runDir, role, argv, options = {}) {
     maxBuffer: 32 * 1024 * 1024,
   });
   const timedOut = r.error && /ETIMEDOUT/.test(r.error.code || r.error.message);
-  append(runDir, 'command_run', { command_id:commandId, role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), env_removed: removed });
+  append(runDir, 'command_run', { command_id:commandId, role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), process_error:r.error?.code||null,process_signal:r.signal||null,terminated:Boolean(r.error||r.signal), env_removed: removed });
   return {
     status: r.error ? (timedOut ? 'timeout' : 'error') : 'ran',
     exit_code: r.status,
@@ -753,7 +753,7 @@ function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerCla
       const commandId=crypto.randomUUID();
       append(runDir,'command_started',{command_id:commandId,role:'verifier',native:true,phase,attempt: lastEvent(events(runDir),'verification_started')?.attempt,criterion:a.id});
       const receipt=nativeExecution.executeFrozen(check,options),owned=nativeExecution.ownsFrozen(receipt,check,gov.doc,options);
-      append(runDir,'command_run',{command_id:commandId,role:'verifier',native:true,phase,exit_code:receipt.exit_code??null,timed_out:(receipt.errors||[]).some(e=>String(e).includes('ETIMEDOUT'))});
+      append(runDir,'command_run',{command_id:commandId,role:'verifier',native:true,phase,exit_code:receipt.exit_code??null,timed_out:receipt.process_error==='ETIMEDOUT',process_error:receipt.process_error??null,process_signal:receipt.process_signal??null,terminated:receipt.terminated===true});
       if(receipt.evidence_path)outPath=receipt.evidence_path;
       else fs.writeFileSync(outPath,JSON.stringify({result:'unavailable',reason:receipt.reason}));
       const result=owned&&['pass','fail'].includes(receipt.result)?receipt.result:'unavailable';
@@ -1821,6 +1821,7 @@ function prebuildRuntimeHistory(evs, readContract) {
 
 function prebuildHostQuiescence(evs, contract) {
   if(evs.some(start=>start.event==='command_started'&&!evs.some(e=>e.event==='command_run'&&e.seq>start.seq&&e.command_id===start.command_id)))throw Error('prebuild_descendants_unproven');
+  if(evs.some(e=>e.event==='command_run'&&e.terminated===true))throw Error('prebuild_descendants_unproven');
   if(contract.runtime?.backend)return;
   const started=evs.filter(e=>e.event==='verification_started'&&e.phase==='baseline');
   const unresolved=started.some(start=>!evs.some(e=>e.seq>start.seq&&e.attempt===start.attempt&&e.contract_version===start.contract_version&&

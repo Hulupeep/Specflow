@@ -111,3 +111,14 @@ prove command-level quiescence; controller recovery still requires sealed termin
 receipts for every issued operation. Normally exiting commands that intentionally
 leave detached children are not independently proven clean by the parent PID;
 managed resources require the separate signed backend cleanup proof.
+
+Forced command termination includes timeout, output-buffer overflow and signals.
+These are structured process fields, not inferred from test names or error text.
+Provider-adapter descendants are outside this command ledger: their quiescence
+relies on the trusted host's execution isolation and sealed operation receipts.
+The default process-identity resolver proves individual PID death, not whole-group
+death; this operation does not qualify hosts that leave untracked provider children.
+Managed baselines interrupted before backend admission are not recoverable through
+this API. Missing history (`backend_attempt_not_admitted`) or no proof for the
+current contract (`backend_cleanup_unconfirmed`) requires separate audited recovery;
+absence of an attempt record is not promoted to a signed cleanup proof.

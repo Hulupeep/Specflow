@@ -411,3 +411,10 @@ test('PREBUILD interrupted direct exec records its start and blocks abandonment'
  expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
  expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
 },45000);
+
+
+test.each(['ENOBUFS','SIGTERM'])('PREBUILD forced termination remains uncertain: %s',async cause=>{
+ const x=await stoppedFixture();core.append(x.runDir,'command_run',{command_id:'terminated-fixture',role:'verifier',terminated:true,timed_out:false,process_error:cause==='ENOBUFS'?cause:null,process_signal:cause==='SIGTERM'?cause:null});
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+},45000);

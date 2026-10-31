@@ -170,3 +170,11 @@ test('TE005 (#263): fresh required skip is current/blocked; a later input change
  expect(runner.revalidateVerifierStage(result)).toMatchObject({status:'current',gate:'blocked',reason:expect.stringContaining('required_case_skipped')});
  require('fs').appendFileSync(env.root+'/input.txt','changed after current blocked result');expect(runner.revalidateVerifierStage(result)).toMatchObject({status:'stale',gate:'blocked'});
 });
+
+test('TE recovery: native signal termination is structured process evidence',()=>{
+ const fs=require('fs'),path=require('path');env=fixture();
+ fs.writeFileSync(path.join(env.root,'cli.test.js'),"test('C-CLI-transform',()=>{process.kill(process.pid,'SIGTERM')});");env.accept();
+ const result=runner.runVerifierStage({root:env.root,runDir:env.runDir,sliceTags:['integration'],configurationId:'local',environment:'isolated-node'});
+ expect(result.gate).not.toBe('pass');
+ expect(result.findings[0].execution).toMatchObject({terminated:true,process_signal:'SIGTERM',process_error:null});
+});
