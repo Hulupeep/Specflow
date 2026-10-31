@@ -1,6 +1,6 @@
 # Managed backend generations — #293 revision
 
-Implemented; runtime qualification was executed on 2026-10-30 UTC across the
+Implemented; runtime qualification was executed on 2026-10-30 and 2026-10-31 UTC across the
 source revisions listed below. Evidence retains its original revision; no single
 head is claimed for every historical probe. Independent acceptance and merge of
 [PR #294](https://github.com/Hulupeep/Specflow/pull/294) remain separate gates.
@@ -19,6 +19,8 @@ UI/schema/RPC/RLS or evaluator.
 | Readiness, output limit, missing migration and foreign-name cases | Original per-run observer fingerprints retained; aggregate verification at `7ec2f67` does not relabel those executions. |
 | Original admission negatives | Original 15-case output retained; it lacks a source-bound observer receipt and is not a current-head execution claim. |
 | Four supervisor boundary cases | `28e96a6ffa0b2ec01a1a5ec174c4d9b6269260eb` |
+| Refreshed before/during/after-create controller loss and 15 admission cases | `4654fce90bcb4d802ff439739e8251a4c837ebed` |
+| Storage-exhaustion repair, schema/environment negatives and 316 backend tests | Executed on the uncommitted repair whose complete tracked script/test fingerprint matches committed `8911d5e11953cd11e62570cf6e58ea6c8ff36157`; not claimed as post-commit executions. |
 
 The documentation-only `28e96a6` follow-up preserved the `7ec2f67` runtime and test
 bytes. Later refreshes must retain their own source-bound receipts alongside these
@@ -49,8 +51,31 @@ clean baseline or authority to retry that job. Earlier failed runs and manual
 containment remain in the private history with their original revisions; they were
 not rewritten as successful qualification.
 
+The subsequent storage regression filled the owned gateway's 16 MiB `/tmp`
+mount and recorded an actual ENOSPC error with zero available blocks. Before the
+repair, the runtime still attempted execution; a test guard intercepted it before
+any protected check. That guard produced `backend_restart_invalid`, so the result
+is not described as a spontaneous restart failure. Earlier inconclusive writer
+attempts remain retained separately.
+
+The repair observes capacity on the closed database `/work` and gateway
+`/work`/`/tmp` mounts through bounded commands after service ownership checks,
+and checks continuity again before execution. It leaves the kernel resource
+limits unchanged. The live repaired run rejected exhaustion as
+`backend_storage_limit`, removed all eight owned attempt resources (including five
+backend services), deleted the credential envelope, preserved a foreign control,
+and never reached the execution guard. Separate repaired-source probes rejected
+an actual schema mutation as `backend_identity_mismatch` and staged environment
+mutation as `backend_input_changed`; each cleaned five services and ran zero
+protected checks, with no skips. The environment rejection does not claim a
+measured identity. All observers preserve the original task deadlines.
+
+The repaired source also passed 316 backend contract/integration tests in 15
+suites, with no failures or skips. Independent acceptance and current-head CI are
+still required; these results do not constitute a product improvement.
+
 [CI run 41125490725](https://github.com/Hulupeep/Specflow/actions/runs/41125490725)
-passed 3,249 tests in 164 suites at the qualification head, with no failures or
+passed 3,249 tests in 164 suites at the earlier qualification head, with no failures or
 skips. The actual owner-local qualification uses the drivers in
 `tests/qualification/improve-managed-core.test.cjs`,
 `improve-backend-product.test.cjs`, `improve-backend-admission.test.cjs`,
