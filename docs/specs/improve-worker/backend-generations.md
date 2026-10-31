@@ -22,6 +22,23 @@ UI/schema/RPC/RLS or evaluator.
 | Refreshed before/during/after-create controller loss and 15 admission cases | `4654fce90bcb4d802ff439739e8251a4c837ebed` |
 | Storage-exhaustion repair, schema/environment negatives and 316 backend tests | Executed on the uncommitted repair whose complete tracked script/test fingerprint matches committed `8911d5e11953cd11e62570cf6e58ea6c8ff36157`; not claimed as post-commit executions. |
 
+
+| Refreshed five-phase lifecycle (baseline, build with two development rounds, after, evaluate, finalize), Auth/RLS 29, browser 2, isolation 57, admission 15 and seed mismatch | `3696cb4d3a4940bae8b727b5614a18b47190d8e7` |
+| Refreshed before/during/after-create controller loss, readiness/output/missing-migration/foreign-name faults, and anchor-loss late acknowledgement | `3696cb4d3a4940bae8b727b5614a18b47190d8e7` |
+| Fresh generation replay (old API key and unexpired old bearer both rejected), envelope/scanner/inspection controls (39 tests) | `3696cb4d3a4940bae8b727b5614a18b47190d8e7` |
+
+These later observations retain their own original source bindings. The five-phase
+lifecycle returned `REVERT`; its two development rounds are within the build phase,
+not additional lifecycle phases. The live backend lease was 120 seconds per
+generation; the production build preceded that lease. No consumed holdout was
+replayed and no task deadline was extended.
+
+[CI run 41149342404](https://github.com/Hulupeep/Specflow/actions/runs/41149342404)
+passed 3,263 tests in 165 suites, with zero failures or skips, for PR head
+`3696cb4d3a4940bae8b727b5614a18b47190d8e7`. This supersedes the earlier
+`b6d88f9` checkpoint for current-head CI evidence, without relabelling historical
+runs. Any documentation follow-up still requires its own current-head CI check.
+
 The documentation-only `28e96a6` follow-up preserved the `7ec2f67` runtime and test
 bytes. Later refreshes must retain their own source-bound receipts alongside these
 originals, including failures; they do not replay the consumed lifecycle holdout.
