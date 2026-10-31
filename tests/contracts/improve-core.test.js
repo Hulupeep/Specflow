@@ -1252,7 +1252,7 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
    expect(improve.events(runDir).find(e=>e.event==='verification_blocked').backendFailure.admission).toEqual(admission);
   }finally{for(const spy of spies)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
  }));
- test.each(['unchanged','before-dispatch','oracle-before-dispatch','ledger-before-dispatch','during-check','after-shutdown','branch-after-shutdown','authority-after-shutdown','profile-registry-during-check','journey-profile-during-check','worker-during-check'])('managed identity boundaries reject mutation without live Git: %s',quiet(async mutation=>{
+ test.each(['unchanged','before-dispatch','oracle-before-dispatch','ledger-before-dispatch','during-check','after-shutdown','branch-after-shutdown','authority-after-shutdown','profile-registry-during-check','journey-profile-during-check','worker-during-check','review-evidence-during-check'])('managed identity boundaries reject mutation without live Git: %s',quiet(async mutation=>{
   const f=fixture(),generation=require('../../scripts/improve-backend-generation.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs'),binding=require('../../scripts/improve-binding.cjs'),native=require('../../scripts/test-execution.cjs');
   let selected,frozenRun,phase='outside',workspace,revoked=false,checks=0;const gitPhases=[];
   const touch=()=>fs.appendFileSync(path.join(workspace,'README.md'),'changed');
@@ -1271,7 +1271,7 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
    jest.spyOn(generation,'close').mockImplementation(async(handle,cause)=>({attempt:{attemptId:'fixture'},terminal:{...terminal,cause},backendTerminal,originalCause:cause})),
    jest.spyOn(native,'ownsFrozen').mockReturnValue(true),
    jest.spyOn(native,'executeFrozen').mockImplementation((check,options)=>{checks++;if(mutation==='during-check')touch();if(profileFile)fs.appendFileSync(profileCopy,' ');const evidence_path=path.join(options.runDir,'fixture-native.json');fs.writeFileSync(evidence_path,'{}');return {result:'fail',executable:true,exit_code:1,evidence_path,framework:{},artifacts:{},cases:[],errors:[],summary:{passed:0,failed:1,skipped:0}};})];
-  const profileFile=mutation==='profile-registry-during-check'?'improve-backend-profiles.cjs':mutation==='journey-profile-during-check'?'improve-backend-journeys-profile.json':mutation==='worker-during-check'?'improve-worker.cjs':null;
+  const profileFile=mutation==='profile-registry-during-check'?'improve-backend-profiles.cjs':mutation==='journey-profile-during-check'?'improve-backend-journeys-profile.json':mutation==='worker-during-check'?'improve-worker.cjs':mutation==='review-evidence-during-check'?'improve-review-evidence.cjs':null;
   const profileCopy=path.join(f.root,'selected-profile');
   if(profileFile){
    fs.copyFileSync(path.join(__dirname,'../../scripts',profileFile),profileCopy);
@@ -1369,3 +1369,62 @@ test('ROLE-PROVENANCE: absent host routing and usage stay explicitly unknown (#1
     expect(row).toMatchObject({ policy_id: null, provider: null, configured_provider: null, requested_provider: null, observed_provider: null, configured_model: null, requested_model: null, observed_model: 'unknown', fallback_model: null, input_tokens: null, output_tokens: null, cost_usd: null, cost_status: 'unknown' });
   } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
 });
+
+test('judge retries retain prior artifacts and cannot record stale output after failure',quiet(async()=>{
+ const f=fixture();let spy;try{
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  const calls=[];spy=jest.spyOn(runner,'runAdapter').mockImplementation((policy,options)=>{
+   calls.push({policy,options});fs.writeFileSync(policy.transcript_path,'attempt '+calls.length);
+   if(calls.length===1){fs.writeFileSync(policy.output_path,JSON.stringify({judgments:[{criterion:'AC-2',level:4,result:'pass',rationale:'independent observed evidence'}]}));return {status:'gate_rerun_required',entry:{exit_code:0}};}
+   return {status:'adapter_failed',entry:{exit_code:2,failure:JSON.stringify({code:'role_input_limit',stage:'model',next_action:'Preserve originals; no acceptance replay.'})}};
+  });
+  const options={policy:writeTmp(f,'judge.json',FAKE_BUILDER({id:'independent-judge'})),criteria:['AC-2']};
+  expect(improve.judge(runDir,options).recorded).toBe(1);const first=fs.readFileSync(calls[0].policy.output_path);
+  const result=improve.judge(runDir,options);expect(result.recorded).toBe(0);expect(result.failure.code).toBe('role_input_limit');
+  expect(calls[1].options.cwd).not.toBe(calls[0].options.cwd);expect(calls[1].policy.output_path).not.toBe(calls[0].policy.output_path);
+  expect(fs.readFileSync(calls[0].policy.output_path).equals(first)).toBe(true);expect(fs.readFileSync(calls[0].policy.transcript_path,'utf8')).toBe('attempt 1');
+ }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test.each(['before','during'])('judge rejects workspace drift %s native review without recording judgments',quiet(async when=>{
+ const f=fixture();let spy;try{
+  const {runDir,ws}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  spy=jest.spyOn(runner,'runAdapter').mockImplementation(policy=>{
+   if(when==='during')setSteps(ws,1);
+   fs.writeFileSync(policy.output_path,JSON.stringify({judgments:[{criterion:'AC-2',level:4,result:'pass',rationale:'reviewed another patch'}]}));
+   return {status:'gate_rerun_required',entry:{exit_code:0}};
+  });
+  if(when==='before')setSteps(ws,1);
+  expect(()=>improve.judge(runDir,{policy:writeTmp(f,'judge.json',FAKE_BUILDER({id:'independent-judge'}))})).toThrow(/binding|changed/i);
+  expect(fs.readFileSync(path.join(runDir,'evidence.jsonl'),'utf8').trim().split('\n').map(JSON.parse).filter(e=>e.kind==='judgment')).toHaveLength(0);
+  if(when==='before')expect(spy).not.toHaveBeenCalled();
+  setSteps(ws,2);expect(improve.evaluate(runDir).criteria.find(c=>c.id==='AC-2').status).toBe('missing');
+ }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test.each([false,true])('judge binds the reviewed patch, receipts and native output (tampered output=%s)',quiet(async tamper=>{
+ const f=fixture();let spy;try{
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  spy=jest.spyOn(runner,'runAdapter').mockImplementation(policy=>{
+   fs.writeFileSync(policy.output_path,JSON.stringify({judgments:[{criterion:'AC-2',level:4,result:'pass',rationale:'independent review'}]}));
+   return {status:'gate_rerun_required',entry:{exit_code:0}};
+  });
+  expect(improve.judge(runDir,{policy:writeTmp(f,'judge.json',FAKE_BUILDER({id:'independent-judge'}))}).recorded).toBe(1);
+  const item=fs.readFileSync(path.join(runDir,'evidence.jsonl'),'utf8').trim().split('\n').map(JSON.parse).find(e=>e.kind==='judgment'),call=improve.events(runDir).find(e=>e.event==='judgment_run');
+  expect(item.source.binding).toEqual(expect.objectContaining({patch_sha256:expect.stringMatching(/^[a-f0-9]{64}$/),after_receipt_sha256:improve.boundReceipt(runDir,'after').entry.sha256,baseline_receipt_sha256:improve.boundReceipt(runDir,'baseline',{current:false}).entry.sha256}));
+  expect(call.judgment_binding).toEqual(item.source.binding);expect(item.source.attempt).toBe(call.attempt);
+  improve.submitJudgment(runDir,{criterion:item.criterion,level:item.level,producer_role:item.producer_role,executor:item.executor,rationale:'mismatched patch must not veto',result:'fail',source:{...item.source,binding:{...item.source.binding,patch_sha256:'0'.repeat(64)}}});
+  improve.submitJudgment(runDir,{criterion:item.criterion,level:item.level,producer_role:item.producer_role,executor:item.executor,rationale:'copied binding is not a native result',result:'fail',native_judgment:true,source:item.source});
+  if(tamper)fs.appendFileSync(call.output_path,'\nchanged after judgment');
+  expect(improve.evaluate(runDir).criteria.find(c=>c.id==='AC-2').status).toBe(tamper?'missing':'satisfied');
+ }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test.each(['pass','fail'])('unbound manual %s judgment cannot decide a heuristic criterion',quiet(async result=>{
+ const f=fixture();try{
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  improve.submitJudgment(runDir,{criterion:'AC-2',level:4,result,producer_role:'ux-evaluator',executor:'manual-review',rationale:'no reviewed input identity'});
+  const decision=improve.evaluate(runDir),criterion=decision.criteria.find(c=>c.id==='AC-2');
+  expect(criterion.status).toBe('missing');expect(criterion.not_counted[0].why).toMatch(/not bound/);expect(decision.decision).toBe('KEEP');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));
