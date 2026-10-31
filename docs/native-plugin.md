@@ -24,9 +24,11 @@ owning checks. State and gate authority remain with the existing runtime.
 Git and the accepted project's test framework are required when those owning
 checks depend on them; bundled runtime dependencies do not replace those tools.
 Audit/simulate remain `/specflow:specflow-audit` and `/specflow:specflow-simulate`.
-Owning hooks (#113) are implemented. Marketplace
-publication (#115) and final integrated/cache proof (#116) remain separate work;
-the overall plugin (#109) is still under qualification.
+Owning hooks (#113), marketplace publication (#115), and integrated/cache proof
+(#116) are complete for the published 0.12.0 release. See the
+[release evidence](https://github.com/Hulupeep/Specflow/issues/116#issuecomment-6493028181).
+Later runtime changes require their own versioned package and installed proof;
+release qualification does not establish real-product Improve outcomes.
 
 Run deterministic payload tests with:
 
@@ -53,8 +55,8 @@ previously registered in an isolated fixture. It is not proof of startup under t
 marketplace's registered id, immutable version-cache update, npm publication or
 customer validity. This Claude Code 2.1.285 qualification copied the local
 marketplace payload into its cache; local source handling depends on the host
-and source type. That observation does not prove versioned updates. Final published npm
-source/cache proof belongs to #115/#116; a Git root with a supported lockfile can
+and source type. That observation does not prove versioned updates. The subsequent published 0.12.0
+source/cache proof is recorded in #115/#116; a Git root with a supported lockfile can
 trigger host-managed dependency installation, despite runtime independence.
 
 Validate the native manifest and marketplace files individually on Claude2.1.285,
@@ -88,8 +90,16 @@ The `specflow-repo` catalog retains the thin Improve plugin and pins the full
 and marketplace package pin from `package.json`; `--check` rejects version drift.
 The catalog entry does not override the installed plugin manifest's version.
 
-The release candidate is 0.12.0. It is not yet published or installed from the
-public registry. Do not merge a catalog pin that points at an unavailable version.
+Version 0.12.0 was published on 2026-10-29 and qualified from public npm through
+the advertised GitHub marketplace. Its 387 cached files matched the validated
+release source; native command execution and four owning-hook scenarios passed.
+The registry integrity is
+`sha512-6a0YBrR0bNc5+I3V9imBpY1ZU6lJh8fi9ZKko6AY+zyorbOf0RVyV9Jk9KED+XBSQcygSwuvsf7D+0/MUHcqCQ==`.
+
+The current source includes later runtime fixes. A local package still labelled
+0.12.0 does not identify those bytes as the published release. Publish them under
+a distinct version, then repeat package parity and installed qualification before
+advancing the catalog pin. Never point the catalog at an unavailable version.
 The npm payload omits lockfiles and bundles its required runtime dependencies;
 this avoids relying on a host dependency install to supply the verifier runtime.
 Claude's [npm plugin source contract](https://code.claude.com/docs/en/plugins/marketplace-reference#npm-plugin-source)
