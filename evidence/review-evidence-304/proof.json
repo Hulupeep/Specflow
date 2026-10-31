@@ -2,25 +2,26 @@
   "scope": "Installed presentation/native role qualification, with separate canonical judge retry and binding regression; not a new product cycle or acceptance replay",
   "installed": {
     "files": 412,
-    "tarSha256": "7ef0177c8ba9837446b1975f04cf6851bf31b7fbf9f7fc3eacf740bab422a6a6"
+    "tarSha256": "35e100fbb85557654b168d9d3bf5a6d8e3e9336b7ac4fdec1b63b37944f618bc",
+    "runtimeCommit": "a139777"
   },
   "native": {
-    "session": "b2ba618d-dc62-476c-83a0-41b05a11775c",
+    "session": "2df60a07-8f21-4aff-9559-40ad22a65eab",
     "model": "claude-opus-5-5",
     "io_tool_calls": 0,
     "serialization_tool_calls": 1,
-    "raw_sha256": "7e5f7e720a281c924203fa068f3120a4e6897a670d13956d6df19250f6276b05",
-    "input_sha256": "34fb1b515c5171295c5d5d8d165e0bf737130b6c6ec46aeb022fc51d9a78418d",
+    "raw_sha256": "9b9a3c141b48ba41610184b267bdbb3e8e0e260d2108bf85cf5ae6c177fe0270",
+    "input_sha256": "44c7f1aee50ca48368fbba39231ce5da9c1928b51af07681ecb4509c0314fd79",
     "usage_mode": "subscription_cli",
     "actual_charges": "unmeasured",
-    "cli_estimate_usd": 1.2906
+    "cli_estimate_usd": 1.3010760000000001
   },
   "presentation": {
     "originalFilesUnchanged": 84,
     "acceptanceFrames": 16,
     "practiceFramesOmitted": 6,
     "promptBytesIncludingFences": 271572,
-    "capsuleValidationDelta": "After native qualification, stricter capsule entry/byte validation added. All presentation file bytes identical after normalizing only random untrusted-fence nonces. This is composed evidence, not a claimed rerun.",
+    "capsuleValidationDelta": "Superseded by fresh installed qualification of the current strict capsule, outer-envelope and receipt-bound image implementation. Earlier native output remains retained privately.",
     "comparedFiles": 83,
     "manifest": {
       "improvement-contract.v1.json": "312409a63f58e43f9db0050717b6f00e49ee2189359da5a3c791722c77975887",
@@ -110,8 +111,21 @@
   },
   "tests": {
     "relevantBeforeFinalCapsuleGuard": 253,
-    "finalCapsuleSuite": "see current test receipt; CI pending"
+    "finalCapsuleSuite": "see current test receipt; CI pending",
+    "receiptBoundCoreAndPresentation": 193,
+    "finalPresentation": 40
   },
   "oldRunMutated": false,
-  "holdoutReplayed": false
+  "holdoutReplayed": false,
+  "previousNativeQualification": {
+    "session": "b2ba618d-dc62-476c-83a0-41b05a11775c",
+    "model": "claude-opus-5-5",
+    "io_tool_calls": 0,
+    "serialization_tool_calls": 1,
+    "raw_sha256": "7e5f7e720a281c924203fa068f3120a4e6897a670d13956d6df19250f6276b05",
+    "input_sha256": "34fb1b515c5171295c5d5d8d165e0bf737130b6c6ec46aeb022fc51d9a78418d",
+    "usage_mode": "subscription_cli",
+    "actual_charges": "unmeasured",
+    "cli_estimate_usd": 1.2906
+  }
 }

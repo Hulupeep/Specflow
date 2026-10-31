@@ -1,23 +1,23 @@
 {
+  "_binding": {
+    "role": "judge",
+    "nonce": "9c2fe2a4-bb2b-4bb4-8c83-e39c3dedcea5",
+    "input_sha256": "44c7f1aee50ca48368fbba39231ce5da9c1928b51af07681ecb4509c0314fd79"
+  },
   "judgments": [
     {
       "criterion": "AC-DRAFT-UX",
       "level": 3,
       "result": "pass",
-      "rationale": "Before the change, the input emptied after a failed save. At baseline, verification/baseline/runtime-evidence/attempt-07iTr0/native-report.json and attempt-Kg6x1i (both widths) record the input value as \"\" after an actual offline failure and after an endpoint denial, while the '.r.bad' receipt was showing. The page snapshot in attempt-Kg6x1i/error-context.md shows the error 'Failed to create next action.' and an empty, focused textbox. The baseline before-failure screenshots (images 11 and 12) show the typed draft before submission. After the change, the after-failure screenshots (image 5 at 1280, image 8 at 360) show the exact draft, including its leading spaces, still in the input. The input still has its focus ring, and the existing '\u00d7 Failed to fetch' receipt sits in the same place. The after-retry screenshots (images 6 and 9) show the action added as the NEXT row with trimmed text, a cleared and still-focused input, and the existing '\u2713 Added to \u2026' receipt. This is evidence that a user can now retry without retyping. Holdout runs attempt-e6vipg, attempt-ob6X3v and attempt-6fPX5T pass 2/2 each with 0 skipped; this covers the pending state (focused, readOnly, not disabled), single create, and draft retention after denial. The patch adds no visible UI: it adds readOnly={pending}, an awaited submit, and a reordered success/error branch in TodayBoard. Preservation screenshots after the change (images 1\u20134) match the baseline ones (images 13\u201316). Header, stax navigation, panel hierarchy, inline 'Failed to fetch' refresh error, Added receipt, command bar and key hints are the same. The existing 360px overflow (about 517px screenshot width) is unchanged and was not made worse. The claim stays within the runtime evidence; no adoption, revenue or broader accessibility claim is made."
+      "rationale": "Observed problem confirmed at baseline: verification/baseline/runtime-evidence/attempt-07iTr0/native-report.json and attempt-ZLDqBM show the input value is \"\" after a real offline failure at 1280 and 360 (accessibility snapshot: input value=\"\"), and attempt-Kg6x1i shows the draft lost while the save is pending and after a denied save. Baseline screenshots 11 and 12 show only the typed draft before the failure. After the change, screenshots 5 (1280) and 8 (360, today-gain after-failure.png) show: the exact draft with its leading spaces still in the input; the focus ring still on the input; the existing footer receipt '\u00d7 Failed to fetch' readable; and the panel still saying '0 open / No open next actions'. Screenshots 6 and 9 (after-retry) show a retry with the text unedited: the trimmed action appears as the NEXT row, the count goes to '1 open', the existing '\u2713 Added to Draft recovery \u2026' receipt shows, the input is cleared and keeps focus. Together these show the retype step is gone. Preservation: the after screenshots 1\u20134 (pinned.png, after-refresh-failure.png) match baseline 13\u201316 in layout. The header, stax pill, Refresh/Pin/Menu, MUST lane banner, Goals toggle, in-panel 'Failed to fetch' error, NEXT row, quick-add input position, receipt line, command bar and shortcut legend are all unchanged. The existing 360px horizontal overflow (stax pill outside the column) appears at both baseline and after, so it is not a regression; fixing it is a stated non-goal. workspace.patch adds no interface. It only makes the input readOnly while a save is pending (not disabled, so focus stays) and clears the draft only on a confirmed create. Keyboard: Enter still submits, focus is kept (focus ring visible in the after screenshots, and the pending holdout attempt-ob6X3v passes), and the aria-label/placeholder are unchanged. The holdouts for recovery, pending and preservation all pass at both widths after the change (attempt-e6vipg, attempt-ob6X3v, attempt-6fPX5T). The claim is limited to this journey; nothing in the evidence supports any adoption, revenue or broader accessibility claim, and none is made."
     }
   ],
   "risks": [
-    "The evidence includes no screenshot of the pending or readOnly state. Its UX (no visible busy indicator and no aria-busy) is supported only by holdout assertions, not by visual or screen-reader evidence.",
-    "The error copy 'Failed to fetch' is raw, technical wording that existed before this change. It is readable but does not tell the user that their draft was kept or that they can press Enter to retry.",
-    "The baseline image set has no gain after-failure screenshot. The empty-input baseline state comes from text assertions and the page snapshot, not from an image.",
-    "The after evidence includes no run of the public tests/e2e/journey_today_draft.spec.cjs delivery journey. The private holdout pass does not prove that public file, which the contract says must be run separately.",
-    "Keeping the draft across panel unmount, navigation or reload is out of scope. Users may still lose text in those cases.",
-    "The pending check covers only a synchronous guard and readOnly. Keyboard and screen-reader announcement of the failure was not tested."
-  ],
-  "_binding": {
-    "role": "judge",
-    "nonce": "a8aa13aa-9470-40cb-a2b9-253801d4b532",
-    "input_sha256": "34fb1b515c5171295c5d5d8d165e0bf737130b6c6ec46aeb022fc51d9a78418d"
-  }
+    "While a save is pending, the readOnly input looks exactly like the idle input. Sighted users get no sign that a save is in progress, and screen readers hear nothing; the contract forbids new UI, but this is a remaining clarity gap on slow networks.",
+    "The failure message is still the generic 'Failed to fetch', shown in the footer receipt rather than next to the input. It is readable but doesn't tell the user that the draft was kept and that pressing Enter again will retry. This is unchanged from before, not a regression.",
+    "No baseline screenshot exists after a failure (the baseline holdout stopped before taking it, and the dev-practice images were left out of the evidence). The baseline lost draft is shown by test assertions and accessibility snapshots, not by images.",
+    "Because the draft is kept, if a response is lost after the server already committed the create, retrying could make a duplicate. The contract explicitly does not guarantee exactly-once here.",
+    "The draft is held only in component state, so navigating away, reloading or closing the panel still loses it. This is an explicit non-goal, but users may expect it to survive.",
+    "Mobile evidence covers only a 360px viewport. Touch input and other breakpoints were not exercised."
+  ]
 }
