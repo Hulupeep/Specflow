@@ -3,7 +3,7 @@
 // journal outcomes, authority, or protected checker receipts.
 const fs=require('fs'),path=require('path'),cp=require('child_process'),assert=require('assert'),crypto=require('crypto');
 const identity=require('../../scripts/improve-process-identity.cjs');
-const SCENARIOS=['readiness-failure','resource-breach','foreign-same-name','missing-migration-file'];
+const SCENARIOS=['readiness-failure','resource-breach','storage-breach','foreign-same-name','missing-migration-file'];
 const read=p=>JSON.parse(fs.readFileSync(p)),hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const docker=args=>cp.spawnSync('/usr/bin/docker',['--host','unix:///var/run/docker.sock',...args],{encoding:'utf8',timeout:10000,env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',DOCKER_CONFIG:'/nonexistent'}});
@@ -12,14 +12,17 @@ if(process.argv[2]==='--supervisor'){
  const [target,scenario,root]=process.argv.slice(3);assert(SCENARIOS.includes(scenario));
  let descriptor,journal,paused=false;
  process.on('message',d=>{if(d?.value?.managed)descriptor=d.value;});
- const Journal=require('../../scripts/improve-managed-backend.cjs').ManagedBackendJournal,phase=Journal.prototype.phase,close=Journal.prototype.close,reserve=Journal.prototype.reserve,spawn=cp.spawn;
+ const Journal=require('../../scripts/improve-managed-backend.cjs').ManagedBackendJournal,phase=Journal.prototype.phase,started=Journal.prototype.started,close=Journal.prototype.close,reserve=Journal.prototype.reserve,spawn=cp.spawn;
  function barrier(operation,state){if(paused)return;paused=true;assert(descriptor);write(root,'barrier.json',{scenario,pid:process.pid,identity:identity.identity(),operation,journalRoot:descriptor.root,stage:descriptor.stage,state});process.kill(process.pid,'SIGSTOP');}
  Journal.prototype.reserve=function(...args){const result=reserve.apply(this,args);journal=this;return result;};
- Journal.prototype.phase=function(next){const result=phase.call(this,next);
+ Journal.prototype.phase=function(next){
+  if(scenario==='storage-breach'&&next==='execution'){write(root,'storage-escaped-to-execution.json',{requestedPhase:next,previousPhase:this.snapshot().phase,protectedChecksExecuted:0});throw Error('storage_exhaustion_not_rejected_before_execution');}
+  const result=phase.call(this,next);
   if(next==='readiness'&&['readiness-failure','resource-breach'].includes(scenario))barrier('real-backend-entering-readiness',this.snapshot());
   if(next==='bootstrap'&&scenario==='missing-migration-file')barrier('before-staged-migrations-execute',this.snapshot());
   return result;
  };
+ Journal.prototype.started=function(role,...args){const result=started.call(this,role,...args);if(scenario==='storage-breach'&&role==='gateway')barrier('real-gateway-started-before-http-readiness',this.snapshot());return result;};
  cp.spawn=function(file,args,options){if(scenario==='foreign-same-name'&&file==='/usr/bin/docker'&&args[2]==='image'&&args[3]==='inspect')barrier('reserved-name-before-create',journal.snapshot());return spawn.call(this,file,args,options);};
  Journal.prototype.close=function(){
   if(descriptor){const file=path.join(descriptor.root,'terminal.json');if(fs.existsSync(file)){const bytes=fs.readFileSync(file);assert.deepEqual(JSON.parse(bytes),this.snapshot());write(root,'observed-terminal.json',{originalPath:file,sha256:hash(bytes),terminal:JSON.parse(bytes)});}}
@@ -52,10 +55,10 @@ if(process.argv[2]==='--supervisor'){
    console.log(JSON.stringify({status:'running',scenario,root,controllerPid:child.pid,originalDeadlineAtMs:admission.deadlineAtMs}));
    const end=Math.min(admission.deadlineAtMs,Date.now()+600000),barrierFile=path.join(root,'barrier.json');
    while(!fs.existsSync(barrierFile)){assert.equal(identity.state(controller),'live','controller terminated before fault barrier');assert(Date.now()<end,'fault barrier timeout');await sleep(25);}
-   barrier=read(barrierFile);assert.equal(barrier.scenario,scenario);assert.equal(identity.state(barrier.identity),'live');assert.notEqual(barrier.identity.group,controller.group);assert.equal(barrier.state.phase,['readiness-failure','resource-breach'].includes(scenario)?'readiness':'bootstrap');
+   barrier=read(barrierFile);assert.equal(barrier.scenario,scenario);assert.equal(identity.state(barrier.identity),'live');assert.notEqual(barrier.identity.group,controller.group);assert.equal(barrier.state.phase,['readiness-failure','resource-breach','storage-breach'].includes(scenario)?'readiness':'bootstrap');
    const attempts=require('../../scripts/improve-backend-attempt.cjs'),store=new worker.DurableStore({root:config.worker.stateRoot,sourceRoot:config.worker.stateRoot}),active=attempts.reconcileStopped(store,q.jobId);assert.equal(active.state,'active');const ref=active.attempt;
    const db=barrier.state.resources.find(r=>r.role==='database');
-   if(['readiness-failure','resource-breach'].includes(scenario)){
+   if(['readiness-failure','resource-breach','storage-breach'].includes(scenario)){
     assert(db&&db.status==='running');const dbEvents=attempts.resourceEvents(store,ref,'database'),created=dbEvents.find(e=>e.state==='created');assert(created&&created.id===db.id);assert(dbEvents.some(e=>e.state==='started'));
     const inspection=JSON.parse(docker(['inspect',db.id]).stdout)[0];assert(inspection.State.Running);assert.equal(inspection.Name,'/'+db.name);assert.equal(inspection.Image,db.image);assert.equal(inspection.Config.Labels['specflow.backend.job'],q.jobId);
    }
@@ -65,6 +68,22 @@ if(process.argv[2]==='--supervisor'){
    }else if(scenario==='resource-breach'){
     const bytes=backend.PROFILE.output.perServiceBytes+1048576;assert(Number.isSafeInteger(bytes)&&bytes<33554432);
     const result=docker(['exec','--detach',db.id,'/bin/sh','-c','head -c '+bytes+' /dev/zero > /proc/1/fd/1']);assert.equal(result.status,0);injection={operation:'actual-owned-process-output',id:db.id,requestedBytes:bytes,perServiceLimit:backend.PROFILE.output.perServiceBytes};
+   }else if(scenario==='storage-breach'){
+    const target=barrier.state.resources.find(r=>r.role==='gateway');assert(target&&target.status==='running');
+    const inspection=JSON.parse(docker(['inspect',target.id]).stdout)[0];
+    assert(inspection.State.Running);assert.equal(inspection.Name,'/'+target.name);assert.equal(inspection.Image,target.image);
+    assert.equal(inspection.Config.Labels['specflow.backend.job'],q.jobId);assert.equal(inspection.Config.Labels['specflow.backend.generation'],barrier.state.generation);assert.equal(inspection.Config.Labels['specflow.backend.reservation'],target.reservation);
+    assert(inspection.HostConfig.Tmpfs['/tmp'].includes('size=16777216'));
+    const available=()=>{const r=docker(['exec',target.id,'df','-Pk','/tmp']);assert.equal(r.status,0);const row=r.stdout.trim().split('\n').at(-1).trim().split(/\s+/);assert.equal(row.at(-1),'/tmp');const blocks=Number(row[3]);assert(Number.isSafeInteger(blocks)&&blocks>=0);return blocks;};
+    const before=available();assert(before>0);
+    assert.equal(docker(['exec',target.id,'/bin/sh','-c','printf storage-positive > /tmp/specflow-storage-positive']).status,0);
+    const bytes=16777216+1048576;
+    const exhausted=docker(['exec',target.id,'/bin/sh','-c','dd if=/dev/zero of=/tmp/specflow-storage-exhaustion bs=1048576 count=17']);
+    const after=available();
+    write(root,'storage-write-attempt.json',{id:target.id,limitBytes:16777216,requestedBytes:bytes,positiveWrite:true,availableBlocksBefore:before,availableBlocksAfter:after,exitCode:exhausted.status,signal:exhausted.signal,error:exhausted.error?.code||null,stderr:exhausted.stderr.slice(0,512)});
+    assert.equal(exhausted.status,1);assert.match(exhausted.stderr,/No space left on device/i);
+    assert.equal(after,0);
+    injection={operation:'actual-owned-tmpfs-exhaustion',id:target.id,role:'gateway',mount:'/tmp',limitBytes:16777216,requestedBytes:bytes,positiveWrite:true,writeExit:exhausted.status,storageError:'ENOSPC',availableBlocksBefore:before,availableBlocksAfter:after};
    }else if(scenario==='missing-migration-file'){
     assert.equal(barrier.state.resources.length,0);const envelope=path.join(store.root,'backend-attempts','envelope-'+ref.attemptId),stage=fs.realpathSync(barrier.stage);assert.equal(path.dirname(stage),fs.realpathSync(envelope));assert(path.basename(stage).startsWith('backend-stage-'));
     const migration=backend.RECIPE.migrations.at(-1),file=path.join(stage,'migrations',migration.name);assert.equal(hash(fs.readFileSync(file)),migration.sha256);assert(fs.lstatSync(file).isFile());fs.unlinkSync(file);assert(!fs.existsSync(file));injection={operation:'remove-one-owned-staged-migration-before-execution',migration:migration.name,originalSha256:migration.sha256,remainingFiles:fs.readdirSync(path.dirname(file)).length};assert.equal(injection.remainingFiles,155);
@@ -77,6 +96,7 @@ if(process.argv[2]==='--supervisor'){
    while(!fs.existsSync(observedFile)||exited===null){assert(Date.now()<finishBy,'operational cleanup timeout');await sleep(50);}
    const observed=read(observedFile),terminal=observed.terminal;assert.equal(terminal.phase,scenario==='foreign-same-name'?'cleanup_failed':'cleaned');assert.equal(terminal.successReceipt,false);if(scenario!=='foreign-same-name')assert(terminal.resources.every(r=>r.status==='removed'));
    if(scenario==='resource-breach'){assert.equal(terminal.cause,'backend_output_limit');assert(terminal.resources.find(r=>r.role==='database').outputBytes>backend.PROFILE.output.perServiceBytes);}
+   else if(scenario==='storage-breach')assert.equal(terminal.cause,'backend_storage_limit');
    else assert(['backend_service_died','backend_readiness_failed'].includes(terminal.cause),'readiness failure lacks expected named cause');
    let signed=null,resources,credentialEnvelopeRemoved=false,attemptState;
    if(scenario==='foreign-same-name'){
