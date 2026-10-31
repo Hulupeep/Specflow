@@ -1023,6 +1023,42 @@ test('PROOF-REPORT: absent usage never becomes zero measured spend',quiet(async(
  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
 }));
 
+test.each(['valid', 'missing'])('ORACLE297: frozen authoring rejects before %s inputs can invoke or mutate', quiet(async inputs => {
+  const f = fixture(); let adapter;
+  try {
+    const { runDir } = await prepare(f);
+    const holdout = path.join(runDir, 'holdout', 'steps.cjs');
+    const ledger = path.join(runDir, 'ledger.jsonl');
+    const adapters = path.join(runDir, 'adapters');
+    fs.mkdirSync(adapters, { recursive: true });
+    const retained = path.join(adapters, 'oracle-author.prompt.md');
+    fs.writeFileSync(retained, 'retained original prompt');
+    const before = [holdout, ledger, retained].map(file => fs.readFileSync(file));
+    adapter = jest.spyOn(runner, 'runAdapter').mockImplementation(() => {
+      const draft = path.join(runDir, 'oracle-draft', 'holdout');
+      fs.mkdirSync(draft, { recursive: true });
+      fs.writeFileSync(path.join(draft, 'steps.cjs'), '// replacement must never be copied');
+      return { status: 'gate_rerun_required', entry: { exit_code: 0 } };
+    });
+    const policy = inputs === 'valid' ? writeTmp(f, 'oracle.json', FAKE_BUILDER({ id: 'independent-oracle' })) : path.join(f.root, 'missing-policy');
+    const prompt = path.join(f.root, 'prompt.md');
+    if (inputs === 'valid') fs.writeFileSync(prompt, 'try authoring again');
+    let rejection;
+    try { improve.oracle(runDir, { policy, prompt }); } catch (error) { rejection = error; }
+    expect(adapter).not.toHaveBeenCalled();
+    expect([holdout, ledger, retained].map(file => fs.readFileSync(file))).toEqual(before);
+    expect(fs.existsSync(path.join(runDir, 'oracle-draft'))).toBe(false);
+    expect(rejection?.message).toMatch(/oracle.*frozen.*retain.*successor/i);
+    expect(rejection).toMatchObject({
+      code: 'oracle_frozen', stage: 'oracle',
+      next_action: expect.stringMatching(/retain.*successor.*deadline/i),
+    });
+  } finally {
+    adapter?.mockRestore();
+    fs.rmSync(f.root, { recursive: true, force: true });
+  }
+}));
+
 test.each(['adapter_failed','blocked_human_required'])('PROOF-ORACLE: %s cannot relabel stale or partial draft files as authored',quiet(async(status)=>{
  const f=fixture();let spy;try{
   const {runDir}=improve.startRun({target:f.repo,mission:f.mission,runId:'oracle-failed',stateDir:f.state,worktreeRoot:f.worktrees});

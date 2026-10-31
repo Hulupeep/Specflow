@@ -1268,6 +1268,14 @@ function recordOracle(runDir, { role, executor, files, provenance = null }) {
 
 function oracle(runDir, options = {}) {
   loadRun(runDir);
+  // recordOracle retains its own guard, but rejecting there is too late:
+  // the provider has run and its output has already replaced holdout bytes.
+  if (lastEvent(events(runDir), 'contract_frozen')) {
+    const recovery = 'Retain this run and its evidence. Repairs require a separately admitted successor; do not reset history or extend the existing deadline.';
+    throw Object.assign(new Error('The oracle is frozen. ' + recovery), {
+      code: 'oracle_frozen', stage: 'oracle', next_action: recovery,
+    });
+  }
   if (!options.policy || !options.prompt) throw new Error('oracle needs --policy and --prompt');
   const raw = loadPolicy(options.policy);
   const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, 'oracle-author');
