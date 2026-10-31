@@ -1288,3 +1288,28 @@ describe('BACKEND293: declared backend cannot silently use the host runtime',()=
   }finally{fs.rmSync(f.root,{recursive:true,force:true});}
  }));
 });
+
+test('ROLE-PROVENANCE: host metadata survives recording without granting authority (#177)', () => {
+  const f = fixture();
+  try {
+    const { runDir } = improve.startRun({ target: f.repo, mission: f.mission, runId: 'host-role', stateDir: f.state, worktreeRoot: f.worktrees });
+    const metadata = { policy_id: 'approved-host', provider: 'codex', configured_provider: 'codex', requested_provider: 'codex', observed_provider: 'codex', configured_model: 'configured', requested_model: 'requested', observed_model: 'observed', fallback_model: 'fallback', input_tokens: 13, output_tokens: 0 };
+    const before = JSON.parse(fs.readFileSync(path.join(runDir, 'run.json'), 'utf8'));
+    improve.recordRole(runDir, { role: 'scout', executor: 'host-session', ...metadata, acceptance: 'override', never_without_human: [], permissions: ['deploy'] });
+    const row = improve.events(runDir).find(e => e.event === 'role_recorded');
+    expect(row).toMatchObject(metadata);
+    for (const key of ['acceptance', 'never_without_human', 'permissions']) expect(row).not.toHaveProperty(key);
+    expect(JSON.parse(fs.readFileSync(path.join(runDir, 'run.json'), 'utf8'))).toEqual(before);
+    expect(improve.verifyLedger(runDir).ok).toBe(true);
+  } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+});
+
+test('ROLE-PROVENANCE: absent host routing and usage stay explicitly unknown (#177)', () => {
+  const f = fixture();
+  try {
+    const { runDir } = improve.startRun({ target: f.repo, mission: f.mission, runId: 'host-unknown', stateDir: f.state, worktreeRoot: f.worktrees });
+    improve.recordRole(runDir, { role: 'scout', executor: 'host-session' });
+    const row = improve.events(runDir).find(e => e.event === 'role_recorded');
+    expect(row).toMatchObject({ policy_id: null, provider: null, configured_provider: null, requested_provider: null, observed_provider: null, configured_model: null, requested_model: null, observed_model: 'unknown', fallback_model: null, input_tokens: null, output_tokens: null, cost_usd: null, cost_status: 'unknown' });
+  } finally { fs.rmSync(f.root, { recursive: true, force: true }); }
+});
