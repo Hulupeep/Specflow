@@ -1,6 +1,6 @@
 {
   "name": "specflow",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Specflow native layout and role/skill catalog. Workflow commands and owning enforcement remain under qualification.",
   "author": {
     "name": "Colm Byrne"
