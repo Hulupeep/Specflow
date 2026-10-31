@@ -1,0 +1,33 @@
+# #304 verification
+
+Red before fix: original regression8cases,6passed2failed (oversized binding; practice-image attribution). A native backend shape regression then caught the services-array mismatch. The judge retry regression reproduced a failed second adapter recording a stale successful judgment (expected0, received1). All failures remain in private logs.
+
+After correction: relevant core/worker/presentation253/253; final capsule/metadata integration27/27. Full current-suite CI still required. No browser UI is changed; no skipped UI journey is used as evidence.
+
+Actual retained before/after envelope:84originalfiles unchanged,16acceptanceframes retained,6practice-only screenshots omitted with hash references and text reports retained. All service/configuration values remain visible; only exact duplicate service projections and validated digest inventories are summarized. Unknown/mutated shapes and duplicate JSON keys remain complete. Text bound is unchanged256KiB before fencing; assembled prompt271572bytes includes outer fences. Images retain the existing16distinct-frame limit.
+
+Installed qualification: local npm pack/prepack/install, packaged-byte parity, installed evidence copier/curatedText/image handling and actual Opus5.5 tool-free role call returned a bound UX judgment. Provenance and output: evidence/review-evidence-304/{proof,native-output}.json. No original product acceptance or old ledger was rerun/modified. This qualifies presentation and native transport; the canonical judge state machine (unique attempt paths, failed output rejection, precise failure code, verifier input binding) is separately exercised by integration/contracts, not falsely attributed to that native call.
+
+After native qualification, the capsule guard was tightened to reject unknown entry fields and mismatched byte totals. Real-bundle file outputs are identical after normalizing only random fence nonces; proof.json carries the comparison manifest. This evidence composition is explicit rather than relabelling the old native run as a new one.
+
+Independent review round1: REV-304-001 permissive shape recognition; REV-304-002 stale retry output/provenance; REV-304-003 native proof absent in its snapshot; REV-304-004 precise failure hidden by adapter status. Changes address001 by validation+retaining nested service data,002 by unique attempt artifacts and success-only judgment parsing,003 by the installed proof above,004 by structured safe code/observed/next-action return. All findings remain in advisory history for re-review. No clean review/CI/merge claim yet.
+
+## Receipt-bound follow-up
+
+Round2 native review was protocol-invalid (cited unread content); it is retained and is not a completed assurance result. Its diagnostic response exposed REV-304-005, loose practice-image classification. The code now uses core-validated phase receipts, digest-bound evidence items, native receipt hashes and acceptance-overlap protection. Loose finding files cannot authorize image removal. Further outer-envelope recognition checks cover attempt IDs, phase, version, hashes and Git identity.
+
+Executed follow-up:193/193 core+presentation tests, then40/40 final presentation tests including outer envelopes and receipt mutation. Native package qualification of this revision is pending; earlier installed evidence remains explicitly historical. Full local suite and canonical CI remain pending.
+
+Fresh installed qualification now completed for runtime commita139777: prepack/install, byte parity, receipt-bound presentation of the real retained envelope and native Opus5.5 bound UX pass with zero I/O calls. proof.json/native-output.json reflect this third qualification; previous raw artifacts remain archived. This supersedes the earlier capsule-delta composition for current runtime coverage, while canonical core state checks remain separately tested as stated above.
+
+## Verified-patch judgment binding (REV-304-006)
+
+The next valid advisory review confirmed001..005 fixed and found006: review could see a changed workspace patch alongside older verified evidence. Three new regressions failed before the fix (both drift routes accepted, and persisted binding absent). The judge now renders the verified Git tree, checks current after-input identity before/after invocation, and records receipt/identity/patch/attempt references. Evaluation excludes unbound or mismatched observations from either passing or failing heuristic criteria, with an explicit not-counted reason. Original receipts and consumed holdout remain untouched.
+
+Executed:273/273 core/worker/presentation checks passed after the binding change;6/6 focused judge/drift/manual checks passed after switching patch rendering to the verified Git object. Full final-head CI and independent re-review remain required. Native qualification a139777 still proves the unchanged installed presentation/transport code; it does not claim native execution of this subsequent core identity guard. The new core behavior is exercised by canonical contract tests.
+
+The next advisory attempt was protocol-invalid because it omitted a required test-file read. Its diagnostic007 was independently confirmed by a red regression: copying a successful attempt's exact source binding into a manual failure wrongly changed the criterion to failed. Native-origin recording now requires a module-private capability; manual claims are always observations, even with copied identifiers or a forged flag. Native output bytes are hash-bound and checked during evaluation. The invalid review remains retained, never counted as assurance.
+
+Native-origin correction checks:273/273 core/worker/presentation passed;7/7 focused final checks passed including both intact and changed native output, copied exact binding with forged native flag, pre/during drift, retries and unbound manual pass/fail. Parsing uses the same captured output bytes whose hash is recorded, avoiding a second mutable-file read. Full final-head CI and a valid independent review remain pending.
+
+Valid independent review e5b109d6 confirmed001..007 fixed. Its P2 finding008 was reproduced: a64-character Git binding remained raw and exceeded the input bound while the40-character case passed. After correction,44/44 presentation tests passed, including both Git formats and rejection of mixed/short/nonhex identities. Re-presenting the retained real envelope with current code produced83files equal to the installed native qualification's input after normalizing only random fence nonces; all16frames remain and all84original files are unchanged. This is an explicit input-equivalence check, not a new native model call. Final review and exact-head CI remain required.
