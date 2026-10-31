@@ -365,11 +365,25 @@ function reconcileStopped(store, jobId) {
   } finally { fs.closeSync(fd); }
 }
 // Evidence-only recovery: do not clear an active claim or an operator fence.
-function verifyClosedHistory(store, runId, contractSha256) {
-  need(id(runId)&&digest(contractSha256),'backend_input_invalid');
+function verifyClosedHistory(store, runId, contractSha256, expectedAttempts = []) {
+  need(id(runId)&&digest(contractSha256)&&Array.isArray(expectedAttempts),'backend_input_invalid');
+  for(const ref of expectedAttempts){validateReference(ref);need(ref.runId===runId,'backend_attempt_proof_missing');}
   const fd=area(store),proofs=[];let currentContract=false;
   try {
     const names=fs.readdirSync(`/proc/self/fd/${fd}`);need(names.length<=100000,'backend_cleanup_unconfirmed');
+    const presentNames=new Set(names),related=new Map();
+    const orphan=name=>{const error=Error('backend_attempt_record_orphan');error.record=name;throw error;};
+    for(const name of names){
+      if(name.startsWith('active-')){
+        let ref;try{ref=readSigned(store,fd,name);validateReference(ref);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
+        if(!presentNames.has(attemptName(ref.attemptId)))orphan(name);
+      }else if(/^(intent|resource|mutation|operator|sealed|terminal|release|envelope)-/.test(name)){
+        const match=/^[a-z]+-([a-f0-9-]{36})(?:[-.]|$)/.exec(name);
+        if(!match||!presentNames.has(attemptName(match[1])))orphan(name);
+        const rows=related.get(match[1])||[];rows.push(name);related.set(match[1],rows);
+      }
+    }
+
     for(const name of names.filter(n=>/^attempt-[a-f0-9-]+\.json$/.test(n))){
       let signed;try{signed=readSigned(store,fd,name);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
       if(signed?.runId!==runId)continue;
@@ -384,7 +398,7 @@ function verifyClosedHistory(store, runId, contractSha256) {
         // begin persists its immutable attempt before competing for the claim.
         // No action can have been issued through this attempt without a claim
         // and a durable mutation/intent/envelope record. Keep all records intact.
-        const otherRecords=names.filter(n=>n.includes(a.attemptId)&&n!==attemptName(a.attemptId));
+        const otherRecords=related.get(a.attemptId)||[];
         need(!ownsClaim&&otherRecords.length===0,'backend_attempt_inert_unproven');
         proofs.push({attempt:ref,disposition:'never_claimed',terminalSha256:null});continue;
       }
@@ -396,7 +410,9 @@ function verifyClosedHistory(store, runId, contractSha256) {
       }
       proofs.push({attempt:ref,disposition:'cleaned',terminalSha256:hash(canonical(t))});
     }
-    need(proofs.length>0&&currentContract,'backend_cleanup_unconfirmed');return proofs;
+    need(expectedAttempts.every(ref=>proofs.some(p=>canonical(p.attempt)===canonical(ref))),'backend_attempt_proof_missing');
+    need(proofs.length>0,'backend_attempt_not_admitted');
+    need(currentContract,'backend_cleanup_unconfirmed');return proofs;
   } finally {fs.closeSync(fd);}
 }
 module.exports = { begin, read, seal, envelope, finish, terminal, reconcileStopped, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents, verifyClosedHistory };

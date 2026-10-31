@@ -1813,10 +1813,15 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
   const revalidate=!prior||prior.request_sha256!==requestSha256;
   if(lastEvent(evs,'decision_made')&&!prior)throw Error('prebuild_decision_exists');
   const baseline=prebuildBaseline(evs,gov.entry);
-  const readGit=(args,cwd)=>{
+  const readGit=(args,cwd,{allowAbsent=false}={})=>{
     const result=spawnSync('/usr/bin/git',['--no-optional-locks','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{cwd,encoding:'utf8',timeout:10000,maxBuffer:1024*1024,env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0'}});
+    if(allowAbsent&&result.status===1&&!result.stdout&&!result.stderr)return '';
     if(result.status!==0)throw Error('prebuild_git_unavailable');return result.stdout.trim();
   };
+  const safeConfig=cwd=>{if(readGit(['config','--includes','--get-regexp','^(filter|diff|merge)\\.'],cwd,{allowAbsent:true}))throw Error('prebuild_git_config_unsafe');};
+  safeConfig(run.target_repo);
+  const verificationStarted=evs.some(e=>e.event==='verification_started'&&e.phase==='baseline'&&e.attempt===baseline.attempt);
+  if(!gov.contract.runtime?.backend&&((baseline.event==='interrupted'&&verificationStarted)||gov.contract.runtime?.serve||gov.contract.runtime?.setup?.length))throw Error('prebuild_descendants_unproven');
   let base=prior?.record.base;
   if(prior&&(!base?.unchanged||base.recorded!==run.base_commit||base.current!==run.base_commit))throw Error('prebuild_base_changed');
   if(revalidate){
@@ -1829,6 +1834,7 @@ function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false 
       const ws=workspaceFor(run,kind),prepared=evs.some(e=>e.event==='workspace_prepared'&&e.kind===kind);
       if(prepared&&!fs.existsSync(ws.worktreePath))throw Error('prebuild_workspace_missing');
       if(fs.existsSync(ws.worktreePath)){
+        safeConfig(ws.worktreePath);
         // Honour frozen generated-output exclusions without staging Git changes.
         const outputs=[...identityOptions(gov.contract).outputs,...identityOptions(gov.contract).mutableOutputs];
         for(const rel of outputs){

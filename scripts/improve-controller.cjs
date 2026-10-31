@@ -993,6 +993,7 @@ function createControllerService({
     );
     const cycle = snapshot.cycles.find((c) => c.id === req.cycle_id);
     need(cycle, 'cycle_unavailable');
+    need(!(cycle.state==='terminal'&&cycle.core_diagnosis?.disposition==='abandoned_before_build'),'prebuild_reconciliation_required');
     const meta = {
       ...cycle.binding,
       principal: snapshot.principal,
@@ -1008,6 +1009,7 @@ function createControllerService({
       mutation(
         req,
         (s, r) => {
+          if(r.active_cycle!==req.cycle_id||s.owners[r.canonical_repo]!==r.id||r.cycles.find(c=>c.id===req.cycle_id)?.state==='terminal')return null;
           r.reasons = [...new Set([...r.reasons, 'reconciliation_required'])];
           r.state = 'incomplete';
           event(s, 'terminal_evidence_rejected', r.id, { cycle_id: cycle.id });
@@ -1225,8 +1227,27 @@ function createControllerService({
     if(r.memory_required)need(cycle.memory_selection&&cycle.memory_selection.base_commit===runRecord.base_commit&&cycle.memory_selection.candidate_digest===candidateDigest,'memory_terminal_selection_mismatch');
     if(governing.contract.runtime?.backend){
       need(governing.contract.runtime.backend.constructionSha256,'prebuild_legacy_backend_unavailable');
-      try{require('./improve-backend-attempt.cjs').verifyClosedHistory(source.backendStore,runRecord.run_id,governing.entry.contract_sha256);}
-      catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_backend_proof_unavailable',error.record&&/^attempt-[a-f0-9-]+\.json$/.test(error.record)?'Inspect retained backend record '+error.record+'; its run identity cannot be authenticated. Do not discard it.':undefined);}
+      const artifact=(name,expected)=>{
+        need(typeof name==='string'&&!path.isAbsolute(name)&&!name.split(path.sep).includes('..'),'prebuild_backend_proof_unavailable');
+        const entry=proof?.files.find(f=>f.path===name);
+        const bytes=proof?(need(entry&&(!expected||entry.sha256===expected),'prebuild_backend_proof_unavailable'),fs.readFileSync(privatePath(path.join(source.archive.root,'blobs',entry.sha256)))):fs.readFileSync(ownedSource(path.join(runDir,name)));
+        need((!expected||sha(bytes)===expected)&&(!entry||sha(bytes)===entry.sha256),'prebuild_backend_proof_unavailable');return bytes;
+      };
+      const ledger=proof?artifact('ledger.jsonl').toString().split('\n').filter(Boolean).map(line=>JSON.parse(line)):core.events(runDir);
+      const expected=[];
+      for(const event of ledger){
+        if(event.backendFailure?.attempt)expected.push(event.backendFailure.attempt);
+        if(event.event==='verification_receipt'){
+          need(typeof event.path==='string'&&/^[a-f0-9]{64}$/.test(event.sha256),'prebuild_backend_proof_unavailable');
+          const relative=path.relative(source.runDir,event.path);let receipt;
+          try{receipt=JSON.parse(artifact(relative,event.sha256));}catch{throw new ControllerError('prebuild_backend_proof_unavailable');}
+          need(receipt&&typeof receipt==='object','prebuild_backend_proof_unavailable');
+          if(receipt.backend?.managed?.attempt)expected.push(receipt.backend.managed.attempt);
+          else if(receipt.identity?.contract_sha256===governing.entry.contract_sha256)throw new ControllerError('backend_attempt_proof_missing');
+        }
+      }
+      try{require('./improve-backend-attempt.cjs').verifyClosedHistory(source.backendStore,runRecord.run_id,governing.entry.contract_sha256,expected);}
+      catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_backend_proof_unavailable',error.record&&/^[a-z]+-[a-f0-9.-]+$/.test(error.record)?'Inspect retained backend record '+error.record+'; its run identity cannot be authenticated. Do not discard it.':undefined);}
     }
     const requestSha256=digest({kind:'reconcile_prebuild',run_id:r.id,cycle_id:cycle.id,...cycle.binding,contract_sha256:governing.entry.contract_sha256});
     let disposition=proof?{request_sha256:proof.core_diagnosis.request_sha256}:null;

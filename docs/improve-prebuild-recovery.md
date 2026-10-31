@@ -78,3 +78,12 @@ A signed record for another run is excluded before validating that run's attempt
 schema. An unreadable or unauthenticated record cannot safely be attributed to
 another run; recovery names the offending record and retains ownership. It does
 not ignore unknown records or infer that they cannot own resources.
+
+Host-run baselines with setup/server commands, or interrupted after verification
+starts, remain blocked as `prebuild_descendants_unproven`: a dead parent does not
+prove its detached children stopped. Interruption before verification starts is
+eligible. Managed backend recovery instead requires signed resource cleanup and
+matches every recorded core attempt reference to its authenticated backend history.
+Orphan backend records and missing referenced attempts remain named blockers.
+Recovery rejects configured Git filters and diff/merge drivers before inspecting
+workspace status, so inspection cannot invoke a repository's external driver.

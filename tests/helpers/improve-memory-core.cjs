@@ -32,7 +32,7 @@ async function executeCycle(f,{number=1,steps=3,id='A',invalid=false,retry=null,
   if(generatedOutput)contract.runtime={identity:{mutable_outputs:['baseline-output']}};
   const extra=prepareFreeze?prepareFreeze(f,runDir,contract):{};
   const frozen=core.freezeContract(runDir,write(path.join(f.root,'contract-'+number+'.json'),contract),{backendCapability:extra.backendCapability});if(frozen.status!=='frozen')throw Error(JSON.stringify(frozen));
-  const baseline=await core.verifyPhase(runDir,'baseline');if(baseline.status!==(expectedBaseline||(invalid?'baseline_blocked':'baseline_recorded')))throw Error(JSON.stringify(baseline));
+  const baseline=await (extra.verifyBaseline?extra.verifyBaseline():core.verifyPhase(runDir,'baseline'));if(baseline.status!==(expectedBaseline||(invalid?'baseline_blocked':'baseline_recorded')))throw Error(JSON.stringify(baseline));
   if(stopBeforeBuild)return {cycle,binding,runDir,baseline,selection,backendStore:extra.backendStore};
   const builder=write(path.join(f.root,'builder-'+number+'.json'),{id:'fixture-builder',provider:'fake',command:'fake',timeout_seconds:10,max_iterations:1,transcript_path:'unused',output_path:'unused',never_without_human:['git push'],fake_stdout:'Fixture implementation'});
   await core.build(runDir,{policy:builder,acceptBaselineBlocker:invalid?CANARY:undefined,

@@ -51,3 +51,22 @@ test('PREBUILD unauthenticated record is named rather than silently assigned to 
  fs.writeFileSync(path.join(store.root,'backend-attempts',name),'corrupt',{mode:0o600});
  try{attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64));throw Error('expected refusal');}catch(e){expect(e.message).toBe('backend_attempt_record_unreadable');expect(e.record).toBe(name);}
 });
+
+
+test('PREBUILD cleanup for a different attempt cannot satisfy the ledger reference',()=>{
+ const {store,ref}=fixture();
+ expect(()=>attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64),[{...ref,attemptSha256:'e'.repeat(64)}])).toThrow('backend_attempt_proof_missing');
+ expect(attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64),[ref])).toHaveLength(1);
+});
+test.each(['terminal','resource','active'])('PREBUILD orphan %s record is retained and named',kind=>{
+ const {store,ref}=fixture({releaseCut:kind==='active'}),area=path.join(store.root,'backend-attempts');
+ fs.unlinkSync(path.join(area,`attempt-${ref.attemptId}.json`));
+ if(kind==='resource')fs.writeFileSync(path.join(area,`resource-${ref.attemptId}-unresolved.json`),'unresolved',{mode:0o600});
+ const before=fs.readdirSync(area).sort();
+ try{attempts.verifyClosedHistory(store,'closed-run','a'.repeat(64));throw Error('expected refusal');}catch(e){expect(e.message).toBe('backend_attempt_record_orphan');expect(before).toContain(e.record);}
+ expect(fs.readdirSync(area).sort()).toEqual(before);
+});
+test('PREBUILD empty backend history identifies an attempt that was never admitted',()=>{
+ const {store}=fixture();
+ expect(()=>attempts.verifyClosedHistory(store,'unadmitted-run','a'.repeat(64))).toThrow('backend_attempt_not_admitted');
+});

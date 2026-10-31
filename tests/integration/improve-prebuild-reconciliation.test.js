@@ -289,10 +289,10 @@ test('PREBUILD an integrity-blocked baseline cannot turn corrupt frozen checks i
 
 test.each(['cleaned','inert','missing_release'])('PREBUILD managed contract traverses the actual signed backend bridge: %s',async kind=>{
  const managed=require('../helpers/improve-prebuild-managed.cjs');
- const x=await stoppedFixture({prepareFreeze:managed.prepareFreeze,expectedBaseline:'blocked'});
+ const x=await stoppedFixture({prepareFreeze:(f,dir,contract)=>managed.prepareFreeze(f,dir,contract,{kind}),expectedBaseline:kind==='missing_release'?'interrupted':'blocked'});
  expect(core.governingContract(x.runDir).contract.runtime.backend.constructionSha256).toMatch(/^[a-f0-9]{64}$/);
  expect(core.events(x.runDir).some(e=>e.event==='verification_receipt')).toBe(false);
- managed.history(x.backendStore,x.runDir,kind);
+ if(kind!=='missing_release')expect(core.events(x.runDir).find(e=>e.event==='verification_blocked').backendFailure.attempt.runId).toBe(x.binding.core_run_id);
  f.recovery.resolvePrebuildSource=()=>({runDir:x.runDir,archive:x.archive,backendStore:x.backendStore});
  if(kind==='missing_release'){
   expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('backend_release_incomplete');
@@ -302,4 +302,50 @@ test.each(['cleaned','inert','missing_release'])('PREBUILD managed contract trav
   expect(f.service().reconcilePrebuild(x.request).allowed).toBe(true);
   expect(f.service().store.read().owners[f.repo]).toBeUndefined();
  }
+},45000);
+
+test('PREBUILD Git clean filters cannot execute during recovery inspection',async()=>{
+ const x=await stoppedFixture(),work=path.join(f.root,'worktrees',x.binding.core_run_id+'-baseline'),marker=path.join(f.root,'filter-ran'),script=path.join(f.root,'filter.sh');
+ fs.writeFileSync(script,'#!/bin/sh\nprintf ran > '+JSON.stringify(marker)+'\ncat\n',{mode:0o700});f.git('config','filter.prebuild.clean',script);
+ fs.writeFileSync(path.join(work,'.gitattributes'),'*.json filter=prebuild\n');
+ const file=path.join(work,'journey.json');fs.utimesSync(file,new Date(),new Date(Date.now()+60000));
+ let failure;try{f.service().reconcilePrebuild(x.request);}catch(e){failure=e;}
+ expect(fs.existsSync(marker)).toBe(false);expect(failure?.message).toBe('prebuild_git_config_unsafe');
+},45000);
+
+test('PREBUILD released stage failure reports abandonment instead of a held repository',async()=>{
+ const x=await stoppedFixture();f.service().store.change(s=>{s.runs[f.req.run_id].reasons=['stage_failure'];});
+ f.service().reconcilePrebuild(x.request);f.recovery.resolveTerminalArchive=()=>x.archive;
+ const report=f.service().report(f.req);expect(report.repo_owned).toBe(false);expect(report.lifecycle).toBe('completed');
+ expect(report.reason_code).toBe('abandoned_before_build');expect(report.next_action.action).not.toContain('remains held');
+},45000);
+
+test('PREBUILD stale completeCycle cannot change an already released abandoned run',async()=>{
+ const x=await stoppedFixture();f.service().reconcilePrebuild(x.request);
+ const before=f.service().store.read(),r=before.runs[f.req.run_id].recovery;
+ f.recovery.resolveAssignment=()=>structuredClone(r.current.assignment);f.recovery.resolveExecution=()=>({...structuredClone(r.current.assignment),generation:r.generation});
+ try{f.service().completeCycle({...f.req,cycle_id:x.cycle.id},x.archive);}catch(e){expect(e.message).toBe('prebuild_reconciliation_required');}
+ expect(f.service().store.read()).toEqual(before);
+},45000);
+
+
+test('PREBUILD interrupted host verification cannot infer descendant cleanup from a dead parent',async()=>{
+ const x=await stoppedFixture();
+ const program=`const runner=require(${JSON.stringify(require.resolve('../../scripts/specflow-runner.cjs'))}),core=require(${JSON.stringify(require.resolve('../../scripts/specflow-improve.cjs'))});const original=runner.appendLedger;runner.appendLedger=(file,entry)=>{const r=original(file,entry);if(entry.event==='verification_started')process.exit(23);return r;};core.verifyPhase(process.argv[1],'baseline');`;
+ expect(cp.spawnSync(process.execPath,['-e',program,x.runDir],{timeout:10000}).status).toBe(23);
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('prebuild_descendants_unproven');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+ expect(core.events(x.runDir).some(e=>e.event==='prebuild_abandonment_started')).toBe(false);
+},45000);
+
+
+test('PREBUILD controller requires cleanup for the exact attempt recorded by the core',async()=>{
+ const managed=require('../helpers/improve-prebuild-managed.cjs');
+ const x=await stoppedFixture({prepareFreeze:(f,dir,contract)=>managed.prepareFreeze(f,dir,contract),expectedBaseline:'blocked'});
+ const event=core.events(x.runDir).find(e=>e.event==='verification_blocked');
+ core.append(x.runDir,'verification_blocked',{...event,backendFailure:{...event.backendFailure,attempt:{...event.backendFailure.attempt,attemptSha256:'e'.repeat(64)}}});
+ f.recovery.resolvePrebuildSource=()=>({runDir:x.runDir,archive:x.archive,backendStore:x.backendStore});
+ expect(()=>f.service().reconcilePrebuild(x.request)).toThrow('backend_attempt_proof_missing');
+ expect(f.service().store.read().owners[f.repo]).toBe(f.req.run_id);
+ expect(core.events(x.runDir).some(e=>e.event==='prebuild_abandonment_started')).toBe(false);
 },45000);
