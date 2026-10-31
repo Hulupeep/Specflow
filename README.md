@@ -6,6 +6,10 @@
 
 An agent can build a plausible interface, pass tests over substituted data and call the feature complete. A stronger model can produce more work without making that completion claim reliable. Reviewers need to see what actually ran, against which inputs, and what remains unresolved.
 
+## Evidence: vague specs measurably hurt coding agents
+
+Specflow strengthens intent before building (`spec-build`) because underspecified tasks cost real success. In a pre-registered test ([modulo-lab MOD-3](https://github.com/Hulupeep/modulo-lab/pull/29)) on 648 SWE-bench Verified items with OpenAI's human annotations, 2025 frontier agents resolved underspecified tickets about **12 points less often** than well-specified tickets of the same difficulty (risk difference +0.117, 95% CI [+0.043, +0.193]; same direction in 6 of 6 agent runs). The effect is narrow: about half that size (+0.049) across the full population, and a simple text classifier only weakly detects vagueness (AUC 0.627), so a model-based scorer is needed. Data: [SWE-bench Verified annotations](https://cdn.openai.com/introducing-swe-bench-verified/swe-bench-annotation-results.zip), SWE-bench agent runs; method, checksums and caveats are in the linked PR.
+
 ## The product
 
 Specflow carries a selected change from intent to evidence. It keeps the accepted scope, required checks, findings and run history outside the builder's conversation. The builder can be replaced without treating its confidence or remembered summary as proof.
