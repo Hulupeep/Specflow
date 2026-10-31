@@ -725,11 +725,42 @@ function createControllerService({
     });
   }
   function startStage(req, launch) {
-    shape(req, ['repo_id', 'run_id', 'cycle_id', 'stage', 'input_sha256'], ['repo_id', 'run_id', 'cycle_id', 'stage']);
+    shape(req, ['repo_id', 'run_id', 'cycle_id', 'stage', 'input_sha256', 'review_input_sha256', 'retry'], ['repo_id', 'run_id', 'cycle_id', 'stage']);
     need(id(req.stage) && typeof launch === 'function', 'invalid_stage');
+    if (req.review_input_sha256 !== undefined) need(typeof req.review_input_sha256 === 'string' && /^[a-f0-9]{64}$/.test(req.review_input_sha256), 'invalid_review_input');
     const admitted = mutation(
       req,
-      (s, r) => {
+      (s, r, ctx) => {
+        let retryOf = null;
+        if (req.retry !== undefined) {
+          shape(req.retry, ['operation_id', 'reason']);
+          need(id(req.retry.operation_id) && typeof req.retry.reason === 'string' &&
+            req.retry.reason.trim().length > 0 && req.retry.reason.length <= 2000, 'invalid_review_retry');
+          const failed = r.operations.find(op => op.id === req.retry.operation_id);
+          need(r.policy_version === 2 && ['critique', 'oracle', 'judge'].includes(req.stage) &&
+            failed?.kind === 'stage' && failed.stage === req.stage && failed.cycle_id === req.cycle_id &&
+            failed.state === 'complete' && failed.result?.exit_code !== 0 &&
+            failed.result?.reason_code === 'stage_failure' && failed.receipt_seal &&
+            r.operations.filter(op => op.kind === 'stage').at(-1)?.id === failed.id && !r.last_failure &&
+            r.active_cycle === req.cycle_id && !r.active_stage &&
+            r.reasons.includes('stage_failure') &&
+            typeof req.input_sha256 === 'string' && /^[a-f0-9]{64}$/.test(req.input_sha256) &&
+            req.input_sha256 !== failed.input_sha256 && failed.review_input_sha256 && req.review_input_sha256, 'review_retry_unavailable');
+          for (let ancestor = failed; ancestor; ancestor = ancestor.retry_of ? r.operations.find(op => op.id === ancestor.retry_of) : null) {
+            need(ancestor.review_input_sha256 && req.review_input_sha256 !== ancestor.review_input_sha256, 'review_retry_unavailable');
+          }
+          need(s.owners[r.canonical_repo] === r.id, 'run_ownership_unavailable');
+          const sealed = recoveryService.verifyResult(r, failed, failed.result);
+          need(sealed.seal === failed.receipt_seal, 'receipt_binding_mismatch');
+          // Probe all remaining stops without removing the durable failure.
+          const candidate = structuredClone(r);
+          candidate.reasons = candidate.reasons.filter(reason => reason !== 'stage_failure');
+          need(guard(candidate), 'review_retry_blocked');
+          need(recoveryService.route(candidate, ctx,
+            req.stage === 'critique' ? 'peer' : req.stage), 'review_retry_blocked');
+          retryOf = failed;
+          r.reasons = candidate.reasons;
+        }
         if (!guard(r, false, false, false)) return { allowed: false, run: view(r, now()) };
         memoryService.beforeStage(s, r, req.stage);
         need(!r.synthetic && r.active_cycle === req.cycle_id && !r.active_stage, 'cycle_unavailable');
@@ -744,6 +775,21 @@ function createControllerService({
           birth: null
         };
         recoveryService.bindOperation(r, op, req.input_sha256);
+        if (req.review_input_sha256 !== undefined) op.review_input_sha256 = req.review_input_sha256;
+        if (retryOf) {
+          op.retry_of = retryOf.id;
+          op.retry_reason = req.retry.reason.trim();
+          (r.review_retries ||= []).push({ failed_operation_id: retryOf.id, replacement_operation_id: op.id,
+            failed_check: r.failed_check, reason: op.retry_reason });
+          r.failed_check = null;
+          r.stopped_at_ms = null;
+          r.state = 'active';
+          event(s, 'review_stage_retry_reserved', r.id, {
+            operation_id: op.id, prior_operation_id: retryOf.id,
+            prior_input_sha256: retryOf.input_sha256, input_sha256: op.input_sha256,
+            reason: op.retry_reason
+          });
+        }
         r.operations.push(op);
         r.active_stage = op.id;
         r.stage = req.stage;

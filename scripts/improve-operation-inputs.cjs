@@ -1,7 +1,7 @@
 'use strict';
 // Hash owner-declared stage inputs, including bytes behind file arguments.
 const fs=require('fs'),path=require('path'),m=require('./improve-memory.cjs'),{RecoveryError}=require('./improve-recovery-controller.cjs');
-function stageInput(stage,args,configFile){
+function inputDigest(stage,args,configFile,includeState,reviewHash){
  const files=new Map();let bytes=0;
  function add(file){
   if(!path.isAbsolute(file)||!fs.existsSync(file))return;
@@ -13,7 +13,10 @@ function stageInput(stage,args,configFile){
  }
  const visit=v=>{if(typeof v==='string')add(v);else if(Array.isArray(v))v.forEach(visit);else if(v&&typeof v==='object')Object.values(v).forEach(visit);};
  visit(args);if(configFile)add(configFile);
- if(typeof args[0]==='string'&&path.isAbsolute(args[0]))for(const name of ['run.json','ledger.jsonl','candidates.json'])add(path.join(args[0],name));
- return m.digest({stage,args,files:[...files].sort(([a],[b])=>a<b?-1:a>b?1:0)});
+ if(includeState&&typeof args[0]==='string'&&path.isAbsolute(args[0]))for(const name of ['run.json','ledger.jsonl','candidates.json'])add(path.join(args[0],name));
+ return m.digest({stage,args,files:[...files].sort(([a],[b])=>a<b?-1:a>b?1:0),...(reviewHash===undefined?{}:{review_input_sha256:reviewHash})});
 }
-module.exports={stageInput};
+function stageInput(stage,args,configFile,reviewHash){return inputDigest(stage,args,configFile,true,reviewHash);}
+// Caller-declared input only: automatic ledger state and memory injection are not repairs.
+function reviewInput(stage,args){return inputDigest(stage,args,undefined,false);}
+module.exports={stageInput,reviewInput};
