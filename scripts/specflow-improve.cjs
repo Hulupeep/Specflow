@@ -1498,7 +1498,18 @@ function judge(runDir, options = {}) {
   const policy = rolePolicy(runDir, { ...raw, role: 'verifier' }, attemptRole);
   // Reuse the #100 isolation rule: the evaluator policy must differ from the builder's.
   runner.resolveVerifierPolicy({ ...policy, id: builderEntry.executor, transcript_path: path.join(runDir, 'adapters', 'builder.transcript.jsonl'), output_path: path.join(runDir, 'adapters', 'builder.final.md'), verifier_policy: policy });
-  const diff = workspaceDiff(run,gov.contract);
+  const proofs = Object.fromEntries(['baseline','after'].map(phase => {
+    const proof=boundReceipt(runDir,phase,{current:phase==='after',backendCapability:options.backendCapability});
+    if(proof.error)throw Error(proof.error);
+    return [phase,proof];
+  }));
+  // Render the verified Git object, never a mutable index between identity checks.
+  const patchResult=git(['diff','--binary',run.base_commit,proofs.after.receipt.identity.git.tree,'--'],workspaceFor(run,'improve').worktreePath,{allowFail:true});
+  if(patchResult.status!==0)throw Error('Evidence binding: verified patch could not be read');
+  const diff={patch:patchResult.stdout,sha256:sha256(patchResult.stdout)};
+  const judgmentBinding={schema:'specflow.improve.judgment-binding/v1',patch_sha256:diff.sha256,
+    baseline_receipt_sha256:proofs.baseline.entry.sha256,after_receipt_sha256:proofs.after.entry.sha256,
+    after_identity_sha256:binding.digest(proofs.after.receipt.identity)};
   fs.writeFileSync(path.join(runDir, 'workspace.patch'), diff?.patch || '');
   const input = runner.assembleVerifierInput({
     artifactPath: path.join(runDir, 'workspace.patch'), specPath: gov.entry.path,
@@ -1515,8 +1526,7 @@ function judge(runDir, options = {}) {
   for (const phase of ['baseline', 'after']) {
     const src = runPaths(runDir).phaseDir(phase);
     if (fs.existsSync(src)) {
-      const proof=boundReceipt(runDir,phase,{current:false,backendCapability:options.backendCapability});
-      if(proof.error)throw Error(proof.error);
+      const proof=proofs[phase];
       const ids=new Set(proof.receipt.evidence.map(e=>e.id));
       require('./improve-review-evidence.cjs').copyVerificationEvidence(src,path.join(inputDir,'verification',phase),{omitPracticeImages:true,phaseEvidence:readEvidence(runDir).filter(e=>ids.has(e.id)),phaseReceipt:{path:proof.entry.path,sha256:proof.entry.sha256}});
     }
@@ -1529,7 +1539,7 @@ function judge(runDir, options = {}) {
   const result = runner.runAdapter(judgePolicy, { promptPath, stage: `improve.${role}`, dryRun: options.dryRun, cwd: inputDir, env });
   const provenance = roleProvenance(judgePolicy, result);
   const peeked = toolCommands(judgePolicy.transcript_path).some((t) => /adapters\/builder\./.test(JSON.stringify(t.input || {})));
-  append(runDir, 'judgment_run', { role, attempt, executor: policy.id, verifier_input: input, input_dir: inputDir, transcript_path:policy.transcript_path, output_path:policy.output_path, prompt_path:promptPath, provenance, adapter_status: result.status, maker_trace_accessed: peeked });
+  append(runDir, 'judgment_run', { role, attempt, judgment_binding:judgmentBinding, executor: policy.id, verifier_input: input, input_dir: inputDir, transcript_path:policy.transcript_path, output_path:policy.output_path, prompt_path:promptPath, provenance, adapter_status: result.status, maker_trace_accessed: peeked });
   if (peeked) return { status: 'blocked', reason: 'judge accessed the builder transcript; judgments not recorded', provenance };
   if(result.status!=='gate_rerun_required'||result.entry?.exit_code!==0) {
     let failure={code:'judge_adapter_failed',stage:'judge',next_action:'Inspect the retained attempt transcript; preserve original acceptance and do not replay a consumed holdout.'};
@@ -1540,10 +1550,16 @@ function judge(runDir, options = {}) {
     append(runDir,'judgment_failed',{role,attempt,failure});
     return {status:result.status,recorded:0,attempt,failure,provenance};
   }
+  // A completed model call cannot authorize a judgment for changed inputs.
+  for(const phase of ['baseline','after']) {
+    const proof=boundReceipt(runDir,phase,{current:phase==='after',backendCapability:options.backendCapability});
+    if(proof.error||proof.entry.sha256!==proofs[phase].entry.sha256)throw Error(proof.error||'Evidence binding: selected receipt changed during judgment');
+  }
+  if(workspaceDiff(run,gov.contract)?.sha256!==judgmentBinding.patch_sha256)throw Error('Evidence binding: reviewed patch changed during judgment');
   const parsed = lastJsonLine(fs.existsSync(policy.output_path) ? fs.readFileSync(policy.output_path, 'utf8') : '');
   const recorded = [];
   for (const j of list(parsed?.judgments)) {
-    recorded.push(submitJudgment(runDir, { ...j, producer_role: role, executor: policy.id, observed_model: provenance.observed_model, source: { transcript: policy.transcript_path } }));
+    recorded.push(submitJudgment(runDir, { ...j, producer_role: role, executor: policy.id, observed_model: provenance.observed_model, source: { transcript: policy.transcript_path, attempt, binding:judgmentBinding } }));
   }
   if (list(parsed?.risks).length) append(runDir, 'risks_reported', { role, risks: parsed.risks });
   return { status: result.status, recorded: recorded.length, provenance };
@@ -1556,7 +1572,7 @@ function evaluateCriteria(contract, evidence, contractVersion) {
   return contract.acceptance.map((a) => {
     // Practice (dev) results are in-sample: shown to builder and peer, never counted.
     const relevant = evidence.filter((e) => e.criterion === a.id && e.set !== 'dev' && (e.phase === 'after' || e.kind === 'judgment') && e.contract_version === contractVersion);
-    const qualifying = relevant.filter((e) => e.level <= a.required_level && !e.self_review && e.producer_role !== 'builder');
+    const qualifying = relevant.filter((e) => e.level <= a.required_level && !e.self_review && e.producer_role !== 'builder' && !e.judgment_binding_error);
     const insufficient = relevant.filter((e) => !qualifying.includes(e));
     let status = 'missing';
     if (qualifying.some((e) => e.result === 'fail')) status = 'failed';
@@ -1564,7 +1580,7 @@ function evaluateCriteria(contract, evidence, contractVersion) {
     return {
       id: a.id, statement: a.statement, mandatory: a.mandatory, required_level: a.required_level, status,
       qualifying: qualifying.map((e) => ({ id: e.id, level: e.level, result: e.result, producer: e.producer_role })),
-      not_counted: insufficient.map((e) => ({ id: e.id, level: e.level, result: e.result, producer: e.producer_role, why: e.self_review || e.producer_role === 'builder' ? 'self-review' : `level ${e.level} cannot satisfy level ${a.required_level}` })),
+      not_counted: insufficient.map((e) => ({ id: e.id, level: e.level, result: e.result, producer: e.producer_role, why: e.self_review || e.producer_role === 'builder' ? 'self-review' : e.level > a.required_level ? `level ${e.level} cannot satisfy level ${a.required_level}` : e.judgment_binding_error })),
     };
   });
 }
@@ -1661,6 +1677,18 @@ function evaluate(runDir,{backendCapability}={}) {
   });
   const diff = workspaceDiff(run,gov.contract) || { files: [], patch: '', sha256: sha256('') };
   fs.writeFileSync(path.join(runDir, 'workspace.patch'), diff.patch);
+  const judgments=evidence.filter(e=>e.kind==='judgment').map(item=>{
+    const ref=item.source?.binding;
+    const call=evs.find(e=>e.event==='judgment_run'&&e.attempt===item.source?.attempt);
+    const valid=ref?.schema==='specflow.improve.judgment-binding/v1' && !afterBinding.error && !baselineBinding.error
+      && ref.patch_sha256===diff.sha256 && ref.after_receipt_sha256===afterBinding.entry.sha256
+      && ref.baseline_receipt_sha256===baselineBinding.entry.sha256
+      && ref.after_identity_sha256===binding.digest(afterBinding.receipt.identity)
+      && call?.executor===item.executor && call?.transcript_path===item.source?.transcript
+      && !call?.maker_trace_accessed && call?.adapter_status==='gate_rerun_required'
+      && binding.digest(call?.judgment_binding)===binding.digest(ref);
+    return valid?item:{...item,judgment_binding_error:'judgment is not bound to the selected verified patch and receipts'};
+  });
   const gates = list(gov.contract.gates).map((g) => {
     const pick = (phase) => {
       const items = decisionEvidence.filter(e => e.criterion === `gate:${g.id}` && e.phase === phase && e.set === 'gate');
@@ -1695,7 +1723,7 @@ function evaluate(runDir,{backendCapability}={}) {
     scope: scopeCheck(gov.contract, diff.files),
     base: baseUnchanged(run),
     empty_diff: diff.files.length === 0,
-    criteria: evaluateCriteria(gov.contract, [...decisionEvidence, ...evidence.filter(e => e.kind === 'judgment')], gov.entry.version),
+    criteria: evaluateCriteria(gov.contract, [...decisionEvidence, ...judgments], gov.entry.version),
     gains,
     evidence_ids: decisionEvidence.map(e => e.id),
     regressions: gates.filter((g) => g.baseline === 'pass' && g.after === 'fail').map((g) => g.id),

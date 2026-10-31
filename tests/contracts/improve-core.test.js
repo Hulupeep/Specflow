@@ -1385,3 +1385,44 @@ test('judge retries retain prior artifacts and cannot record stale output after 
   expect(fs.readFileSync(calls[0].policy.output_path).equals(first)).toBe(true);expect(fs.readFileSync(calls[0].policy.transcript_path,'utf8')).toBe('attempt 1');
  }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
 }));
+
+test.each(['before','during'])('judge rejects workspace drift %s native review without recording judgments',quiet(async when=>{
+ const f=fixture();let spy;try{
+  const {runDir,ws}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  spy=jest.spyOn(runner,'runAdapter').mockImplementation(policy=>{
+   if(when==='during')setSteps(ws,1);
+   fs.writeFileSync(policy.output_path,JSON.stringify({judgments:[{criterion:'AC-2',level:4,result:'pass',rationale:'reviewed another patch'}]}));
+   return {status:'gate_rerun_required',entry:{exit_code:0}};
+  });
+  if(when==='before')setSteps(ws,1);
+  expect(()=>improve.judge(runDir,{policy:writeTmp(f,'judge.json',FAKE_BUILDER({id:'independent-judge'}))})).toThrow(/binding|changed/i);
+  expect(fs.readFileSync(path.join(runDir,'evidence.jsonl'),'utf8').trim().split('\n').map(JSON.parse).filter(e=>e.kind==='judgment')).toHaveLength(0);
+  if(when==='before')expect(spy).not.toHaveBeenCalled();
+  setSteps(ws,2);expect(improve.evaluate(runDir).criteria.find(c=>c.id==='AC-2').status).toBe('missing');
+ }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test('judge binds the reviewed patch and selected receipts in persisted evidence',quiet(async()=>{
+ const f=fixture();let spy;try{
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  spy=jest.spyOn(runner,'runAdapter').mockImplementation(policy=>{
+   fs.writeFileSync(policy.output_path,JSON.stringify({judgments:[{criterion:'AC-2',level:4,result:'pass',rationale:'independent review'}]}));
+   return {status:'gate_rerun_required',entry:{exit_code:0}};
+  });
+  expect(improve.judge(runDir,{policy:writeTmp(f,'judge.json',FAKE_BUILDER({id:'independent-judge'}))}).recorded).toBe(1);
+  const item=fs.readFileSync(path.join(runDir,'evidence.jsonl'),'utf8').trim().split('\n').map(JSON.parse).find(e=>e.kind==='judgment'),call=improve.events(runDir).find(e=>e.event==='judgment_run');
+  expect(item.source.binding).toEqual(expect.objectContaining({patch_sha256:expect.stringMatching(/^[a-f0-9]{64}$/),after_receipt_sha256:improve.boundReceipt(runDir,'after').entry.sha256,baseline_receipt_sha256:improve.boundReceipt(runDir,'baseline',{current:false}).entry.sha256}));
+  expect(call.judgment_binding).toEqual(item.source.binding);expect(item.source.attempt).toBe(call.attempt);
+  improve.submitJudgment(runDir,{criterion:item.criterion,level:item.level,producer_role:item.producer_role,executor:item.executor,rationale:'mismatched patch must not veto',result:'fail',source:{...item.source,binding:{...item.source.binding,patch_sha256:'0'.repeat(64)}}});
+  expect(improve.evaluate(runDir).criteria.find(c=>c.id==='AC-2').status).toBe('satisfied');
+ }finally{spy?.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+}));
+
+test.each(['pass','fail'])('unbound manual %s judgment cannot decide a heuristic criterion',quiet(async result=>{
+ const f=fixture();try{
+  const {runDir}=await runToImplementation(f,{edits:{1:ws=>setSteps(ws,2)}});await improve.verifyPhase(runDir,'after');
+  improve.submitJudgment(runDir,{criterion:'AC-2',level:4,result,producer_role:'ux-evaluator',executor:'manual-review',rationale:'no reviewed input identity'});
+  const decision=improve.evaluate(runDir),criterion=decision.criteria.find(c=>c.id==='AC-2');
+  expect(criterion.status).toBe('missing');expect(criterion.not_counted[0].why).toMatch(/not bound/);expect(decision.decision).toBe('KEEP');
+ }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+}));

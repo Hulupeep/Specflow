@@ -46,3 +46,20 @@ Returning operator: first judge succeeds, retry transport fails -> preserve firs
 Accepted additions: judge first validates bound phase receipts through the existing core authority; image classification uses only corresponding digest-bound phase items and matching native receipts. Uncertain attribution preserves all images. Failure output includes the precise allowed error code and safe next action, without reflecting arbitrary stderr.
 
 Audit: requirements/interface/mapping updated by these clarifications, no schema/UI change or new invariants. Executable regressions now cover failed retry, image receipt mutation, outer binding fields and presentation-code identity mutation. Preparation remains noCRITICAL/P1; runtime acceptance and valid independent review still required.
+
+## Judgment identity follow-up: simulation, audit and pre-flight
+
+REV-304-006 confirms that validating receipts without current inputs allowed a changed patch to reach review. This is a clarification of REQ03's binding authority, not a new product feature.
+
+Simulation Findings (proposed):
+- Returning operator: verified candidate -> review -> decision succeeds; divergent route changes the workspace before review. Require refusal before model invocation, retaining original receipts.
+- Concurrent collaborator: verified candidate -> review completes normally; divergent route edits the candidate while review runs. Record the attempt, but no judgment may gain decision authority after drift.
+- Evidence consumer: matching review -> heuristic result counts; divergent route imports an unbound manual pass or failure. Keep the observation, explicitly exclude it from deciding the selected verified candidate.
+
+Accepted under standing implementation authority. Audit phase1: existing scope, invariants, interface, negative-case mapping and DoD present; missing precise judgment binding shape and drift cases. Database/UI/testids remain N/A for this CLI trust-boundary bug.
+
+Audit phase2 additions: REQ08 (MUST): deciding judgments reference the selected baseline/after receipt hashes, after-input identity, reviewed patch hash and native attempt. Generate the patch from the verified Git object, not a mutable worktree index. Validate current after inputs before and after invocation. Evaluation matches these references to its selected receipts and native attempt; missing/mismatched references remain visible but cannot pass or fail a criterion. No retrospective binding of old observations.
+
+Gherkin: Given current verified inputs, when independent review succeeds, then persisted judgment and attempt share the patch/receipt identity and evaluation counts it. Given inputs changed before review, when invoking the judge, then no model is called. Given inputs change during review, then no judgment is recorded. Given an unbound manual pass or failure, when evaluating, then the heuristic criterion remains missing with an explicit explanation. Mapping: `tests/contracts/improve-core.test.js` judge drift, persisted binding, unbound manual judgment and retained retry cases. Existing invariant I-REVIEW-EVIDENCE-001 applies; no new invariant ID needed.
+
+Audit phase3 / Pre-flight Findings: simulation_status passed_with_warnings for this bounded clarification; no CRITICAL/P1 specification gaps. P2: manual/legacy unbound observations remain reportable but cannot authorize decisions; use a fresh canonical review, never invent historical provenance or rerun consumed acceptance. Runtime regression, independent review and CI evidence still required before completion.
