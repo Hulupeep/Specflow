@@ -39,7 +39,7 @@ Scenario: Explicit expiry
   And no clock or attempt counter is reset
 ```
 
-Files: scripts/improve-worker.cjs, scripts/improve-worker-role.cjs and focused tests/integration/improve-role-deadline.test.js; controller gateway/recovery tests reused. Delivery DoD: red regression, focused tests, native installed operation, independent review, canonical CI before merge. Preserve failed qualification and no product success claim from transport tests. Returned native output still passes existing binding/model/tool checks.
+Files: scripts/improve-worker.cjs, scripts/improve-worker-role.cjs, scripts/improve-controller-provider.cjs, scripts/improve-worker-qualify.cjs and focused tests/integration/improve-role-deadline.test.js; controller gateway/recovery tests reused. Delivery DoD: red regression, focused tests, native installed operation, independent review, canonical CI before merge. Preserve failed qualification and no product success claim from transport tests. Returned native output still passes existing binding/model/tool checks.
 
 ## Pre-flight disposition
 

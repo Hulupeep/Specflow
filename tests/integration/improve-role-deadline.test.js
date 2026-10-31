@@ -7,12 +7,12 @@ afterEach(()=>fs.rmSync(root,{recursive:true,force:true}));
 function invoke(deadlineAtMs,body='process.stdout.write("completed");'){
  const request={claude:process.execPath,args:['-e',body],cwd:root,input:'',raw:path.join(root,'raw'),stderr:path.join(root,'stderr'),done:path.join(root,'done'),deadlineAtMs};
  const file=path.join(root,'request.json');fs.writeFileSync(file,JSON.stringify(request));
- const child=spawnSync(process.execPath,[path.resolve('scripts/improve-worker-role.cjs'),file],{encoding:'utf8',timeout:5000});
+ const child=spawnSync(process.execPath,[path.resolve('scripts/improve-worker-role.cjs'),file],{encoding:'utf8',timeout:5000,detached:true});
  return {child,done:fs.existsSync(request.done)?JSON.parse(fs.readFileSync(request.done)):null,raw:fs.existsSync(request.raw)?fs.readFileSync(request.raw,'utf8'):null};
 }
 test('expired absolute deadline prevents native invocation',()=>{
  const result=invoke(Date.now()-1,`require('fs').writeFileSync(${JSON.stringify(path.join(root,'should-not-launch'))},'bad');`);
- expect(result.done).toMatchObject({status:null,error:'ETIMEDOUT'});expect(result.raw).toBe('');expect(fs.existsSync(path.join(root,'should-not-launch'))).toBe(false);
+ expect(result.done).toMatchObject({status:null,error:'not_started_deadline'});expect(result.raw).toBe('');expect(fs.existsSync(path.join(root,'should-not-launch'))).toBe(false);
 });
 test('explicit absolute deadline interrupts actual long-running native process',()=>{
  const result=invoke(Date.now()+300,'setTimeout(()=>process.stdout.write("too late"),1200)');
@@ -67,4 +67,13 @@ test.each(['missing','unknown'])('unavailable relay identity %s reports unknown 
 });
 test('terminal record arriving during the exit check is processed instead of reported missing',()=>{
  expect(()=>observerCase('race')).toThrow(expect.objectContaining({code:'role_unavailable'}));
+});
+
+test('failed spawn with no pid never defaults to the worker identity or signals it',()=>{
+ const identity=require('../../scripts/improve-process-identity.cjs'),watch=require('../../scripts/improve-controller-watchdog.cjs');
+ const i=jest.spyOn(identity,'identity'),kill=jest.spyOn(watch,'signalGroup');
+ try{
+  expect(()=>require('../../scripts/improve-worker.cjs').roleCall({role:'oracle',model:'opus',effectiveModel:'fixture',prompt:'test',schema:{type:'object',properties:{}},cwd:root,evidence:path.join(root,'evidence'),claude:process.execPath,deadlineAtMs:Date.now()+5000,authorizeStart:()=>({pid:undefined})})).toThrow(expect.objectContaining({code:'role_not_started'}));
+  expect(i).not.toHaveBeenCalled();expect(kill).not.toHaveBeenCalled();
+ }finally{i.mockRestore();kill.mockRestore();}
 });

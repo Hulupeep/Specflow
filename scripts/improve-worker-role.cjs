@@ -9,11 +9,13 @@ function run(requestFile) {
   const deadline = req.deadlineAtMs;
   if (!Number.isSafeInteger(deadline) || deadline <= 0 || deadline - Date.now() > 2147483647)
     throw new Error('role_deadline_invalid');
+  const identity = require('./improve-process-identity.cjs').identity();
+  if (!identity || identity.group !== process.pid) throw new Error('role_relay_group_required');
   const remaining = deadline - Date.now();
   // Managed provider gateways own the task deadline and cancellation. No local
   // quota may kill their observer while a separately supervised call is live.
-  const result = remaining !== null && remaining <= 0
-    ? {status:null,error:{code:'ETIMEDOUT'},stdout:'',stderr:''}
+  const result = remaining <= 0
+    ? {status:null,error:{code:'not_started_deadline'},stdout:'',stderr:''}
     : spawnSync(req.claude, req.args, {
     cwd: req.cwd,
     env: process.env,
@@ -31,6 +33,10 @@ function run(requestFile) {
     flag: 'wx'
   });
   fs.renameSync(temp, req.done);
+  // Retain the interruption record first, then remove all local descendants.
+  // The independently supervised controller operation retains its own deadline.
+  if (result.error?.code === 'ETIMEDOUT')
+    require('./improve-controller-watchdog.cjs').signalGroup(identity);
 }
 if (require.main === module) run(process.argv[2]);
 module.exports = { run };

@@ -11,3 +11,9 @@ First independent advisory review requested changes: unrestricted direct calls a
 Initial local installed-package qualification passed in255117ms:250000ms deliberately added transport delay followed by a real tool-free subscription response from observed `claude-opus-5-5`. This is not255seconds of model reasoning. That snapshot predates the review repairs. Fresh repaired-package parity and native qualification are running; no current-native pass, public npm release or product improvement verdict is claimed here.
 
 All private raw native/receipt evidence and failed attempts remain retained. No running qualification runtime was overwritten, task deadline extended, consumed holdout replayed or production change made. Formal Duo acceptance is not claimed for an advisory same-provider review.
+
+## Cleanup repair validation
+
+After the second advisory review (no P0/P1, five P2 groups), the final focused run passed147 tests across5 suites with0 failures/skips/flaky cases; native report accounting also passed. It includes actual managed observer loss, refusal of a duplicate provider start, cancellation cleanup, original-deadline wiring, spawn failure, unavailable identity and the terminal-record race.
+
+The final local installed gateway/worker check passed with real process supervision and a sealed completion: original deadline unchanged,30000ms transport grace, exactly1 attempt. Its CLI is explicitly a protocol fixture, not a live provider. A separately installed real-subscription run with250seconds artificial transport latency and a third advisory review are still pending. Canonical CI on the final commit remains required.

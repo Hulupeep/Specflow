@@ -1343,11 +1343,16 @@ function roleCall({
       detached: true
     });
   const child = authorizeStart ? authorizeStart(launch) : launch();
+  need(Number.isSafeInteger(child?.pid) && child.pid > 1, 'role_not_started', 'model');
   const relayIdentity = require('./improve-process-identity.cjs').identity(child.pid);
   const completionUnknown = () => new WorkerError('role_completion_unknown', 'model',
     'The role observer has no terminal record; provider completion is unknown.', false,
     'Reconcile the original provider receipt before another invocation. Do not replay the call.');
-  if (!relayIdentity) { child.kill('SIGKILL'); throw completionUnknown(); }
+  if (!relayIdentity) {
+    // This PID is the just-spawned, unreaped detached child, not a restored PID.
+    try { process.kill(-child.pid, 'SIGKILL'); } catch (e) { if (e.code !== 'ESRCH') throw e; }
+    throw completionUnknown();
+  }
   while (!fs.existsSync(relay.done)) {
     const state = require('./improve-process-identity.cjs').state(relayIdentity);
     if (state !== 'live' || Date.now() > deadlineAtMs + 5000) {
@@ -1361,10 +1366,11 @@ function roleCall({
   }
   const result = strictJSON(regular(relay.done).toString());
   const raw = regular(relay.raw).toString();
+  if (result.error === 'not_started_deadline') throw new WorkerError('role_deadline', 'model', 'The explicit deadline expired before the native process started.', false);
   if (result.error === 'ETIMEDOUT') throw completionUnknown();
   if (result.status !== 0)
     throw new WorkerError(
-      result.error === 'ETIMEDOUT' ? 'role_deadline' : 'role_unavailable',
+      'role_unavailable',
       'model',
       'The configured subscription CLI did not complete. Private native output is retained.',
       true,
