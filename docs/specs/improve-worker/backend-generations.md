@@ -62,9 +62,12 @@ Actual fault qualification covers controller loss before, during and after creat
 anchor removal before a late creation acknowledgement, unavailable readiness,
 output-limit breach, a missing staged migration and a foreign object occupying the
 reserved name. The foreign-name case preserved foreign resources and removed all
-known owned resources, but retained `cleanup_failed` / `operator_required` and its
-private envelope for unresolved dispatch. It is a verified safe rejection, not a
-clean baseline or authority to retry that job. Earlier failed runs and manual
+known owned resources, but recorded controller cause `backend_readiness_failed`,
+cleanup cause `backend_cleanup_failed`, terminal phase `cleanup_failed`, and
+attempt state `operator_required`. It retained its private envelope for unresolved
+dispatch. The foreign container survived; this outcome was never relabelled
+`cleaned`. It is a verified safe rejection, not a clean baseline or authority to
+retry that job. Earlier failed runs and manual
 containment remain in the private history with their original revisions; they were
 not rewritten as successful qualification.
 
