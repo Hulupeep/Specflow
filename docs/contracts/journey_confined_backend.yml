@@ -4,8 +4,8 @@ journey_meta:
   covers_reqs: [AC-BACKEND-02, AC-BACKEND-03, AC-BACKEND-07]
   type: e2e
   dod_criticality: critical
-  status: not_tested
-  last_verified: null
+  status: passing
+  last_verified: "2026-10-31T09:48:32.644Z"
 preconditions:
   - description: "Fresh confined backend, complete unchanged migrations, two ordinary fake users, owner Stax/block and bound real production output; no production credentials or bypass."
 steps:
@@ -29,5 +29,5 @@ steps:
     expected: ["Actual route returns 403/404; exact returned error visible; independent owner readback equals the complete prior rows."]
 test_hooks:
   e2e_test_file: tests/e2e/journey_confined_backend.spec.cjs
-qualification_note: "Earlier prototype journeys passed; this repository integration remains not_tested until this mapped spec executes."
+qualification_note: "Mapped spec executed unchanged at 1280px and 360px against real disposable Auth/API/Postgres: 8 baseline and 6 candidate case executions, zero failures/skips/flaky cases. Backend runtime source 2f8fb8a; see evidence/backend-profile-298/proof.json and evidence/backend-profile-298/RESULTS.md. Repeated capacity workload, not a product improvement or KEEP."
 case_aliases: [J-BACKEND-PRODUCT-1280, J-BACKEND-PRODUCT-360]

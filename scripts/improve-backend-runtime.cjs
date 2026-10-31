@@ -9,6 +9,7 @@ const identity=require('./improve-process-identity.cjs');
 const {BackendJournal,monitorJournal,fingerprint}=require('./improve-backend-supervisor.cjs');
 const {measureSnapshot,expectedSemantic}=require('./improve-backend-measure.cjs');
 const semantics=require('./improve-backend-semantics.cjs');
+const profiles=require('./improve-backend-profiles.cjs');
 const storage=require('./improve-backend-storage.cjs');
 const need=(x,c='backend_input_invalid')=>{if(!x)throw Error(c);};
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -27,7 +28,8 @@ function readInputsInternal(root,request,raw,managed=false){
  need(hash(readBoundFile(root,r.inputManifest))===hash(Buffer.from(canonical(m))),'backend_input_changed');
  for(const k of Object.keys(pins))need(m[k].sha256===pins[k],'backend_input_changed');
  const files={};for(const k of ['bootstrap','supabaseCli','seed','credentialBinding','runtimeLayer','configuration','resourceProfile'])files[k]=readBoundFile(root,m[k],k==='supabaseCli'?128*1024*1024:PROFILE.output.maxFileBytes);
- need(canonical(strict(files.resourceProfile))===canonical(PROFILE),'backend_input_changed');
+ if(r.resourceProfile===PROFILE.id)need(canonical(strict(files.resourceProfile))===canonical(PROFILE),'backend_input_changed');
+ else profiles.validateProfileBytes(r.resourceProfile,files.resourceProfile);
  need(canonical(strict(files.configuration))===canonical({recipeId:RECIPE.id}),'backend_input_changed');
  const c=credential(files.credentialBinding,r);const migrations=[];
  // Enumerate through an anchored no-follow descriptor, including hidden extras.
@@ -39,8 +41,8 @@ function readInputsInternal(root,request,raw,managed=false){
 }
 function readInputs(root,request,raw,managed=false){try{return readInputsInternal(root,request,raw,managed);}catch(e){throw Error(e.message==='backend_input_changed'?'backend_input_changed':'backend_input_invalid');}}
 function write(root,name,bytes,mode=0o444){fs.writeFileSync(path.join(root,name),bytes,{mode,flag:'wx'});}
-function issueServer(c,r){const enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url'),now=Math.floor(Date.now()/1000);
- const unsigned=enc({alg:'HS256',typ:'JWT'})+'.'+enc({role:'service_role',aud:'authenticated',iss:'supabase',job:r.jobId,generation:r.generation,iat:now,exp:now+600});
+function issueServer(c,r,deadlineAtMs){const enc=x=>Buffer.from(JSON.stringify(x)).toString('base64url'),now=Math.floor(Date.now()/1000);
+ const unsigned=enc({alg:'HS256',typ:'JWT'})+'.'+enc({role:'service_role',aud:'authenticated',iss:'supabase',job:r.jobId,generation:r.generation,iat:now,exp:profiles.serverExpiry(r.resourceProfile,c.expiresAt,deadlineAtMs,now)});
  return unsigned+'.'+crypto.createHmac('sha256',c.jwtSecret).update(unsigned).digest('base64url');}
 function gateway(anonKey,serviceKey){return {_format_version:'1.1',consumers:[{username:'anon',keyauth_credentials:[{key:anonKey}]},{username:'server',keyauth_credentials:[{key:serviceKey}]}],services:[['auth',9999],['rest',3001]].map(([name,port])=>({name:name+'-v1',url:'http://127.0.0.1:'+port+'/',routes:[{name:name+'-v1',paths:['/'+name+'/v1/'],strip_path:true}],plugins:[{name:'cors',config:{origins:['http://127.0.0.1:3000'],headers:['Authorization','apikey','Content-Type','x-client-info','x-supabase-api-version','Prefer','Accept-Profile','Content-Profile','Range','Range-Unit'],methods:['GET','POST','PATCH','DELETE','OPTIONS'],credentials:true}},{name:'key-auth',config:{key_names:['apikey'],hide_credentials:false,run_on_preflight:false}}]}))};}
 const databaseCommand=`set -eu
@@ -70,7 +72,7 @@ function stageInputs(root,admitted,managed){
   fs.mkdirSync(path.join(stage,'migrations'),{mode:0o755});for(const f of migrations)write(stage,'migrations/'+f.name,f.bytes);
   write(stage,'bootstrap.sql',files.bootstrap);write(stage,'supabase',files.supabaseCli,0o555);write(stage,'seed.sql',files.seed);
   write(stage,'sodium',c.sodium+'\n');write(stage,'database-password',c.databasePassword+'\n');
-  write(stage,'database.sh',databaseCommand);const serverKey=issueServer(c,r);
+  write(stage,'database.sh',databaseCommand);const serverKey=issueServer(c,r,managed?require('./improve-backend-attempt.cjs').read(managed.store,managed.attempt).deadlineAtMs:undefined);
   const env=(name,values)=>write(stage,name,Object.entries(values).map(([k,v])=>k+'='+v).join('\n')+'\n',0o600);
   const common={GOTRUE_DB_DRIVER:'postgres',DB_NAMESPACE:'auth',GOTRUE_DB_DATABASE_URL:'postgres://supabase_auth_admin:'+c.databasePassword+'@127.0.0.1:5432/postgres?sslmode=disable',GOTRUE_JWT_SECRET:c.jwtSecret,GOTRUE_SITE_URL:'http://127.0.0.1:3000',API_EXTERNAL_URL:'http://127.0.0.1:9999',GOTRUE_LOG_LEVEL:'info'};
   env('auth.env',{...common,GOTRUE_API_HOST:'127.0.0.1',GOTRUE_API_PORT:9999,GOTRUE_JWT_AUD:'authenticated',GOTRUE_JWT_DEFAULT_GROUP_NAME:'authenticated',GOTRUE_EXTERNAL_EMAIL_ENABLED:true,GOTRUE_MAILER_AUTOCONFIRM:true});
@@ -110,7 +112,7 @@ async function runSupervisor(descriptor){
  const {root,stage,request,anchor,controller,inputs,inputRoot}=descriptor;
  const credentialMaterial=readInputs(inputRoot,request,inputs,!!managed).credentials;
  const Journal=managed?require('./improve-managed-backend.cjs').ManagedBackendJournal:BackendJournal;
- const journal=new Journal({root,jobId:request.jobId,generation:request.generation,controller,...(managed||{})});
+ const journal=new Journal({root,jobId:request.jobId,generation:request.generation,controller,resourceProfile:request.resourceProfile,...(managed||{})});
  const streams=new Set(),pending=new Set();
  const monitoring=monitorJournal(journal,{beforeCleanup:()=>Promise.allSettled([...pending]),observeStorage});let terminal,operation='admission';
  let measuredManifest=null;
@@ -220,6 +222,7 @@ async function startBackend({worker,anchorId,root,request,inputs,credentials,pro
  need(worker instanceof require('./improve-worker.cjs').DockerWorker&&worker.jobId===request.jobId,'backend_input_changed');
  const managed=require('./improve-managed-worker.cjs').context(worker);
  const admitted=readInputs(root,request,inputs,!!managed);worker.inspectProduction(anchorId);
+ if(request.resourceProfile!==PROFILE.id)need(canonical(worker.receipts.get(anchorId).expected.backendProfile)===canonical(profiles.workerLimits(request.resourceProfile,'app').binding),'backend_input_changed');
  if(managed){
   const active=require('./improve-backend-attempt.cjs').read(managed.store,managed.attempt);
   need(active.jobId===request.jobId&&active.phase===request.phase&&active.constructionSha256===request.constructionSha256,'backend_input_changed');
@@ -317,6 +320,7 @@ async function startBackendServer(capability,context){
  const directory='/tmp/sf-secret-'+crypto.randomBytes(16).toString('hex');
  const envelope={job:s.request.jobId,generation:s.request.generation,container:s.anchorId,nonce:crypto.randomUUID(),issued,expires,key:s.serverKey};
  const bytes=canonical(envelope),expected={job:envelope.job,generation:envelope.generation,container:envelope.container,nonce:envelope.nonce,envelopeSha256:hash(bytes)};
+ if(s.request.resourceProfile!==PROFILE.id)expected.backendProfile=s.request.resourceProfile;
  const state={started:false,closing:false,failure:null,bytes:0,tails:{stdout:'',stderr:''},child:null};s.server=state;
  const fail=(cause,type)=>{if(state.failure)return;state.failure=cause;if(s.child.connected&&!s.terminal)s.child.send({type},()=>{});};
  try{
@@ -394,13 +398,13 @@ function prepareBackendChecks(capability,context,{oracleRoot,frozenFiles,checks}
    need(Object.keys(publicConfig).sort().join(',')==='anonKey,url'&&publicConfig.anonKey===s.admitted.credentials.anonKey&&publicConfig.url==='http://127.0.0.1:54321','backend_input_changed');
    mounts.push({source:path.join(stage,'inputs/public.json'),destination:'/inputs/public.json'});
   }
-  s.checker=s.worker.create({role:'checker',network:'container:'+s.anchorId,mounts,tmpfs:[{path:'/output',bytes:64*1024*1024}]});
-  s.oracle={stage,root:oracleRoot,frozenFiles:{...frozenFiles},checks:checks.map(c=>hash(canonical(c)))};
+  s.checker=s.request.resourceProfile===PROFILE.id?s.worker.create({role:'checker',network:'container:'+s.anchorId,mounts,tmpfs:[{path:'/output',bytes:64*1024*1024}]}):s.worker.createBackendChecker({network:'container:'+s.anchorId,mounts},s.request.resourceProfile);
+  s.oracle={stage,root:oracleRoot,frozenFiles:{...frozenFiles},checks:checks.map(c=>require('./outcome-contract.cjs').hashValue(c))};
   backendNativeFramework(capability,context);
  }catch(e){if(s.checker)s.worker.destroy(s.checker);s.checker=null;fs.rmSync(stage,{recursive:true,force:true});throw e;}
 }
 function backendNativeLaunch(capability,context,{check,options,dir,args,env}){
- const s=executionSession(capability,context);need(s.checker&&s.oracle&&s.oracle.root===options.oracleRoot&&s.oracle.checks.includes(hash(canonical(check))),'backend_input_invalid');
+ const s=executionSession(capability,context);need(s.checker&&s.oracle&&s.oracle.root===options.oracleRoot&&s.oracle.checks.includes(require('./outcome-contract.cjs').hashValue(check)),'backend_input_invalid');
  need(canonical(options.frozenFiles)===canonical(s.oracle.frozenFiles),'backend_input_changed');
  for(const file of [...check.checker_paths,...check.input_paths,...check.rule_paths]){
   readBoundFile(s.oracle.root,{path:file,sha256:s.oracle.frozenFiles[file]});
@@ -415,7 +419,7 @@ function backendNativeLaunch(capability,context,{check,options,dir,args,env}){
  s.worker.exec(s.checker,['/node/bin/node','-e',"require('fs').mkdirSync(process.argv[1],{mode:448})",output],{cwd:'/tmp',timeout:5000});
  let result;
  try{
-  result=s.worker.exec(s.checker,['/node/bin/node',...actualArgs],{cwd:'/oracle',env:actualEnv,timeout:Math.max(1,Math.min((check.timeout_seconds||120)*1000,strict(fs.readFileSync(path.join(s.journalRoot,'journal.json'))).phaseDeadlineEpochMs-Date.now())),allowFailure:true,maxBuffer:16*1024*1024});
+  result=s.worker.exec(s.checker,['/node/bin/node',...actualArgs],{cwd:'/oracle',env:actualEnv,timeout:Math.max(1,Math.min(Math.ceil((check.timeout_seconds||120)*1000),strict(fs.readFileSync(path.join(s.journalRoot,'journal.json'))).phaseDeadlineEpochMs-Date.now())),allowFailure:true,maxBuffer:16*1024*1024});
   s.worker.pause(s.checker);s.worker.capture(s.checker,output,dir,{maxBytes:64*1024*1024});
  }finally{if(s.worker.containers.has(s.checker))s.worker.call(['unpause',s.checker],{allowFailure:true});}
  const delivery=require('./improve-backend-server.cjs');

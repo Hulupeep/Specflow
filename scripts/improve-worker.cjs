@@ -548,6 +548,7 @@ function validateMountTopology(destinations, code = 'offline_resource_invalid') 
   return true;
 }
 const PRODUCTION_LAYOUT = Symbol('internal-production-layout');
+const BACKEND_CHECKER_LAYOUT = Symbol('internal-backend-checker-layout');
 class DockerWorker {
   constructor({ image, layer, stateRoot, gitArea = null, uid = process.getuid(), maxMilliseconds = 120000, jobId = null }) {
     need(/^sha256:[a-f0-9]{64}$/.test(image), 'worker_image_unavailable');
@@ -663,9 +664,10 @@ class DockerWorker {
       return ['--mount', `type=bind,src=${m.source},dst=${m.destination}${m.writable === true ? '' : ',readonly'}`];
     });
   }
-  createProduction(options) {
+  createProduction(options, backendProfileId) {
     need(options && Object.keys(options).every(k => ['source', 'dependencies', 'output'].includes(k)), 'build_layout_invalid');
     const { source, dependencies, output } = options;
+    if(backendProfileId!==undefined){need(output,'build_layout_invalid');require('./improve-backend-profiles.cjs').workerLimits(backendProfileId,'app');}
     const inputs = [source, dependencies, ...(output ? [output] : [])];
     need(inputs.every(c => c && Object.keys(c).sort().join(',') === 'receipt,target'), 'build_layout_invalid');
     const destinations = ['/app', '/app/node_modules', '/app/.next'];
@@ -674,7 +676,12 @@ class DockerWorker {
       const reserved = path.join(mounts[0].source, name);
       need(fs.lstatSync(reserved).isDirectory() && fs.readdirSync(reserved).length === 0, 'build_reserved_path');
     }
-    return this.create({ role: 'app', mounts, resourceProfile: output ? 'production-consumer-v1' : 'production-build-v1' }, PRODUCTION_LAYOUT, inputs);
+    return this.create({ role: 'app', mounts, resourceProfile: output ? 'production-consumer-v1' : 'production-build-v1' }, PRODUCTION_LAYOUT, inputs, backendProfileId);
+  }
+  createBackendChecker(options, backendProfileId) {
+    need(options&&Object.keys(options).sort().join(',')==='mounts,network'&&Array.isArray(options.mounts)&&/^container:[a-f0-9]{64}$/.test(options.network),'backend_input_invalid');
+    require('./improve-backend-profiles.cjs').workerLimits(backendProfileId,'checker');
+    return this.create({role:'checker',network:options.network,mounts:options.mounts},BACKEND_CHECKER_LAYOUT,undefined,backendProfileId);
   }
   inspectProduction(id) {
     need(this.containers.has(id) && this.receipts.has(id), 'worker_container_identity');
@@ -695,13 +702,15 @@ class DockerWorker {
       digest(identity) === digest(containerProcessIdentity(id, after.State.Pid)), 'build_process_changed');
     return identity;
   }
-  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory, resourceProfile }, internal, productionInputs) {
+  create({ role = 'app', mounts = [], capsules = [], tmpfs = [], network = 'none', memory, resourceProfile }, internal, productionInputs, backendProfileId) {
     const production = internal === PRODUCTION_LAYOUT;
+    const backend=backendProfileId===undefined?null:((production&&resourceProfile==='production-consumer-v1')||internal===BACKEND_CHECKER_LAYOUT)?require('./improve-backend-profiles.cjs').workerLimits(backendProfileId,production?'app':'checker'):null;
+    need(backendProfileId===undefined||backend,'backend_input_invalid');
     const buildProfile = production && require('./improve-production-build.cjs').PROFILE;
     if (resourceProfile !== undefined) need(Object.keys(arguments[0]).every(key =>
       ['role', 'mounts', 'capsules', 'tmpfs', 'network', 'memory', 'resourceProfile'].includes(key)),
     'offline_resource_invalid');
-    const resources = production ? { memory: buildProfile.memoryBytes,
+    const resources = backend ? backend : production ? { memory: buildProfile.memoryBytes,
       tmpfs: resourceProfile === 'production-build-v1' ? [{ path: '/app/.next', bytes: buildProfile.outputBytes }] : [],
       phaseMilliseconds: buildProfile.phaseMilliseconds } : resourcePlan({ role, memory, tmpfs, resourceProfile });
     memory = resources.memory;
@@ -773,7 +782,7 @@ class DockerWorker {
     const managed = require('./improve-managed-worker.cjs');
     const managedId = managed.create(this, { image: this.image, uid: this.uid, network, memory,
       mounts: [...selected, ...mounts].map(m => ({ source: m.source, destination: m.destination, writable: m.writable === true })),
-      tmpfs, phaseMilliseconds: resources.phaseMilliseconds || this.maxMilliseconds });
+      tmpfs, phaseMilliseconds: resources.phaseMilliseconds || this.maxMilliseconds,...(backend?{backendProfile:backend.binding}:{}) });
     const id = managedId || this.call(args).stdout.trim();
     need(/^[a-f0-9]{64}$/.test(id), 'worker_container_identity');
     this.containers.add(id);
@@ -797,8 +806,9 @@ class DockerWorker {
       memory,
       ...(resources.phaseMilliseconds ? { phaseMilliseconds: resources.phaseMilliseconds,
         tmpfsLimits: { '/tmp': { bytes: OFFLINE_RESOURCE_PROFILE.tmpBytes, mode: '1777' },
-          ...(production ? (tmpfs.length ? { '/app/.next': { bytes: buildProfile.outputBytes, mode: '0700', uid: this.uid, gid: this.uid, noexec: true } } : {}) :
+          ...(backend&&!production?{'/output':{bytes:67108864,mode:'0700',uid:this.uid,gid:this.uid,noexec:true}}:production ? (tmpfs.length ? { '/app/.next': { bytes: buildProfile.outputBytes, mode: '0700', uid: this.uid, gid: this.uid, noexec: true } } : {}) :
             { '/work': { bytes: OFFLINE_RESOURCE_PROFILE.workBytes, mode: '0700', uid: this.uid, gid: this.uid } }) } } : {}),
+      ...(backend?{backendProfile:backend.binding}:{}),
       ...(production ? { productionMode: resourceProfile === 'production-build-v1' ? 'build' : 'consumer', productionInputs: structuredClone(productionInputs) } : {}),
       mounts: [...selected, ...mounts],
       tmpfs: ['/tmp', ...tmpfs.map((t) => t.path)]

@@ -46,12 +46,15 @@ function gateway(raw, credentials, request) {
     claims = strictJSON(Buffer.from(payload, 'base64url').toString());
   } catch { throw Error('backend_identity_mismatch'); }
   need(Number.isSafeInteger(claims.iat) && Number.isSafeInteger(claims.exp));
-  need(canonical(claims) === canonical({ role: 'service_role', aud: 'authenticated', iss: 'supabase', job: request.jobId, generation: request.generation, iat: claims.iat, exp: claims.iat + 600 }));
+  const extended=request.resourceProfile==='heystax-backend-journeys-v1';
+  const lifetimeSeconds=extended?require('./improve-backend-profiles.cjs').workerLimits(request.resourceProfile,'app').phaseMilliseconds/1000:600;
+  need(extended?(claims.exp>claims.iat&&claims.exp<=claims.iat+lifetimeSeconds&&claims.exp<=credentials.expiresAt):claims.exp===claims.iat+600);
+  need(canonical(claims) === canonical({ role: 'service_role', aud: 'authenticated', iss: 'supabase', job: request.jobId, generation: request.generation, iat: claims.iat, exp: claims.exp }));
   need(claims.iat * 1000 <= Date.now() + 1000 && claims.exp * 1000 > Date.now());
   const expected = crypto.createHmac('sha256', credentials.jwtSecret).update(header + '.' + payload).digest(), actual = Buffer.from(signature, 'base64url');
   need(expected.length === actual.length && crypto.timingSafeEqual(expected, actual));
   anon[0].keyauth_credentials[0].key = normalized.anon;
-  server[0].keyauth_credentials[0].key = { kind: 'job-generation-server-token', job: claims.job, role: claims.role, aud: claims.aud, iss: claims.iss, lifetimeSeconds: 600, algorithm: 'HS256' };
+  server[0].keyauth_credentials[0].key = { kind: 'job-generation-server-token', job: claims.job, role: claims.role, aud: claims.aud, iss: claims.iss, lifetimeSeconds, algorithm: 'HS256' };
   return result;
 }
 module.exports = { projection, environment, gateway };

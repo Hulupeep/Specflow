@@ -1,0 +1,148 @@
+{
+  "config": {
+    "configFile": "/oracle/journeys/config-1.cjs",
+    "rootDir": "/oracle",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "reporter": [
+      [
+        "json"
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "quiet": false,
+    "projects": [
+      {
+        "outputDir": "/output/attempt-7rgvdQ/artifacts",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "",
+        "name": "",
+        "testDir": "/oracle",
+        "testIgnore": [],
+        "testMatch": [
+          "**/invocation-1.spec.cjs"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.57.0",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "journeys/invocation-1.spec.cjs",
+      "file": "journeys/invocation-1.spec.cjs",
+      "column": 0,
+      "line": 0,
+      "specs": [
+        {
+          "title": "J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4560,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "{\"diagnostic\":\"next-action-create\",\"width\":1280,\"status\":201,\"error\":null,\"actionReturned\":true}\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T09:40:30.468Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "94108fab4dc3f0159624-e09df933b948e2d165ec",
+          "file": "journeys/invocation-1.spec.cjs",
+          "line": 40,
+          "column": 31
+        },
+        {
+          "title": "J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+          "ok": true,
+          "tags": [],
+          "tests": [
+            {
+              "timeout": 45000,
+              "annotations": [],
+              "expectedStatus": "passed",
+              "projectId": "",
+              "projectName": "",
+              "results": [
+                {
+                  "workerIndex": 0,
+                  "parallelIndex": 0,
+                  "status": "passed",
+                  "duration": 4240,
+                  "errors": [],
+                  "stdout": [
+                    {
+                      "text": "{\"diagnostic\":\"next-action-create\",\"width\":360,\"status\":201,\"error\":null,\"actionReturned\":true}\n"
+                    }
+                  ],
+                  "stderr": [],
+                  "retry": 0,
+                  "startTime": "2026-10-31T09:40:35.360Z",
+                  "annotations": [],
+                  "attachments": []
+                }
+              ],
+              "status": "expected"
+            }
+          ],
+          "id": "94108fab4dc3f0159624-6312d5e1f8b9beec43f2",
+          "file": "journeys/invocation-1.spec.cjs",
+          "line": 40,
+          "column": 31
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-10-31T09:40:29.183Z",
+    "duration": 10515.395,
+    "expected": 2,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

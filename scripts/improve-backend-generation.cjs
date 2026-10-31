@@ -5,6 +5,7 @@ const fs=require('fs'),path=require('path'),crypto=require('crypto');
 const production=require('./improve-production-build.cjs'),{canonical}=production;
 const admission=require('./improve-backend.cjs'),attempts=require('./improve-backend-attempt.cjs');
 const managed=require('./improve-managed-worker.cjs'),credentials=require('./improve-backend-credentials.cjs');
+const profiles=require('./improve-backend-profiles.cjs');
 const runtime=require('./improve-backend-runtime.cjs'),semantics=require('./improve-backend-semantics.cjs');
 const capabilities=new WeakMap(),sessions=new WeakMap();
 const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
@@ -37,7 +38,11 @@ function binding(config,store,runId){
  need(value.dependencies.expected.identity.jobId===value.jobId&&value.sourceRecipeSha256===hash(RECONSTRUCT),'backend_binding_invalid');
  const template=admission.validateInputs(json(absolute(value.inputsTemplate)));
  need(template.jobId===value.jobId&&template.resourceProfile.sha256===value.resourceProfileSha256,'backend_binding_invalid');
- return {value,template};
+ const profileBytes=admission.readBoundFile(path.dirname(value.inputsTemplate.path),template.resourceProfile);
+ const profileId=json(profileBytes).id,profile=profiles.profileFor(profileId);
+ if(profileId===admission.PROFILE.id)need(canonical(json(profileBytes))===canonical(profile),'backend_input_changed');
+ else profiles.validateProfileBytes(profileId,profileBytes);
+ return {value,template,profileId};
 }
 function install(config,runDir,authorize){
  need(typeof authorize==='function');authorize();
@@ -78,10 +83,15 @@ const RECONSTRUCT="const fs=require('fs'),p=require('path'),s=JSON.parse(fs.read
 async function open(token,runDir,phase,refresh){
  need(require('./improve-backend-phase.cjs').validPhase(phase));
  const c=current(token,runDir),v=c.admitted.value,initial=refresh({metadataOnly:true});declaration(token,runDir,initial.declaration);need(initial.bindingSha256===c.config.backendJobBinding.sha256,'backend_binding_invalid');
+ const extended=c.admitted.profileId!==admission.PROFILE.id;
+ // Every new managed admission must fit its selected profile; legacy selection
+ // is not an escape hatch. Already running, pinned workers keep their bytes.
+ const phasePlan=profiles.planPhase({phase,contract:json(Buffer.from(initial.contractJSON)),profileId:c.admitted.profileId,deadlineAtMs:v.deadlineAtMs});
  const ref=attempts.begin(c.store,{jobId:v.jobId,runId:v.runId,phase,contractSha256:initial.contractSha256,constructionSha256:v.constructionSha256,authoritySha256:hash(canonical(c.config.authority)),deadlineAtMs:v.deadlineAtMs});
- const state={c,token,ref,worker:null,session:null,consumer:null,root:null,product:null,context:null};const handle=Object.freeze({});sessions.set(handle,state);
+ const state={c,token,ref,phasePlan:phasePlan?{...phasePlan,contractSha256:initial.contractSha256}:null,worker:null,session:null,consumer:null,root:null,product:null,context:null};const handle=Object.freeze({});sessions.set(handle,state);
  try{
   state.root=attempts.envelope(c.store,ref);
+  if(phasePlan)state.plan=write(state.root,'phase-plan.json',canonical(state.phasePlan));
   const selected=refresh();
   const metadata=({identity,...rest})=>rest;
   need(canonical(metadata(selected))===canonical(metadata(initial)),'backend_input_changed');current(token,runDir);state.identity=selected.identity;
@@ -99,7 +109,7 @@ async function open(token,runDir,phase,refresh){
   for(const key of ['bootstrap','supabaseCli','seed','runtimeLayer','configuration','resourceProfile'])write(state.root,template[key].path,admission.readBoundFile(inputRoot,template[key],128*1024*1024));
   for(const file of template.migrations)write(state.root,template.migrationRoot+'/'+file.name,admission.readBoundFile(inputRoot,{path:template.migrationRoot+'/'+file.name,sha256:file.sha256}));
   const credentialRef=credentials.issue(c.store,{jobId:v.jobId,phase}),issued=credentials.read(c.store,credentialRef);
-  const request={schema:'specflow.backend-request/v2',jobId:v.jobId,phase,recipeId:v.recipeId,generation:credentialRef.generation,expectedBackendIdentity:v.expectedSemanticSha256,resourceProfile:admission.PROFILE.id,constructionSha256:v.constructionSha256};
+  const request={schema:'specflow.backend-request/v2',jobId:v.jobId,phase,recipeId:v.recipeId,generation:credentialRef.generation,expectedBackendIdentity:v.expectedSemanticSha256,resourceProfile:c.admitted.profileId,constructionSha256:v.constructionSha256};
   const normalized=JSON.parse(canonical(template));normalized.credentialBinding.sha256=semantics.projection(issued,request);
   need(hash(canonical(normalized))===v.constructionSha256,'backend_identity_mismatch');
   const secret=write(state.root,template.credentialBinding.path,canonical(issued));template.credentialBinding.sha256=secret.sha256;
@@ -114,13 +124,14 @@ async function open(token,runDir,phase,refresh){
   managed.select(worker,'build');const built=production.runProductionBuild(worker,productInput,path.join(state.root,'built'));
   current(token,runDir);credentials.read(c.store,credentialRef);need(worker.containers.size===0,'backend_cleanup_unconfirmed');
   const build=write(state.root,'generation-build.json',canonical(built.receipt));request.productBuildReceipt={path:'generation-build.json',sha256:build.sha256};state.product=build;
-  managed.select(worker,'app');state.consumer=production.createProductionConsumer(worker,productInput,built.receipt,built.target);
+  if(phasePlan){const rechecked=profiles.planPhase({phase,contract:json(Buffer.from(selected.contractJSON)),profileId:c.admitted.profileId,deadlineAtMs:v.deadlineAtMs});need(canonical(rechecked)===canonical(phasePlan),'backend_input_changed');}
+  managed.select(worker,'app');state.consumer=production.createProductionConsumer(worker,productInput,built.receipt,built.target,extended?c.admitted.profileId:undefined);
   state.session=await runtime.startBackend({worker,anchorId:state.consumer.id,root:state.root,request,inputs:template,credentials:{store:c.store,reference:credentialRef},productInput});
   state.context={runId:v.runId,phase,expectedBackendIdentity:v.expectedSemanticSha256,inputManifestSha256:request.inputManifest.sha256};
   state.request=request;return handle;
  }catch(error){try{error.backendGeneration=await close(handle,error.code||error.message);}catch(cleanup){error.cleanupCause=cleanup.message;}throw error;}
 }
-function access(handle){const s=sessions.get(handle);need(s&&s.session&&!s.stopping,'backend_capability_required');return {session:s.session,context:s.context,identity:s.identity};}
+function access(handle){const s=sessions.get(handle);need(s&&s.session&&!s.stopping,'backend_capability_required');return {session:s.session,context:s.context,identity:s.identity,plan:s.plan};}
 function selectChecker(handle){const s=sessions.get(handle);need(s&&s.worker&&!s.stopping);managed.select(s.worker,'checker');}
 function validate(handle){const s=sessions.get(handle);need(s,'backend_capability_required');current(s.token,s.c.runDir);}
 // Stop live resources once, but retain the sealed reservation until the core's
@@ -149,13 +160,17 @@ async function close(handle,cause=null){
   if(cause===null)try{validate(handle);}catch(error){cause=error.code||error.message;}
   const originalCause=cause,terminalCause=cause===null?null:/^backend_[a-z_]+$/.test(cause)?cause:'backend_generation_failed';
   const terminal=attempts.finish(s.c.store,s.ref,{cause:terminalCause,backendTerminalSha256:backendTerminal?hash(canonical(backendTerminal)):null,productReceiptSha256:s.product?.sha256||null});
-  return {attempt:s.ref,terminal,backendTerminal,originalCause};
+  return {attempt:s.ref,terminal,backendTerminal,originalCause,...(s.phasePlan?{plan:s.phasePlan}:{})};
  }finally{sessions.delete(handle);}
 }
 module.exports={install,open,access,selectChecker,validate,shutdown,close,declaration};
 
-function verifyReceipt(token,runDir,phase,contractSha256,receipt){
+function verifyReceipt(token,runDir,phase,contractSha256,receipt,contract){
  const c=current(token,runDir,false),v=c.admitted.value,m=receipt.managed;
+ {
+  const expected=profiles.planPhase({phase,contract,profileId:c.admitted.profileId,deadlineAtMs:v.deadlineAtMs,nowMs:0});
+  need(canonical(json(absolute(receipt.plan)))===canonical({...expected,contractSha256}),'backend_receipt_invalid');
+ }
  need(m&&m.attempt.jobId===v.jobId&&m.attempt.runId===v.runId,'backend_receipt_invalid');
  const terminal=attempts.terminal(c.store,m.attempt);
  need(canonical(terminal)===canonical(m.terminal)&&terminal.state==='cleaned'&&terminal.cause===null&&terminal.credentialEnvelopeRemoved===true&&terminal.phase===phase,'backend_cleanup_unconfirmed');
@@ -163,6 +178,7 @@ function verifyReceipt(token,runDir,phase,contractSha256,receipt){
  need(signed.mac===c.store.mac(JSON.parse(canonical(a)))&&hash(canonical(a))===m.attempt.attemptSha256,'backend_receipt_invalid');
  need(a.contractSha256===contractSha256&&a.constructionSha256===v.constructionSha256&&a.deadlineAtMs===v.deadlineAtMs&&a.phase===phase&&a.authoritySha256===hash(canonical(c.config.authority)),'backend_receipt_invalid');
  const entry=json(absolute(receipt.entry)),backendTerminal=json(absolute(receipt.terminal));
+ if(c.admitted.profileId!==admission.PROFILE.id)need(backendTerminal.resourceProfile===c.admitted.profileId&&backendTerminal.resourceProfileSha256===v.resourceProfileSha256,'backend_receipt_invalid');
  need(entry.jobId===v.jobId&&entry.phase===phase&&entry.attemptSha256===m.attempt.attemptSha256&&entry.constructionSha256===v.constructionSha256&&entry.generation===backendTerminal.generation,'backend_receipt_invalid');
  need(terminal.backendTerminalSha256===hash(canonical(backendTerminal))&&terminal.productReceiptSha256===receipt.product.build.sha256,'backend_receipt_invalid');
  for(const slot of ['source-producer','build','app','checker','database','authMigration','auth','rest','gateway'])need(terminal.resources.some(r=>r.slot===slot&&r.status==='removed'),'backend_cleanup_unconfirmed');

@@ -279,3 +279,23 @@ missing fields, unsafe/fractional deadline values, provenance correspondence and
 expiry/nonrenewal examples. These tests establish the specification only. Runtime
 qualification must additionally prove tampered provenance rejection before create,
 expired admission, and unchanged deadlines across actual baseline/dev/after runs.
+
+## Workload admission (#298)
+
+Every new managed generation validates its frozen invocation inventory and original
+remaining task horizon before reserving an attempt or creating resources. The
+selected profile is explicit; no automatic profile upgrade or deadline renewal is
+allowed. Admission repeats after the build before app/backend creation, and the
+receipt binds the resulting plan.
+
+The original `heystax-backend-v1` bytes and previously pinned workers are unchanged.
+Its 120-second execution ceiling cannot fit a new native journey under the current
+conservative setup, continuity and dispatch allowances. Such new managed requests
+fail with `backend_inventory_exceeds_profile` and required/available milliseconds;
+they must explicitly select a qualified profile that fits. Direct historical
+qualification of the old profile does not bypass this new managed admission rule.
+
+`heystax-backend-journeys-v1` provides a finite 600-second execution ceiling with
+unchanged non-time resource limits. Four separately dispatched 100-second checks
+require 580 seconds including allowances. The original job deadline still bounds
+the complete app lifecycle; insufficient remaining time is a named rejection.

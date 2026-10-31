@@ -1,0 +1,874 @@
+{
+  "schema": "specflow.backend-journeys-qualification/v1",
+  "scope": "Runtime capacity and owned cleanup; repeated real two-width login/save/reload/wrong-user-RLS workloads, not product improvement or KEEP",
+  "sourceCommit": "2f8fb8a1c435bfb7b90e444b03f6c6c2e2e674d1",
+  "runtimeManifestSha256": "eb560543ac56eafb9f7cd7068a92ed3603e2f43d1612716c401c1a9c82b08d18",
+  "privateRuntimeManifestSha256": "690d7587840ebf257bc980c0be6f4174cb628e0bf94b7f558c5e7cc90ac746c3",
+  "baseline": {
+    "result": {
+      "cleanup": "cleaned",
+      "deadlineAtMs": 1793441883937,
+      "elapsedMilliseconds": 386670,
+      "phase": "baseline",
+      "profileId": "heystax-backend-journeys-v1",
+      "results": [
+        {
+          "elapsedMilliseconds": 28966,
+          "id": "CAPACITY-1",
+          "invocation": 0,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        },
+        {
+          "elapsedMilliseconds": 28753,
+          "id": "CAPACITY-2",
+          "invocation": 1,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        },
+        {
+          "elapsedMilliseconds": 28589,
+          "id": "CAPACITY-3",
+          "invocation": 2,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        },
+        {
+          "elapsedMilliseconds": 28610,
+          "id": "CAPACITY-1",
+          "invocation": 3,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        }
+      ],
+      "scope": "Repeated real two-width integration workload; runtime capacity/cleanup only, not product improvement",
+      "status": "passed",
+      "timings": {
+        "admitMilliseconds": 9135,
+        "continuityMilliseconds": 7445,
+        "openMilliseconds": 181969,
+        "setupMilliseconds": 59917,
+        "shutdownMilliseconds": 11758
+      }
+    },
+    "attempt": {
+      "attemptId": "a2089eb2-e567-4bed-aca8-520b3385fd4c",
+      "attemptSha256": "2fee9e6becb10e1b278711324e0000ca24df218399137f100573355b5f6763e4",
+      "jobId": "backend-qualification-298-2ee3875e-1952-4b6c-986d-e57311e53d75",
+      "runId": "profile-298-baseline-b7eb8afc-9751-475f-bef1-06a07670350e"
+    },
+    "plan": {
+      "availableExecutionMilliseconds": 600000,
+      "continuityMilliseconds": 10000,
+      "contractSha256": "a4ec22db93c85998d5e3b331a75dd65bdf0e06103f9cb9e99bd64dd84ba4ceba",
+      "deadlineAtMs": 1793441883937,
+      "declaredMilliseconds": 400000,
+      "dispatchMilliseconds": 80000,
+      "dispatchMillisecondsPerInvocation": 20000,
+      "inventorySha256": "71cfcd9af066c204a4fdffd838566ff75bebdfadc3084a5fba41223a6b4fa6e1",
+      "invocations": [
+        {
+          "checkSha256": "7df64f9b5f1717f75c36a3100ea3025d4a6077e8fb19142bdb9746f9a18db834",
+          "id": "CAPACITY-1",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "holdout",
+          "timeoutMilliseconds": 100000
+        },
+        {
+          "checkSha256": "f36dbe4aab930b775da47b05acc189b05c4f6607c6bdc5ee47d26143db65b55b",
+          "id": "CAPACITY-2",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "holdout",
+          "timeoutMilliseconds": 100000
+        },
+        {
+          "checkSha256": "c422ebd444fbb3a2529e8adb78491fa40a356eec983e45c82e8b301133f878f8",
+          "id": "CAPACITY-3",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "holdout",
+          "timeoutMilliseconds": 100000
+        },
+        {
+          "checkSha256": "55967e1e3fae16a43ade3d3121e39fc94df6900188e435c3c274583534f57e45",
+          "id": "CAPACITY-1",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-4.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-4.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "dev",
+          "timeoutMilliseconds": 100000
+        }
+      ],
+      "phase": "baseline",
+      "profileId": "heystax-backend-journeys-v1",
+      "profileSha256": "d97baabca70c61f2f6b9f00d537d73aa22e2e54cc5026b4e8ba2088b751bc739",
+      "requiredExecutionMilliseconds": 580000,
+      "requiredLifecycleMilliseconds": 880000,
+      "schema": "specflow.backend-phase-plan/v1",
+      "setupMilliseconds": 90000
+    },
+    "cleanup": {
+      "state": "cleaned",
+      "cause": null,
+      "credentialEnvelopeRemoved": true,
+      "resources": [
+        {
+          "id": "3847964b1a68b62100a426a94361dc81bb18ab22b5f3fe57fbc92ea287b96012",
+          "intentSha256": "6d414f67a048be2731996d7fd0c2e0b562804f925f4156e7a83887e5e7d83b23",
+          "slot": "source-producer",
+          "status": "removed"
+        },
+        {
+          "id": "1c5242562875c358d62f5c5830b411e68688144ab2426dbf6094d119a0bb20cb",
+          "intentSha256": "e628a93e6e9716ac7b3855e47be6696fe5153b748092556bcaddb3e6707de62a",
+          "slot": "build",
+          "status": "removed"
+        },
+        {
+          "id": "73f1bece7abf427df8273468b1b6626219bb1c5c0bfa159727325176eabec0ed",
+          "intentSha256": "c2be4f8ba765a95b516a59d0c52b333380db176d671a25b55f68ad7db6a8af8d",
+          "slot": "app",
+          "status": "removed"
+        },
+        {
+          "id": "0a356d46c0ddbf12ae28456290dee7d90ceaf5fe2910964d8be962ce641943e9",
+          "intentSha256": "835fa7c12408836791d65e02a54902a47dc6d0fe1d686e3648a3439712e490aa",
+          "slot": "checker",
+          "status": "removed"
+        },
+        {
+          "id": "46cdb7fac0c43e599ea04969db91458134bf372e3d2ec7d956059c9a0ae77874",
+          "intentSha256": "b15168d5b8801345eeeea2099a447cb9ec847bc2184f0d997dad79ce1e460ba1",
+          "slot": "database",
+          "status": "removed"
+        },
+        {
+          "id": "2ff626af2017cfd760f975d11eadee10464de5f505a92d9262ec5e84bae4a2be",
+          "intentSha256": "6161e5941cbdca7aef28aa3aa13918bbf040e443eae17e9a6de6a2ae8bee1de9",
+          "slot": "authMigration",
+          "status": "removed"
+        },
+        {
+          "id": "15f9a4ffa1d370631604cbb11f0e2732cc532b82fd86fcbedf253d3fe0098487",
+          "intentSha256": "230d97ef742edad0f80f01ca71665bff17f17fb11ac5cbec206675b0bb79c2f1",
+          "slot": "auth",
+          "status": "removed"
+        },
+        {
+          "id": "5d29bb470e818bda895389f1828420cd1017d063004ad118edeb99a17f82a9da",
+          "intentSha256": "612202539dfb4985e862e1fdae97a443eb9676f9c4eb96f1f95954e8bf6b26e7",
+          "slot": "rest",
+          "status": "removed"
+        },
+        {
+          "id": "8cd2604c6cb16d3a70ac7f0a284fb1db94f4931b9ac093d01763fce50f4793b7",
+          "intentSha256": "79e056052762adcc9e2376f18624cfe0c497781fcc31448e06f4b9b53af11437",
+          "slot": "gateway",
+          "status": "removed"
+        }
+      ],
+      "backendPhase": "cleaned",
+      "backendCause": null,
+      "profile": "heystax-backend-journeys-v1",
+      "profileSha256": "d97baabca70c61f2f6b9f00d537d73aa22e2e54cc5026b4e8ba2088b751bc739"
+    },
+    "secretScans": [
+      {
+        "bytes": 348650,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 348139,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 348398,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 348322,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 2240363,
+        "canaryHits": 0,
+        "files": 46
+      }
+    ],
+    "native": [
+      {
+        "attemptId": "attempt-7rgvdQ",
+        "checkId": "CAPACITY-1",
+        "startedAt": "2026-10-31T09:40:22.077Z",
+        "finishedAt": "2026-10-31T09:40:48.368Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-1.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-1.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "baseline/native-0.json",
+          "sha256": "249c944fad173b547b102453bdaa4323b46bf4c899a0e5be084a6d2626c40725"
+        }
+      },
+      {
+        "attemptId": "attempt-manr8y",
+        "checkId": "CAPACITY-2",
+        "startedAt": "2026-10-31T09:40:53.763Z",
+        "finishedAt": "2026-10-31T09:41:19.842Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-2.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-2.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "baseline/native-1.json",
+          "sha256": "144a6223abc6f8e9824cc500994cf54aac637ff9020b8961a3f2afbddef71917"
+        }
+      },
+      {
+        "attemptId": "attempt-N4YfiQ",
+        "checkId": "CAPACITY-3",
+        "startedAt": "2026-10-31T09:41:25.123Z",
+        "finishedAt": "2026-10-31T09:41:51.068Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-3.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-3.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "baseline/native-2.json",
+          "sha256": "e497ddebef8802c87cf5a1501c2f74777355fd287a1ebef9a7d03fa7a976a18d"
+        }
+      },
+      {
+        "attemptId": "attempt-rh991v",
+        "checkId": "CAPACITY-1",
+        "startedAt": "2026-10-31T09:41:56.607Z",
+        "finishedAt": "2026-10-31T09:42:22.333Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-4.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-4.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-4.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-4.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "baseline/native-3.json",
+          "sha256": "9564e5582de00887559f762c2b088981db354ef3a00bcfe1a6b40edc032c961c"
+        }
+      }
+    ]
+  },
+  "after": {
+    "result": {
+      "cleanup": "cleaned",
+      "deadlineAtMs": 1793441883937,
+      "elapsedMilliseconds": 363469,
+      "phase": "after",
+      "profileId": "heystax-backend-journeys-v1",
+      "results": [
+        {
+          "elapsedMilliseconds": 28864,
+          "id": "CAPACITY-1",
+          "invocation": 0,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        },
+        {
+          "elapsedMilliseconds": 28808,
+          "id": "CAPACITY-2",
+          "invocation": 1,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        },
+        {
+          "elapsedMilliseconds": 28647,
+          "id": "CAPACITY-3",
+          "invocation": 2,
+          "result": "pass",
+          "summary": {
+            "collected": 2,
+            "failed": 0,
+            "flaky": 0,
+            "passed": 2,
+            "skipped": 0
+          }
+        }
+      ],
+      "scope": "Repeated real two-width integration workload; runtime capacity/cleanup only, not product improvement",
+      "status": "passed",
+      "timings": {
+        "admitMilliseconds": 8907,
+        "continuityMilliseconds": 7585,
+        "openMilliseconds": 190092,
+        "setupMilliseconds": 59414,
+        "shutdownMilliseconds": 12184
+      }
+    },
+    "attempt": {
+      "attemptId": "4b42df07-615d-4a81-a34f-c01600bd9516",
+      "attemptSha256": "56c6ee13412989be22dbcdfc68257a187acfc944ee15fab6cc7c41aa3bb8bc9f",
+      "jobId": "backend-qualification-298-2ee3875e-1952-4b6c-986d-e57311e53d75",
+      "runId": "profile-298-after-0effb2b9-258d-4839-abb3-1f82a37555f2"
+    },
+    "plan": {
+      "availableExecutionMilliseconds": 600000,
+      "continuityMilliseconds": 10000,
+      "contractSha256": "a4ec22db93c85998d5e3b331a75dd65bdf0e06103f9cb9e99bd64dd84ba4ceba",
+      "deadlineAtMs": 1793441883937,
+      "declaredMilliseconds": 300000,
+      "dispatchMilliseconds": 60000,
+      "dispatchMillisecondsPerInvocation": 20000,
+      "inventorySha256": "e5b471aed2ed0a7cf17ffb341e65ef91addc8a601e3e36dfcca656b3474dc6c9",
+      "invocations": [
+        {
+          "checkSha256": "7df64f9b5f1717f75c36a3100ea3025d4a6077e8fb19142bdb9746f9a18db834",
+          "id": "CAPACITY-1",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "holdout",
+          "timeoutMilliseconds": 100000
+        },
+        {
+          "checkSha256": "f36dbe4aab930b775da47b05acc189b05c4f6607c6bdc5ee47d26143db65b55b",
+          "id": "CAPACITY-2",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "holdout",
+          "timeoutMilliseconds": 100000
+        },
+        {
+          "checkSha256": "c422ebd444fbb3a2529e8adb78491fa40a356eec983e45c82e8b301133f878f8",
+          "id": "CAPACITY-3",
+          "optionalCaseIds": [],
+          "requiredCaseIds": [
+            "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection"
+          ],
+          "set": "holdout",
+          "timeoutMilliseconds": 100000
+        }
+      ],
+      "phase": "after",
+      "profileId": "heystax-backend-journeys-v1",
+      "profileSha256": "d97baabca70c61f2f6b9f00d537d73aa22e2e54cc5026b4e8ba2088b751bc739",
+      "requiredExecutionMilliseconds": 460000,
+      "requiredLifecycleMilliseconds": 880000,
+      "schema": "specflow.backend-phase-plan/v1",
+      "setupMilliseconds": 90000
+    },
+    "cleanup": {
+      "state": "cleaned",
+      "cause": null,
+      "credentialEnvelopeRemoved": true,
+      "resources": [
+        {
+          "id": "212f85a92bbaa808c9e5d5a330e4255e4d7685f48674db5df3f89cc091696810",
+          "intentSha256": "db2399541735617ab3d3b29f9212163e7ea5ab5fe68e19af4614d0d9b4e6b78e",
+          "slot": "source-producer",
+          "status": "removed"
+        },
+        {
+          "id": "e57ecb99f19594be023237789ebf0549ef1fc1f418047ff5586fc4b5e6c67650",
+          "intentSha256": "54aca6e7a30a82bee8a3713e5654385cc4c591faa86dec52b5bea1613677dbfa",
+          "slot": "build",
+          "status": "removed"
+        },
+        {
+          "id": "70541ad07bebc28e9a7ee47d37da7fdfd84abf9cab716634adbc95fb6b8860c6",
+          "intentSha256": "2dce2397eae099735c0e638e23195a2599efa4cfb6ed9b7abfab5f6c2902fc9d",
+          "slot": "app",
+          "status": "removed"
+        },
+        {
+          "id": "6f8f2efa0652bd2f02b20c36e9f7d8542154b7aed6cb7345f2bc88b501b80081",
+          "intentSha256": "8c2957ddee47d5e1d21c0c180c2096d904f59bcbbd30a1597d450d470195cdc8",
+          "slot": "checker",
+          "status": "removed"
+        },
+        {
+          "id": "e89e25ccf0b6ed2df57ff2f727984906603d6d86cb07e3a64ca0ea67c22956c1",
+          "intentSha256": "a26d3b91dbcbaab414737ad75476621c98021828eeee441af0a81d7970311c2c",
+          "slot": "database",
+          "status": "removed"
+        },
+        {
+          "id": "d7b9774d2849b7128eb4901be22ff874ed8fee4d50d39d7fcac2eb73e225a672",
+          "intentSha256": "2522b255a0881c7c21bef97def773c8d2e80a792dea10381b1809bc63e2c0046",
+          "slot": "authMigration",
+          "status": "removed"
+        },
+        {
+          "id": "df9109f8e50f924dc5e7bc61787ec706baf873b04a5cb096100763ad7a83157a",
+          "intentSha256": "b66690aaefe894b7166d22e515bc42727dab44eb8fd6813e25b207349bb7c118",
+          "slot": "auth",
+          "status": "removed"
+        },
+        {
+          "id": "4e209959be79f687a78f9f49d89e7c1d87daaeb0f859125c937f627c27734ca6",
+          "intentSha256": "8a785cd90cbebc44fed931ed2cfac34e112df24437c4bb6897f68057cdb339aa",
+          "slot": "rest",
+          "status": "removed"
+        },
+        {
+          "id": "8d11bfbb888df0f87209284c2e5241a96bf420e65cbf2b3078380f46b5b1fd7d",
+          "intentSha256": "7bc0c4c1c4504955518f6e5101321309b4f3af4042c43dcbaf0876338450a2a6",
+          "slot": "gateway",
+          "status": "removed"
+        }
+      ],
+      "backendPhase": "cleaned",
+      "backendCause": null,
+      "profile": "heystax-backend-journeys-v1",
+      "profileSha256": "d97baabca70c61f2f6b9f00d537d73aa22e2e54cc5026b4e8ba2088b751bc739"
+    },
+    "secretScans": [
+      {
+        "bytes": 348059,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 348389,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 348315,
+        "canaryHits": 0,
+        "files": 13
+      },
+      {
+        "bytes": 2240359,
+        "canaryHits": 0,
+        "files": 46
+      }
+    ],
+    "native": [
+      {
+        "attemptId": "attempt-zNoXqQ",
+        "checkId": "CAPACITY-1",
+        "startedAt": "2026-10-31T09:47:03.741Z",
+        "finishedAt": "2026-10-31T09:47:29.970Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-1.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-1.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-1.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "after/native-0.json",
+          "sha256": "a25e346837b86e52d704ca29430435dee70a8fcc2183167f666b0f296f1b1add"
+        }
+      },
+      {
+        "attemptId": "attempt-EkJxPd",
+        "checkId": "CAPACITY-2",
+        "startedAt": "2026-10-31T09:47:35.157Z",
+        "finishedAt": "2026-10-31T09:48:01.366Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-2.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-2.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-2.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "after/native-1.json",
+          "sha256": "14be26382dc9e24921f509b91aef2e0f7a9acff4cb031095930cb02fa88db571"
+        }
+      },
+      {
+        "attemptId": "attempt-z9a63Q",
+        "checkId": "CAPACITY-3",
+        "startedAt": "2026-10-31T09:48:06.566Z",
+        "finishedAt": "2026-10-31T09:48:32.644Z",
+        "exitCode": 0,
+        "summary": {
+          "collected": 2,
+          "passed": 2,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "cases": [
+          {
+            "id": "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-1280: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-3.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          },
+          {
+            "id": "default::journeys/invocation-3.spec.cjs::J-BACKEND-PRODUCT-360: real login save reload and wrong-user RLS rejection",
+            "file": "journeys/invocation-3.spec.cjs",
+            "status": "passed",
+            "native_status": "expected",
+            "attempt_statuses": [
+              "passed"
+            ]
+          }
+        ],
+        "sourceSha256": "b4131a5a79bcd86530227529d6a408cccb2d30da3d9ca2332ff2b5a99423632d",
+        "contractSha256": "1c5dcaa7b42d36d29071bef79a4c61d5eb66b080cdd6f2914907161010971f07",
+        "framework": {
+          "name": "@playwright/test",
+          "version": "1.57.0",
+          "entrySha256": "79e23e6a249176295b8490567daa7717448a75866d6ea6f6b296ff3d23305c69"
+        },
+        "report": {
+          "path": "after/native-2.json",
+          "sha256": "f3b7e583964420cbe28107d0abecab8dcda65270263499930484d5f7afea7f79"
+        }
+      }
+    ]
+  },
+  "controllerLoss": {
+    "status": "passed",
+    "scope": "Independent owned-container cleanup and conservative fencing after actual controller-group death; not whole-attempt release",
+    "profileId": "heystax-backend-journeys-v1",
+    "controllerDead": true,
+    "removed": [
+      {
+        "slot": "source-producer",
+        "id": "aa96b695844a4684a5adddecb580b930548abd95b5fc5cbbe9744070d18fbf73"
+      },
+      {
+        "slot": "build",
+        "id": "94325b00df74be94c7d8149ef3c9216010925a0926837f35d6022cdd9e4ba363"
+      },
+      {
+        "slot": "app",
+        "id": "20adf32d4083bf05fc71d4882b81288e5dcbea4977eba994919128832c49ca63"
+      },
+      {
+        "slot": "checker",
+        "id": "cbd457857d647556c35a30d506f0bc3a7de8d0b9e5248d8fb831affb82dc0df1"
+      },
+      {
+        "slot": "database",
+        "id": "bc6535b3d77df471451b09e12e635a087e13961e589ef85ac9494d13b6e3eaa2"
+      },
+      {
+        "slot": "authMigration",
+        "id": "0d3ffe01c649f2047de453f6b8eca170bcf7ddfa3c4402f483ee1d4d09967f37"
+      },
+      {
+        "slot": "auth",
+        "id": "55474cab55da75c2886a7182096ef93edc5f9b362597136c3b57766dd6ced387"
+      },
+      {
+        "slot": "rest",
+        "id": "951795c91f7ac66bc397012f15110a900d820d0f4b31278fc82f848fd0993075"
+      },
+      {
+        "slot": "gateway",
+        "id": "9125039592ded856424113e6d5ff5db276bb1375e3c499473828decf4c3fe5af"
+      }
+    ],
+    "foreignSurvived": true,
+    "backendCause": "backend_controller_died",
+    "backendTerminal": "cleaned",
+    "attemptState": "operator_required",
+    "credentialEnvelopeRemoved": false,
+    "successReceipt": false,
+    "originalDeadlineAtMs": 1793441883937,
+    "backendDeadlineAtMs": 1793441088183,
+    "foreignControlRemoved": true
+  },
+  "privateOriginalSha256": [
+    {
+      "path": "baseline-i5FyBZ/result.json",
+      "sha256": "f731ba954283929b6835473d8afb3bd48b35a9463ac96d88d837a8b0d25b623d"
+    },
+    {
+      "path": "baseline-i5FyBZ/terminal.json",
+      "sha256": "a9d8f5e54e138745f4215551170c059f21aaf56f56c2449cf4a33e434221a60f"
+    },
+    {
+      "path": "baseline-i5FyBZ/secret-scan.json",
+      "sha256": "af5efb58d28c2ab0a0060f409020e84bfc899abb2cee5a9fe713291ef0524283"
+    },
+    {
+      "path": "baseline-i5FyBZ/native-receipt-0.json",
+      "sha256": "793237c006b5a80d3ad89148144e9da1ca8cf339186379a951f0faff9e716e4b"
+    },
+    {
+      "path": "baseline-i5FyBZ/native-receipt-1.json",
+      "sha256": "e7fe9cf173059c99c4150df9b187b142d2ddf436696fd1f5e4e03a4eff5d2e27"
+    },
+    {
+      "path": "baseline-i5FyBZ/native-receipt-2.json",
+      "sha256": "fcbc4e973097ad4c1574754dfe25d91eb74f0b43c9805ada753936609980bdd3"
+    },
+    {
+      "path": "baseline-i5FyBZ/native-receipt-3.json",
+      "sha256": "cff6958a07f7877aa0728f40b8dff727f7d6b2d865e74dd39e00f73e79a84a15"
+    },
+    {
+      "path": "after-WmwgSS/result.json",
+      "sha256": "9838864f54b15f79d1eef8a8154389c3455b6086305b3b576535224927b99445"
+    },
+    {
+      "path": "after-WmwgSS/terminal.json",
+      "sha256": "d16cd1892cddd82c7c345eb43a5605c5da1290098bf523e1c1f172be9bc79431"
+    },
+    {
+      "path": "after-WmwgSS/secret-scan.json",
+      "sha256": "92677876d99863ff3e7b7a8e579fc7170be9664d6cd2ba9d588ef2f990a7acb5"
+    },
+    {
+      "path": "after-WmwgSS/native-receipt-0.json",
+      "sha256": "86232344cb83dd74ce21a34c3f89728667276b9e50a2f8b3d8469d39668ba573"
+    },
+    {
+      "path": "after-WmwgSS/native-receipt-1.json",
+      "sha256": "8900cd9960bda74bff6fc7bb767bfc83446968868881ccb87bbacedfd7e56566"
+    },
+    {
+      "path": "after-WmwgSS/native-receipt-2.json",
+      "sha256": "90759d9a14da3f322284a2cd8df82dc02ea24e2ba6b01771cd68436c83a4aa66"
+    },
+    {
+      "path": "controller-loss-PWfb1e/result.json",
+      "sha256": "abf7aab7c25351799798abc2b5882b220d690bc32ece8f3f87ac9b7619b301b2"
+    }
+  ]
+}

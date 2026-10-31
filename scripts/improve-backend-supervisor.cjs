@@ -6,15 +6,16 @@ const {directory}=require('./improve-offline-cache.cjs');
 const {canonical}=require('./improve-production-build.cjs');
 const {PROFILE,RECIPE,FAILURE_CAUSES}=require('./improve-backend.cjs');
 const processIdentity=require('./improve-process-identity.cjs');
+const profiles=require('./improve-backend-profiles.cjs');
 const hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const validId=x=>typeof x==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(x);
 const clone=x=>JSON.parse(JSON.stringify(x));
 const need=(ok,code='backend_restart_invalid')=>{if(!ok)throw Error(code);};
 const imageFor=role=>RECIPE.images[role==='authMigration'?'auth':role];
 const roles=['database','authMigration','auth','rest','gateway'];
-const phaseLimits={initializing:PROFILE.time.bootstrapMilliseconds,bootstrap:PROFILE.time.bootstrapMilliseconds,
- readiness:PROFILE.time.readinessMilliseconds,measured:PROFILE.time.measurementMilliseconds,
- execution:PROFILE.time.executionMilliseconds,quiescing:PROFILE.time.cleanupMilliseconds};
+const phaseLimits=profile=>({initializing:profile.time.bootstrapMilliseconds,bootstrap:profile.time.bootstrapMilliseconds,
+ readiness:profile.time.readinessMilliseconds,measured:profile.time.measurementMilliseconds,
+ execution:profile.time.executionMilliseconds,quiescing:profile.time.cleanupMilliseconds});
 const nextPhase={initializing:'bootstrap',bootstrap:'readiness',readiness:'measured',measured:'execution',execution:'quiescing'};
 function fingerprint(c,normalizeCreation=false,expectedHostname) {
  const host=clone(c.HostConfig),config=clone(c.Config);if(normalizeCreation&&host.OomKillDisable===false)host.OomKillDisable=null;
@@ -28,8 +29,9 @@ function owned(c,state,slot) {
  c.Config.Labels['specflow.backend.reservation']===slot.reservation&&c.Config.Labels['specflow.backend.role']===slot.role;
 }
 class BackendJournal {
- #fd; #state; #monoStart; #phaseMono; #closed=false; #attemptId;
- constructor({root,jobId,generation,controller,attemptId,deadlineAtMs}) {
+ #fd; #state; #monoStart; #phaseMono; #closed=false; #attemptId; #profile; #phaseLimits;
+ constructor({root,jobId,generation,controller,attemptId,deadlineAtMs,resourceProfile=PROFILE.id}) {
+  this.#profile=profiles.profileFor(resourceProfile);this.#phaseLimits=phaseLimits(this.#profile);
   if(attemptId!==undefined)need(typeof attemptId==='string'&&/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.test(attemptId)&&attemptId.length===36,'backend_input_invalid');
   if(deadlineAtMs!==undefined)need(Number.isSafeInteger(deadlineAtMs)&&deadlineAtMs>Date.now(),'backend_lease_expired');
   this.#attemptId=attemptId;
@@ -39,7 +41,8 @@ class BackendJournal {
    const stat=fs.fstatSync(this.#fd);need(stat.uid===process.getuid()&&!(stat.mode&0o077),'backend_input_invalid');
    this.#monoStart=this.#phaseMono=performance.now();const now=Date.now();
    this.#state={schema:'specflow.backend-journal/v1',jobId,generation,controller:clone(controller),startedEpochMs:now,
-    deadlineEpochMs:Math.min(now+PROFILE.time.totalMilliseconds,deadlineAtMs??Infinity),phaseDeadlineEpochMs:Math.min(now+phaseLimits.initializing,deadlineAtMs??Infinity),
+    resourceProfile,resourceProfileSha256:hash(profiles.profileBytes(resourceProfile)),
+    deadlineEpochMs:Math.min(now+this.#profile.time.totalMilliseconds,deadlineAtMs??Infinity),phaseDeadlineEpochMs:Math.min(now+this.#phaseLimits.initializing,deadlineAtMs??Infinity),
     phase:'initializing',cause:null,resources:[],outputBytes:0,successReceipt:false};
    const initial=fs.openSync(this.#at('journal.json'),fs.constants.O_WRONLY|fs.constants.O_CREAT|fs.constants.O_EXCL|fs.constants.O_NOFOLLOW,0o600);
    try{fs.writeFileSync(initial,canonical(this.#state));fs.fsyncSync(initial);}finally{fs.closeSync(initial);}fs.fsyncSync(this.#fd);
@@ -87,7 +90,7 @@ class BackendJournal {
  phase(next){
   this.#active();need(nextPhase[this.#state.phase]===next,'backend_restart_invalid');
   this.check();this.#active();const initializing=this.#state.phase==='initializing';this.#state.phase=next;if(!initializing)this.#phaseMono=performance.now();
-  this.#state.phaseDeadlineEpochMs=Math.min(this.#state.deadlineEpochMs-(next==='quiescing'?0:PROFILE.time.cleanupMilliseconds),(initializing?this.#state.startedEpochMs:Date.now())+phaseLimits[next]);this.#persist();
+  this.#state.phaseDeadlineEpochMs=Math.min(this.#state.deadlineEpochMs-(next==='quiescing'?0:PROFILE.time.cleanupMilliseconds),(initializing?this.#state.startedEpochMs:Date.now())+this.#phaseLimits[next]);this.#persist();
  }
  fail(cause,detail){
   need(FAILURE_CAUSES.includes(cause),'backend_input_invalid');if(['cleaned','cleanup_failed'].includes(this.#state.phase))return;
@@ -99,7 +102,7 @@ class BackendJournal {
   const controllerState=processIdentity.state(s.controller);
   if(controllerState==='dead')this.fail('backend_controller_died');
   else if(controllerState!=='live')this.fail('backend_restart_invalid');
-  else if(Date.now()>=s.phaseDeadlineEpochMs||Date.now()>=s.deadlineEpochMs||performance.now()-this.#monoStart>=PROFILE.time.totalMilliseconds||performance.now()-this.#phaseMono>=phaseLimits[s.phase])this.fail('backend_lease_expired');
+  else if(Date.now()>=s.phaseDeadlineEpochMs||Date.now()>=s.deadlineEpochMs||performance.now()-this.#monoStart>=this.#profile.time.totalMilliseconds||performance.now()-this.#phaseMono>=this.#phaseLimits[s.phase])this.fail('backend_lease_expired');
   return this.snapshot();
  }
  observe(role,c){

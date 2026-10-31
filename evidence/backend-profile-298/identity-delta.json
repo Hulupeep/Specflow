@@ -1,0 +1,27 @@
+{
+  "schema": "specflow.qualification-identity-delta/v1",
+  "qualifiedCommit": "2f8fb8a1c435bfb7b90e444b03f6c6c2e2e674d1",
+  "qualificationProofSha256": "b5008b25cb5e4c40d8374594a40a19b0180586c1fcae39268c3f64eed3b71f88",
+  "scope": "Composed evidence: unchanged backend capacity/cleanup workload plus separately tested core verifier identity addition; no product improvement or KEEP",
+  "unchangedRuntimeFiles": 137,
+  "changedFiles": [
+    {
+      "path": "scripts/specflow-improve.cjs",
+      "beforeSha256": "93644c5e8f2a2aa0ff29217a15625e04d3ae17bbbc578b7a3b74cdb4a0b3a1e2",
+      "afterSha256": "7d9a62039c0bbb9ae84becd253c08ae2aed0433a760244ea048ed1f56b8398a5",
+      "exactChange": "Add improve-worker.cjs to the backend inputIdentity verifier file list; no other source bytes changed"
+    }
+  ],
+  "verification": {
+    "suite": "tests/contracts/improve-core.test.js",
+    "passed": 158,
+    "failed": 0,
+    "skipped": 0,
+    "logSha256": "30d29dd04d01ec5c7000ed4840d63f27d3e0c8f93c0fbd6526ed55f1e3685b3a",
+    "regression": "Mutating a temporary worker copy during verification must block and emit no verification_receipt. Red before the fix; green afterward."
+  },
+  "limits": [
+    "Native capacity workload does not execute core inputIdentity; its original source manifest remains unchanged.",
+    "Final-head CI and independent review remain separate merge requirements."
+  ]
+}
