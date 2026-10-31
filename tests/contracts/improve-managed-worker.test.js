@@ -83,3 +83,13 @@ describe('closed journey worker lifetimes (#298)',()=>{
   expect(()=>managed.validatePlan({...p,network:'none'})).toThrow('backend_input_invalid');
  });
 });
+
+
+test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2'])('managed checker derives exact task ceiling from %s, never caller overrides (#315)',id=>{
+ const limits=require('../../scripts/improve-backend-profiles.cjs').workerLimits(id,'checker');
+ const p={...plan(),memory:limits.memory,tmpfs:limits.tmpfs,phaseMilliseconds:limits.phaseMilliseconds,network:'container:'+'b'.repeat(64),backendProfile:limits.binding};
+ const args=managed.createArgs(p,'specflow-12345678-1234-4123-a123-123456789abc-checker');
+ expect(args[args.indexOf('--pids-limit')+1]).toBe(id.endsWith('v2')?'256':'128');
+ expect(()=>managed.validatePlan({...p,pids:9999})).toThrow('backend_input_invalid');
+ expect(()=>managed.createArgs({...p,backendProfile:{...p.backendProfile,sha256:'0'.repeat(64)}},'specflow-12345678-1234-4123-a123-123456789abc-checker')).toThrow('backend_input_invalid');
+});

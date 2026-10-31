@@ -457,3 +457,13 @@ test('managed builder refuses linked candidate source instead of following it',(
  fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'package.json'),'{}');fs.symlinkSync('/etc/passwd',path.join(root,'src/page.tsx'));
  expect(()=>worker.builderText(root,{backendJobBinding:{},allowed:['src/**'],protected:[]})).toThrow('role_input_link');
 });
+
+
+test('inspection enforces closed checker PID binding and rejects profile tampering (#315)',()=>{
+ const f=syntheticInspection(),limits=require('../../scripts/improve-backend-profiles.cjs').workerLimits('heystax-backend-journeys-v2','checker');
+ f.expected.backendProfile=limits.binding;f.inspect.HostConfig.PidsLimit=256;
+ expect(worker.validateInspection(f.inspect,f.expected)).toBe(true);
+ for(const n of [128,257,-1,0]){f.inspect.HostConfig.PidsLimit=n;expect(()=>worker.validateInspection(f.inspect,f.expected)).toThrow('worker_unconfined');}
+ f.inspect.HostConfig.PidsLimit=256;f.expected.backendProfile={...limits.binding,sha256:'0'.repeat(64)};
+ expect(()=>worker.validateInspection(f.inspect,f.expected)).toThrow();
+});

@@ -299,3 +299,22 @@ qualification of the old profile does not bypass this new managed admission rule
 unchanged non-time resource limits. Four separately dispatched 100-second checks
 require 580 seconds including allowances. The original job deadline still bounds
 the complete app lifecycle; insufficient remaining time is a named rejection.
+
+
+`heystax-backend-journeys-v2` (#315) changes only the checker task ceiling from
+128 to 256 and aggregate tasks from 640 to 768. Old profile bytes, generic workers,
+app/build limits and all time limits are unchanged. A real combined browser run
+recorded `pids.current=128`, `pids.peak=128` and `pids.events max 1`; this was a
+kernel task denial, not evidence of a zombie leak. Both ordinary and managed
+finite task-pressure fixtures reproduce v1 denial and v2 success. Full browser
+capacity qualification remains a separate required gate; neither kernel capacity
+nor expected layout failures constitute a product KEEP. The selected profile and
+its bytes are bound by verification, including mutation-during-check rejection.
+Limits never grow automatically and a running generation cannot change profiles.
+See `docs/specs/checker-pids/preparation.md` for the acceptance and test mapping.
+
+The aggregate task count is the documented sum of per-slot ceilings; it is not a
+separate parent-cgroup limit. Per-slot `--pids-limit` enforces capacity. The
+qualification's cumulative kernel counters cover the checker cgroup only, not
+host ancestor slices or app task denial. Native failures remain failures and
+must be inspected; zero checker denials alone cannot prove infrastructure health.
