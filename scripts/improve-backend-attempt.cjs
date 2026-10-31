@@ -364,4 +364,37 @@ function reconcileStopped(store, jobId) {
     return { state: 'operator_required', cause: 'backend_cleanup_unconfirmed', attempt: ref, ownerState };
   } finally { fs.closeSync(fd); }
 }
-module.exports = { begin, read, seal, envelope, finish, terminal, reconcileStopped, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents };
+// Evidence-only recovery: do not clear an active claim or an operator fence.
+function verifyClosedHistory(store, runId, contractSha256) {
+  need(id(runId)&&digest(contractSha256),'backend_input_invalid');
+  const fd=area(store),proofs=[];let currentContract=false;
+  try {
+    const names=fs.readdirSync(`/proc/self/fd/${fd}`);need(names.length<=100000,'backend_cleanup_unconfirmed');
+    for(const name of names.filter(n=>/^attempt-[a-f0-9-]+\.json$/.test(n))){
+      const a=validateAttempt(readSigned(store,fd,name));if(a.runId!==runId)continue;
+      currentContract||=a.contractSha256===contractSha256;
+      need(processIdentity.state(a.owner)==='dead','backend_cleanup_unconfirmed');
+      need(!present(fd,`operator-${a.attemptId}.json`),'backend_cleanup_unconfirmed');
+      const ref=reference(a),active=present(fd,activeName(a.jobId))?readSigned(store,fd,activeName(a.jobId)):null;
+      if(active)validateReference(active);
+      const ownsClaim=active&&canonical(active)===canonical(ref);
+      if(!present(fd,`terminal-${a.attemptId}.json`)){
+        // begin persists its immutable attempt before competing for the claim.
+        // No action can have been issued through this attempt without a claim
+        // and a durable mutation/intent/envelope record. Keep all records intact.
+        const otherRecords=names.filter(n=>n.includes(a.attemptId)&&n!==attemptName(a.attemptId));
+        need(!ownsClaim&&otherRecords.length===0,'backend_attempt_inert_unproven');
+        proofs.push({attempt:ref,disposition:'never_claimed',terminalSha256:null});continue;
+      }
+      let t;try{t=terminal(store,ref);}catch{throw Error('backend_cleanup_unconfirmed');}
+      need(t.state==='cleaned'&&t.credentialEnvelopeRemoved===true&&t.resources.every(r=>['removed','absent'].includes(r.status)),'backend_cleanup_unconfirmed');
+      if(ownsClaim){
+        let release;try{release=readSigned(store,fd,`release-${a.attemptId}.json`);}catch{throw Error('backend_release_incomplete');}
+        need(release.attemptSha256===ref.attemptSha256&&release.terminalSha256===hash(canonical(t)),'backend_release_incomplete');
+      }
+      proofs.push({attempt:ref,disposition:'cleaned',terminalSha256:hash(canonical(t))});
+    }
+    need(proofs.length>0&&currentContract,'backend_cleanup_unconfirmed');return proofs;
+  } finally {fs.closeSync(fd);}
+}
+module.exports = { begin, read, seal, envelope, finish, terminal, reconcileStopped, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents, verifyClosedHistory };

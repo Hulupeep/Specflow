@@ -1002,6 +1002,7 @@ function createControllerService({
     let proof;
     try {
       proof = verifyTerminalArchive(durableStore, meta, snapshot.canonical_repo);
+      need(proof.core_diagnosis.disposition!=='abandoned_before_build','prebuild_reconciliation_required');
     } catch (e) {
       // Failure cannot free ownership or supply an experimental decision.
       mutation(
@@ -1179,7 +1180,74 @@ function createControllerService({
       })
     );
   }
-  const recoveryService = require('./improve-recovery-controller.cjs').attach({ store, access, ownerPrincipal, now, recovery, applyReceipt:(s,r,op,doc)=>{
+  function abandonPrebuild(s,r,ctx,req){
+    const cycle=r.cycles.find(c=>c.id===req.cycle_id);
+    need(cycle&&cycle.state!=='terminal','cycle_unavailable');
+    need(!r.reasons.includes('pending_review'),'pending_review');
+    need(typeof recovery.resolvePrebuildSource==='function','prebuild_source_unavailable');
+    let source;
+    try{source=recovery.resolvePrebuildSource({...cycle.binding,run_id:r.id,cycle_id:cycle.id});}
+    catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_source_unavailable');}
+    const worker=require('./improve-worker.cjs'),core=require('./specflow-improve.cjs');
+    need(source&&source.archive instanceof worker.DurableStore&&typeof source.runDir==='string','prebuild_source_unavailable');
+    const ownedSource=(file,directory=false)=>{
+      need(path.isAbsolute(file),'prebuild_source_unavailable');
+      let privateBoundary=false;
+      for(let p=file;p!==path.dirname(p);p=path.dirname(p)){const st=fs.lstatSync(p);need(!st.isSymbolicLink(),'unsafe_store_path');if(st.isDirectory()&&st.uid===process.getuid()&&!(st.mode&0o077))privateBoundary=true;}
+      const stat=fs.statSync(file);need(privateBoundary&&stat.uid===process.getuid()&&(directory?stat.isDirectory():stat.isFile()&&stat.nlink===1),'prebuild_source_unavailable');return file;
+    };
+    const meta={...cycle.binding,principal:r.principal,repo_id:r.repo_id,profile_revision:r.profile_revision};
+    let proof=null,governing,runRecord,candidateDigest,runDir;
+    if(fs.existsSync(source.archive.location(meta.job_id))){
+      // An authenticated fsynced archive survives loss of the mutable source.
+      // Never repair or overwrite that source while finishing controller state.
+      proof=verifyTerminalArchive(source.archive,meta,r.canonical_repo);
+      need(proof.core_diagnosis.disposition==='abandoned_before_build'&&proof.decision==='INCONCLUSIVE','prebuild_disposition_invalid');
+      const entry=proof.files.find(f=>/^improvement-contract\.v[0-9]+\.json$/.test(f.path)&&f.sha256===proof.contract_revision);
+      need(entry,'prebuild_contract_unavailable');
+      const bytes=fs.readFileSync(privatePath(path.join(source.archive.root,'blobs',entry.sha256)));
+      need(sha(bytes)===entry.sha256&&bytes.length===entry.size,'terminal_artifact_corrupt');
+      governing={contract:JSON.parse(bytes).contract,entry:{contract_sha256:entry.sha256}};
+      runRecord={run_id:cycle.binding.core_run_id,base_commit:proof.base_commit};candidateDigest=proof.candidate_digest;
+    }else{
+      try{
+        runDir=ownedSource(source.runDir,true);
+        runRecord=JSON.parse(fs.readFileSync(ownedSource(path.join(runDir,'run.json'))));
+        governing=core.governingContract(runDir);
+        candidateDigest=require('./improve-memory.cjs').digest(JSON.parse(fs.readFileSync(ownedSource(path.join(runDir,'candidates.json')))));
+      }catch(error){
+        if(error instanceof SyntaxError||['ENOENT','ENOTDIR'].includes(error.code))throw new ControllerError('prebuild_source_invalid');
+        throw error;
+      }
+      need(runRecord.run_id===cycle.binding.core_run_id&&runRecord.target_repo===r.canonical_repo,'terminal_identity_mismatch');
+    }
+    need(governing,'prebuild_contract_unavailable');
+    if(r.memory_required)need(cycle.memory_selection&&cycle.memory_selection.base_commit===runRecord.base_commit&&cycle.memory_selection.candidate_digest===candidateDigest,'memory_terminal_selection_mismatch');
+    if(governing.contract.runtime?.backend){
+      need(governing.contract.runtime.backend.constructionSha256,'prebuild_legacy_backend_unavailable');
+      try{require('./improve-backend-attempt.cjs').verifyClosedHistory(source.backendStore,runRecord.run_id,governing.entry.contract_sha256);}
+      catch(error){throw new ControllerError(/^backend_[a-z_]+$/.test(error.message)?error.message:'prebuild_backend_proof_unavailable');}
+    }
+    const requestSha256=digest({kind:'reconcile_prebuild',run_id:r.id,cycle_id:cycle.id,...cycle.binding,contract_sha256:governing.entry.contract_sha256});
+    let disposition=proof?{request_sha256:proof.core_diagnosis.request_sha256}:null;
+    if(!proof){
+      try{disposition=core.abandonBeforeBuild(runDir,{reason:req.reason,requestSha256,adoptPrior:true});}
+      catch(error){if(/^prebuild_[a-z_]+$/.test(error.message))throw new ControllerError(error.message);if(error instanceof SyntaxError)throw new ControllerError('prebuild_source_invalid');throw error;}
+      source.archive.commit(meta,runDir);
+      proof=verifyTerminalArchive(source.archive,meta,r.canonical_repo);
+      need(proof.core_diagnosis.disposition==='abandoned_before_build'&&proof.decision==='INCONCLUSIVE','prebuild_disposition_invalid');
+      need(proof.core_diagnosis.request_sha256===disposition.request_sha256&&proof.core_diagnosis.decision_sha256===sha(fs.readFileSync(path.join(runDir,'decision.json')))&&proof.files.find(f=>f.path==='ledger.jsonl')?.sha256===sha(fs.readFileSync(path.join(runDir,'ledger.jsonl'))),'prebuild_archive_request_mismatch');
+    }
+    memoryService.terminal(s,r,cycle,proof,ctx);
+    cycle.state='terminal';cycle.decision=proof.decision;cycle.manifest_sha256=proof.manifest_sha256;cycle.core_diagnosis=proof.core_diagnosis;
+    r.terminal_cycles++;r.active_cycle=null;r.no_progress++;r.state='stopped';r.stopped_at_ms??=now();
+    r.last_completed_action='abandoned_before_build:'+cycle.id;r.evidence.push(proof.manifest_sha256);
+    // Original reasons, consumption, limits and deadline remain untouched.
+    need(s.owners[r.canonical_repo]===r.id,'run_ownership_unavailable');delete s.owners[r.canonical_repo];
+    event(s,'prebuild_abandoned',r.id,{cycle_id:cycle.id,manifest_sha256:proof.manifest_sha256,request_sha256:digest(req),binding_sha256:requestSha256,reason:req.reason,adopted_prior:disposition.request_sha256!==requestSha256});
+    return {allowed:true,run_id:r.id,cycle_id:cycle.id,disposition:'abandoned_before_build',manifest_sha256:proof.manifest_sha256,duplicate:false};
+  }
+  const recoveryService = require('./improve-recovery-controller.cjs').attach({ store, access, ownerPrincipal, now, recovery, abandonPrebuild, applyReceipt:(s,r,op,doc)=>{
     const result={...doc.result,evidence:[doc.stdout_sha256,doc.stderr_sha256]};
     if(op.kind==='stage')delete result.estimate_usd;
     if(doc.phase==='not_started'){
@@ -1315,6 +1383,23 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
         last('decision_applied')?.decision === d.decision,
       'terminal_ledger_binding'
     );
+    if(last('prebuild_abandonment_started'))need(d.disposition==='abandoned_before_build','prebuild_disposition_invalid');
+    if(d.disposition!=='abandoned_before_build')need(last('implementation_started')&&last('implementation_started').seq<last('decision_made').seq,'terminal_implementation_missing');
+    if(d.disposition==='abandoned_before_build'){
+      const start=last('prebuild_abandonment_started');
+      const attempt=last('baseline_attempted'),outcome=events.filter(e=>['baseline_blocked','baseline_recorded'].includes(e.event)).at(-1),frozen=last('contract_frozen');
+      need(start&&attempt&&outcome&&outcome.attempt===attempt.attempt&&outcome.seq>attempt.seq&&outcome.seq<start.seq&&outcome.contract_sha256===d.contract.sha256&&outcome.contract_version===d.contract.version&&frozen?.contract_sha256===d.contract.sha256,'prebuild_baseline_unresolved');
+      need(canonical(d.baseline)===canonical({attempt:outcome.attempt,event:outcome.event,seq:outcome.seq})&&frozen.version===d.contract.version,'prebuild_baseline_unresolved');
+      need(receipt.files.some(f=>f.path===`improvement-contract.v${frozen.version}.json`&&f.sha256===frozen.contract_sha256)&&Object.entries(frozen.artifact_sha256||{}).every(([name,hash])=>receipt.files.some(f=>f.path===name&&f.sha256===hash)),'prebuild_integrity_failed');
+      need(start&&canonical(events.filter(e=>e.seq>start.seq).map(e=>e.event))===canonical(['decision_made','decision_applied']),'prebuild_disposition_invalid');
+      need(d.decision==='INCONCLUSIVE'&&d.implementation_attempted===false&&
+        last('decision_applied')?.disposition==='abandoned_before_build'&&
+        last('prebuild_abandonment_started')?.request_sha256===d.request_sha256&&
+        canonical(last('prebuild_abandonment_started')?.record)===canonical(d)&&
+        !events.some(e=>['implementation_started','holdout_consumed','verification_completed'].includes(e.event))&&
+        d.workspace.files.length===0&&bytes['workspace.patch'].length===0&&d.gains.length===0,
+      'prebuild_disposition_invalid');
+    }
     if (d.decision === 'KEEP')
       need(
         receipt.files.some((f) => f.path === 'retained.bundle'),
@@ -1335,6 +1420,9 @@ function verifyTerminalArchive(store, meta, canonicalRepo) {
         return require('./improve-memory.cjs').digest(JSON.parse(content));
       })(),
       core_diagnosis: {
+        disposition: d.disposition || null,
+        implementation_attempted: d.disposition==='abandoned_before_build'?false:true,
+        request_sha256: d.disposition==='abandoned_before_build'?d.request_sha256:null,
         decision_sha256: sha(bytes['decision.json']),
         reasons: d.reasons || [],
         gates_failed: d.gates_failed || [],

@@ -11,8 +11,8 @@ function report({r,ctx,now,host,memory,view,verifyTerminalArchive,ownsRepo}){
    const proof=verifyTerminalArchive(store,{...cycle.binding,principal:r.principal,repo_id:r.repo_id,profile_revision:r.profile_revision},r.canonical_repo);
    if(proof.manifest_sha256!==cycle.manifest_sha256||proof.decision!==cycle.decision)throw Error('archive_binding_mismatch');
    const entry=proof.files.find(f=>f.path==='decision.json'),d=JSON.parse(fs.readFileSync(path.join(store.root,'blobs',entry.sha256)));
-   valid=!d.baseline_blocker&&!d.binding_errors?.length&&!(Array.isArray(d.holdout_exposed)?d.holdout_exposed.length:d.holdout_exposed);
-   row={...row,available:true,retained_commit:proof.retained_commit,base_commit:proof.base_commit,criteria:d.criteria||[],gains:d.gains||[],regressions:d.regressions||[],risks:[...(d.gates_missing||[]),...(d.reasons||[])]};
+   valid=d.disposition!=='abandoned_before_build'&&!d.baseline_blocker&&!d.binding_errors?.length&&!(Array.isArray(d.holdout_exposed)?d.holdout_exposed.length:d.holdout_exposed);
+   row={...row,available:true,disposition:d.disposition||null,implementation_attempted:d.disposition==='abandoned_before_build'?false:true,retained_commit:proof.retained_commit,base_commit:proof.base_commit,criteria:d.criteria||[],gains:d.gains||[],regressions:d.regressions||[],risks:[...(d.gates_missing||[]),...(d.reasons||[])]};
    if(row.decision==='KEEP'&&/^[a-f0-9]{40}$/.test(row.retained_commit||'')&&/^[a-zA-Z0-9][a-zA-Z0-9._/-]*$/.test(d.workspace?.branch||'')){
     const git=args=>cp.execFileSync('/usr/bin/git',['-C',r.canonical_repo,...args],{encoding:'utf8',timeout:10000,maxBuffer:65536,stdio:['ignore','pipe','pipe'],env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null'}}).trim();
     try{row.retained=git(['rev-parse','--verify',d.workspace.branch+'^{commit}'])===row.retained_commit&&git(['rev-parse',row.retained_commit+'^{tree}'])===d.workspace.verified_git?.tree;}catch{row.retained=false;}

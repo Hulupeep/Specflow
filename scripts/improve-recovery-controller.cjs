@@ -16,7 +16,7 @@ function routes(values){
   const key=digest([r.role,r.requested_model,r.effective_model,r.billing]);need(!seen.has(key),'invalid_route_policy');seen.add(key);
  }return structuredClone(values);
 }
-function attach({store,access,ownerPrincipal,now,recovery,applyReceipt}){
+function attach({store,access,ownerPrincipal,now,recovery,applyReceipt,abandonPrebuild}){
  function host(){need(recovery?.format===2&&['resolveAssignment','resolveExecution','resolveSuccessor','resolveProcess','resolveRoute','resolveReceipt','resolveTerminalArchive'].every(k=>typeof recovery[k]==='function'),'recovery_trusted_host_required');return recovery;}
  const enabled=r=>r.policy_version===2;
  const actor=ctx=>{const a=assignment(host().resolveAssignment());need(a.principal===ctx.principal,'recovery_actor_mismatch');return a;};
@@ -109,6 +109,24 @@ function attach({store,access,ownerPrincipal,now,recovery,applyReceipt}){
   const sealed=host().resolveReceipt(op.id);need(same(sealed.binding,bindingFor(r,op))&&sealed.phase==='complete','receipt_binding_mismatch');
   need(same(sealed.result,{exit_code:result.exit_code,reason_code:result.reason_code,estimate_usd:result.estimate_usd??null}),'receipt_result_mismatch');return sealed;
  }
- return {public:{resume,assign,reconcile,issueExecutionTicket},admit,guard,route,bindOperation,host,bindingFor,verifyResult,clearReconciliation};
+ function reconcilePrebuild(req){
+  need(!host().scope,'scoped_execution_only');
+  return command(req,['cycle_id','reason'],'reconcile_prebuild',(s,r,ctx,a)=>{
+   need(host().resolveProcess(a.process)==='live','recovery_holder_unavailable');
+   need(token(req.cycle_id)&&typeof req.reason==='string'&&req.reason.trim().length>0&&req.reason.length<=2000,'invalid_recovery_request');
+   need(s.owners[r.canonical_repo]===r.id&&r.active_cycle===req.cycle_id,'run_ownership_unavailable');
+   need(r.reasons.length>0||r.cancel_requested||now()>=r.deadline_ms,'prebuild_stop_required');
+   need(r.recovery.current&&host().resolveProcess(r.recovery.current.assignment.process)==='dead','previous_holder_not_dead');
+   need(!r.operations.some(o=>o.state==='reserved'||o.unknown_reason),'reconciliation_required');
+   for(const op of r.operations){
+    if(op.process_identity)need(host().resolveProcess(op.process_identity)==='dead','issued_process_not_quiescent');
+    need(op.receipt_seal,'receipt_binding_mismatch');
+    const sealed=host().resolveReceipt(op.id);need(['complete','not_started'].includes(sealed.phase)&&sealed.seal===op.receipt_seal&&same(sealed.binding,bindingFor(r,op)),'receipt_binding_mismatch');
+   }
+   need(typeof abandonPrebuild==='function','prebuild_reconciliation_unavailable');
+   return abandonPrebuild(s,r,ctx,req);
+  },{owner:true});
+ }
+ return {public:{resume,assign,reconcile,reconcilePrebuild,issueExecutionTicket},admit,guard,route,bindOperation,host,bindingFor,verifyResult,clearReconciliation};
 }
 module.exports={RecoveryError,processIdentity,assignment,routes,attach};
