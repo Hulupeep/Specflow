@@ -2,6 +2,10 @@
 
 ## 0.12.1 (release candidate; not yet published)
 
+- Managed role calls use the verified original controller deadline instead of a
+  hidden four-minute transport cutoff. Direct calls require an explicit deadline;
+  uncertain completion keeps the original operation for reconciliation.
+
 - Real-backend Improve verification uses explicit journey execution profiles,
   preserves failure and cleanup evidence, and rejects exhausted storage before
   execution. Cleanup remains bound to acknowledged resources.
