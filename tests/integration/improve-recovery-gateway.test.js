@@ -31,3 +31,14 @@ test.each(['cancel','deadline'])('REC-RECEIPT real gateway %s stops the local na
  }
  expect(call).toThrow();f.clock=Date.now();const svc=f.serviceV2(),r=svc.status(f.req).runs[0],op=r.operations[0];expect(op.state).toBe('reserved');expect(op.unknown_reason).toBe('external_completion_unknown');expect(op.local_interruption).toBe(mode==='cancel'?'operator_cancelled':'deadline');expect(r.deadline_ms).toBe(original.deadline_ms);expect(r.consumed_attempts).toBe(1);const report=svc.report(f.req);expect(report.claim).toBe('improvement not established');expect(report.next_action.owner).toBe('owner');expect(report.next_action.action).not.toMatch(/reconcile/i);expect(report.next_action.action).toMatch(/no automatic|cannot automatically/i);let calls=0;expect(svc.startAttempt({...f.req,cycle_id:op.cycle_id,role:'builder',input_sha256:op.input_sha256},()=>{calls++;}).result.allowed).toBe(false);expect(calls).toBe(0);expect(svc.reconcile(f.command({receipt_id:op.id}))).toMatchObject({allowed:false,reason_code:'external_completion_unknown'});
 },25000);
+test('ROLE-DEADLINE modified gateway bytes cannot supply implicit deadline authority',()=>{
+ const {ctx,call}=setup('success');const executable=path.join(f.root,'gateway','controller-provider');fs.appendFileSync(executable,'\n// modified after generation\n');
+ expect(call).toThrow(expect.objectContaining({code:'role_deadline_required'}));
+ expect(f.serviceV2().status(f.req).runs[0].consumed_attempts).toBe(0);
+ expect(fs.existsSync(path.join(f.root,'provider-started.json'))).toBe(false);
+});
+test('ROLE-DEADLINE verified gateway exposes the unchanged original job deadline',()=>{
+ const {ctx}=setup('success'),deadline=f.serviceV2().status(f.req).runs[0].deadline_ms;
+ expect(gateway.gatewayDeadline(path.join(f.root,'gateway','controller-provider'))).toBe(deadline);
+ expect(f.serviceV2().status(f.req).runs[0].consumed_attempts).toBe(0);
+});
