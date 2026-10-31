@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.0 (release candidate, not published)
+## 0.12.0 (2026-10-29)
 
 - Owning native case accounting, independent expected/actual comparison and
   seam checks distinguish current executed evidence from declarations and copies.
@@ -9,9 +9,11 @@
   stop; explicit limits, named stagnation and expensive billable-route controls remain.
 - Native Claude workflow commands and owning hooks use the canonical runtime.
   Claude/Codex versions and the full marketplace package pin derive from package.json.
-- Source qualification, installed behavior, real-product outcomes and publication
-  remain separate gates. This candidate has not been published or qualified as a
-  remote cached release.
+- Published to npm and qualified through the advertised GitHub marketplace: all
+  387 installed cache files matched the validated release source. Native command
+  execution and four owning-hook scenarios passed; see the [release evidence](https://github.com/Hulupeep/Specflow/issues/116#issuecomment-6493028181).
+- Real-product outcomes remain a separate gate. Changes merged after this release
+  are not part of the published 0.12.0 package and require a new version.
 
 
 All notable changes to `@colmbyrne/specflow`.
