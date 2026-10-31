@@ -75,11 +75,11 @@ function workspace(w) {
 }
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(v);
 const uuid=v=>typeof v==='string'&&/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/.test(v);
-const commit=v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v);
+const commit=v=>typeof v==='string'&&/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(v);
 function bindingEnvelope(v) {
  if(v?.schema!=='specflow.improve.binding/v1'||!keys(v,['schema','attempt','identity','evidence'],['backend'])||!uuid(v.attempt)||!Array.isArray(v.evidence)||!v.evidence.every(e=>keys(e,['id','sha256'])&&id(e.id)&&hex(e.sha256))||new Set(v.evidence.map(e=>e.id)).size!==v.evidence.length)return false;
  const i=v.identity;
- return keys(i,['run_id','phase','contract_version','contract_sha256','artifact_sha256','base_commit','verifier','git','workspace'])&&id(i.run_id)&&['baseline','after'].includes(i.phase)&&Number.isSafeInteger(i.contract_version)&&i.contract_version>0&&hex(i.contract_sha256)&&object(i.artifact_sha256)&&Object.entries(i.artifact_sha256).every(([k,x])=>rel(k)&&hex(x))&&commit(i.base_commit)&&hex(i.verifier)&&keys(i.git,['tree','parent','branch'])&&commit(i.git.tree)&&commit(i.git.parent)&&typeof i.git.branch==='string'&&i.git.branch.startsWith('refs/heads/')&&workspace(i.workspace)&&(!Object.hasOwn(v,'backend')||object(v.backend));
+ return keys(i,['run_id','phase','contract_version','contract_sha256','artifact_sha256','base_commit','verifier','git','workspace'])&&id(i.run_id)&&['baseline','after'].includes(i.phase)&&Number.isSafeInteger(i.contract_version)&&i.contract_version>0&&hex(i.contract_sha256)&&object(i.artifact_sha256)&&Object.entries(i.artifact_sha256).every(([k,x])=>rel(k)&&hex(x))&&commit(i.base_commit)&&hex(i.verifier)&&keys(i.git,['tree','parent','branch'])&&commit(i.git.tree)&&commit(i.git.parent)&&i.git.tree.length===i.base_commit.length&&i.git.parent.length===i.base_commit.length&&typeof i.git.branch==='string'&&i.git.branch.startsWith('refs/heads/')&&workspace(i.workspace)&&(!Object.hasOwn(v,'backend')||object(v.backend));
 }
 function capsule(v) {
  if(!Array.isArray(v.entries)||v.entryCount!==v.entries.length||!Number.isSafeInteger(v.bytes)||v.bytes<0)return false;

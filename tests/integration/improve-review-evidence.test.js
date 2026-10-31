@@ -37,10 +37,10 @@ test('symlinked evidence cannot be copied into a summary',()=>{
  fs.symlinkSync(receipt,path.join(source,'linked.json'));expect(()=>copyVerificationEvidence(source,target)).toThrow('review_evidence_special');
 });
 
-test('backend binding workspace inventory shrinks without losing identity or failure evidence',()=>{
+test.each([40,64])('backend binding workspace inventory shrinks with %s-character Git objects',width=>{
  const file=path.join(source,'binding-22222222-2222-2222-2222-222222222222.json');
  const entries=Array.from({length:4000},(_,i)=>({path:'src/'+i,kind:'file',sha256:'a'.repeat(64),token:['1','2','3','1','5','6']}));
- const value={schema:'specflow.improve.binding/v1',attempt:'22222222-2222-2222-2222-222222222222',identity:{run_id:'run',phase:'after',contract_version:1,contract_sha256:'b'.repeat(64),artifact_sha256:{},base_commit:'c'.repeat(40),verifier:'d'.repeat(64),git:{tree:'e'.repeat(40),parent:'c'.repeat(40),branch:'refs/heads/branch'},workspace:{sha256:sha(JSON.stringify(entries)),entries,bytes:4000,limits:{max_bytes:1000000,max_entries:10000}}},evidence:[{id:'failed-case',sha256:'a'.repeat(64)}]};
+ const value={schema:'specflow.improve.binding/v1',attempt:'22222222-2222-2222-2222-222222222222',identity:{run_id:'run',phase:'after',contract_version:1,contract_sha256:'b'.repeat(64),artifact_sha256:{},base_commit:'c'.repeat(width),verifier:'d'.repeat(64),git:{tree:'e'.repeat(width),parent:'c'.repeat(width),branch:'refs/heads/branch'},workspace:{sha256:sha(JSON.stringify(entries)),entries,bytes:4000,limits:{max_bytes:1000000,max_entries:10000}}},evidence:[{id:'failed-case',sha256:'a'.repeat(64)}]};
  fs.writeFileSync(file,JSON.stringify(value));const original=fs.readFileSync(file);
  copyVerificationEvidence(source,target);fenceInputTree(target);
  const prompt=curatedText(target,{omitRuntimeMetadata:true});expect(prompt).toContain('failed-case');expect(prompt).toContain(sha(original));expect(prompt).toContain('Saved action disappeared');expect(fs.readFileSync(file).equals(original)).toBe(true);
@@ -104,4 +104,13 @@ test.each(['attempt','evidence','artifact-map','git','version','phase','backend'
  const options=boundImages([]),file=options.phaseReceipt.path,value=JSON.parse(fs.readFileSync(file));
  if(kind==='attempt')value.attempt='not-an-attempt';if(kind==='evidence')value.evidence=[{id:'ev',sha256:'invalid'}];if(kind==='artifact-map')value.identity.artifact_sha256={'holdout/check':'invalid'};if(kind==='git')value.identity.git.tree='invalid';if(kind==='version')value.identity.contract_version=-1;if(kind==='phase')value.identity.phase='unknown';if(kind==='backend')value.backend='invalid';
  const bytes=JSON.stringify(value);fs.writeFileSync(file,bytes);copyVerificationEvidence(source,target);expect(fs.readFileSync(path.join(target,path.basename(file)),'utf8')).toBe(bytes);
+});
+
+test.each(['mixed-format','short-hash','non-hex'])('malformed Git identity remains raw: %s',kind=>{
+ const options=boundImages([['required','holdout']]),file=options.phaseReceipt.path,value=JSON.parse(fs.readFileSync(file));
+ if(kind==='mixed-format')value.identity.git.tree='a'.repeat(64);
+ if(kind==='short-hash')value.identity.git.parent='a'.repeat(39);
+ if(kind==='non-hex')value.identity.base_commit='z'.repeat(40);
+ fs.writeFileSync(file,JSON.stringify(value));copyVerificationEvidence(source,target);
+ expect(fs.readFileSync(path.join(target,path.basename(file)),'utf8')).toBe(fs.readFileSync(file,'utf8'));
 });
