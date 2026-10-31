@@ -34,10 +34,23 @@ unchanged. A numeric caller override cannot grant additional capacity.
 - Dry package inventory: 414 files; the new profile JSON is included. This does
   not claim publication or installed qualification.
 
-## Pending gates
+## Final native qualification and remaining gates
 
-The combined 36-case browser qualification, final independent review and
-exact-source CI must pass before merge. One attempted browser fixture supplied an
+The committed v2 preparer passed in 180,127 ms with zero owned resources remaining.
+The committed combined browser runner then executed all 36 cases in 486,247 ms:
+fit 6 pass/10 expected layout failures, preservation 4/4 pass, public 8 pass/8
+expected layout failures; no skipped or flaky cases. All failure messages were
+inspected: only MOBILE_FIT_VIOLATIONS and DOCUMENT_MUST_FIT. Checker task peaks
+were 120, 125 and 143 with zero kernel denials. Continuity, secret scanning and
+clean teardown passed. The six check files matched the earlier diagnostic run
+byte-for-byte. See `browser-capacity.json` and `source-manifest.json`.
+
+Source CI passed 3,439 tests across 170 suites with zero failures/skips/retried
+assertions. Downloaded report and matching source/merge tree are recorded in
+`ci-source.json`. Final native Claude advisory review accepted the source and qualification
+evidence, with one non-blocking suite-label finding addressed by an explicit
+`suiteMapping` in the JSON. This was not formal Duo and the reviewer did not run
+tests. See `review.json`. CI on the evidence commit remains required before merge. One attempted browser fixture supplied an
 incorrect local oracle directory and failed ENOENT before cases ran; cleanup was
 confirmed. The corrected invocation uses the actual oracle directory and checks
 input existence before allocating its backend. Neither attempt consumes a
