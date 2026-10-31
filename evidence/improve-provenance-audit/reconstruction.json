@@ -1,0 +1,582 @@
+{
+  "schema": "specflow.qualification.reconstruction/v1",
+  "real_product_keep": {
+    "kind": "persisted-real-product-reconstruction",
+    "run_id": "today-draft-ddb64a68-95e2-464b-a725-c1ba559e32a1",
+    "source_runtime": "30efb4b71f34a6bbe770410ca71eba06c3a38f2a",
+    "audited_at": "2026-10-31T12:35:51.810Z",
+    "decision": "KEEP",
+    "commit": "6ebc4e8d8ba3f08b710cd9d4ad92af9c6d99d3e3",
+    "ledger": {
+      "ok": true,
+      "entries": 50,
+      "improve_entries": 47,
+      "head_sha256": "92437cf9b9d9dee5f5b2ee5980a98f671fd820345526d2353550aa1435c9b9f5",
+      "errors": []
+    },
+    "checks": [
+      {
+        "name": "candidates",
+        "sha256": "6d77580bf80a4256c203759f5c9f1198522039e65c89b3388771d9c4fa8eba0e",
+        "expected": "6d77580bf80a4256c203759f5c9f1198522039e65c89b3388771d9c4fa8eba0e",
+        "ok": true
+      },
+      {
+        "name": "contract",
+        "sha256": "250fd55acb31a74caa800680a34913c54ac8e5351eaa9b1569391886c07fb8f4",
+        "expected": "250fd55acb31a74caa800680a34913c54ac8e5351eaa9b1569391886c07fb8f4",
+        "ok": true
+      },
+      {
+        "name": "holdout/today-gain.spec.cjs",
+        "sha256": "32b45beef189a73438f7304866dd9aa98262fc7516534db3e01bf0298980b738",
+        "expected": "32b45beef189a73438f7304866dd9aa98262fc7516534db3e01bf0298980b738",
+        "ok": true
+      },
+      {
+        "name": "holdout/gain-config.spec.cjs",
+        "sha256": "86281d166fbdebf3aeff3aad1baa1460e72992c2650ff1804f8dd9afefb32f78",
+        "expected": "86281d166fbdebf3aeff3aad1baa1460e72992c2650ff1804f8dd9afefb32f78",
+        "ok": true
+      },
+      {
+        "name": "dev/today-draft.spec.cjs",
+        "sha256": "08845e983040c75422a94ebe35884ea857c02dc61c7509e22491e2945502af4c",
+        "expected": "08845e983040c75422a94ebe35884ea857c02dc61c7509e22491e2945502af4c",
+        "ok": true
+      },
+      {
+        "name": "dev/playwright.config.cjs",
+        "sha256": "6fae98f271c44d83325fb51a72cae3677ffaffad6a7a20d77021e9119819b5e4",
+        "expected": "6fae98f271c44d83325fb51a72cae3677ffaffad6a7a20d77021e9119819b5e4",
+        "ok": true
+      },
+      {
+        "name": "holdout/today-pending.spec.cjs",
+        "sha256": "8aeceb4ec8745583c63713fbe180a64306bbbc193d2c62518b05b6f76ed4f22e",
+        "expected": "8aeceb4ec8745583c63713fbe180a64306bbbc193d2c62518b05b6f76ed4f22e",
+        "ok": true
+      },
+      {
+        "name": "holdout/pending-config.spec.cjs",
+        "sha256": "7e40ddf9860a4435b4a43323bae12a9d7fbcc1ba06067f0d80f62acb6152fda6",
+        "expected": "7e40ddf9860a4435b4a43323bae12a9d7fbcc1ba06067f0d80f62acb6152fda6",
+        "ok": true
+      },
+      {
+        "name": "holdout/today-preserve.spec.cjs",
+        "sha256": "4ee472eba0ae1009e48c03f6d56bc73485a67517c567b3ad1b2854a106908c4b",
+        "expected": "4ee472eba0ae1009e48c03f6d56bc73485a67517c567b3ad1b2854a106908c4b",
+        "ok": true
+      },
+      {
+        "name": "holdout/preserve-config.spec.cjs",
+        "sha256": "a76281f653e5ee092f672154bc0e31c9f9666cd8f7c1f66b90e0d535e7c08e79",
+        "expected": "a76281f653e5ee092f672154bc0e31c9f9666cd8f7c1f66b90e0d535e7c08e79",
+        "ok": true
+      },
+      {
+        "name": "decision",
+        "sha256": "cb7f4ca336970982ff7a832c8c221dc2b0a41c6fea7629149177b91f9791d489",
+        "expected": "cb7f4ca336970982ff7a832c8c221dc2b0a41c6fea7629149177b91f9791d489",
+        "ok": true
+      },
+      {
+        "name": "patch",
+        "sha256": "57ea50c52a7a1ebeedaf49966e640ee5a393f967123d1e6f25f4a73c36bd0893",
+        "expected": "57ea50c52a7a1ebeedaf49966e640ee5a393f967123d1e6f25f4a73c36bd0893",
+        "ok": true
+      },
+      {
+        "name": "receipt:baseline",
+        "sha256": "a60d6a4b605dbfe01c5dfd8c84b63672f824f1793fd92e24e774722222230952",
+        "expected": "a60d6a4b605dbfe01c5dfd8c84b63672f824f1793fd92e24e774722222230952",
+        "ok": true
+      },
+      {
+        "name": "receipt:after",
+        "sha256": "525f01ad68df298069e8c16b8c08f89a4c36e41d3edd5cfe9aaa882bf55a5975",
+        "expected": "525f01ad68df298069e8c16b8c08f89a4c36e41d3edd5cfe9aaa882bf55a5975",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-1",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-1",
+        "sha256": "fdc80f79aef08ea8fd128a79d1af7b761f0f20dd0de20144e01cbea5256c5807",
+        "expected": "fdc80f79aef08ea8fd128a79d1af7b761f0f20dd0de20144e01cbea5256c5807",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-2",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-2",
+        "sha256": "3f18c6caba7bdf21a0cd4dadaa1e7993974ac09777f95cba68019ac3434f8d80",
+        "expected": "3f18c6caba7bdf21a0cd4dadaa1e7993974ac09777f95cba68019ac3434f8d80",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-3",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-3",
+        "sha256": "585ee2450bfeaa7a1cbe26631cc1fbadc05d4a5def33591fdf5925f9c936421e",
+        "expected": "585ee2450bfeaa7a1cbe26631cc1fbadc05d4a5def33591fdf5925f9c936421e",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-4",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-4",
+        "sha256": "be2577f6c2eff870fa4b9599fd6d1510763c77756ae8f193abddeef5948adfdd",
+        "expected": "be2577f6c2eff870fa4b9599fd6d1510763c77756ae8f193abddeef5948adfdd",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-5",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-5",
+        "sha256": "24322270a88f4f3953f6a4e32a4664e7dc567256ffbacdde3f38e84e7550e074",
+        "expected": "24322270a88f4f3953f6a4e32a4664e7dc567256ffbacdde3f38e84e7550e074",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-6",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-6",
+        "sha256": "ba6a23e9c43a4867ed2b158581826bc7cb4e0921efcc435cd0945e7ab2e2b364",
+        "expected": "ba6a23e9c43a4867ed2b158581826bc7cb4e0921efcc435cd0945e7ab2e2b364",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-7",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-7",
+        "sha256": "122d3498d0df4081bd49181d34323f4c29bb809909a153ea72d3dfa7dd678954",
+        "expected": "122d3498d0df4081bd49181d34323f4c29bb809909a153ea72d3dfa7dd678954",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-8",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-8",
+        "sha256": "447972f7eb39f0a23f4c0ef274263b252b85dd8af9cde893521c03aac0cb6833",
+        "expected": "447972f7eb39f0a23f4c0ef274263b252b85dd8af9cde893521c03aac0cb6833",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-9",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-9",
+        "sha256": "472463bcadccbe9a4866b3897bad76a6bc02b6620924f3455f68fc10d0f6080e",
+        "expected": "472463bcadccbe9a4866b3897bad76a6bc02b6620924f3455f68fc10d0f6080e",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-10",
+        "ok": true
+      },
+      {
+        "name": "artifact:ev-10",
+        "sha256": "bd470cc6d6d0d989002ee9c45697fed6bd36d5c4ff25fe3b91e8bc6cb81a8069",
+        "expected": "bd470cc6d6d0d989002ee9c45697fed6bd36d5c4ff25fe3b91e8bc6cb81a8069",
+        "ok": true
+      },
+      {
+        "name": "evidence:ev-11",
+        "ok": true
+      }
+    ],
+    "report_sha256": "985b7af92363497d5cdfe242ef5b99fd36a5b31e59537235eece1ba10651a3ab",
+    "failed_judge_attempts": 1,
+    "builder_rounds": 3,
+    "limitations": [
+      "Original pinned runtime and presentation workaround; no decision re-evaluation under newer verifier.",
+      "No claim of real-product multi-cycle proof or absent host-role provenance."
+    ]
+  },
+  "deterministic_cases": {
+    "audited_at": "2026-10-31T12:37:38.397Z",
+    "runtime_commit": "14ab7a2afceccb05f6416c756488b54942194dd3",
+    "native_model_calls": false,
+    "real_product": false,
+    "results": [
+      {
+        "kind": "deterministic-qualification-fixture",
+        "decision": "KEEP",
+        "reason": [
+          "all declared mandatory gains established by matched holdout evidence; all mandatory criteria and required gates passed; scope and safety held"
+        ],
+        "ledger": {
+          "ok": true,
+          "entries": 38,
+          "improve_entries": 35,
+          "head_sha256": "6e10025a2dbcec3417b849b0d03b3736fb1d670a246bcdb2b7bf080da54c752b",
+          "errors": []
+        },
+        "checks": [
+          {
+            "name": "candidate",
+            "sha256": "0daf312c8056dfc0793cc65124235c9876798c30b378660ea558106b13b43c08",
+            "ok": true
+          },
+          {
+            "name": "contract",
+            "sha256": "07411ca0ec15de9227be4d3cf658d3c6daba0ce0a903333446538a233e8e0f49",
+            "ok": true
+          },
+          {
+            "name": "holdout/steps.cjs",
+            "sha256": "42fc7af53165d3f629032da3daa2bd167a7bea83c49c06942ecd0bd8dbf87932",
+            "ok": true
+          },
+          {
+            "name": "dev/steps.cjs",
+            "sha256": "be967c188e7d7203251fc505203ab7283005c57db36e9e6a684f1bc4258d6a1b",
+            "ok": true
+          },
+          {
+            "name": "receipt:baseline",
+            "sha256": "0f823be91ebdf6e6a1771181d65ad32c2a7d3eface5da572ab33eabeff6cbdbe",
+            "ok": true
+          },
+          {
+            "name": "receipt:after",
+            "sha256": "76cd56f532fcbb45ba992fe2033007e318e0d6d31ea42364a568c6abc49667cc",
+            "ok": true
+          },
+          {
+            "name": "ev-1",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-1",
+            "sha256": "66603163c2b1320856d7fa2a1c3bb702bf8a97c3a6a1c13f52a9745c725d28e8",
+            "ok": true
+          },
+          {
+            "name": "ev-2",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-2",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "ev-3",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-3",
+            "sha256": "66603163c2b1320856d7fa2a1c3bb702bf8a97c3a6a1c13f52a9745c725d28e8",
+            "ok": true
+          },
+          {
+            "name": "ev-4",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-4",
+            "sha256": "a351696f7e55c21c42e26d21fb139bcc68005cce301559bab78fc9d817e2ba6b",
+            "ok": true
+          },
+          {
+            "name": "ev-5",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-5",
+            "sha256": "a351696f7e55c21c42e26d21fb139bcc68005cce301559bab78fc9d817e2ba6b",
+            "ok": true
+          },
+          {
+            "name": "ev-6",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-6",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "decision",
+            "sha256": "05ca4dcae55eea2d1f871810968e5e160439472fb6e5276b0819c8dee4242a2c",
+            "ok": true
+          },
+          {
+            "name": "patch",
+            "sha256": "1b57ec34f23c52f16a79fcfb1f0bdef77f065a610b47b64be8bbf81641581a32",
+            "ok": true
+          }
+        ],
+        "builder_claim": "complete",
+        "divergence": null,
+        "branch_retained": true,
+        "commit": "0f2a441a6e0fd29ff537942859391dca05e56916",
+        "report_sha256": "53359b1ca4a3e5db185e6a4f6ed9b1a6768e0c1d6ee48c0c9c095a9a25bad276",
+        "unmeasured_charges_explicit": true,
+        "unknown_not_zero": true,
+        "report_product_result": "**Product result:** Improvement established: Removing the repeated confirmation shortens resume to 2 steps.",
+        "next_action": "- Review branch `specflow/improve-test` (commit `0f2a441a6e0fd29ff537942859391dca05e56916`) and decide whether to push/open a PR. Specflow never pushes or merges."
+      },
+      {
+        "kind": "deterministic-qualification-fixture",
+        "decision": "REVERT",
+        "reason": [
+          "mandatory criteria failed: AC-1"
+        ],
+        "ledger": {
+          "ok": true,
+          "entries": 38,
+          "improve_entries": 35,
+          "head_sha256": "862e18189d849dd805186796797fc5473ecdb4b31ffd2f2385687cde4fd36a11",
+          "errors": []
+        },
+        "checks": [
+          {
+            "name": "candidate",
+            "sha256": "0daf312c8056dfc0793cc65124235c9876798c30b378660ea558106b13b43c08",
+            "ok": true
+          },
+          {
+            "name": "contract",
+            "sha256": "d673e602fba22e500368219ff2b8eacd4f459cb937ec4bb646a282373c98cc0a",
+            "ok": true
+          },
+          {
+            "name": "holdout/steps.cjs",
+            "sha256": "42fc7af53165d3f629032da3daa2bd167a7bea83c49c06942ecd0bd8dbf87932",
+            "ok": true
+          },
+          {
+            "name": "dev/steps.cjs",
+            "sha256": "be967c188e7d7203251fc505203ab7283005c57db36e9e6a684f1bc4258d6a1b",
+            "ok": true
+          },
+          {
+            "name": "receipt:baseline",
+            "sha256": "7f0b7ebcf76cb08a25052928f643d25426d93dd9effc6ffb0f03981c210d17ad",
+            "ok": true
+          },
+          {
+            "name": "receipt:after",
+            "sha256": "a49032753e0b367b309802c16cb5ed715620d55a37d405d1f16406db220ea2f2",
+            "ok": true
+          },
+          {
+            "name": "ev-1",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-1",
+            "sha256": "66603163c2b1320856d7fa2a1c3bb702bf8a97c3a6a1c13f52a9745c725d28e8",
+            "ok": true
+          },
+          {
+            "name": "ev-2",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-2",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "ev-3",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-3",
+            "sha256": "66603163c2b1320856d7fa2a1c3bb702bf8a97c3a6a1c13f52a9745c725d28e8",
+            "ok": true
+          },
+          {
+            "name": "ev-4",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-4",
+            "sha256": "b8e76fd5c5cce2b354151589e24e24480466069df9c89ada668f092a8f76a01c",
+            "ok": true
+          },
+          {
+            "name": "ev-5",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-5",
+            "sha256": "b8e76fd5c5cce2b354151589e24e24480466069df9c89ada668f092a8f76a01c",
+            "ok": true
+          },
+          {
+            "name": "ev-6",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-6",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "decision",
+            "sha256": "7f1c18b416ec02a9ef8b1475e7102839862a122d70a9eebbbbcdfc1d07862f50",
+            "ok": true
+          },
+          {
+            "name": "patch",
+            "sha256": "91eb97108e4570a3b9408e34526b322869fc9f52c4d1f8e73de40c215dd933f9",
+            "ok": true
+          }
+        ],
+        "builder_claim": "complete",
+        "divergence": "builder_claimed_complete_but_decision_differs",
+        "branch_retained": false,
+        "commit": null,
+        "report_sha256": "28430a6d21bd0d754e8b087e2e0c9d4451e17e3d5936c11476e89dfe08f4eeca",
+        "unmeasured_charges_explicit": true,
+        "unknown_not_zero": true,
+        "report_product_result": "**Product result:** Change reverted: it failed, regressed or broke the run boundary. Product unchanged.",
+        "next_action": "- Nothing to merge. Deciding failures: AC-1: Resume journey takes at most 2 steps. Review their before/after evidence before deciding whether the opportunity deserves a differently scoped contract."
+      },
+      {
+        "kind": "deterministic-qualification-fixture",
+        "decision": "INCONCLUSIVE",
+        "reason": [
+          "gain AC-1 not established: declared binary gain requires baseline fail and after pass",
+          "mandatory criteria without qualifying evidence: AC-1",
+          "verifier rail gate is blocked"
+        ],
+        "ledger": {
+          "ok": true,
+          "entries": 38,
+          "improve_entries": 35,
+          "head_sha256": "5f5019a4f13dafcb9f67b63e4623a68ccdfdb60de28e2f9f1fe0354a8804d645",
+          "errors": []
+        },
+        "checks": [
+          {
+            "name": "candidate",
+            "sha256": "0daf312c8056dfc0793cc65124235c9876798c30b378660ea558106b13b43c08",
+            "ok": true
+          },
+          {
+            "name": "contract",
+            "sha256": "ce58563d672a0b327c9e72de31ce3fc94be8b0ef229d56fdcdaf177d8cbe2474",
+            "ok": true
+          },
+          {
+            "name": "holdout/steps.cjs",
+            "sha256": "2bf98abb6ecc9cbd56a0fcf951016165edb7a894f28a04e6018d5489d418e628",
+            "ok": true
+          },
+          {
+            "name": "dev/steps.cjs",
+            "sha256": "be967c188e7d7203251fc505203ab7283005c57db36e9e6a684f1bc4258d6a1b",
+            "ok": true
+          },
+          {
+            "name": "receipt:baseline",
+            "sha256": "e5b1eedae7bea7a784cf10771d453c834d9dad52678334d9367c2a77916e95c9",
+            "ok": true
+          },
+          {
+            "name": "receipt:after",
+            "sha256": "4847ea915960746a694e299c47b04d674c69704bff8509ee81d565666e1c83bf",
+            "ok": true
+          },
+          {
+            "name": "ev-1",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-1",
+            "sha256": "66603163c2b1320856d7fa2a1c3bb702bf8a97c3a6a1c13f52a9745c725d28e8",
+            "ok": true
+          },
+          {
+            "name": "ev-2",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-2",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "ev-3",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-3",
+            "sha256": "66603163c2b1320856d7fa2a1c3bb702bf8a97c3a6a1c13f52a9745c725d28e8",
+            "ok": true
+          },
+          {
+            "name": "ev-4",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-4",
+            "sha256": "a351696f7e55c21c42e26d21fb139bcc68005cce301559bab78fc9d817e2ba6b",
+            "ok": true
+          },
+          {
+            "name": "ev-5",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-5",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "ev-6",
+            "ok": true
+          },
+          {
+            "name": "artifact:ev-6",
+            "sha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+            "ok": true
+          },
+          {
+            "name": "decision",
+            "sha256": "d07112a1c7fa2ca79978fad18adb484aebc9319f9853bc4645a74656ce25f757",
+            "ok": true
+          },
+          {
+            "name": "patch",
+            "sha256": "1b57ec34f23c52f16a79fcfb1f0bdef77f065a610b47b64be8bbf81641581a32",
+            "ok": true
+          }
+        ],
+        "builder_claim": "complete",
+        "divergence": "builder_claimed_complete_but_decision_differs",
+        "branch_retained": false,
+        "commit": null,
+        "report_sha256": "ebaced77a5ccb655f45761ef00859de644b36f4fd0b452160d52167df7299059",
+        "unmeasured_charges_explicit": true,
+        "unknown_not_zero": true,
+        "report_product_result": "**Product result:** Improvement not established: the evidence cannot show the change is better. Product unchanged.",
+        "next_action": "- Resolve the current evidence blockers or discard: gain AC-1 not established: declared binary gain requires baseline fail and after pass; mandatory criteria without qualifying evidence: AC-1; verifier rail gate is blocked. The attempted patch is preserved at `workspace.patch` (sha256 1b57ec34f23c52f16a79fcfb1f0bdef77f065a610b47b64be8bbf81641581a32). Never rerun a consumed holdout."
+      }
+    ]
+  }
+}
