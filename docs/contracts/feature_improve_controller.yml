@@ -35,6 +35,7 @@ invariants:
     tests: [CTRL-RACE, CTRL-INTERRUPT, STORE-READ]
 test_hooks:
   tests:
+    - file: tests/contracts/controller-stage-deadline.test.js
     - file: tests/contracts/controller-store-read.test.js
     - file: tests/contracts/improve-limits.test.js
     - file: tests/integration/improve-controller.test.js
