@@ -1162,3 +1162,129 @@ describe('EFFORT178: useful subscription work and explicit boundaries',()=>{
   const f=fixture();try{const{built}=await runToImplementation(f,{continuationPolicy:writeTmp(f,'continuation.json',{usageMode:'subscription',maxElapsedMs:1}),peer:[CONTINUE]});expect(built.rounds).toHaveLength(0);expect(built.stop_reason).toMatch(/maxElapsedMs checkpoint/);}finally{fs.rmSync(f.root,{recursive:true,force:true});}
  }));
 });
+
+describe('BACKEND293: declared backend cannot silently use the host runtime',()=>{
+ function backendContract(){
+  const doc=contract();delete doc.acceptance[0].dev_check;doc.gates=[];
+  const c=doc.acceptance[0].check;delete c.command;c.artifact='holdout/native.test.js';Object.assign(c,{verification_level:'integration',boundaries:['network','database'],configuration_ids:['confined'],checker_paths:['holdout/native.test.js','holdout/jest.config.cjs'],input_paths:[],rule_paths:[],execution:{adapter:'playwright',test_files:['holdout/native.test.js'],required_case_ids:['default::holdout/native.test.js::required'],optional_case_ids:[],args:['--config','holdout/jest.config.cjs']}});
+  doc.runtime={configuration_id:'confined',backend:{recipeId:'heystax-supabase-v1',expectedSemanticSha256:'1'.repeat(64),inputManifestSha256:{baseline:'2'.repeat(64),after:'3'.repeat(64)}}};return doc;
+ }
+ const oracle=marker=>runDir=>{fs.writeFileSync(path.join(runDir,'holdout/native.test.js'),"require('fs').writeFileSync("+JSON.stringify(marker)+",'host ran');");fs.writeFileSync(path.join(runDir,'holdout/jest.config.cjs'),'module.exports={};');};
+ test.each([undefined,{}])('missing or forged capability blocks before any check: %p',quiet(async backendSession=>{
+  const f=fixture();try{const marker=path.join(f.root,'host-ran'),{runDir,frozen}=await prepare(f,{contractDoc:backendContract(),nativeOracle:oracle(marker)});expect(frozen.status).toBe('frozen');
+   const result=await improve.verifyPhase(runDir,'baseline',{backendSession});expect(result.status).toBe('blocked');expect(fs.existsSync(marker)).toBe(false);
+   expect(improve.events(runDir).some(e=>['holdout_consumed','verification_receipt','baseline_recorded','evidence_added'].includes(e.event))).toBe(false);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test.each(['cleaned','cleanup-failed','open-failed','evidence-failed'])('managed failure retains original terminal and reports cleanup separately: %s',quiet(async failureMode=>{
+  const cleanupFails=failureMode==='cleanup-failed';
+  const f=fixture(),generation=require('../../scripts/improve-backend-generation.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs');
+  const backendTerminal={phase:'cleaned',cause:'backend_lease_expired',resources:[]};
+  const terminal={state:'cleaned',cause:'backend_lease_expired',credentialEnvelopeRemoved:true,resources:[]};
+  const spies=[jest.spyOn(generation,'freezeBinding').mockReturnValue({sha256:'4'.repeat(64)}),
+   jest.spyOn(generation,'open').mockImplementation(async()=>{if(failureMode==='open-failed'){const error=Error('backend_service_died');error.backendGeneration={attempt:{attemptId:'fixture'},terminal,backendTerminal,originalCause:'backend_lease_expired'};throw error;}return {};}),jest.spyOn(generation,'access').mockReturnValue({session:{},context:{}}),
+   jest.spyOn(runtime,'admitBackend').mockRejectedValue(Error('backend_service_died')),
+   jest.spyOn(generation,'close').mockImplementation(async()=>{if(cleanupFails)throw Error('backend_cleanup_unconfirmed');return {attempt:{attemptId:'fixture'},terminal,backendTerminal,originalCause:'backend_lease_expired'};})];
+  if(failureMode==='evidence-failed')spies.push(jest.spyOn(generation,'writeProof').mockImplementation(()=>{throw Error('disk_full');}));
+  try{
+   const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256='2'.repeat(64);
+   const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).toBe('frozen');
+   const result=await improve.verifyPhase(runDir,'baseline',{backendCapability:{}});expect(result.status).toBe('blocked');
+   expect(improve.events(runDir).some(e=>e.event==='verification_receipt')).toBe(false);
+   if(cleanupFails){expect(result.reason).toContain('cleanup: backend_cleanup_unconfirmed');expect(result.backendFailure.cleanup).toBe('unconfirmed');}
+   else if(failureMode==='evidence-failed'){expect(result.backendFailure).toMatchObject({originalCause:'backend_lease_expired',cleanup:'cleaned',evidenceCause:'disk_full'});expect(result.reason).toContain('evidence retention: disk_full');expect(result.reason).not.toContain('cleanup:');}
+   else{
+    expect(result.reason).toBe('Backend generation unavailable: backend_lease_expired');
+    expect(result.backendFailure).toMatchObject({originalCause:'backend_lease_expired',observedCause:'backend_service_died',cleanup:'cleaned'});
+    for(const [key,expected]of [['terminal',terminal],['backendTerminal',backendTerminal]]){
+     const ref=result.backendFailure[key];expect(JSON.parse(fs.readFileSync(ref.path))).toEqual(expected);expect(fs.statSync(ref.path).mode&0o777).toBe(0o600);
+    }
+    expect(improve.events(runDir).find(e=>e.event==='verification_blocked').backendFailure).toEqual(result.backendFailure);
+   }
+  }finally{for(const spy of spies)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test.each(['unchanged','before-dispatch','oracle-before-dispatch','ledger-before-dispatch','during-check','after-shutdown','branch-after-shutdown','authority-after-shutdown'])('managed identity boundaries reject mutation without live Git: %s',quiet(async mutation=>{
+  const f=fixture(),generation=require('../../scripts/improve-backend-generation.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs'),binding=require('../../scripts/improve-binding.cjs'),native=require('../../scripts/test-execution.cjs');
+  let selected,frozenRun,phase='outside',workspace,revoked=false,checks=0;const gitPhases=[];
+  const touch=()=>fs.appendFileSync(path.join(workspace,'README.md'),'changed');
+  const terminal={state:'cleaned',cause:null,credentialEnvelopeRemoved:true,resources:[]},backendTerminal={phase:'cleaned',cause:null,resources:[]};
+  const spies=[jest.spyOn(generation,'freezeBinding').mockReturnValue({sha256:'4'.repeat(64)}),
+   jest.spyOn(generation,'validate').mockImplementation(()=>{if(revoked)throw Error('authority_revoked');}),
+   jest.spyOn(generation,'open').mockImplementation(async(cap,run,which,refresh)=>{phase='preparing';frozenRun=run;expect(refresh({metadataOnly:true}).identity).toBeUndefined();selected=refresh();workspace=selected.workspace;phase='live';return {};}),
+   jest.spyOn(generation,'access').mockImplementation(()=>({session:{},context:{expectedBackendIdentity:'1'.repeat(64)},identity:selected.identity})),
+   jest.spyOn(generation,'selectChecker').mockImplementation(()=>{}),
+   jest.spyOn(generation,'retainProof').mockImplementation((dir,ref)=>ref),
+   jest.spyOn(runtime,'admitBackend').mockResolvedValue({path:'fixture-entry',sha256:'1'.repeat(64),manifest:{measuredBackendIdentity:'1'.repeat(64)}}),
+   jest.spyOn(runtime,'bindBackendProduct').mockReturnValue({}),jest.spyOn(runtime,'prepareBackendChecks').mockImplementation(()=>{}),
+   jest.spyOn(runtime,'startBackendServer').mockImplementation(async()=>{if(mutation==='before-dispatch')touch();if(mutation==='oracle-before-dispatch')fs.appendFileSync(path.join(frozenRun,'holdout/native.test.js'),'// changed');if(mutation==='ledger-before-dispatch')improve.append(frozenRun,'implementation_started',{});}),
+   jest.spyOn(runtime,'backendContinuity').mockResolvedValue({}),
+   jest.spyOn(generation,'shutdown').mockImplementation(async()=>{phase='stopped';if(mutation==='after-shutdown')touch();if(mutation==='branch-after-shutdown'){git(workspace,'branch','other');git(workspace,'symbolic-ref','HEAD','refs/heads/other');}if(mutation==='authority-after-shutdown')revoked=true;return backendTerminal;}),
+   jest.spyOn(generation,'close').mockImplementation(async(handle,cause)=>({attempt:{attemptId:'fixture'},terminal:{...terminal,cause},backendTerminal,originalCause:cause})),
+   jest.spyOn(native,'ownsFrozen').mockReturnValue(true),
+   jest.spyOn(native,'executeFrozen').mockImplementation((check,options)=>{checks++;if(mutation==='during-check')touch();const evidence_path=path.join(options.runDir,'fixture-native.json');fs.writeFileSync(evidence_path,'{}');return {result:'fail',executable:true,exit_code:1,evidence_path,framework:{},artifacts:{},cases:[],errors:[],summary:{passed:0,failed:1,skipped:0}};})];
+  const tree=binding.tree;spies.push(jest.spyOn(binding,'tree').mockImplementation((...args)=>{gitPhases.push(phase);return tree(...args);}));
+  try{
+   const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256='2'.repeat(64);
+   const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).toBe('frozen');
+   const result=await improve.verifyPhase(runDir,'baseline',{backendCapability:{}});
+   expect(gitPhases.filter(x=>x==='live')).toHaveLength(0);expect(gitPhases.filter(x=>x==='preparing')).toHaveLength(1);
+   if(mutation==='unchanged'){expect(result.status).toBe('baseline_recorded');expect(checks).toBe(1);expect(gitPhases.filter(x=>x==='stopped')).toHaveLength(1);}
+   else{expect(result.status).toBe('blocked');expect(improve.events(runDir).some(e=>e.event==='verification_receipt')).toBe(false);if(mutation.endsWith('before-dispatch'))expect(checks).toBe(0);}
+  }finally{for(const spy of spies)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ // Evaluator unit boundary: substitute backend/native execution, but let the core
+ // write real hashed phase receipts and consume them through evaluate().
+ test.each([false,true])('evaluate consumes hashed backend pair and rejects semantic mismatch (%s)',quiet(async mismatch=>{
+  const f=fixture(),generation=require('../../scripts/improve-backend-generation.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs'),native=require('../../scripts/test-execution.cjs');
+  const crypto=require('crypto');let selected,phase;const expected='1'.repeat(64),construction='2'.repeat(64);
+  const proof=(name,data)=>{const file=path.join(f.root,name),bytes=JSON.stringify(data);fs.writeFileSync(file,bytes);return {path:file,sha256:crypto.createHash('sha256').update(bytes).digest('hex')};};
+  const product=Object.fromEntries(['source','build','output'].map(k=>[k,proof(k+'.json',{fixture:k})]));
+  const terminal=()=>({phase:'cleaned',cause:null,jobId:'fixture',generation:phase,resources:[]});
+  const spies=[jest.spyOn(generation,'freezeBinding').mockReturnValue({sha256:'4'.repeat(64)}),
+   jest.spyOn(generation,'open').mockImplementation(async(cap,run,which,refresh)=>{phase=which;selected=refresh();return {};}),
+   jest.spyOn(generation,'access').mockImplementation(()=>({session:{},context:{expectedBackendIdentity:expected},identity:selected.identity})),
+   jest.spyOn(generation,'selectChecker').mockImplementation(()=>{}),jest.spyOn(generation,'validate').mockImplementation(()=>{}),
+   jest.spyOn(generation,'verifyReceipt').mockReturnValue(true),
+   jest.spyOn(runtime,'admitBackend').mockImplementation(async()=>{const measured=mismatch&&phase==='after'?'9'.repeat(64):expected;const entry={phase,jobId:'fixture',generation:phase,constructionSha256:construction,expectedBackendIdentity:expected,measuredBackendIdentity:measured};return {...proof(phase+'-entry.json',entry),manifest:entry};}),
+   jest.spyOn(runtime,'bindBackendProduct').mockReturnValue(product),jest.spyOn(runtime,'prepareBackendChecks').mockImplementation(()=>{}),
+   jest.spyOn(runtime,'startBackendServer').mockResolvedValue(undefined),jest.spyOn(runtime,'backendContinuity').mockResolvedValue({}),
+   jest.spyOn(generation,'shutdown').mockImplementation(async()=>terminal()),
+   jest.spyOn(generation,'close').mockImplementation(async(handle,cause)=>({attempt:{attemptId:'fixture-'+phase},terminal:{state:'cleaned',cause,credentialEnvelopeRemoved:true,resources:[]},backendTerminal:terminal(),originalCause:cause})),
+   jest.spyOn(native,'ownsFrozen').mockReturnValue(true),
+   jest.spyOn(native,'executeFrozen').mockImplementation((check,options)=>{const artifact=proof(phase+'-native.json',{fixture:'native failure'});return {result:'fail',executable:true,exit_code:1,evidence_path:artifact.path,framework:{fixture:true},artifacts:{},cases:[],errors:[],summary:{passed:0,failed:1,skipped:0}};})];
+  try{
+   const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256=construction;
+   const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).toBe('frozen');
+   expect((await improve.verifyPhase(runDir,'baseline',{backendCapability:{}})).status).toBe('baseline_recorded');
+   // Explicit synthetic implementation history, not a provider/build claim.
+   improve.prepareWorkspace(runDir,'improve');improve.append(runDir,'implementation_started',{executor:'fixture-builder',role:'builder'});improve.append(runDir,'implementation_finished',{executor:'fixture-builder',rounds:[],peer_recommendation:'continue'});
+   await improve.verifyPhase(runDir,'after',{backendCapability:{}});
+   const receipts=improve.events(runDir).filter(x=>x.event==='verification_receipt');expect(receipts.map(x=>x.phase)).toEqual(['baseline','after']);
+   for(const r of receipts){expect(crypto.createHash('sha256').update(fs.readFileSync(r.path)).digest('hex')).toBe(r.sha256);const body=JSON.parse(fs.readFileSync(r.path));expect(body.backend.entry.sha256).toMatch(/^[a-f0-9]{64}$/);expect(body.backend.terminal.sha256).toMatch(/^[a-f0-9]{64}$/);expect(body.backend.measuredSemanticSha256).toBe(mismatch&&r.phase==='after'?'9'.repeat(64):expected);}
+   const result=improve.evaluate(runDir,{backendCapability:{}});expect(result.decision).not.toBe('KEEP');
+   if(mismatch)expect(result.binding_errors.join(' ')).toContain('backend identity mismatch');else expect(result.binding_errors).toEqual([]);
+  }finally{for(const spy of spies)spy.mockRestore();fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test('managed declaration cannot freeze without trusted pre-freeze binding',quiet(async()=>{
+  const f=fixture();try{const doc=backendContract();delete doc.runtime.backend.inputManifestSha256;doc.runtime.backend.constructionSha256='2'.repeat(64);
+   const {runDir,frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});
+   expect(frozen.status).toBe('rejected');expect(JSON.stringify(frozen)).toContain('managed backend binding unavailable before freeze');
+   expect(improve.events(runDir).some(e=>e.event==='contract_frozen')).toBe(false);expect(fs.existsSync(path.join(f.root,'host-ran'))).toBe(false);
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test.each(['legacy-single','missing-after','same-generation','extra-phase','invalid-after'])('phase manifest declaration fails closed: %s',quiet(async kind=>{
+  const f=fixture();try{const doc=backendContract(),b=doc.runtime.backend;
+   if(kind==='legacy-single')b.inputManifestSha256='2'.repeat(64);
+   if(kind==='missing-after')delete b.inputManifestSha256.after;
+   if(kind==='same-generation')b.inputManifestSha256.after=b.inputManifestSha256.baseline;
+   if(kind==='extra-phase')b.inputManifestSha256.retry='4'.repeat(64);
+   if(kind==='invalid-after')b.inputManifestSha256.after='not-a-hash';
+   const {frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).not.toBe('frozen');expect(JSON.stringify(frozen)).toContain('runtime.backend');
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+ test.each(['unknown-recipe','unknown-field','host-setup','host-serve','command-gate'])('invalid backend declaration fails freezing: %s',quiet(async kind=>{
+  const f=fixture();try{const doc=backendContract();if(kind==='unknown-recipe')doc.runtime.backend.recipeId='anything';if(kind==='unknown-field')doc.runtime.backend.command=['node'];if(kind==='host-setup')doc.runtime.setup=[['node','-e','process.exit(0)']];if(kind==='host-serve')doc.runtime.serve={command:['node','server.js'],port:3000};if(kind==='command-gate')doc.gates=[{id:'bad',command:['node','-e','process.exit(0)']}];
+   const {frozen}=await prepare(f,{contractDoc:doc,nativeOracle:oracle(path.join(f.root,'host-ran'))});expect(frozen.status).not.toBe('frozen');expect(JSON.stringify(frozen)).toContain('runtime.backend');
+  }finally{fs.rmSync(f.root,{recursive:true,force:true});}
+ }));
+});

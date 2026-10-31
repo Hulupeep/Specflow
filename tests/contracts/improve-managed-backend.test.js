@@ -1,0 +1,51 @@
+const fs=require('fs'),os=require('os'),path=require('path');
+const {DurableStore}=require('../../scripts/improve-worker.cjs');
+const {ManagedBackendJournal}=require('../../scripts/improve-managed-backend.cjs');
+const attempts=require('../../scripts/improve-backend-attempt.cjs');
+const identity=require('../../scripts/improve-process-identity.cjs');
+const {PROFILE}=require('../../scripts/improve-backend.cjs');
+const {fingerprint}=require('../../scripts/improve-backend-supervisor.cjs');
+describe('managed backend service ownership (state tests, not live qualification)',()=>{
+ let root,store,ref,journal;
+ const anchor={Id:'b'.repeat(64),Config:{Hostname:'anchor-host'},State:{Running:true}};
+ beforeEach(()=>{root=fs.mkdtempSync(path.join(os.tmpdir(),'managed-backend-'));store=new DurableStore({root,sourceRoot:root});ref=attempts.begin(store,{jobId:'job',runId:'run',phase:'dev-r1',contractSha256:'a'.repeat(64),constructionSha256:'b'.repeat(64),authoritySha256:'c'.repeat(64),deadlineAtMs:Date.now()+60000});const jroot=path.join(root,'journal');fs.mkdirSync(jroot,{mode:0o700});journal=new ManagedBackendJournal({root:jroot,jobId:'job',generation:'generation',controller:identity.identity(),store,attempt:ref});});
+ afterEach(()=>{journal.close();fs.rmSync(root,{recursive:true,force:true});});
+ function reserve(role){return journal.reserve(role,slot=>['closed-fixture',slot.name]);}
+ function dispatch(role){const slot=journal.snapshot().resources.find(r=>r.role===role);return journal.dispatch(role,['closed-fixture',slot.name]);}
+ function inspect(slot){const limits=PROFILE.slots[slot.role];return {Id:'a'.repeat(64),Name:'/'+slot.name,Image:slot.image,Config:{Hostname:'',Labels:{'specflow.backend.job':'job','specflow.backend.generation':'generation','specflow.backend.reservation':slot.reservation,'specflow.backend.role':slot.role}},HostConfig:{ReadonlyRootfs:true,Privileged:false,CapDrop:['ALL'],CapAdd:[],SecurityOpt:['no-new-privileges'],Memory:limits.memoryBytes,MemorySwap:limits.memorySwapBytes,NanoCpus:1e9,PidsLimit:limits.pids,NetworkMode:'container:'+anchor.Id,PidMode:'',IpcMode:'private',PortBindings:{},OomKillDisable:false},Mounts:[],State:{Running:false,Paused:false,ExitCode:0,OOMKilled:false}};}
+ test.each(['database','authMigration','auth','rest','gateway'])('registers %s intent before dispatch with original deadline',role=>{const slot=reserve(role),list=attempts.intents(store,ref);expect(list).toHaveLength(1);expect(list[0].value.name).toBe(slot.name);expect(list[0].value.supervisor).toEqual(identity.identity());expect(journal.snapshot().deadlineEpochMs).toBe(attempts.read(store,ref).deadlineAtMs);expect(attempts.resourceEvents(store,ref,role)).toEqual([]);dispatch(role);expect(attempts.resourceEvents(store,ref,role)[0].state).toBe('dispatching');});
+ test('no dispatch is signed absent; whole-attempt reservation remains',()=>{reserve('database');journal.fail('backend_controller_died');journal.removed('database',true);expect(journal.finishCleanup().phase).toBe('cleaned');expect(attempts.resourceEvents(store,ref,'database')[0].state).toBe('not_dispatched');expect(attempts.read(store,ref).attemptId).toBe(ref.attemptId);});
+ test('unknown dispatch cannot be converted to absence and requires operator',()=>{reserve('database');dispatch('database');journal.fail('backend_controller_died');expect(()=>journal.removed('database',true)).toThrow('backend_cleanup_unconfirmed');expect(journal.finishCleanup().phase).toBe('cleanup_failed');expect(()=>attempts.intent(store,ref,{slot:'app',expectedConfigSha256:'d'.repeat(64),creator:identity.identity(),supervisor:identity.identity()})).toThrow('backend_cleanup_unconfirmed');});
+ test.each(['','aaaaaaaaaaaa'])('late create acknowledgment with hostname %j remains owned for removal',hostname=>{const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=hostname;dispatch('database');journal.fail('backend_controller_died');journal.created('database',c,anchor);expect(journal.cleanupTarget('database',c)).toBe(c.Id);journal.removed('database',true);expect(journal.finishCleanup()).toMatchObject({phase:'cleaned',cause:'backend_controller_died'});expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching','created','removed']);});
+ test('created hostname mutation cannot hide behind startup normalization',()=>{const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=c.Id.slice(0,12);dispatch('database');journal.created('database',c,anchor);journal.fail('backend_controller_died');c.Config.Hostname=anchor.Config.Hostname;expect(()=>journal.cleanupTarget('database',c)).toThrow('backend_cleanup_unconfirmed');});
+ test.each(['before-inspection','during-inspection'])('removed anchor at %s still permits cleanup acknowledgment, never startup',async ordering=>{
+  const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=c.Id.slice(0,12);dispatch('database');
+  if(ordering==='before-inspection')journal.fail('backend_controller_died');
+  let inspections=0;
+  const inspectAnchor=async()=>{inspections++;journal.fail('backend_controller_died');throw Error('backend_readiness_failed');};
+  await expect(journal.acknowledgeCreated('database',c,anchor,inspectAnchor)).rejects.toThrow('backend_controller_died');
+  expect(inspections).toBe(ordering==='before-inspection'?0:1);
+  expect(journal.cleanupTarget('database',c)).toBe(c.Id);journal.removed('database',true);
+  expect(journal.finishCleanup()).toMatchObject({phase:'cleaned',cause:'backend_controller_died',successReceipt:false});
+  expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching','created','removed']);
+ });
+ test('healthy startup cannot use an old anchor when current inspection fails',async()=>{
+  const slot=reserve('database'),c=inspect(slot);dispatch('database');
+  await expect(journal.acknowledgeCreated('database',c,anchor,async()=>{throw Error('backend_readiness_failed');})).rejects.toThrow('backend_readiness_failed');
+  expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching']);
+ });
+ test('healthy acknowledgment reads the current anchor',async()=>{
+  const slot=reserve('database'),c=inspect(slot);dispatch('database');let read=false;
+  await journal.acknowledgeCreated('database',c,anchor,async()=>{read=true;return anchor;});
+  expect(read).toBe(true);expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching','created']);
+ });
+ test('cleanup-only acknowledgment still rejects a foreign namespace',async()=>{
+  const slot=reserve('database'),c=inspect(slot);dispatch('database');journal.fail('backend_controller_died');c.HostConfig.NetworkMode='container:'+'c'.repeat(64);
+  await expect(journal.acknowledgeCreated('database',c,anchor,async()=>anchor)).rejects.toThrow('backend_input_changed');
+  expect(attempts.resourceEvents(store,ref,'database').map(e=>e.state)).toEqual(['dispatching']);
+ });
+ test('signed acknowledgment retains raw configuration across the checked startup transition',()=>{const slot=reserve('database'),c=inspect(slot);c.Config.Hostname=c.Id.slice(0,12);const raw=fingerprint(c);dispatch('database');journal.created('database',c,anchor);expect(attempts.resourceEvents(store,ref,'database').find(e=>e.state==='created').inspectionSha256).toBe(raw);c.Config.Hostname=anchor.Config.Hostname;c.HostConfig.OomKillDisable=null;c.State.Running=true;journal.started('database',c);journal.fail('backend_controller_died');expect(journal.cleanupTarget('database',c)).toBe(c.Id);journal.removed('database',true);expect(attempts.resourceEvents(store,ref,'database').find(e=>e.state==='removed').inspectionSha256).toBe(raw);expect(journal.finishCleanup().phase).toBe('cleaned');});
+ test.each(['name','hostname','memory'])('changed %s object cannot authorize removal',field=>{const slot=reserve('database'),c=inspect(slot);dispatch('database');journal.created('database',c,anchor);c.Config.Hostname=anchor.Config.Hostname;c.HostConfig.OomKillDisable=null;c.State.Running=true;journal.started('database',c);journal.fail('backend_controller_died');if(field==='name')c.Name='/foreign';if(field==='hostname')c.Config.Hostname='foreign';if(field==='memory')c.HostConfig.Memory++;expect(()=>journal.cleanupTarget('database',c)).toThrow();expect(journal.finishCleanup().phase).toBe('cleanup_failed');});
+ test('changed dispatch plan is rejected before a dispatch event',()=>{reserve('database');expect(()=>journal.dispatch('database',['changed'])).toThrow('backend_input_changed');expect(attempts.resourceEvents(store,ref,'database')).toEqual([]);});
+ test('sealed attempt blocks new service dispatch',()=>{reserve('database');attempts.seal(store,ref);expect(()=>dispatch('database')).toThrow('backend_attempt_sealed');});
+});

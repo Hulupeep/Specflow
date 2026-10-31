@@ -4,6 +4,9 @@
 const { spawnSync } = require('child_process'),
   fs = require('fs');
 function start(args) {
+  if (args.length === 2 && args[0] === '--intent') {
+    return require('./improve-managed-worker.cjs').runIntent(args[1]).catch(() => { process.exitCode = 2; });
+  }
   const [id, parent, deadline, config] = args;
   if (!/^[a-f0-9]{64}$/.test(id) || !/^\d+$/.test(parent) || !/^\d+$/.test(deadline) || !config.startsWith('/'))
     process.exit(2);

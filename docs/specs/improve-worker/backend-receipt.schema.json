@@ -1,0 +1,314 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "jobId",
+    "phase",
+    "generation",
+    "state",
+    "namedCause",
+    "expectedBackendIdentity",
+    "measuredBackendIdentity",
+    "manifest",
+    "productBuildReceiptSha256",
+    "supervisorJournal",
+    "deadlineEpochMs",
+    "cleanup",
+    "checks",
+    "attempt",
+    "constructionSha256",
+    "attemptTerminal",
+    "inputManifestSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "specflow.backend-receipt/v2"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "phase": {
+      "type": "string",
+      "pattern": "^(?:baseline|after|dev-r(?:[1-9][0-9]{0,14}|[1-8][0-9]{15}|900[0-6][0-9]{12}|90070[0-9]{11}|90071[0-8][0-9]{10}|900719[0-8][0-9]{9}|9007199[0-1][0-9]{8}|90071992[0-4][0-9]{7}|900719925[0-3][0-9]{6}|9007199254[0-6][0-9]{5}|90071992547[0-3][0-9]{4}|9007199254740[0-8][0-9]{2}|90071992547409[0-8][0-9]{1}|9007199254740990|9007199254740991))$(?![\\s\\S])"
+    },
+    "generation": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "state": {
+      "enum": [
+        "qualified",
+        "failed",
+        "interrupted"
+      ]
+    },
+    "namedCause": {
+      "enum": [
+        null,
+        "backend_input_invalid",
+        "backend_input_changed",
+        "backend_identity_mismatch",
+        "backend_readiness_failed",
+        "backend_controller_died",
+        "backend_service_died",
+        "backend_lease_expired",
+        "backend_storage_limit",
+        "backend_output_limit",
+        "backend_cleanup_failed",
+        "backend_restart_invalid",
+        "backend_cleanup_unconfirmed",
+        "backend_attempt_active",
+        "backend_credentials_expired",
+        "backend_authority_revoked",
+        "backend_dependency_changed"
+      ]
+    },
+    "expectedBackendIdentity": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "measuredBackendIdentity": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "manifest": {
+      "anyOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 4096
+            },
+            "sha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "productBuildReceiptSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "supervisorJournal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "deadlineEpochMs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "cleanup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "complete",
+        "ownedRemoved",
+        "remainingOwned"
+      ],
+      "properties": {
+        "complete": {
+          "type": "boolean"
+        },
+        "ownedRemoved": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "remainingOwned": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      }
+    },
+    "checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "executed",
+        "failed",
+        "skipped"
+      ],
+      "properties": {
+        "executed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "attempt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "constructionSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "attemptTerminal": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "inputManifestSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "qualified"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namedCause": {
+            "type": "null"
+          },
+          "measuredBackendIdentity": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "manifest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "path": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4096
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[a-f0-9]{64}$"
+              }
+            }
+          },
+          "cleanup": {
+            "properties": {
+              "complete": {
+                "const": true
+              },
+              "remainingOwned": {
+                "const": 0
+              }
+            }
+          },
+          "checks": {
+            "properties": {
+              "executed": {
+                "minimum": 1
+              },
+              "failed": {
+                "const": 0
+              },
+              "skipped": {
+                "const": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "failed",
+              "interrupted"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "namedCause": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ]
+}

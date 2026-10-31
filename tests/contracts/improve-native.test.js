@@ -38,3 +38,29 @@ test.each(['inside','symlink','unfrozen','correctness','competing-command'])('NA
 });
 
 test('NATIVE178: actual exit-zero process without native report is unavailable',()=>{const{check,options}=setup('missing-report'),r=native.executeFrozen(check,options);expect(r).toMatchObject({result:'blocked',exit_code:0,summary:{collected:0}});expect(r.reason).toContain('native_report_missing_or_corrupt');});
+
+// Backend declarations never fall back to the host native subprocess.
+test('BACKEND293: a forged backend session cannot execute the native oracle on the host',()=>{
+ const {check,options}=setup('pass','playwright');const marker=path.join(oracle,'host-executed');
+ fs.writeFileSync(path.join(oracle,check.execution.test_files[0]),"require('fs').writeFileSync("+JSON.stringify(marker)+",'bad');");
+ options.frozenFiles[check.execution.test_files[0]]=hash(path.join(oracle,check.execution.test_files[0]));
+ options.backendSession={ready:true,coreBinding:{}};options.backendContext={runId:'forged'};
+ const receipt=native.executeFrozen(check,options);expect(receipt.result).toBe('blocked');expect(receipt.reason).toContain('backend_input_invalid');expect(fs.existsSync(marker)).toBe(false);
+});
+
+// Transport is mocked here; this proves native binding semantics, not Docker.
+test.each([false,true])('managed native source binding detects even ignored byte mutations without Duo Git fingerprint: %s',mutate=>{
+ const {check,options}=setup('pass','playwright'),runtime=require('../../scripts/improve-backend-runtime.cjs'),binding=require('../../scripts/improve-binding.cjs'),duo=require('../../scripts/duo-build.cjs');
+ fs.unlinkSync(path.join(product.root,'node_modules')); // Product capsule has no host dependency symlink.
+ fs.writeFileSync(path.join(product.root,'.gitignore'),'ignored.txt\n');fs.writeFileSync(path.join(product.root,'ignored.txt'),'original');
+ options.backendSession={};options.backendContext={};
+ const spies=[jest.spyOn(duo,'fingerprint').mockImplementation(()=>{throw Error('unexpected_full_git_fingerprint');}),
+  jest.spyOn(runtime,'backendNativeSource').mockImplementation((cap,context,root)=>binding.workspace(root).sha256),
+  jest.spyOn(runtime,'backendNativeFramework').mockReturnValue({name:'@playwright/test',version:'fixture',entry:path.join(path.dirname(require.resolve('@playwright/test/package.json')),'cli.js'),entry_sha256:'a'.repeat(64)}),
+  jest.spyOn(runtime,'backendNativeLaunch').mockImplementation((cap,context,{args,env})=>{
+   const result=require('child_process').spawnSync(process.execPath,args,{cwd:oracle,env,encoding:'utf8',timeout:30000});
+   if(mutate)fs.appendFileSync(path.join(product.root,'ignored.txt'),'changed');return result;
+  })];
+ try{const result=native.executeFrozen(check,options);expect(result.result).toBe(mutate?'blocked':'pass');if(mutate)expect(result.reason).toContain('stale: source');expect(spies[0]).not.toHaveBeenCalled();expect(spies[1]).toHaveBeenCalledTimes(2);}
+ finally{for(const spy of spies)spy.mockRestore();}
+});

@@ -1,0 +1,33 @@
+journey_meta:
+  id: J-CONFINED-HEYSTAX-BACKEND
+  from_spec: docs/specs/improve-worker/backend-design.md
+  covers_reqs: [AC-BACKEND-02, AC-BACKEND-03, AC-BACKEND-07]
+  type: e2e
+  dod_criticality: critical
+  status: not_tested
+  last_verified: null
+preconditions:
+  - description: "Fresh confined backend, complete unchanged migrations, two ordinary fake users, owner Stax/block and bound real production output; no production credentials or bypass."
+steps:
+  - step: 1
+    name: "Open /attention at 1280 and 360; login-form visible. Fill actual Email/Password labels and submit."
+    expected: ["Real Auth login succeeds; Choose your handle appears for a new account."]
+  - step: 2
+    name: "Enter a unique handle and Continue."
+    expected: ["Handle prompt disappears; attention-board visible; unique owner block-card present."]
+  - step: 3
+    name: "Use add-action-button when necessary, fill add-action-input and press Enter."
+    expected: ["Actual POST /api/next-actions returns 201; next-action-item contains saved text; ordinary owner REST readback matches."]
+  - step: 4
+    name: "Reload the page."
+    expected: ["Same next-action-item remains visible with persisted text."]
+  - step: 5
+    name: "Sign in as the second user in a separate context. Attempt owner-row read and update through real ordinary-user REST."
+    expected: ["Private card absent; read/update return no rows; all owner row fields unchanged."]
+  - step: 6
+    name: "Replace one owner UI create request's bearer with the second user's actual bearer; do not mock the response."
+    expected: ["Actual route returns 403/404; exact returned error visible; independent owner readback equals the complete prior rows."]
+test_hooks:
+  e2e_test_file: tests/e2e/journey_confined_backend.spec.cjs
+qualification_note: "Earlier prototype journeys passed; this repository integration remains not_tested until this mapped spec executes."
+case_aliases: [J-BACKEND-PRODUCT-1280, J-BACKEND-PRODUCT-360]

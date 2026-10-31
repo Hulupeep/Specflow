@@ -445,3 +445,15 @@ test('worker image manifest preserves26 paths while sending all14 byte-distinct 
   expect(new Set(manifest.map((f) => f.sha256)).size).toBe(14);
   for (const f of frames) expect(crypto.createHash('sha256').update(f.bytes).digest('hex')).toBe(f.sha256);
 });
+
+test('managed product builder sees approved source rather than a nonexistent Node fixture',()=>{
+ fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'package.json'),'{"name":"product"}');fs.writeFileSync(path.join(root,'src/page.tsx'),'approved-product-source');fs.writeFileSync(path.join(root,'src/private.tsx'),'protected-private-source');
+ for(const dir of ['.specflow','holdout','node_modules']){fs.mkdirSync(path.join(root,dir));fs.writeFileSync(path.join(root,dir,'hidden.txt'),'hidden-oracle-or-dependency');}
+ fs.writeFileSync(path.join(root,'src/.env.local'),'secret-env');
+ const text=worker.builderText(root,{backendJobBinding:{},allowed:['src/**'],protected:['src/private.tsx']});
+ expect(text).toContain('approved-product-source');expect(text).toContain('product');expect(text).not.toContain('protected-private-source');expect(text).not.toContain('secret-env');expect(text).not.toContain('hidden-oracle-or-dependency');
+});
+test('managed builder refuses linked candidate source instead of following it',()=>{
+ fs.mkdirSync(path.join(root,'src'));fs.writeFileSync(path.join(root,'package.json'),'{}');fs.symlinkSync('/etc/passwd',path.join(root,'src/page.tsx'));
+ expect(()=>worker.builderText(root,{backendJobBinding:{},allowed:['src/**'],protected:[]})).toThrow('role_input_link');
+});

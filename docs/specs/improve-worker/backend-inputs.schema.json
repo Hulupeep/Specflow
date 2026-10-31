@@ -1,0 +1,252 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "jobId",
+    "recipeId",
+    "images",
+    "migrationRevision",
+    "migrations",
+    "migrationRoot",
+    "bootstrap",
+    "supabaseCli",
+    "seed",
+    "credentialBinding",
+    "runtimeLayer",
+    "configuration",
+    "resourceProfile",
+    "expectedState"
+  ],
+  "properties": {
+    "schema": {
+      "const": "specflow.backend-inputs/v1"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$"
+    },
+    "recipeId": {
+      "const": "heystax-supabase-v1"
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "database",
+        "auth",
+        "rest",
+        "gateway"
+      ],
+      "properties": {
+        "database": {
+          "const": "sha256:8613ba8eab946dff6674a2db6aab75b80aa101da39035fe20f62b0c7591ab35d"
+        },
+        "auth": {
+          "const": "sha256:b061f1fa636f31bc01de0a791986352e82772760cce8e1d55bbec6f552930a1e"
+        },
+        "rest": {
+          "const": "sha256:dfbce466e2fc4abe7d9bbd81284144b7acc50e220e033edbf85f2071f565ceee"
+        },
+        "gateway": {
+          "const": "sha256:3cefb958bcd694597b65adc00053a762b1f9a6df3c6031af528d052d75a64e1a"
+        }
+      }
+    },
+    "migrationRevision": {
+      "const": "11d3973874df3e2b9f629f9ba2f7ac7ed8e32f09"
+    },
+    "migrations": {
+      "type": "array",
+      "minItems": 156,
+      "maxItems": 156,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "sha256"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[0-9]{14}_[A-Za-z0-9_-]+\\.sql$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          }
+        }
+      }
+    },
+    "migrationRoot": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "supabaseCli": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "credentialBinding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "runtimeLayer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "configuration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "resourceProfile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    },
+    "expectedState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaSha256",
+        "tablesSha256",
+        "sequencesSha256",
+        "migrationHistorySha256"
+      ],
+      "properties": {
+        "schemaSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "tablesSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "sequencesSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        },
+        "migrationHistorySha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$"
+        }
+      }
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "description": "Exact per-generation raw inputs. constructionSha256 is computed from this validated manifest with only credentialBinding.sha256 replaced by the verified issued-credential projection; never accepted as a caller-supplied replacement for raw references."
+}

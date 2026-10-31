@@ -1,0 +1,636 @@
+{
+  "id": "heystax-supabase-v1",
+  "images": {
+    "database": "sha256:8613ba8eab946dff6674a2db6aab75b80aa101da39035fe20f62b0c7591ab35d",
+    "auth": "sha256:b061f1fa636f31bc01de0a791986352e82772760cce8e1d55bbec6f552930a1e",
+    "rest": "sha256:dfbce466e2fc4abe7d9bbd81284144b7acc50e220e033edbf85f2071f565ceee",
+    "gateway": "sha256:3cefb958bcd694597b65adc00053a762b1f9a6df3c6031af528d052d75a64e1a"
+  },
+  "migrationRevision": "11d3973874df3e2b9f629f9ba2f7ac7ed8e32f09",
+  "migrations": [
+    {
+      "name": "00000000000000_prehistory_baseline.sql",
+      "sha256": "38902971ee3a8b0559d94d30143d8cb8e27692ac5a1953aaf46b79e2c45dfdeb"
+    },
+    {
+      "name": "20241006150000_add_tags_to_stax.sql",
+      "sha256": "2e36cc4360679d43857b56a62b6c37aa54fa50144a3dde6b501af7d56f010d77"
+    },
+    {
+      "name": "20250728000000_add_profiles_public_rls.sql",
+      "sha256": "ed13e85f21eb1cf09a130245e3c226f7f3ff62a8ad5d70ca2af3f3f0900292f8"
+    },
+    {
+      "name": "20250728010000_add_profiles_public_rls_rollback.sql",
+      "sha256": "4d3eb6b71a59bd429970baeedad99d41708f3f467a0e31511372883050ca324d"
+    },
+    {
+      "name": "20250728020000_add_share_id_rollback.sql",
+      "sha256": "73b17ec78931c96753b692341781daa3f893199a5e0c97a7606e9bfbc939893e"
+    },
+    {
+      "name": "20250728030000_add_share_id_to_stax.sql",
+      "sha256": "51c373d240e1c2e7a872de0d79e8fdfe18cfd72523f409fa2021bf761e486a30"
+    },
+    {
+      "name": "20251018000000_add_created_by_to_stax_links.sql",
+      "sha256": "08d6b9aa18e2d0acab34cc1cb751c8484ec507a200df7b23173460b2f3fb019d"
+    },
+    {
+      "name": "20251018010000_add_version_last_activity_to_stax.sql",
+      "sha256": "c465330a7da90bc2aa662034742aea1aba43e56738fede9a2a1e1ae445a81c93"
+    },
+    {
+      "name": "20251101090000_add_share_token_columns.sql",
+      "sha256": "42df83acb556951686a9bf8346732c42cb78ac5a314e9c89d189ddb930f076a5"
+    },
+    {
+      "name": "20251107000000_add_start_page_column_to_stax.sql",
+      "sha256": "2c804b0c263e01b952d6eff966ff14eb93eca5b808b505bebe53283014713f12"
+    },
+    {
+      "name": "20251108000000_refresh_public_stax_policy.sql",
+      "sha256": "e39e3235083b97512be527e13d4c9429178e89283acb8fa06bf490f3cd0476f7"
+    },
+    {
+      "name": "20251223000000_e2e_cleanup_hollywoodsign.sql",
+      "sha256": "b6a7ff5eee60eb6f2da66736689d1309b79f367cacd1fa6472974a706a0a62dc"
+    },
+    {
+      "name": "20260120000000_admin_analytics.sql",
+      "sha256": "f48103bb206069e2e6da854a4efa400d229f7a4ef95ee72a4df4e92eb3042916"
+    },
+    {
+      "name": "20260120010000_personal_access_tokens.sql",
+      "sha256": "30bc70882bf678bad7ba65106e7b837cdcd5283c70faac991280cb6ae30a7374"
+    },
+    {
+      "name": "20260122000000_mcp_auth_codes.sql",
+      "sha256": "06adebf65a6ec943358b1d59d6d12fa486b51e8af6f7aa7d34fcee8822d997ec"
+    },
+    {
+      "name": "20260123000000_add_refresh_token_hash.sql",
+      "sha256": "2281c8d14042aae16f8a638b8548d5d507e8a5874f9ee20a3be7f9e4009ceef9"
+    },
+    {
+      "name": "20260123010000_mcp_oauth_clients.sql",
+      "sha256": "b210a2ec14ffb1f0b3ce67e42a11db6f0135b6ec799bb2a89bb6f622be0cfab5"
+    },
+    {
+      "name": "20260216000000_collaborative_rls.sql",
+      "sha256": "ce883297bbeffcb5df4311d755b961a29e9a7aaf08fc0d720e4f7fa1ae22b11a"
+    },
+    {
+      "name": "20260216100000_collaborator_color.sql",
+      "sha256": "d3e73812e047a344a5a8bce87682ff5654df52b1777e4e3fb00f198653a60369"
+    },
+    {
+      "name": "20260216110000_next_actions_collab.sql",
+      "sha256": "d5001021f5af68abfccbfca7f1094cdfc73b386bc55027b334f8113c12cf5218"
+    },
+    {
+      "name": "20260216120000_fix_rls_recursion.sql",
+      "sha256": "bc5b8583a43492bfcb3128d47571fc8dc9248bcc49f0df3ef719d0c68b25ec9e"
+    },
+    {
+      "name": "20260216130000_next_actions_assigned_to.sql",
+      "sha256": "d3a36a65224865885b6c6606ea83bbce9b1289e92f4a3d517f34e85883c823fe"
+    },
+    {
+      "name": "20260216130001_collaborator_color.sql",
+      "sha256": "60d0822ff2917a5b1bdbdf5b2c9c8ca322a804307c516b909d1123f36d8301f4"
+    },
+    {
+      "name": "20260216140000_lookup_user_by_email.sql",
+      "sha256": "0e3feebdb2d3b677c34d07021e1afb05eb3bfaf6450fbaf6e041a8bd1cb7a555"
+    },
+    {
+      "name": "20260217000000_stax_invites.sql",
+      "sha256": "59474031c8d3d0c5b72f7d626dbbd5d40fb69cdc68a30fa833b88cd6d91ff6af"
+    },
+    {
+      "name": "20260217010000_invite_expiry.sql",
+      "sha256": "8077bfc7b1173aa3657fd5baa6e15c4656743e76865206b8f62685cff88b14a5"
+    },
+    {
+      "name": "20260226120000_next_actions_assigned_to.sql",
+      "sha256": "18e72e296edf92c99cbab61d61db9fdcb294191bbca5c5b2f59c11e113665b2a"
+    },
+    {
+      "name": "20260226130000_auto_promote_collab_stax.sql",
+      "sha256": "d200c3e1956a32792130aa902ba6ea83c2a0efd01c7022b3044e171c4d7e2efc"
+    },
+    {
+      "name": "20260226140000_fix_auto_promote_source.sql",
+      "sha256": "4cf3afc6930f30059caa943a1c465372bdde702f15d88874491d28de58cf9d8e"
+    },
+    {
+      "name": "20260226145000_webapps_prehistory_bridge.sql",
+      "sha256": "845ec9cce92edca1a6f645ae1644303902351471a9997ec2f2ffc39d36d14304"
+    },
+    {
+      "name": "20260226150000_fix_view_collab_actions.sql",
+      "sha256": "55f05f8581b1e7d54cd4f8c872acc1b651cb42c6b297e6868be01c1109ab2ed6"
+    },
+    {
+      "name": "20260227120000_view_add_stax_share_mode.sql",
+      "sha256": "f70fc895e0c7fe820e070f8d6a639d831a8b5ed5f621da05029cd7c67b0b9ca1"
+    },
+    {
+      "name": "20260303120000_fix_next_actions_select_owner.sql",
+      "sha256": "aa03734705102b63b5ac0401f3a14098e4a76ef1aa1ed6ef453fa615baadff0f"
+    },
+    {
+      "name": "20260303130000_view_add_created_by_handle.sql",
+      "sha256": "b530a36faa9cfcfc60d16935995517311172bb075897e91d95f7989567094af0"
+    },
+    {
+      "name": "20260304120000_timesheets_schema.sql",
+      "sha256": "238003fc41390ccac24f06b71504facb91bb2d4eb057cbab6cbf447ae2271b9b"
+    },
+    {
+      "name": "20260304130000_timesheets_allow_reopen.sql",
+      "sha256": "209732202a9581f17766cc0bc670098ce85c94f16eb5b6a7a28d3f7293133bb6"
+    },
+    {
+      "name": "20260305120000_lockdown_profiles_rls.sql",
+      "sha256": "a55033e79a36de0fbca43179630fb060f3894149a539823e225dea86dbc98e1b"
+    },
+    {
+      "name": "20260305130000_nuke_profiles_select_policies.sql",
+      "sha256": "341d508cc1ede7b9ca9696f0b69188b7086a96939c63e16807b83cfaf3b1433c"
+    },
+    {
+      "name": "20260305140000_force_schema_cache_reload.sql",
+      "sha256": "f67785328b6e4bf463c57a1854834b493ba63b7cb26549972985e3a089ecfc91"
+    },
+    {
+      "name": "20260305150000_drop_transitional_handle_policy.sql",
+      "sha256": "beb68122c773856c43bfee79094475ccf25aa90d834a6474d2fafd1a066ac2e5"
+    },
+    {
+      "name": "20260306120000_timesheet_day_notes.sql",
+      "sha256": "3caae50071b71b2380d32dddc17a3ee78d2c51375f3344009f63aebcf51370a0"
+    },
+    {
+      "name": "20260306150000_view_add_action_created_at.sql",
+      "sha256": "0aeb477e8038f5c920e231ffae3a5a9f787212c2471c85ddcccf9b642e5cd41a"
+    },
+    {
+      "name": "20260308120000_collaborator_timesheet_rpcs.sql",
+      "sha256": "ffa60fc54e4a595a4d2e00d0cec0d78db817ca18382bce5d7bf0b085fd611a75"
+    },
+    {
+      "name": "20260308130000_fix_collab_rpc_ambiguous_column.sql",
+      "sha256": "40221936a31840dc80d6fc35537e7169a90a7f5ace4dbaab7beb17e5b83ed8e1"
+    },
+    {
+      "name": "20260308140000_nudge_rules.sql",
+      "sha256": "be708d47a837fcee6d5102f23eda9897506c04e4224aedd09e8c59d894e72f04"
+    },
+    {
+      "name": "20260309120000_mcp_plan_check_rpc.sql",
+      "sha256": "30cebcf2eb3423e42b9dab1d41139cbe256b599eff8f24fdbbe94b690906b791"
+    },
+    {
+      "name": "20260309130000_security_audit_remediation.sql",
+      "sha256": "384ee1159efe4220fc19c6115b81591bf05032baaa47ce6eb84ae0bd0608bb33"
+    },
+    {
+      "name": "20260309140000_fix_next_actions_update_owner.sql",
+      "sha256": "e79aa159cdf0d21d8ef46e7eab7290e35503e500ad957c76492cfbc629984d04"
+    },
+    {
+      "name": "20260309150000_fix_stax_anon_read.sql",
+      "sha256": "a9d399dfcb2d4bb74a162c46095ab142cf48bdf0cebbd42f9bf3dec89be4d6a4"
+    },
+    {
+      "name": "20260309160000_drop_anon_stax_policies.sql",
+      "sha256": "9757c6cf79226c98874ad44b14604acca98483d36d1c15bc6f16fe1f2a8103fc"
+    },
+    {
+      "name": "20260309170000_fix_stax_links_select_role.sql",
+      "sha256": "6efeaba2389cdd04600ade3c64ad9a28989db51de83055ba303d8912afaebb07"
+    },
+    {
+      "name": "20260310120000_view_add_stax_link_count.sql",
+      "sha256": "751dbaa2b3abf8e27ccffe8f6efb7082f337043faf6d4fb189167f028df5988a"
+    },
+    {
+      "name": "20260310140100_fix_next_actions_delete_rls.sql",
+      "sha256": "0b9278ba3511c77ec963e13af399b932886fc3aa7a02ac68d4d224c884b1054d"
+    },
+    {
+      "name": "20260310150000_add_urgent_column.sql",
+      "sha256": "92686cc12e898b0a132b334c3c48d2ff807e6bfbf64920cf8d54aede39f77e19"
+    },
+    {
+      "name": "20260310160000_lookup_user_by_handle.sql",
+      "sha256": "0b3ec7809fe8b255daa8a1fa0358920c198ecfac92594429760cde3eaed78f5d"
+    },
+    {
+      "name": "20260310170000_enable_pgcrypto.sql",
+      "sha256": "3c20a59c18455d6f08b867274a0f545bc233fdfecabccca35b33baf99900f883"
+    },
+    {
+      "name": "20260310170100_fix_invite_search_path.sql",
+      "sha256": "3c20a59c18455d6f08b867274a0f545bc233fdfecabccca35b33baf99900f883"
+    },
+    {
+      "name": "20260311120000_notifications_table.sql",
+      "sha256": "45807a6215b146925ed686be96243cad77d6c63438738f157e25e10fef780f16"
+    },
+    {
+      "name": "20260311120100_notify_on_collaborator_add.sql",
+      "sha256": "7e4d0d0b7443cd6b601a22c2304f2e9d74af0475b2af204719983d67c72f5c4c"
+    },
+    {
+      "name": "20260311120200_notification_rpcs.sql",
+      "sha256": "25c6844edb67b63d38d4e5374db59fd9a63ddcb0c1aa78393f0f32cac4392727"
+    },
+    {
+      "name": "20260311120300_notify_invite_accepted.sql",
+      "sha256": "bd7357ec84dc3506c4a99aaaa38d6555c07fb9a01c143a0cb5a5bbf552e4019b"
+    },
+    {
+      "name": "20260311130000_invite_email_trigger.sql",
+      "sha256": "3d90f24ea3ed24232e32254422ca75f8280c826050a0da1f0e8069c7543e2691"
+    },
+    {
+      "name": "20260311130100_enable_pg_net.sql",
+      "sha256": "725f457500f7507b08035ef1c1e4b6c5ff9f96d81c2d01c21dfdd41314f75aa0"
+    },
+    {
+      "name": "20260311130200_fix_pg_net_call.sql",
+      "sha256": "2d12421ce453e0a268e9b068d9bdd7b2bf9aaa33b238ca134d89e2073d2738ea"
+    },
+    {
+      "name": "20260311130300_fix_trigger_no_auth.sql",
+      "sha256": "c94a180b5c2f54b024284cfffc2a7e698e9df67033d2b53f5ac980c01ae5e3ab"
+    },
+    {
+      "name": "20260314100000_fix_anon_rls_audit.sql",
+      "sha256": "869448d1ad93010ea3058b5099949f5000750cb6636d84acd482cd062038b2c9"
+    },
+    {
+      "name": "20260314100100_fix_anon_rpc_revoke_public.sql",
+      "sha256": "6e7f76f1410191a4d8757fcfdabe98918d9cc05608629a3745b87cc504dba2f3"
+    },
+    {
+      "name": "20260320120000_timesheet_minutes.sql",
+      "sha256": "f422944451181437670e5581057853ce306eeaa8f5b8e6d3b1b1e905810e85a0"
+    },
+    {
+      "name": "20260321110000_shared_editor_own_action_crud.sql",
+      "sha256": "de3cfe9353cf349c42e19c6f332ab34924c1d9913e05ba48ee0f80f96e504a45"
+    },
+    {
+      "name": "20260401100000_stax_project_context.sql",
+      "sha256": "8b19db4b66de00f08f73283121b7222a7d329e55bd020377875a3567dc758e29"
+    },
+    {
+      "name": "20260401101000_stax_people_collaborator_migration.sql",
+      "sha256": "2a0ef1ec634a9ca7ebf6a1c40eaf23380667c3740bc5f74e9908a5885a0898d2"
+    },
+    {
+      "name": "20260401120000_placeholder_applied_out_of_band.sql",
+      "sha256": "d920f560be23611707bcd00df2383fe48d9f2bef3ebdeefaf53ceab3c6d3ce37"
+    },
+    {
+      "name": "20260401133000_align_stax_project_context_membership.sql",
+      "sha256": "c0e37fa87f74685e867b5ff9dbffde206c51a35804ee5fd748109a1297648d56"
+    },
+    {
+      "name": "20260401140000_agents_registration_and_auth.sql",
+      "sha256": "49bea5da652b2421c6525c1f23e15060d2d3bcf5306d8f19c7badd20bcd84a82"
+    },
+    {
+      "name": "20260401150000_action_comments.sql",
+      "sha256": "c8fa08ca961e4bc250425b4a83b0605cff23e41e41b2720850431d7958e33d4c"
+    },
+    {
+      "name": "20260401160000_agent_hooktunnel_linkage.sql",
+      "sha256": "798da08767b5813c86de06aae7854040833adb5758e4b77cefd7c614a2b71d0b"
+    },
+    {
+      "name": "20260402094500_agent_dispatch_audit.sql",
+      "sha256": "4c9c3dada6282f36b1276bd930a1a1f2cdcd61742357dd3452a12ec5ef724081"
+    },
+    {
+      "name": "20260403120000_agent_action_writeback.sql",
+      "sha256": "68f983d5f8620e7958e1add6fd71994020167cacaa6c5cfa15cb5c257b923564"
+    },
+    {
+      "name": "20260423100000_principal_context_schema.sql",
+      "sha256": "d6a719ece37aa0f2ae3dd141112af9b3db60fc3fa5bb860156729c65d1276a81"
+    },
+    {
+      "name": "20260423101000_principal_context_indexes.sql",
+      "sha256": "93f26149b7c806f2725eae6a1efdeb273ac377182ee44db0474fd6c0f8104147"
+    },
+    {
+      "name": "20260423102000_principal_context_rls.sql",
+      "sha256": "35448a5a8e3c0527cbf8db4c2d83aef0e525a129d7909527b488cf809fcee033"
+    },
+    {
+      "name": "20260508120000_stax_records_v1.sql",
+      "sha256": "b644d9660d470f6b1aaf213fb52ee9eabc3c2b5f35e1ca9dc54343a9af76eb6b"
+    },
+    {
+      "name": "20260509120000_stax_records_pii_grants.sql",
+      "sha256": "838b0964bdb0ba4c74063a202713c830f624a7b1ef3ddaee1175850948d0989a"
+    },
+    {
+      "name": "20260510120000_account_records_scope.sql",
+      "sha256": "84b0def6bda4761fb7156af8d761d0dec9f7d955c0bc0c5664ed148453851abf"
+    },
+    {
+      "name": "20260514154619_add_stax_people_accountable_for.sql",
+      "sha256": "17807cf6ec785a2fb37d1e58aec8e927ce87c691036bb733558f3c5634b8f341"
+    },
+    {
+      "name": "20260515113000_actor_external_identities.sql",
+      "sha256": "d865b0a4c5849c2538d7d74b2a8c2409a45372b1cb10d5e8f5720516dc9df8b8"
+    },
+    {
+      "name": "20260601100000_contractor_billing_invoice_lifecycle.sql",
+      "sha256": "65c0ffe7aa577fd213c25b489db418f193e609c3813785d2994eb4e049fa0eed"
+    },
+    {
+      "name": "20260601110000_contractor_approval_note_seen.sql",
+      "sha256": "82de30a03d3ad118b197298626b027360c4670c0febbf65ecd23dadb2cda56cb"
+    },
+    {
+      "name": "20260601120000_invoiceable_timesheets_view.sql",
+      "sha256": "523f2cc84195cee718b0405b5dadb7b06a143d3c1088a40622127f4c835a85d6"
+    },
+    {
+      "name": "20260601130000_legacy_timesheet_backfill.sql",
+      "sha256": "7c02a6336974753b0c4dac1084d4ffe316c6c5c3ffe18995a282763b3f9f9c35"
+    },
+    {
+      "name": "20260601140000_contractor_invoice_pdf.sql",
+      "sha256": "92f347e55b39904c340eae8f7a569937719e6661426e6cb40867f6f30be3c70f"
+    },
+    {
+      "name": "20260601150000_submit_contractor_invoice.sql",
+      "sha256": "1e8c9b04a4df2153153683e123d1ce1985b7195a14ef5a296ca85f9f044a1bd7"
+    },
+    {
+      "name": "20260601160000_engagement_billing_confidential.sql",
+      "sha256": "87976cdeb3954df48d00e28ce62f349cfc4c5bcf5e756e804f0d15b6744de0f3"
+    },
+    {
+      "name": "20260601170000_bill_arch_001_consolidate_engagement_rate.sql",
+      "sha256": "ad909c2a38ff06f2619a5c44a08983b66f0ed0eea9993d265e1e371ba8fbd0db"
+    },
+    {
+      "name": "20260601180000_bill_notify_001_invoice_submitted_notify.sql",
+      "sha256": "2246a318039c1a34cdf1371062fbde08f831280adf15464447ba5904cd9f5763"
+    },
+    {
+      "name": "20260601190000_timesheet_collaborator_assigned_actions.sql",
+      "sha256": "01db11c8a310a79ddab4440248a88a3f7d42ef66abe92abca751dcfdd6b541c2"
+    },
+    {
+      "name": "20260601200000_bill_empty_001_request_engagement.sql",
+      "sha256": "c6fcc95354fe9363417fc8ae5d92e83c7517165cdae0f00b7dcf118691d649ea"
+    },
+    {
+      "name": "20260601210000_bill_notify_fix_display_name_resolver.sql",
+      "sha256": "01c01ce8bf04a4178afc91e90fee4db6f74fea5cf7cc25394e4ca4af960d0fa4"
+    },
+    {
+      "name": "20260602080000_submit_contractor_invoice_basis_aware.sql",
+      "sha256": "3878598ed45e17e86be71ad314baa33592a0c0f24c8262612a491453b2bdb1ac"
+    },
+    {
+      "name": "20260602080100_invoice_snapshot_immutable_basis_fields.sql",
+      "sha256": "d5a7e68dea00db65412c8693232ea014619eaae561c5abc9b3fe9ffcfb3071a6"
+    },
+    {
+      "name": "20260602080200_contractor_invoice_pdf_basis_fields.sql",
+      "sha256": "c2884a5a3385b1ed75c76b8f5aa2890df5879af548ce77444af1c090e2124b94"
+    },
+    {
+      "name": "20260602090000_bill_arch_006_pii_grants_rpcs.sql",
+      "sha256": "218a54345da038196fc508e7a71fd8215cdd02df0b2e788d016054f36ad878a3"
+    },
+    {
+      "name": "20260602203555_timesheet_engagement_scope.sql",
+      "sha256": "df435abdfeb985289e267f2f73b02086fb1eb15e3777a84807e820377e5ea81b"
+    },
+    {
+      "name": "20260602204947_legacy_timesheet_backfill_rpc.sql",
+      "sha256": "a81b85bf1707c4d55e31459b15b9beb43492204746e4a5453808a7b352f6812d"
+    },
+    {
+      "name": "20260603055036_external_invoice_references.sql",
+      "sha256": "6fa1115594e5127435b8b753f230f8f027e1fa5e7d9b1d671884c2f7da0a33b3"
+    },
+    {
+      "name": "20260603075648_external_invoice_coverage_exclusion.sql",
+      "sha256": "acd4360ad7e7a25f3a94ab9400bc41b353610dc8b459539d667deba22949655c"
+    },
+    {
+      "name": "20260603081312_billing_records_parties_only_rls.sql",
+      "sha256": "386dba4f9c827fa23019ed38a952bd9c59a5978ef7d6a6ee862b82bc9d341b9b"
+    },
+    {
+      "name": "20260603081545_timesheets_engagement_party_rls.sql",
+      "sha256": "01209b0ea1c6ab3d0c24e4f8265bdaaaa85316d8050e0e7e38c30201eb2f30b2"
+    },
+    {
+      "name": "20260603081715_collaborator_timesheet_summaries_engagement_scoped.sql",
+      "sha256": "44f9dc4830a10821b6f3d35985f56f16f792aff80e3af1d661bf63738107aebe"
+    },
+    {
+      "name": "20260603082303_remove_rolled_back_legacy_timesheet_flags.sql",
+      "sha256": "e464d80283bfdfaf22b37b2d4d63a8dcc0f25aded3ace5056875513c9880112e"
+    },
+    {
+      "name": "20260603085550_billing_owner_exposure_totals.sql",
+      "sha256": "f0230d6dbe86912547be9eb6b5c1008e0549b83bb15cbef2cd47a1d2a338f09a"
+    },
+    {
+      "name": "20260603093800_timesheet_billing_display_states.sql",
+      "sha256": "d10de222a4d2963ac87b8ef358ed752f64b392fa2df34dc0a42f8488194b0783"
+    },
+    {
+      "name": "20260603100454_invoice_identity_numbering_tax_pdf_naming.sql",
+      "sha256": "942810e7d2db565157e37d02bb784c38b3f634d7d73ced20bca65af7ac3b8142"
+    },
+    {
+      "name": "20260603110900_billing_owner_or_contractor_invoice_submit.sql",
+      "sha256": "a5e3b0a0d2e5f4f8811f0b7a3940c4a409d1374df8e8a0ce7c18ec174171b77d"
+    },
+    {
+      "name": "20260603122546_timesheet_submit_requires_notes_or_actions.sql",
+      "sha256": "10cd16499333d97023d578ffd660e07dd0d3f1e363d8617a2570e24e78e1097a"
+    },
+    {
+      "name": "20260603133136_timesheet_billing_lifecycle_display_states.sql",
+      "sha256": "bb3e17eff52f82776033e9e7e5fc9e63627a836d9d3ba16f52477907d74a69d0"
+    },
+    {
+      "name": "20260609195347_invoice_rejection_correction_loop.sql",
+      "sha256": "0caea9ec3c070b865763415865f8569667353f8cb01b5ccd603b317374108ddc"
+    },
+    {
+      "name": "20260610113000_billing_adjustment_payment_source.sql",
+      "sha256": "beb2f64801a70b6e2fcd4582edbc7693f0e94a033940b85537b37ad9e75e7a21"
+    },
+    {
+      "name": "20260702083656_invoice_rejection_correction_note.sql",
+      "sha256": "709479374eca9929089a8969c4e3a4b6d41c50726cb4221e242d1d6db5d7d839"
+    },
+    {
+      "name": "20260707183000_backfill_billing_next_action_redaction.sql",
+      "sha256": "756850e35f727aa50e4de16fe3819798aa98d5e10dbd6f4bb9d8e904ba3f63bf"
+    },
+    {
+      "name": "20260717110805_backdated_engagement_rate_versions.sql",
+      "sha256": "39ab03c5c4610cadf365e2b141211d54d6a0acdfd9188cb87b2a4883c2a9ea87"
+    },
+    {
+      "name": "20260717125500_rate_change_invoice_lookup_index.sql",
+      "sha256": "8514be11726ece90c251c67c3770aae4333c099d03d1a42228b45cb12f2bc5d7"
+    },
+    {
+      "name": "20260717144115_telegram_transport_inbox_outbox.sql",
+      "sha256": "ccf7832d0ac5dae3bf25ab4bc055755a6f6f342c32240521f2d9c1c536202cdb"
+    },
+    {
+      "name": "20260717150511_telegram_dm_identity_default.sql",
+      "sha256": "5a5a25a36a99c4e63c7d6e5372194fc8f3e0c9fc070b5f25d5401041aeb75b02"
+    },
+    {
+      "name": "20260717152343_telegram_group_binding_actions.sql",
+      "sha256": "7cb3d418d54b252da25d269aaa083b93459752e05f34fffc60ce4a4d09944c96"
+    },
+    {
+      "name": "20260717153915_telegram_correlated_action_replies.sql",
+      "sha256": "93bf094e6aa9e9fccce6c98e5ea667ffef79853d17eea94772c55a9f78dd52fe"
+    },
+    {
+      "name": "20260717155114_telegram_standup_sessions.sql",
+      "sha256": "8433df9705833db4d1946df837bbc2a4db0189d0b9ce0580a9b2df2c41009e3e"
+    },
+    {
+      "name": "20260719173715_telegram_link_project_context.sql",
+      "sha256": "623e5c2d7e917b8dd8f236a8b3ce6894197480f4aeffb5a35a3462eed8e22d77"
+    },
+    {
+      "name": "20260720055948_telegram_group_membership_callback_bind.sql",
+      "sha256": "74cf96d87ad3eda96e70762df9d1ef9f11072215806655a5acc5482a7716bd86"
+    },
+    {
+      "name": "20260720062858_telegram_contextual_confirmations.sql",
+      "sha256": "4746dc65640fee6427a29c1456e0b690d4885ae06f8bba897f571a805a4f7b27"
+    },
+    {
+      "name": "20260907105018_tab_sets_expand.sql",
+      "sha256": "105172309539220ae92f3c583ba0950b037c2f641898a12d0655569d1aa4ad9e"
+    },
+    {
+      "name": "20260921190000_today_sets.sql",
+      "sha256": "03380dbb221f1fdf33991eaee300bba5df8b492fdd27e17438e1ac15f0762fd5"
+    },
+    {
+      "name": "20260927090000_live_stax.sql",
+      "sha256": "aa7fcdba08c801e48bafcc89bbebe0d6fb39c89a0df14c477c69e6aa2dc630cf"
+    },
+    {
+      "name": "20260927140000_live_stax_live_op.sql",
+      "sha256": "5236ec8750326ca805bdded4b2cf77937ae8ed92154bc8a91673033ccb886a69"
+    },
+    {
+      "name": "20260927170000_live_stax_detours.sql",
+      "sha256": "7c23188aee82324ababf515db6cec23fd6cf5778541064b120241b3bfa58d5c4"
+    },
+    {
+      "name": "20260927190000_live_stax_pauses.sql",
+      "sha256": "0671bfdb29c981df2f3fc2c0bfb9380a520dc8d0f26e66b4854bc36307653da5"
+    },
+    {
+      "name": "20260928140000_glenda_agent.sql",
+      "sha256": "7b09a61460a8285cc559848b62266a342e7d9f5af0087b373a1825df96235a7b"
+    },
+    {
+      "name": "20260928160000_glenda_help_me_start_brief.sql",
+      "sha256": "ee865bebead29681240e7d16ccd18bfc4f9a24b618258a962d00ed09fcc7a7ad"
+    },
+    {
+      "name": "20260930120000_glenda_trigger_grants.sql",
+      "sha256": "a7f1917d5fd188bf2897d26448ca7038b598cb3b9988111aece7301aa713c9be"
+    },
+    {
+      "name": "20261005120000_token_grants.sql",
+      "sha256": "e21907169fa90cd04209dfe2657fa6fed76518b5d106028cf53688cb2fe27fe2"
+    },
+    {
+      "name": "20261005130000_memory_recollection.sql",
+      "sha256": "9816c289ebb79a5b8f29dd583e84161f22bd633d8e767b403eb7aa064dce30dc"
+    },
+    {
+      "name": "20261005140000_records_agent_scopes.sql",
+      "sha256": "a47fbc583ac154565fbb2c62c480abf938dac37ae413e81c6885d5ffb13fea4f"
+    },
+    {
+      "name": "20261005150000_evidence_request.sql",
+      "sha256": "a34218c2c224d0524da638ce74ac832ef5a0bf4745fa60fc45230448ce55c1ec"
+    },
+    {
+      "name": "20261013233224_navigation_goal_write.sql",
+      "sha256": "9e94ca2d8b01b48e56160ac57cb12881d35a8feeced896518d72672360456a0a"
+    },
+    {
+      "name": "20261014000448_navigation_date_write.sql",
+      "sha256": "da90c6f666041f11ce1e8b9ef54e6358ae0109b9ed4b7472e8c5ef7539015373"
+    },
+    {
+      "name": "20261014034049_navigation_action_write.sql",
+      "sha256": "3223482b0a01123d264cc26c6eb7387402002c4f86cc91b9b71caf062f263358"
+    },
+    {
+      "name": "20261014043026_navigation_action_create.sql",
+      "sha256": "193dcd5410414ec029c1aa937c4f9abb31e2233983d7754fcc1b94cf723ac7bc"
+    },
+    {
+      "name": "20261014050146_navigation_action_assign.sql",
+      "sha256": "ed546d88d0593c304befbb6123f1db454f2b918404f5646f2ce35b515211a430"
+    },
+    {
+      "name": "20261014062914_navigation_focus_finish.sql",
+      "sha256": "d6cb474661dd75e71eb4d8e270d55115dacdfb02233f9ae4c85c875bd568a925"
+    },
+    {
+      "name": "20261014132612_account_record_creation_audit.sql",
+      "sha256": "33d48d3faebc653ce4f976bec9f7c47a0f97f430afd2b8342dfbed01123ca045"
+    },
+    {
+      "name": "20261014164723_navigation_audited_time_approval.sql",
+      "sha256": "f5e1f43bb84d0bcb521f2ec068b14db88e8d852f734f6b11e55b027d5e882c26"
+    },
+    {
+      "name": "20261014175447_navigation_approved_time_billing.sql",
+      "sha256": "7a5db87e449ecec86175e63d85acdb94933522b9edb6f4c6bead6a07b2b0f36c"
+    },
+    {
+      "name": "20261014204138_navigation_invoice_nudge.sql",
+      "sha256": "8427ecc985dcfcf5d976e51229244fad3ab425816f00416509d5241cd7e8ec8b"
+    },
+    {
+      "name": "20261014211447_navigation_profile_entitlements.sql",
+      "sha256": "fc417a9aec71b50b938456c4a5659f857e61776ace28887d7201018a7f700b3b"
+    },
+    {
+      "name": "20261015020650_agent_permission_boundaries.sql",
+      "sha256": "bdcdc4a1096059877b5d3ecbc1d79dda60188b11407da0075091f2e82d137e78"
+    },
+    {
+      "name": "20261017120000_agents_as_peers.sql",
+      "sha256": "9c5cc325971e0df6f4d3fddb17a7f7c029d8b63a0abc4ed34c43d83bb8ae8ae7"
+    }
+  ]
+}

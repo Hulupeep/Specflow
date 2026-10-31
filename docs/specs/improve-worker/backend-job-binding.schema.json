@@ -1,0 +1,154 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "jobId",
+    "runId",
+    "recipeId",
+    "constructionSha256",
+    "expectedSemanticSha256",
+    "inputsTemplate",
+    "dependencies",
+    "sourceRecipeSha256",
+    "resourceProfileSha256",
+    "dependencySource",
+    "deadlineAtMs"
+  ],
+  "properties": {
+    "schema": {
+      "const": "specflow.backend-job-binding/v1"
+    },
+    "jobId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$(?![\\s\\S])"
+    },
+    "runId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$(?![\\s\\S])"
+    },
+    "recipeId": {
+      "const": "heystax-supabase-v1"
+    },
+    "constructionSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "expectedSemanticSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "inputsTemplate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "sha256"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "dependencies": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "target",
+        "expected"
+      ],
+      "properties": {
+        "target": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "identity",
+            "manifestSha256"
+          ],
+          "properties": {
+            "identity": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "jobId",
+                "sourceContainerId",
+                "recipeSha256",
+                "sourceInputSha256"
+              ],
+              "properties": {
+                "jobId": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$(?![\\s\\S])"
+                },
+                "sourceContainerId": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+                },
+                "recipeSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+                },
+                "sourceInputSha256": {
+                  "type": "string",
+                  "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+                }
+              }
+            },
+            "manifestSha256": {
+              "type": "string",
+              "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+            }
+          }
+        }
+      }
+    },
+    "sourceRecipeSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "resourceProfileSha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+    },
+    "dependencySource": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "packageSha256",
+        "lockSha256",
+        "manifestSha256"
+      ],
+      "properties": {
+        "packageSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        },
+        "lockSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        },
+        "manifestSha256": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{64}$(?![\\s\\S])"
+        }
+      }
+    },
+    "deadlineAtMs": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    }
+  },
+  "$schema": "http://json-schema.org/draft-07/schema#"
+}
