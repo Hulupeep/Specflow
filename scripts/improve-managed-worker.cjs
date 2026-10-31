@@ -30,7 +30,7 @@ function validatePlan(p){
 function createArgs(p,name){
  p=validatePlan(p);if(p.backendProfile)need(name.endsWith('-'+p.backendProfile.slot));need(/^specflow-[a-f0-9-]{36}-(source-producer|build|app|checker|seed)$/.test(name));
  return ['create','--name',name,'--label','specflow.worker=owned','--entrypoint','/node/bin/node','--network',p.network,
- '--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user',`${p.uid}:${p.uid}`,'--pids-limit','128','--cpus','1',
+ '--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user',`${p.uid}:${p.uid}`,'--pids-limit',String(p.backendProfile?require('./improve-backend-profiles.cjs').workerLimits(p.backendProfile.id,p.backendProfile.slot).pids:128),'--cpus','1',
  '--memory',String(p.memory),'--memory-swap',String(p.memory),'--env','PATH=/node/bin:/usr/bin:/bin','--env','HOME=/tmp',
  '--tmpfs','/tmp:rw,nosuid,nodev,noexec,size=128m,mode=1777',
  ...p.mounts.flatMap(m=>['--mount',`type=bind,src=${m.source},dst=${m.destination}${m.writable?'':',readonly'}`]),
@@ -139,7 +139,7 @@ async function runIntent(file){
   if(created.code!==0||!(/^[a-f0-9]{64}$/.test(created.out.trim()))){unknown=true;throw Error('backend_cleanup_unconfirmed');}
   id=created.out.trim();const c=await inspect(id);
   need(c&&c.Id===id&&c.Name==='/'+intent.name&&c.Image===p.image,'backend_input_changed');
-  const expected={image:p.image,uid:p.uid,network:p.network,memory:p.memory,mounts:p.mounts,tmpfs:['/tmp',...p.tmpfs.map(t=>t.path)]};
+  const expected={image:p.image,uid:p.uid,network:p.network,memory:p.memory,...(p.backendProfile?{backendProfile:p.backendProfile}:{}),mounts:p.mounts,tmpfs:['/tmp',...p.tmpfs.map(t=>t.path)]};
   validateInspection(c,expected);need(!c.State.Running,'backend_input_changed');anchor=fingerprint(c);event('created',id,anchor);
   if(live()){
    const start=await docker(['start',id]);need(start.code===0,'backend_service_died');const running=await inspect(id);

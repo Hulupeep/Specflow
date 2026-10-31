@@ -10,7 +10,7 @@ function consumeEnvelope(directory, expected, now = Date.now(), hostname = requi
     // This function is serialized into the container: keep the closed mapping
     // self-contained, and test it against the host profile registry. No caller
     // may supply a numeric lifetime or an arbitrary profile.
-    const extended = expected?.backendProfile === 'heystax-backend-journeys-v1';
+    const extended = ['heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(expected?.backendProfile);
     const fields = extended ? 'backendProfile,container,envelopeSha256,generation,job,nonce' : 'container,envelopeSha256,generation,job,nonce';
     const lifetimeMilliseconds = extended ? 880000 : 600000;
     if (!expected || Object.keys(expected).sort().join(',') !== fields ||

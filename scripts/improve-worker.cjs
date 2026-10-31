@@ -753,7 +753,7 @@ class DockerWorker {
       '--user',
       `${this.uid}:${this.uid}`,
       '--pids-limit',
-      '128',
+      String(backend?.pids ?? 128),
       '--cpus',
       '1',
       '--memory',
@@ -1794,13 +1794,19 @@ function backendFingerprint(source) {
 Object.assign(module.exports, { backendFingerprint });
 function validateInspection(inspect, expected) {
   const h = inspect.HostConfig;
+  let pids = 128;
+  if (expected.backendProfile) {
+    const limits = require('./improve-backend-profiles.cjs').workerLimits(expected.backendProfile.id, expected.backendProfile.slot);
+    need(require('./improve-production-build.cjs').canonical(expected.backendProfile) === require('./improve-production-build.cjs').canonical(limits.binding), 'worker_unconfined');
+    pids = limits.pids;
+  }
   need(
     inspect.Image === expected.image &&
       h.ReadonlyRootfs &&
       !h.Privileged &&
       h.CapDrop?.includes('ALL') &&
       !(h.CapAdd || []).length &&
-      h.PidsLimit === 128 &&
+      h.PidsLimit === pids &&
       h.Memory === expected.memory &&
       h.MemorySwap === expected.memory &&
       h.NanoCpus === 1000000000 &&

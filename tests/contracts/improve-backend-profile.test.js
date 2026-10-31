@@ -8,6 +8,7 @@ const contract=()=>({acceptance:[{id:'gain',mandatory:true,check:check('gain'),d
 const plan=(phase='baseline',c=contract(),extra={})=>profiles.planPhase({phase,contract:c,profileId:journeys,deadlineAtMs:2000000,nowMs:1000,...extra});
 test('original profile bytes and non-time resource limits remain unchanged',()=>{
  expect(hash(fs.readFileSync(require.resolve('../../scripts/improve-backend-profile.json')))).toBe('c80d88b2dba8f111b455c1cdbdcf38cdfad2ca6a63a51eb25175c209b7d80c54');
+ expect(hash(profiles.profileBytes(journeys))).toBe('d97baabca70c61f2f6b9f00d537d73aa22e2e54cc5026b4e8ba2088b751bc739');
  const a=profiles.profileFor(old),b=profiles.profileFor(journeys);
  for(const k of ['slots','aggregate','output'])expect(b[k]).toEqual(a[k]);
  expect(a.time.executionMilliseconds).toBe(120000);expect(b.time.executionMilliseconds).toBe(600000);expect(b.time.totalMilliseconds).toBe(780000);
@@ -91,4 +92,33 @@ test('internal service token spans the journey but never exceeds credential/task
 test('four default native timeouts cannot silently absorb dispatch overhead',()=>{
  const c=contract();for(const a of c.acceptance)for(const k of ['check','dev_check'])if(a[k])delete a[k].timeout_seconds;
  try{plan('baseline',c);throw Error('not rejected');}catch(e){expect(e).toMatchObject({code:'backend_inventory_exceeds_profile',requiredMilliseconds:660000,availableMilliseconds:600000});}
+});
+
+
+test('v2 changes only checker task capacity; old profile and all deadlines stay fixed (#315)',()=>{
+ const id='heystax-backend-journeys-v2',a=profiles.profileFor(journeys),b=profiles.profileFor(id);
+ expect(hash(profiles.profileBytes(id))).toBe('0bcde64357203af07e5678e28984f991f5c3be977b7f989fa4ba871c228618c9');
+ expect(profiles.workerLimits(journeys,'app').pids).toBe(128);
+ for(const slot of ['app','checker'])expect(profiles.workerLimits(id,slot).phaseMilliseconds).toBe(profiles.workerLimits(journeys,slot).phaseMilliseconds);
+ expect(profiles.serverExpiry(id,5000,5000000,1000)).toBe(profiles.serverExpiry(journeys,5000,5000000,1000));
+ const expected=JSON.parse(JSON.stringify(a));expected.id=id;expected.slots.checker.pids=256;expected.aggregate.pids=768;
+ expect(b).toEqual(expected);
+ expect(profiles.workerLimits(id,'checker').pids).toBe(256);
+ expect(profiles.workerLimits(id,'app').pids).toBe(128);
+ expect(profiles.workerLimits(journeys,'checker').pids).toBe(128);
+ expect(plan('baseline',contract(),{profileId:id}).requiredLifecycleMilliseconds).toBe(plan().requiredLifecycleMilliseconds);
+ expect(()=>profiles.validateProfileBytes(id,profiles.profileBytes(journeys))).toThrow('backend_input_changed');
+});
+
+
+test.each([undefined,'heystax-backend-journeys-v1','heystax-backend-journeys-v2','unlimited','heystax-backend-v1'])('qualification CLI admits only closed journey profile before inputs or Docker: %s',id=>{
+ const cp=require('child_process'),path=require('path');
+ const args=[path.resolve(__dirname,'../qualification/improve-backend-journeys-prepare.cjs'),'/missing-specflow-315-input','/missing-specflow-315-descriptor','1',...(id===undefined?[]:[id])];
+ const r=cp.spawnSync(process.execPath,args,{cwd:path.resolve(__dirname,'../..'),encoding:'utf8',timeout:10000});
+ expect(r.status).toBe(1);
+ const error=JSON.parse(r.stderr.trim());
+ expect(error.cause).toBe(id===undefined||['heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(id)?'ENOENT':'backend_profile_invalid');
+});
+test.each([old,journeys,'heystax-backend-journeys-v2'])('aggregate task declaration sums the per-slot ceilings: %s',id=>{
+ const p=profiles.profileFor(id);expect(p.aggregate.pids).toBe(Object.values(p.slots).reduce((sum,s)=>sum+s.pids*s.maxInstances,0));
 });

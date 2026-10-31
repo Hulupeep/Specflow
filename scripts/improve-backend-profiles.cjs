@@ -8,7 +8,8 @@ const hash=b=>crypto.createHash('sha256').update(b).digest('hex');
 function freeze(v){if(v&&typeof v==='object'){Object.values(v).forEach(freeze);Object.freeze(v);}return v;}
 const registry=new Map([
  ['heystax-backend-v1','./improve-backend-profile.json'],
- ['heystax-backend-journeys-v1','./improve-backend-journeys-profile.json']
+ ['heystax-backend-journeys-v1','./improve-backend-journeys-profile.json'],
+ ['heystax-backend-journeys-v2','./improve-backend-journeys-v2-profile.json']
 ].map(([id,file])=>{const bytes=fs.readFileSync(require.resolve(file));return[id,{bytes,profile:freeze(JSON.parse(bytes))}];}));
 function entry(id){if(!registry.has(id))throw Error('backend_profile_invalid');return registry.get(id);}
 function profileFor(id){return entry(id).profile;}
@@ -52,7 +53,7 @@ function planPhase({phase,contract,profileId,deadlineAtMs,nowMs=Date.now()}){
  // Recheck after the separately bounded build, before app/backend creation.
  // This does not promise that build time is part of the backend envelope.
  const remaining=deadlineAtMs-nowMs;
- const requiredLifecycleMilliseconds=profileId==='heystax-backend-journeys-v1'?workerLimits(profileId,'app').phaseMilliseconds:profile.time.totalMilliseconds;
+ const requiredLifecycleMilliseconds=profileId!=='heystax-backend-v1'?workerLimits(profileId,'app').phaseMilliseconds:profile.time.totalMilliseconds;
  if(remaining<requiredLifecycleMilliseconds)reject('backend_job_time_insufficient',requiredLifecycleMilliseconds,Math.max(0,remaining));
  const inventory={phase,invocations};
  return freeze({schema:'specflow.backend-phase-plan/v1',profileId,profileSha256:hash(entry(profileId).bytes),deadlineAtMs,
@@ -63,9 +64,9 @@ function planPhase({phase,contract,profileId,deadlineAtMs,nowMs=Date.now()}){
 // clock starts and the managed worker's ten-second cleanup reserve. Generic
 // production build timing is not enlarged by this consumer/checker profile.
 function workerLimits(id,slot){
- if(id!=='heystax-backend-journeys-v1'||!['app','checker'].includes(slot))throw Error('backend_profile_invalid');
+ if(!['heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(id)||!['app','checker'].includes(slot))throw Error('backend_profile_invalid');
  const p=profileFor(id);
- return freeze({binding:{id,sha256:hash(entry(id).bytes),slot},memory:p.slots[slot].memoryBytes,
+ return freeze({binding:{id,sha256:hash(entry(id).bytes),slot},memory:p.slots[slot].memoryBytes,pids:p.slots[slot].pids,
   tmpfs:slot==='checker'?[{path:'/output',bytes:67108864}]:[],
   phaseMilliseconds:slot==='app'?p.time.totalMilliseconds+p.time.bootstrapMilliseconds+10000:p.time.executionMilliseconds+p.time.cleanupMilliseconds+10000});
 }

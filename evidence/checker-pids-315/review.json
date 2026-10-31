@@ -1,0 +1,24 @@
+{
+  "scope": "Native Claude advisory review; not formal Duo and no reviewer test execution",
+  "reviewedSource": "cd9ade96006d51453609dddd893c13e5f3323c4c",
+  "verdict": "accept",
+  "findings": [
+    {
+      "severity": "P2",
+      "file": "evidence/checker-pids-315/browser-capacity.json:41-52; tests/qualification/improve-checker-journeys.test.cjs:41,51",
+      "description": "Invocations 0 and 2 both have id \"AC-FIT\". The runner flattens ['check','dev_check'] but does not record which key each invocation came from. The README and the review brief call invocation 2 the 'public' suite, but the committed JSON does not say so. A reader must infer the fit/public split from case counts and failure reasons. This is not a false claim (counts, reasons and peaks agree with the README), but it is a provenance gap in the evidence.",
+      "repair": "Optional, non-blocking: record the source key (check or dev_check) or a suite label in each result row, or add a field to browser-capacity.json that maps invocation 2 to the public suite. If you change the runner, do not re-run qualification for this alone; annotating the JSON with the mapping is enough."
+    }
+  ],
+  "limitations": [
+    "Source integrity: every path and sha256 in source-manifest.json (commit cd9ade9) matches the snapshot's source-hashes.json. That includes the v2 profile, all core scripts, the contract tests, the C fixture, the preparer and both qualification runners.",
+    "Profile correctness: compared field by field with v1, the v2 profile differs only in checker.pids (128 to 256) and aggregate.pids (640 to 768). The aggregate equals the slot sum: 128+256+6×64=768. Memory, tmpfs and time are identical to v1, so the server's hard-coded 880000 ms lifetime and the gateway's lifetime still hold.",
+    "Core paths re-read: workerLimits is closed to the two journey ids and now returns pids. Ordinary create (improve-worker.cjs:707,756,811) reads pids only from the bound backend limits and defaults to 128. validateInspection re-derives pids from the binding and checks that it matches canonically. Managed createArgs and runIntent's expected.backendProfile use the same closed lookup. The semantics, server and admission allow-lists name exactly v1 and v2. planPhase's switch to `!=='heystax-backend-v1'` is safe because entry() and workerLimits throw for unknown ids. The v2 JSON is in the verifier identity list. I found no numeric override or fallback that grows the limit.",
+    "Prior P2s confirmed fixed in cd9ade9. The oracle pre-check now covers the union of checker_paths, input_paths and rule_paths, and maps any stat error to the named cause oracle_input_not_file. The preparer uses the label profile-315 for v2 (root prefix, admission scope, runId). The probe's mount match is asserted per invocation (exact_checker_required, PidsLimit 256, denied 0), and kernel JSON is written before the asserts. Scope is limited to the checker cgroup, and docs and evidence say so.",
+    "Evidence consistency: the summaries (16/6/10, 4/4/0, 16/8/8; zero skipped or flaky) agree with the README and with failureMessages (10 MOBILE_FIT_VIOLATIONS, 8 DOCUMENT_MUST_FIT). Kernel peaks are 120, 125 and 143 against a limit of 256, with zero denials. cleanupConfirmed is true and cause/cleanupCause are null. kernel-capacity.json shows v1 denied at 120 of 160 and v2 created 160, in both modes. The README separates the earlier preflight (180,631 ms, uncommitted preparer) from the committed one (180,127 ms). It makes no KEEP, holdout, deadline-extension or two-cycle claim.",
+    "Not independently verified: I ran no tests, Docker, hashing or gh commands. The preflight and browser runs, native failure inspection, the byte-identical check files, secret scans, CI run 41235643450 (3439 tests, 170 suites) and the merge-tree equality are taken from your report and the evidence files. The receipt hashes in browser-capacity.json were not checked against the private artifacts.",
+    "Residual measurement scope, documented rather than a defect: the app/consumer container (still 128 tasks) and host ancestor cgroups were not sampled. Zero checker denials therefore do not rule out app-side task pressure. The observed failures were product layout assertions only, so this does not affect the result.",
+    "Operational gate, separate from code findings: at snapshot time, browser-capacity.json and source-manifest.json are untracked and the README is modified. The final evidence/docs commit and its exact-source CI still have to land and pass before merge. Acceptance here covers source and qualification correctness at cd9ade9 only, not that gate."
+  ],
+  "followup": "Non-blocking suite provenance finding addressed by explicit suiteMapping in browser-capacity.json; no runtime or checks changed."
+}
