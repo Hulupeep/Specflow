@@ -24,6 +24,26 @@ describe('closed server credential envelope (#293)',()=>{
  test.each([['stale',v=>v.issued=now-30001],['future',v=>v.issued=now+1001],['expired',v=>v.expires=now],['long-lived',v=>v.expires=now+600001],['extra-field',v=>v.extra=true]])('rejects %s envelope',(_,change)=>{
   change(value);expected.envelopeSha256=hash(JSON.stringify(value));expect(write().status).toBe(0);expect(consume).toThrow(/^backend_envelope_/);
  });
+ test('journey profile envelope accepts its closed app lifetime',()=>{
+  expected.backendProfile='heystax-backend-journeys-v1';
+  value.expires=now+880000;expected.envelopeSha256=hash(JSON.stringify(value));
+  expect(write().status).toBe(0);expect(consume()).toEqual(value);
+ });
+ test.each(['unknown','heystax-backend-v1'])('does not accept an unrecognised envelope profile extension: %s',id=>{
+  expected.backendProfile=id;expect(write().status).toBe(0);expect(consume).toThrow('backend_envelope_binding');
+ });
+ test('journey profile cannot exceed its closed lifetime',()=>{
+  expected.backendProfile='heystax-backend-journeys-v1';value.expires=now+880001;
+  expected.envelopeSha256=hash(JSON.stringify(value));expect(write().status).toBe(0);expect(consume).toThrow('backend_envelope_expired');
+ });
+ test('serialized reader works without host modules and agrees with the admitted app lifetime',()=>{
+  const vm=require('vm'), profiles=require('../../scripts/improve-backend-profiles.cjs');
+  expected.backendProfile='heystax-backend-journeys-v1';
+  value.expires=now+profiles.workerLimits(expected.backendProfile,'app').phaseMilliseconds;
+  expected.envelopeSha256=hash(JSON.stringify(value));expect(write().status).toBe(0);
+  const reader=vm.runInNewContext('('+delivery.consumeEnvelope.toString()+')',{require,process,Buffer});
+  expect(reader(directory,expected,now,container.slice(0,12))).toEqual(value);
+ });
  test('rejects bytes modified after expected hash was bound',()=>{
   expect(write().status).toBe(0);fs.appendFileSync(directory+'/envelope',' ');expect(consume).toThrow('backend_envelope_binding');
  });

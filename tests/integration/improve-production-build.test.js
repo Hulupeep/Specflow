@@ -146,7 +146,14 @@ const connect=(host,port)=>new Promise(resolve=>{const s=net.connect({host,port}
     expect(() => another.createProduction({ source, dependencies })).toThrow('capsule_job_identity');
     expect(createSpy).not.toHaveBeenCalled(); createSpy.mockRestore();
     worker.close(); expect(worker.containers.size).toBe(0);
-    expect(worker.call(['ps', '-aq', '--filter', 'label=specflow.worker=owned']).stdout.trim()).toBe('');
+    // Other jobs may legitimately be running. Verify every container actually
+    // created by this worker is absent, rather than asserting global idleness.
+    expect(worker.receipts.size).toBeGreaterThan(0);
+    for (const ownedId of worker.receipts.keys()) {
+      const observed = worker.call(['container', 'inspect', ownedId], { allowFailure: true, timeout: 10000 });
+      expect(observed.status).not.toBe(0);
+      expect(observed.stderr).toMatch(/No such (object|container)/i);
+    }
   } finally { worker?.close(); fs.rmSync(root, { recursive: true, force: true }); }
 }, 120000);
 

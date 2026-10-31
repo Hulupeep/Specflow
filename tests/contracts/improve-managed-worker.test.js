@@ -62,3 +62,24 @@ describe('shared-network hostname transition is exact (#293)',()=>{
  test.each(['created','running','exited'])('rejects unrelated hostname in %s state',status=>{const c=specimen();c.State.Status=status;c.Config.Hostname='foreign';expect(()=>managed.workerFingerprint(c,'c'.repeat(12))).toThrow('backend_input_changed');});
  test('running checker cannot retain the pre-start hostname or normalize a different network mode',()=>{const c=specimen();c.State.Status='running';expect(()=>managed.workerFingerprint(c,'c'.repeat(12))).toThrow();c.State.Status='created';c.HostConfig.NetworkMode='none';expect(()=>managed.workerFingerprint(c,'c'.repeat(12))).toThrow();});
 });
+
+describe('closed journey worker lifetimes (#298)',()=>{
+ const profiles=require('../../scripts/improve-backend-profiles.cjs');
+ const id='heystax-backend-journeys-v1';
+ function backendPlan(slot){const limits=profiles.workerLimits(id,slot);return {...plan(),memory:limits.memory,phaseMilliseconds:limits.phaseMilliseconds,tmpfs:limits.tmpfs,network:slot==='app'?'none':'container:'+'b'.repeat(64),backendProfile:limits.binding};}
+ test.each(['app','checker'])('accepts only exact closed %s limits',slot=>{
+  const p=backendPlan(slot);expect(managed.validatePlan(p)).toEqual(p);expect(p.phaseMilliseconds).toBeGreaterThan(600000);
+  for(const key of ['memory','phaseMilliseconds'])expect(()=>managed.validatePlan({...p,[key]:p[key]+1})).toThrow('backend_input_invalid');
+  expect(()=>managed.validatePlan({...p,backendProfile:{...p.backendProfile,sha256:'c'.repeat(64)}})).toThrow('backend_input_invalid');
+  expect(()=>managed.createArgs(p,'specflow-12345678-1234-4123-a123-123456789abc-build')).toThrow('backend_input_invalid');
+ });
+ test('no caller-defined limits or extra roles can select the exception',()=>{
+  for(const slot of ['build','source-producer','seed'])expect(()=>profiles.workerLimits(id,slot)).toThrow('backend_profile_invalid');
+  expect(()=>profiles.workerLimits('arbitrary','app')).toThrow('backend_profile_invalid');
+  expect(()=>managed.validatePlan({...plan(),phaseMilliseconds:880000})).toThrow('backend_input_invalid');
+ });
+ test('profile checker keeps its closed tmpfs and isolated network',()=>{
+  const p=backendPlan('checker');expect(()=>managed.validatePlan({...p,tmpfs:[]})).toThrow('backend_input_invalid');
+  expect(()=>managed.validatePlan({...p,network:'none'})).toThrow('backend_input_invalid');
+ });
+});

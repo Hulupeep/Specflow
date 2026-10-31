@@ -11,11 +11,16 @@ const slots=['source-producer','build','app','checker','seed'];
 const exact=(v,keys)=>{need(v&&Object.getPrototypeOf(v)===Object.prototype&&Reflect.ownKeys(v).length===keys.length&&keys.every(k=>Object.hasOwn(v,k)));need(Object.values(Object.getOwnPropertyDescriptors(v)).every(d=>d.enumerable&&Object.hasOwn(d,'value')));};
 const absolute=p=>typeof p==='string'&&p.startsWith('/')&&!/[,\r\n\0]/.test(p)&&p.split('/').slice(1).every(x=>x&&x!=='.'&&x!=='..');
 function validatePlan(p){
- exact(p,['image','uid','network','memory','mounts','tmpfs','phaseMilliseconds']);
+ exact(p,['image','uid','network','memory','mounts','tmpfs','phaseMilliseconds',...(Object.hasOwn(p,'backendProfile')?['backendProfile']:[])]);
  need(typeof p.image==='string'&&/^sha256:[a-f0-9]{64}$/.test(p.image)&&p.image.length===71);
  need(Number.isSafeInteger(p.uid)&&p.uid>0&&Number.isSafeInteger(p.memory)&&p.memory>=16777216&&p.memory<=2147483648);
  need(p.network==='none'||(/^container:[a-f0-9]{64}$/.test(p.network)&&p.network.length===74));
- need(Number.isSafeInteger(p.phaseMilliseconds)&&p.phaseMilliseconds>0&&p.phaseMilliseconds<=600000);
+ if(Object.hasOwn(p,'backendProfile')){
+  exact(p.backendProfile,['id','sha256','slot']);
+  let limits;try{limits=require('./improve-backend-profiles.cjs').workerLimits(p.backendProfile.id,p.backendProfile.slot);}catch{throw Error('backend_input_invalid');}
+  need(canonical(p.backendProfile)===canonical(limits.binding)&&p.memory===limits.memory&&p.phaseMilliseconds===limits.phaseMilliseconds&&canonical(p.tmpfs)===canonical(limits.tmpfs));
+  need(p.backendProfile.slot==='app'?p.network==='none':/^container:[a-f0-9]{64}$/.test(p.network));
+ }else need(Number.isSafeInteger(p.phaseMilliseconds)&&p.phaseMilliseconds>0&&p.phaseMilliseconds<=600000);
  need(Array.isArray(p.mounts)&&p.mounts.length<=256&&Array.isArray(p.tmpfs)&&p.tmpfs.length<=8);
  for(const m of p.mounts){exact(m,['source','destination','writable']);need(absolute(m.source)&&absolute(m.destination)&&m.writable===false);}
  for(const t of p.tmpfs){exact(t,['path','bytes']);need(absolute(t.path)&&Number.isSafeInteger(t.bytes)&&t.bytes>0&&t.bytes<=2147483648);}
@@ -23,7 +28,7 @@ function validatePlan(p){
  return JSON.parse(canonical(p));
 }
 function createArgs(p,name){
- p=validatePlan(p);need(/^specflow-[a-f0-9-]{36}-(source-producer|build|app|checker|seed)$/.test(name));
+ p=validatePlan(p);if(p.backendProfile)need(name.endsWith('-'+p.backendProfile.slot));need(/^specflow-[a-f0-9-]{36}-(source-producer|build|app|checker|seed)$/.test(name));
  return ['create','--name',name,'--label','specflow.worker=owned','--entrypoint','/node/bin/node','--network',p.network,
  '--read-only','--cap-drop','ALL','--security-opt','no-new-privileges','--user',`${p.uid}:${p.uid}`,'--pids-limit','128','--cpus','1',
  '--memory',String(p.memory),'--memory-swap',String(p.memory),'--env','PATH=/node/bin:/usr/bin:/bin','--env','HOME=/tmp',
@@ -54,7 +59,7 @@ function waitFile(file,b,child,deadline){for(;;){try{return readFile(file);}catc
 function create(worker,raw){
  const b=bindings.get(worker);if(!b)return null;
  b.authorize();const attempt=attempts.read(b.store,b.attempt),slot=b.slot;need(slots.includes(slot));b.slot=null;
- const plan=validatePlan(raw),root=fs.mkdtempSync(path.join(attempts.envelope(b.store,b.attempt),'managed-create-'));fs.chmodSync(root,0o700);
+ const plan=validatePlan(raw);if(plan.backendProfile)need(plan.backendProfile.slot===slot);const root=fs.mkdtempSync(path.join(attempts.envelope(b.store,b.attempt),'managed-create-'));fs.chmodSync(root,0o700);
  const end=Math.min(attempt.deadlineAtMs,Date.now()+plan.phaseMilliseconds);
  const value={schema:'specflow.managed-worker/v1',storeRoot:b.store.root,sourceRoot:b.store.sourceRoot,attempt:b.attempt,slot,plan,controller:identity.identity(),root,deadlineAtMs:end};
  write(path.join(root,'descriptor.json'),{value,mac:b.store.mac(JSON.parse(canonical(value)))});
@@ -92,6 +97,7 @@ async function runIntent(file){
  need(typeof descriptor.mac==='string'&&descriptor.mac.length===64&&/^[a-f0-9]+$/.test(descriptor.mac));
  need(crypto.timingSafeEqual(Buffer.from(descriptor.mac,'hex'),Buffer.from(store.mac(JSON.parse(canonical(d))),'hex')));
  const a=attempts.read(store,d.attempt),p=validatePlan(d.plan),self=identity.identity();
+ if(p.backendProfile)need(p.backendProfile.slot===d.slot);
  need(canonical(a.owner)===canonical(d.controller)&&identity.state(d.controller)==='live');
  const intent=attempts.intent(store,d.attempt,{slot:d.slot,expectedConfigSha256:hash(p),creator:d.controller,supervisor:self});
  need(Number.isSafeInteger(d.deadlineAtMs)&&d.deadlineAtMs<=a.deadlineAtMs&&d.deadlineAtMs<=Date.now()+p.phaseMilliseconds);

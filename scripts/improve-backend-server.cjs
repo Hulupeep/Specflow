@@ -7,7 +7,13 @@ function consumeEnvelope(directory, expected, now = Date.now(), hostname = requi
   let parent, file;
   try {
     if (!/^\/tmp\/sf-secret-[a-f0-9]{32}$/.test(directory)) fail('path');
-    if (!expected || Object.keys(expected).sort().join(',') !== 'container,envelopeSha256,generation,job,nonce' ||
+    // This function is serialized into the container: keep the closed mapping
+    // self-contained, and test it against the host profile registry. No caller
+    // may supply a numeric lifetime or an arbitrary profile.
+    const extended = expected?.backendProfile === 'heystax-backend-journeys-v1';
+    const fields = extended ? 'backendProfile,container,envelopeSha256,generation,job,nonce' : 'container,envelopeSha256,generation,job,nonce';
+    const lifetimeMilliseconds = extended ? 880000 : 600000;
+    if (!expected || Object.keys(expected).sort().join(',') !== fields ||
         !/^[a-f0-9]{64}$/.test(expected.container) || !/^[a-f0-9]{64}$/.test(expected.envelopeSha256)) fail('binding');
     if (hostname !== expected.container.slice(0, 12)) fail('container');
     parent = fs.openSync(directory, fs.constants.O_RDONLY | fs.constants.O_DIRECTORY | fs.constants.O_NOFOLLOW);
@@ -25,7 +31,7 @@ function consumeEnvelope(directory, expected, now = Date.now(), hostname = requi
     if (Object.keys(value).sort().join(',') !== 'container,expires,generation,issued,job,key,nonce') fail('fields');
     for (const key of ['job','generation','container','nonce']) if (value[key] !== expected[key]) fail(key);
     if (!Number.isSafeInteger(value.issued) || value.issued > now + 1000 || now - value.issued > 30000) fail('stale');
-    if (!Number.isSafeInteger(value.expires) || value.expires <= now || value.expires > now + 600000) fail('expired');
+    if (!Number.isSafeInteger(value.expires) || value.expires <= now || value.expires > now + lifetimeMilliseconds) fail('expired');
     if (typeof value.key !== 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(value.key)) fail('key');
     fs.unlinkSync('/proc/self/fd/' + parent + '/envelope');
     fs.rmdirSync(directory);

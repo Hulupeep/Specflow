@@ -291,9 +291,9 @@ function runProductionBuild(worker, input, destination) {
   try { fs.fsyncSync(parent); } finally { fs.closeSync(parent); }
   return { receipt: candidate, target: destination, evidenceDirectory: area };
 }
-function createProductionConsumer(worker, input, receipt, target) {
+function createProductionConsumer(worker, input, receipt, target, backendProfileId) {
   const bound = verifyProductionOutput(worker, input, receipt, target), expectedReceipt = canonical(receipt);
-  const id = worker.createProduction({ source: bound.input.source, dependencies: bound.input.dependencies, output: { target, receipt: receipt.output } });
+  const id = worker.createProduction({ source: bound.input.source, dependencies: bound.input.dependencies, output: { target, receipt: receipt.output } }, backendProfileId);
   const guard = () => {
     requireThat(canonical(receipt) === expectedReceipt, 'build_receipt_changed');
     verifyProductionOutput(worker, input, receipt, target);

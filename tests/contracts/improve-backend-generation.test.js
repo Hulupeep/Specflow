@@ -14,12 +14,29 @@ beforeEach(()=>{
  store=new DurableStore({root:path.join(root,'store'),sourceRoot:root});
  const ref=name=>({path:name,sha256:digest});
  const template={schema:'specflow.backend-inputs/v1',jobId:'job',recipeId:RECIPE.id,images:RECIPE.images,migrationRevision:RECIPE.migrationRevision,migrations:RECIPE.migrations,migrationRoot:'migrations',bootstrap:ref('bootstrap'),supabaseCli:ref('cli'),seed:ref('seed'),credentialBinding:ref('credentials'),runtimeLayer:ref('layer'),configuration:ref('configuration'),resourceProfile:ref('profile'),expectedState:{schemaSha256:digest,tablesSha256:digest,sequencesSha256:digest,migrationHistorySha256:digest}};
+ template.resourceProfile={path:'profile',sha256:write(path.join(root,'profile'),require('../../scripts/improve-backend.cjs').PROFILE).sha256};
  const dependencySource={packageSha256:digest,lockSha256:digest,manifestSha256:digest};
- value={schema:'specflow.backend-job-binding/v1',jobId:'job',runId:'run',recipeId:RECIPE.id,constructionSha256:digest,expectedSemanticSha256:digest,inputsTemplate:write(path.join(root,'inputs.json'),template),dependencies:{target:path.join(root,'deps'),expected:{identity:{jobId:'job',sourceContainerId:digest,recipeSha256:digest,sourceInputSha256:hash(canonical(dependencySource))},manifestSha256:digest}},sourceRecipeSha256:generation.sourceRecipeSha256,resourceProfileSha256:digest,dependencySource,deadlineAtMs:Date.now()+60000};
+ value={schema:'specflow.backend-job-binding/v1',jobId:'job',runId:'run',recipeId:RECIPE.id,constructionSha256:digest,expectedSemanticSha256:digest,inputsTemplate:write(path.join(root,'inputs.json'),template),dependencies:{target:path.join(root,'deps'),expected:{identity:{jobId:'job',sourceContainerId:digest,recipeSha256:digest,sourceInputSha256:hash(canonical(dependencySource))},manifestSha256:digest}},sourceRecipeSha256:generation.sourceRecipeSha256,resourceProfileSha256:template.resourceProfile.sha256,dependencySource,deadlineAtMs:Date.now()+60000};
  config={worker:{jobId:'job',stateRoot:store.root},deadlineAtMs:value.deadlineAtMs,authority:{repo_id:'repo',revision:1}};sign();
 });
 afterEach(()=>fs.rmSync(root,{recursive:true,force:true}));
 const declaration=()=>({recipeId:value.recipeId,expectedSemanticSha256:value.expectedSemanticSha256,constructionSha256:value.constructionSha256});
+function journeyProfile(){
+ const bytes=require('../../scripts/improve-backend-profiles.cjs').profileBytes('heystax-backend-journeys-v1');fs.writeFileSync(path.join(root,'profile'),bytes);
+ const template=JSON.parse(fs.readFileSync(value.inputsTemplate.path));template.resourceProfile.sha256=hash(bytes);
+ value.inputsTemplate=write(value.inputsTemplate.path,template);value.resourceProfileSha256=hash(bytes);value.deadlineAtMs=Date.now()+2000000;config.deadlineAtMs=value.deadlineAtMs;sign();
+}
+const journeyContract=()=>({acceptance:[{id:'journey',mandatory:true,dev_check:{timeout_seconds:100,verification_level:'journey',boundaries:['browser','api'],checker_paths:['test.cjs','config.cjs'],input_paths:[],rule_paths:[],execution:{adapter:'playwright',test_files:['test.cjs'],required_case_ids:['case'],optional_case_ids:[],args:['--config','config.cjs']}}}]});
+test('new profile refuses impossible inventory before reservation or resources',async()=>{
+ journeyProfile();const token=generation.install(config,runDir,()=>{}),contract=journeyContract();contract.acceptance[0].dev_check.timeout_seconds=501;
+ await expect(generation.open(token,runDir,'dev-r1',()=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,contractJSON:JSON.stringify(contract)}))).rejects.toMatchObject({code:'backend_inventory_exceeds_profile',requiredMilliseconds:621000,availableMilliseconds:600000});
+ expect(fs.existsSync(path.join(store.root,'backend-attempts'))).toBe(false);
+});
+test('changed signed profile bytes are rejected before capability installation',()=>{
+ journeyProfile();fs.appendFileSync(path.join(root,'profile'),' ');expect(()=>generation.install(config,runDir,()=>{})).toThrow('backend_input_changed');
+ expect(fs.existsSync(path.join(store.root,'backend-attempts'))).toBe(false);
+});
+
 test('JSON and copied tokens cannot grant generation authority',async()=>{
  const authorize=jest.fn(),token=generation.install(config,runDir,authorize);expect(authorize).toHaveBeenCalledTimes(1);
  expect(generation.freezeBinding(token,runDir,declaration())).toEqual({sha256:config.backendJobBinding.sha256});
@@ -105,7 +122,8 @@ test('capability snapshot preserves the admitted software-layer byte ordering',a
 // Live owned-resource removal is covered by the separate qualification drivers.
 describe('GENERATION293 reservation ordering and failure terminals',()=>{
  afterEach(()=>jest.restoreAllMocks());
- function staged(stage){
+ function staged(stage,extended=false){
+  if(extended)journeyProfile();
   const workerModule=require('../../scripts/improve-worker.cjs');
   const admission=require('../../scripts/improve-backend.cjs'),credentials=require('../../scripts/improve-backend-credentials.cjs');
   const semantics=require('../../scripts/improve-backend-semantics.cjs'),managed=require('../../scripts/improve-managed-worker.cjs');
@@ -119,7 +137,7 @@ describe('GENERATION293 reservation ordering and failure terminals',()=>{
   const normalized=JSON.parse(canonical(template));normalized.credentialBinding.sha256=semantics.projection(prior,prior);value.constructionSha256=hash(canonical(normalized));sign();
   const read=admission.readBoundFile;
   jest.spyOn(admission,'readBoundFile').mockImplementation((dir,ref,...args)=>{
-   if(dir===root&&[...['bootstrap','supabaseCli','seed','runtimeLayer','configuration','resourceProfile'].map(k=>template[k].path),...template.migrations.map(x=>'migrations/'+x.name)].includes(ref.path))return Buffer.from('substituted inert build input');
+   if(dir===root&&[...['bootstrap','supabaseCli','seed','runtimeLayer','configuration'].map(k=>template[k].path),...template.migrations.map(x=>'migrations/'+x.name)].includes(ref.path))return Buffer.from('substituted inert build input');
    return read(dir,ref,...args);
   });
   const calls=[],fail=at=>{calls.push(at);if(stage===at)throw Error('backend_'+at+'_failed');};
@@ -141,9 +159,25 @@ describe('GENERATION293 reservation ordering and failure terminals',()=>{
   jest.spyOn(runtime,'startBackend').mockImplementation(async()=>{fail('start');return {};});
   jest.spyOn(runtime,'closeBackend').mockImplementation(async()=>{fail('close');return {phase:'cleaned',cause:null};});
   const token=generation.install(config,runDir,()=>{});
-  const refresh=({metadataOnly}={})=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,workspace,...(metadataOnly?{}:{identity:{workspace:{entries}}})});
+  const refresh=({metadataOnly}={})=>({bindingSha256:config.backendJobBinding.sha256,declaration:declaration(),contractSha256:digest,workspace,...(extended?{contractJSON:JSON.stringify(journeyContract())}:{}),...(metadataOnly?{}:{identity:{workspace:{entries}}})});
   return {calls,open:()=>generation.open(token,runDir,'dev-r1',refresh),reservation:()=>reservation};
  }
+ test('new profile propagates to app/backend and retains exact admitted inventory',async()=>{
+  const f=staged('check',true),handle=await f.open();
+  const production=require('../../scripts/improve-production-build.cjs'),runtime=require('../../scripts/improve-backend-runtime.cjs');
+  expect(production.createProductionConsumer.mock.calls[0][4]).toBe('heystax-backend-journeys-v1');
+  expect(runtime.startBackend.mock.calls[0][0].request.resourceProfile).toBe('heystax-backend-journeys-v1');
+  const ref=generation.access(handle).plan,proof=JSON.parse(fs.readFileSync(ref.path));expect(hash(fs.readFileSync(ref.path))).toBe(ref.sha256);
+  expect(proof).toMatchObject({profileId:'heystax-backend-journeys-v1',contractSha256:digest,deadlineAtMs:value.deadlineAtMs,requiredExecutionMilliseconds:220000});
+  expect(proof.invocations.map(x=>x.set+':'+x.id)).toEqual(['dev:journey']);
+  const closed=await generation.close(handle,'backend_check_failed');expect(closed.plan).toEqual(proof);
+ });
+ test('time spent building cannot renew original task horizon or create an app',async()=>{
+  const f=staged('check',true),production=require('../../scripts/improve-production-build.cjs');
+  const now=Date.now();production.runProductionBuild.mockImplementation(()=>{jest.spyOn(Date,'now').mockReturnValue(now+1200000);return {receipt:{fixture:'substituted build'},target:'/substituted/build'};});
+  await expect(f.open()).rejects.toMatchObject({code:'backend_job_time_insufficient'});
+  expect(production.createProductionConsumer).not.toHaveBeenCalled();expect(config.deadlineAtMs).toBe(value.deadlineAtMs);
+ });
  test.each(['issue','build','start'])('failure at %s preserves cause and cleans exact durable attempt',async stage=>{
   const f=staged(stage);let error;try{await f.open();}catch(e){error=e;}
   expect(error?.message).toBe('backend_'+stage+'_failed');
