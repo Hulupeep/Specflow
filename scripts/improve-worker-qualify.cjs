@@ -115,6 +115,7 @@ async function transport(o, root) {
     ['oracle', 'opus', 'claude-opus-5-5']
   ]) {
     const result = w.roleCall({
+      deadlineAtMs: Date.now() + 600000,
       role,
       model,
       effectiveModel,

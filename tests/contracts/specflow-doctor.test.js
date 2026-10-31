@@ -37,10 +37,12 @@ test('two installed fixture package versions report their own identity despite n
 }finally{fs.rmSync(root,{recursive:true,force:true});}});
 test('missing installed selector is diagnosed rather than a healthy first-use route',()=>{const root=fixture();try{for(const area of ['.claude','.codex','.agents']){const p=root+'/'+area+'/skills/specflow-loop-selector';fs.mkdirSync(p,{recursive:true});fs.copyFileSync(ROOT+'/skills/specflow-loop-selector/SKILL.md',p+'/SKILL.md');}fs.unlinkSync(root+'/.codex/skills/specflow-loop-selector/SKILL.md');const before=bytes(root),d=doctor(root).value;expect(d.status).toBe('repair_required');expect(d.findings.some(f=>f.code==='missing_selector_skill'||f.message.includes('specflow-loop-selector'))).toBe(true);expect(bytes(root)).toEqual(before);}finally{fs.rmSync(root,{recursive:true,force:true});}});
 // The shared native executor now reaches the backend worker; its identity is
-// part of the conservative Gate D dependency closure. Service orchestration is not.
+// part of the conservative Gate D dependency closure. Managed role deadlines now
+// reach the service controller too; unrelated host delivery remains outside it.
 test.each([
  ['scripts/improve-worker.cjs','stale'],
- ['scripts/improve-service-controller.cjs','present']
+ ['scripts/improve-service-controller.cjs','stale'],
+ ['scripts/improve-delivery-host.cjs','present']
 ])('custom %s reports Gate D as %s', (artifact,gateStatus)=>{const root=fixture();try{
  fs.appendFileSync(path.join(root,artifact),'\n// deliberate capability customization\n');
  const before=bytes(root),d=doctor(root).value;

@@ -269,22 +269,33 @@ async function run(ctx, args = process.argv.slice(2)) {
   process.stderr.write(stderr);
   process.exitCode = reason ? 2 : outcome;
 }
-function writeGateway(directory, ctx) {
-  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const context = path.join(directory, 'controller-context.json'),
-    gateway = path.join(directory, 'controller-provider');
-  fs.writeFileSync(context, JSON.stringify(ctx), { mode: 0o600, flag: 'wx' });
-  // require both generated inputs before #217 pins its complete loaded dependency closure.
-  const code =
-    '#!' +
+function gatewayCode(context) {
+  return '#!' +
     process.execPath +
     '\nconst ctx=require(' +
     JSON.stringify(context) +
     ');module.exports=ctx;if(require.main===module)require(' +
     JSON.stringify(__filename) +
     ').run(ctx).catch(e=>{process.stderr.write(JSON.stringify({code:e.code||"provider_failure",next_action:e.next_action||"Inspect retained controller evidence."})+"\\n");process.exitCode=2;});\n';
+}
+function gatewayDeadline(executable) {
+  const read=require('./improve-controller-cli.cjs').readPrivate;
+  const context=path.join(path.dirname(executable),'controller-context.json');
+  const ctx=read(context);
+  check(path.basename(executable)==='controller-provider' && fs.readFileSync(executable,'utf8')===gatewayCode(context),'provider_gateway_mismatch');
+  const run=service(ctx).status({repo_id:ctx.repo_id,run_id:ctx.run_id}).runs.find(r=>r.id===ctx.run_id);
+  check(run && run.repo_id===ctx.repo_id && run.profile_revision===ctx.profile_revision && Number.isSafeInteger(run.deadline_ms),'provider_gateway_mismatch');
+  return run.deadline_ms;
+}
+function writeGateway(directory, ctx) {
+  fs.mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const context = path.join(directory, 'controller-context.json'),
+    gateway = path.join(directory, 'controller-provider');
+  fs.writeFileSync(context, JSON.stringify(ctx), { mode: 0o600, flag: 'wx' });
+  // require both generated inputs before #217 pins its complete loaded dependency closure.
+  const code = gatewayCode(context);
   fs.writeFileSync(gateway, code, { mode: 0o700, flag: 'wx' });
   require(gateway);
   return gateway;
 }
-module.exports = { run, writeGateway, invocation, classify, terminalCompletion };
+module.exports = { run, writeGateway, gatewayDeadline, invocation, classify, terminalCompletion };
