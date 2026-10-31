@@ -1,0 +1,13 @@
+{
+  "run": "https://github.com/Hulupeep/Specflow/actions/runs/41235643450",
+  "sourceCommit": "cd9ade96006d51453609dddd893c13e5f3323c4c",
+  "mergeCommit": "bfb394626eac087c55f064ac036cc052aa1c1101",
+  "tree": "c1d8a8fbd1d7528a5c6868cecb9c98e573432fd7",
+  "totalTests": 3439,
+  "passedTests": 3439,
+  "failedTests": 0,
+  "skippedTests": 0,
+  "suites": 170,
+  "reportSha256": "af579a5b6942299f944c3e55209ebe587af4a48c6d5726c42615f88c13d4e30b",
+  "retriedAssertions": 0
+}

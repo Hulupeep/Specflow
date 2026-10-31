@@ -1,0 +1,134 @@
+{
+  "schema": "specflow.checker-capacity-evidence/v1",
+  "scope": "Committed-tool infrastructure qualification; expected product layout failures remain failures, not a product KEEP",
+  "profileId": "heystax-backend-journeys-v2",
+  "deadlineAtMs": 1793479462279,
+  "preflight": {
+    "status": "passed",
+    "elapsedMilliseconds": 180127,
+    "remainingOwned": 0
+  },
+  "browser": {
+    "status": "observed",
+    "results": [
+      {
+        "invocation": 0,
+        "id": "AC-FIT",
+        "result": "fail",
+        "summary": {
+          "collected": 16,
+          "passed": 6,
+          "failed": 10,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "elapsedMilliseconds": 107855
+      },
+      {
+        "invocation": 1,
+        "id": "AC-PRESERVATION",
+        "result": "pass",
+        "summary": {
+          "collected": 4,
+          "passed": 4,
+          "failed": 0,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "elapsedMilliseconds": 33803
+      },
+      {
+        "invocation": 2,
+        "id": "AC-FIT",
+        "result": "fail",
+        "summary": {
+          "collected": 16,
+          "passed": 8,
+          "failed": 8,
+          "skipped": 0,
+          "flaky": 0
+        },
+        "elapsedMilliseconds": 88250
+      }
+    ],
+    "failureMessages": [
+      {
+        "invocation": 0,
+        "count": 10,
+        "reason": "Error: MOBILE_FIT_VIOLATIONS"
+      },
+      {
+        "invocation": 2,
+        "count": 8,
+        "reason": "Error: DOCUMENT_MUST_FIT"
+      }
+    ],
+    "kernel": [
+      {
+        "current": 29,
+        "denied": 0,
+        "endpoint": "unix:///var/run/docker.sock",
+        "invocation": 0,
+        "peak": 120,
+        "pidsLimit": 256,
+        "scope": "checker cgroup only; ancestor limits not measured"
+      },
+      {
+        "current": 31,
+        "denied": 0,
+        "endpoint": "unix:///var/run/docker.sock",
+        "invocation": 1,
+        "peak": 125,
+        "pidsLimit": 256,
+        "scope": "checker cgroup only; ancestor limits not measured"
+      },
+      {
+        "current": 49,
+        "denied": 0,
+        "endpoint": "unix:///var/run/docker.sock",
+        "invocation": 2,
+        "peak": 143,
+        "pidsLimit": 256,
+        "scope": "checker cgroup only; ancestor limits not measured"
+      }
+    ],
+    "timings": {
+      "openMilliseconds": 173653,
+      "admitMilliseconds": 8649,
+      "setupMilliseconds": 56182,
+      "continuityMilliseconds": 6909,
+      "shutdownMilliseconds": 11915
+    },
+    "elapsedMilliseconds": 486247,
+    "cleanupConfirmed": true,
+    "cause": null,
+    "cleanupCause": null
+  },
+  "checksUnchangedBetweenDiagnosticAndFinal": true,
+  "receipts": {
+    "preflightSha256": "eb7da8f520a681d52746be654d1f68bdd6f5ee9532319bc334d4040a23c0a8e9",
+    "browserSha256": "6663e8fd76af90763943aacc010b61072bfb45569b695732ba92cff21ca84b04"
+  },
+  "limitations": [
+    "Checker cgroup counters only; app and host ancestor limits not measured.",
+    "No product implementation or deciding after-holdout in this qualification.",
+    "Previously verified immutable source/dependency capsules reused; no fresh acquisition claimed."
+  ],
+  "suiteMapping": [
+    {
+      "invocation": 0,
+      "contractKey": "check",
+      "suite": "independently authored fit"
+    },
+    {
+      "invocation": 1,
+      "contractKey": "check",
+      "suite": "independently authored preservation"
+    },
+    {
+      "invocation": 2,
+      "contractKey": "dev_check",
+      "suite": "public development journey"
+    }
+  ]
+}
