@@ -43,7 +43,8 @@
     "docs/native-plugin.md",
     "docs/contracts/feature_native_commands.yml",
     "docs/contracts/feature_native_hooks.yml",
-    "docs/contracts/feature_pr_handoff.yml"
+    "docs/contracts/feature_pr_handoff.yml",
+    "docs/improve-prebuild-recovery.md"
   ],
   "scripts": {
     "prepack": "node scripts/native-plugin.cjs --check && node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
