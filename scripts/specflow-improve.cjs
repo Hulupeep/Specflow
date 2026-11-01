@@ -252,7 +252,7 @@ function guardedSpawn(runDir, role, argv, options = {}) {
     maxBuffer: 32 * 1024 * 1024,
   });
   const timedOut = r.error && /ETIMEDOUT/.test(r.error.code || r.error.message);
-  append(runDir, 'command_run', { command_id:commandId, role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), process_error:r.error?.code||null,process_signal:r.signal||null,terminated:Boolean(r.signal||['ETIMEDOUT','ENOBUFS'].includes(r.error?.code)), env_removed: removed });
+  append(runDir, 'command_run', { command_id:commandId, role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), process_error:r.error?.code||null,process_signal:r.signal||null,terminated:Boolean(r.signal||['ETIMEDOUT','ENOBUFS'].includes(r.error?.code)||(r.error&&r.pid>0)), env_removed: removed });
   return {
     status: r.error ? (timedOut ? 'timeout' : 'error') : 'ran',
     exit_code: r.status,
