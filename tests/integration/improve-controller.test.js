@@ -43,6 +43,7 @@ function archive(cycle, decision = 'REVERT', change = () => {}, diagnosis = {}) 
   fs.writeFileSync(path.join(source, 'report.md'), 'Protocol fixture only.');
   if (decision === 'KEEP') fs.writeFileSync(path.join(source, 'retained.bundle'), 'protocol bundle fixture');
   core.append(source, 'run_started', { run_sha256: sha(canonical(r)) });
+  core.append(source, 'implementation_started', { protocol_fixture: true });
   core.append(source, 'decision_made', {
     decision,
     decision_sha256: sha(fs.readFileSync(path.join(source, 'decision.json')))

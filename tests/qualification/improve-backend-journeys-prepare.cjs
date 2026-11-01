@@ -11,7 +11,7 @@ function write(root,name,value){const b=Buffer.isBuffer(value)?value:Buffer.from
 async function main(){
  const profileId=process.argv[5]??'heystax-backend-journeys-v1';
  profiles.workerLimits(profileId,'app');
- const label=profileId==='heystax-backend-journeys-v2'?'profile-315':'profile-298';
+ const label=profileId==='heystax-backend-journeys-v3'?'profile-327':profileId==='heystax-backend-journeys-v2'?'profile-315':'profile-298';
  const inputs=read(process.argv[2]),descriptor=read(process.argv[3]),old=bound(descriptor.recipe);
  const root=fs.mkdtempSync(path.join(inputs.root,label+'-'));fs.chmodSync(root,0o700);
  const startedAtMs=Date.now(),deadlineAtMs=process.argv[4]===undefined?startedAtMs+7200000:Number(process.argv[4]);

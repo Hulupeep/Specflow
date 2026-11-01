@@ -64,9 +64,9 @@ caller for a configured Improve service. The full plugin uses the same versioned
 npm payload as the source kit, including the canonical scripts, agents, skills,
 commands and hooks.
 
-Release status: **0.12.0 is a candidate, not yet published**. These marketplace
-commands are the release path being qualified; the published 0.11.1 package does
-not establish their current behavior.
+Release status: **0.12.0 is published and qualified through the registered marketplace**.
+The 0.12.1 source is an unpublished candidate containing later runtime fixes;
+those fixes require separate release and installed qualification.
 
 ```text
 /plugin marketplace add Hulupeep/Specflow

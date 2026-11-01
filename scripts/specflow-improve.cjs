@@ -235,12 +235,15 @@ function scrubbedEnv(extra = {}, { keepProvider = false } = {}) {
 }
 
 function guardedSpawn(runDir, role, argv, options = {}) {
+  requireOpenRun(runDir);
   const blocked = classifySideEffect(argv);
   if (blocked) {
     append(runDir, 'side_effect_blocked', { role, argv, ...blocked, executed: false });
     return { status: 'blocked', blocked, exit_code: null, stdout: '', stderr: '' };
   }
   const { env, removed } = scrubbedEnv(options.env);
+  const commandId=crypto.randomUUID();
+  append(runDir,'command_started',{command_id:commandId,role,argv,cwd:options.cwd||null});
   const r = spawnSync(argv[0], argv.slice(1), {
     cwd: options.cwd,
     env,
@@ -249,7 +252,7 @@ function guardedSpawn(runDir, role, argv, options = {}) {
     maxBuffer: 32 * 1024 * 1024,
   });
   const timedOut = r.error && /ETIMEDOUT/.test(r.error.code || r.error.message);
-  append(runDir, 'command_run', { role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), env_removed: removed });
+  append(runDir, 'command_run', { command_id:commandId, role, argv, cwd: options.cwd || null, exit_code: r.status, timed_out: Boolean(timedOut), process_error:r.error?.code||null,process_signal:r.signal||null,terminated:Boolean(r.signal||['ETIMEDOUT','ENOBUFS'].includes(r.error?.code)||(r.error&&r.pid>0)), env_removed: removed });
   return {
     status: r.error ? (timedOut ? 'timeout' : 'error') : 'ran',
     exit_code: r.status,
@@ -350,6 +353,7 @@ function validateCandidates(doc) {
 }
 
 function recordCandidates(runDir, file) {
+  requireOpenRun(runDir);
   loadRun(runDir);
   const evs = events(runDir);
   if (lastEvent(evs, 'contract_frozen')) throw new Error('Candidates are fixed once a contract is frozen; start a new run to reselect');
@@ -488,6 +492,7 @@ function validateContract(runDir, contract, selected) {
 }
 
 function freezeContract(runDir, file, options = {}) {
+  requireOpenRun(runDir);
   const run = loadRun(runDir);
   const p = runPaths(runDir);
   const evs = events(runDir);
@@ -604,6 +609,7 @@ function workspaceFor(run, kind) {
 }
 
 function prepareWorkspace(runDir, kind) {
+  requireOpenRun(runDir);
   const run = loadRun(runDir);
   const { branch, worktreePath } = workspaceFor(run, kind);
   if (branch === `specflow/${run.base_ref}` || branch === run.base_ref) throw new Error('workspace branch collides with base');
@@ -744,7 +750,10 @@ function runCheckSet(runDir, { ws, gov, dir, phase, set, vars, baseUrl, makerCla
         environment:gov.contract.runtime?.environment||'isolated-improve',frozenFiles:gov.entry.artifact_sha256,
         ...(backendSession!==undefined?{backendSession,backendContext}:{}),
         env:scrubbedEnv({BASE_URL:baseUrl||'',IMPROVE_EVIDENCE_DIR:dir,IMPROVE_PHASE:phase,IMPROVE_CRITERION:a.id,IMPROVE_WORKSPACE:ws.worktreePath,IMPROVE_SET:set}).env};
+      const commandId=crypto.randomUUID();
+      append(runDir,'command_started',{command_id:commandId,role:'verifier',native:true,confined:backendSession!==undefined,phase,attempt: lastEvent(events(runDir),'verification_started')?.attempt,criterion:a.id});
       const receipt=nativeExecution.executeFrozen(check,options),owned=nativeExecution.ownsFrozen(receipt,check,gov.doc,options);
+      append(runDir,'command_run',{command_id:commandId,role:'verifier',native:true,confined:backendSession!==undefined,phase,exit_code:receipt.exit_code??null,timed_out:receipt.process_error==='ETIMEDOUT',process_error:receipt.process_error??null,process_signal:receipt.process_signal??null,terminated:receipt.terminated===true});
       if(receipt.evidence_path)outPath=receipt.evidence_path;
       else fs.writeFileSync(outPath,JSON.stringify({result:'unavailable',reason:receipt.reason}));
       const result=owned&&['pass','fail'].includes(receipt.result)?receipt.result:'unavailable';
@@ -810,7 +819,7 @@ function inputIdentity(runDir,run,gov,phase,ws,timing,selectedGit) {
   if(gitTree.branch!=='refs/heads/'+ws.branch || (phase==='baseline'&&gitTree.parent!==run.base_commit))throw Error('Workspace branch or baseline parent differs from recorded base');
   return {run_id:run.run_id,phase,contract_version:gov.entry.version,contract_sha256:gov.entry.contract_sha256,
     artifact_sha256:gov.entry.artifact_sha256,base_commit:run.base_commit,
-    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'improve-review-evidence.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-worker.cjs','improve-backend-timing.cjs','improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-profiles.cjs','improve-backend-journeys-profile.json','improve-backend-journeys-v2-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
+    verifier:binding.verifier(gov.contract,ws.worktreePath,scrubbedEnv().env,[__filename,path.join(__dirname,'improve-binding.cjs'),path.join(__dirname,'improve-untrusted.cjs'),path.join(__dirname,'improve-review-evidence.cjs'),path.join(__dirname,'specflow-runner.cjs'),path.join(__dirname,'test-execution.cjs'),path.join(__dirname,'oracle-comparison.cjs'),path.join(__dirname,'data-seams.cjs'),path.join(__dirname,'outcome-contract.cjs'),...(gov.contract.runtime?.backend?['improve-worker.cjs','improve-backend-timing.cjs','improve-backend-generation.cjs','improve-backend-attempt.cjs','improve-managed-worker.cjs','improve-managed-backend.cjs','improve-backend.cjs','improve-backend-runtime.cjs','improve-backend-server.cjs','improve-backend-credentials.cjs','improve-backend-semantics.cjs','improve-production-build.cjs','improve-backend-measure.cjs','improve-backend-measure.sql','improve-backend-supervisor.cjs','improve-backend-profile.json','improve-backend-profiles.cjs','improve-backend-journeys-profile.json','improve-backend-journeys-v2-profile.json','improve-backend-journeys-v3-profile.json','improve-backend-recipe.json'].map(p=>path.join(__dirname,p)):[]),...Object.keys(gov.entry.artifact_sha256||{}).map(p=>path.join(runDir,p))]),
     git:gitTree,workspace:measured('workspace_identity',()=>binding.workspace(ws.worktreePath,identityOptions(gov.contract)))};
 }
 // Name what changed so a blocked verification is diagnosable (#176).
@@ -941,6 +950,7 @@ async function withManagedBackend(runDir,phase,capability,ws,gov,dir,execute){
 }
 
 async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {}) {
+  requireOpenRun(runDir);
   if (!['baseline', 'after'].includes(phase)) throw new Error('phase must be baseline or after');
   const run = loadRun(runDir);
   const gov = governingContract(runDir);
@@ -1014,6 +1024,7 @@ async function verifyPhase(runDir, phase, {backendSession,backendCapability} = {
 
 // Builder-visible practice run inside a Duo round: dev checks only.
 async function devRound(runDir, round, {backendCapability} = {}) {
+  requireOpenRun(runDir);
   const run = loadRun(runDir);
   const gov = governingContract(runDir);
   const blocked = integrityBlock(runDir, gov, `dev-r${round}`);
@@ -1048,6 +1059,7 @@ function addEvidenceItem(runDir, item) {
 // Judgments from independent roles (levels 3-4). Level 1-2 evidence only
 // comes from the frozen checks; a submitted "tests passed" is not evidence.
 function submitJudgment(runDir, item, authority) {
+  requireOpenRun(runDir);
   loadRun(runDir);
   const errors = [];
   if (![3, 4].includes(item?.level)) errors.push('submitted evidence is limited to level 3 (heuristic) or 4 (judgment)');
@@ -1215,6 +1227,7 @@ function publicContract(gov) {
 }
 
 function critique(runDir, options = {}) {
+  requireOpenRun(runDir);
   require('./improve-review-input.cjs').validateInclude(options.include);
   const spendPolicy = loadPeerPolicy(options.peerPolicy);
   const run = loadRun(runDir);
@@ -1259,6 +1272,7 @@ function acceptedOracle(entry) {
 }
 
 function recordOracle(runDir, { role, executor, files, provenance = null }) {
+  requireOpenRun(runDir);
   loadRun(runDir);
   if (!acceptedOracle({ event: 'oracle_authored', provenance })) throw new Error('Failed or unexecuted provider invocation cannot establish oracle authorship');
   if (!nonempty(role) || !nonempty(executor) || ['builder', 'scout', 'contract-writer'].includes(role)) throw new Error('oracle author must be an evaluator role');
@@ -1272,6 +1286,7 @@ function recordOracle(runDir, { role, executor, files, provenance = null }) {
 }
 
 function oracle(runDir, options = {}) {
+  requireOpenRun(runDir);
   loadRun(runDir);
   // recordOracle retains its own guard, but rejecting there is too late:
   // the provider has run and its output has already replaced holdout bytes.
@@ -1360,6 +1375,7 @@ async function build(runDir, options = {}) {
   const spendPolicy = loadPeerPolicy(options.peerPolicy);
   const run = loadRun(runDir);
   const evs = events(runDir);
+  if(lastEvent(evs,'prebuild_abandonment_started'))throw Error('prebuild_abandonment_started');
   const gov = governingContract(runDir);
   if (!gov) throw new Error('Implementation cannot start without a frozen ImprovementContract');
   if (gov.tampered || gov.artifactErrors.length) throw new Error('Frozen contract integrity failed; implementation blocked');
@@ -1470,6 +1486,7 @@ async function build(runDir, options = {}) {
 }
 
 function dispute(runDir, { criterion, reason, role, executor }) {
+  requireOpenRun(runDir);
   loadRun(runDir);
   const gov = governingContract(runDir);
   if (!gov?.contract.acceptance.some((a) => a.id === criterion)) throw new Error(`unknown criterion ${criterion}`);
@@ -1493,6 +1510,7 @@ function judgePrompt(runDir, role, criteria, gov) {
 }
 
 function judge(runDir, options = {}) {
+  requireOpenRun(runDir);
   const run = loadRun(runDir);
   const evs = events(runDir);
   const builderEntry = lastEvent(evs, 'implementation_started');
@@ -1627,6 +1645,7 @@ function decide(state) {
 }
 
 function evaluate(runDir,{backendCapability}={}) {
+  requireOpenRun(runDir);
   const run = loadRun(runDir);
   const evs = events(runDir);
   if (lastEvent(evs, 'decision_made')) throw new Error('This run already has a decision; decisions are not re-rolled');
@@ -1771,7 +1790,124 @@ function evaluate(runDir,{backendCapability}={}) {
 // ---------------------------------------------------------------------------
 // finalize: apply the decision without touching base (AC-04-3)
 
+// Recovery-only disposition. The controller proves holder/resource quiescence
+// before calling this while holding its authority and writer locks. No checks,
+// implementation, Git mutation or worktree deletion occur here.
+function requireOpenRun(runDir) {
+  if(lastEvent(events(runDir),'prebuild_abandonment_started'))throw Error('prebuild_abandonment_started');
+}
+
+function prebuildBaseline(evs, frozen) {
+  const attempt=lastEvent(evs,'baseline_attempted');
+  if(!attempt||attempt.contract_sha256!==frozen.contract_sha256||attempt.contract_version!==frozen.version)throw Error('prebuild_baseline_unresolved');
+  const outcome=evs.filter(e=>e.seq>attempt.seq&&(
+    (['baseline_blocked','baseline_recorded'].includes(e.event)&&e.attempt===attempt.attempt&&e.contract_sha256===frozen.contract_sha256&&e.contract_version===frozen.version)||
+    (e.event==='verification_blocked'&&e.phase==='baseline'&&e.attempt===attempt.attempt&&e.contract_version===frozen.version)||
+    (e.event==='contract_integrity_failed'&&e.phase==='baseline'))).at(-1);
+  return {attempt:attempt.attempt,event:outcome?.event||'interrupted',seq:outcome?.seq??attempt.seq};
+}
+
+function prebuildRuntimeHistory(evs, readContract) {
+  let runtime;
+  for(const frozen of evs.filter(e=>e.event==='contract_frozen')){
+    if(!Number.isSafeInteger(frozen.version)||frozen.version<1)throw Error('prebuild_integrity_failed');
+    const bytes=readContract(`improvement-contract.v${frozen.version}.json`);
+    if(sha256(bytes)!==frozen.contract_sha256)throw Error('prebuild_integrity_failed');
+    const value=canonical(JSON.parse(bytes).contract.runtime||{});
+    if(runtime!==undefined&&runtime!==value)throw Error('prebuild_runtime_history_changed');
+    runtime=value;
+  }
+}
+
+function prebuildHostQuiescence(evs, contract) {
+  const confined=e=>contract.runtime?.backend&&e.confined===true;
+  if(evs.some(start=>start.event==='command_started'&&!confined(start)&&!evs.some(e=>e.event==='command_run'&&e.seq>start.seq&&e.command_id===start.command_id)))throw Error('prebuild_descendants_unproven');
+  if(evs.some(e=>e.event==='command_run'&&e.terminated===true&&!confined(e)))throw Error('prebuild_descendants_unproven');
+  if(contract.runtime?.backend)return;
+  const started=evs.filter(e=>e.event==='verification_started'&&e.phase==='baseline');
+  const unresolved=started.some(start=>!evs.some(e=>e.seq>start.seq&&e.attempt===start.attempt&&e.contract_version===start.contract_version&&
+    (['baseline_blocked','baseline_recorded'].includes(e.event)||(e.event==='verification_blocked'&&e.phase==='baseline'))));
+  if(contract.runtime?.serve||contract.runtime?.setup?.length||unresolved||evs.some(e=>e.event==='command_run'&&e.timed_out===true))throw Error('prebuild_descendants_unproven');
+}
+
+function abandonBeforeBuild(runDir, { reason, requestSha256, adoptPrior = false }) {
+  if (!nonempty(reason) || reason.length > 2000 || !/^[a-f0-9]{64}$/.test(requestSha256 || '')) throw Error('invalid_prebuild_disposition');
+  const run=loadRun(runDir), evs=events(runDir), gov=governingContract(runDir);
+  if(!gov)throw Error('prebuild_contract_unavailable');
+  if (!verifyLedger(runDir).ok || gov.tampered || gov.artifactErrors.length) throw Error('prebuild_integrity_failed');
+  if (evs.some(e=>['implementation_started','holdout_consumed','verification_completed'].includes(e.event))) throw Error('prebuild_work_already_started');
+  const prior=lastEvent(evs,'prebuild_abandonment_started');
+  if(prior && (prior.record.contract.sha256!==gov.entry.contract_sha256 || (prior.request_sha256!==requestSha256&&!adoptPrior)))throw Error('prebuild_request_conflict');
+  const revalidate=!prior||prior.request_sha256!==requestSha256;
+  if(lastEvent(evs,'decision_made')&&!prior)throw Error('prebuild_decision_exists');
+  prebuildRuntimeHistory(evs,name=>fs.readFileSync(path.join(runDir,name)));
+  const baseline=prebuildBaseline(evs,gov.entry);
+  const readGit=(args,cwd,{allowAbsent=false}={})=>{
+    const result=spawnSync('/usr/bin/git',['--no-optional-locks','-c','core.hooksPath=/dev/null','-c','core.fsmonitor=false',...args],{cwd,encoding:'utf8',timeout:10000,maxBuffer:1024*1024,env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',GIT_CONFIG_NOSYSTEM:'1',GIT_CONFIG_GLOBAL:'/dev/null',GIT_TERMINAL_PROMPT:'0'}});
+    if(allowAbsent&&result.status===1&&!result.stdout&&!result.stderr)return '';
+    if(result.status!==0)throw Error('prebuild_git_unavailable');return result.stdout.trim();
+  };
+  const safeConfig=cwd=>{if(readGit(['config','--includes','--get-regexp','^(filter|diff|merge)\\.'],cwd,{allowAbsent:true}))throw Error('prebuild_git_config_unsafe');};
+  prebuildHostQuiescence(evs,gov.contract);
+  let base=prior?.record.base;
+  if(prior&&(!base?.unchanged||base.recorded!==run.base_commit||base.current!==run.base_commit))throw Error('prebuild_base_changed');
+  if(revalidate){
+    safeConfig(run.target_repo);
+    if(!prior){
+      const current=readGit(['rev-parse','--verify','--end-of-options',run.base_ref+'^{commit}'],run.target_repo);
+      base={base_ref:run.base_ref,recorded:run.base_commit,current,unchanged:current===run.base_commit};
+      if(!base.unchanged)throw Error('prebuild_base_changed');
+    }
+    for(const kind of ['baseline','improve']){
+      const ws=workspaceFor(run,kind),prepared=evs.some(e=>e.event==='workspace_prepared'&&e.kind===kind);
+      if(prepared&&!fs.existsSync(ws.worktreePath))throw Error('prebuild_workspace_missing');
+      if(fs.existsSync(ws.worktreePath)){
+        safeConfig(ws.worktreePath);
+        if(readGit(['ls-files','--stage','-z'],ws.worktreePath).split('\0').some(row=>row.startsWith('160000 ')))throw Error('prebuild_submodule_unavailable');
+        // Honour frozen generated-output exclusions without staging Git changes.
+        const outputs=[...identityOptions(gov.contract).outputs,...identityOptions(gov.contract).mutableOutputs];
+        for(const rel of outputs){
+          if(typeof rel!=='string'||!rel||path.isAbsolute(rel)||rel.includes('\\')||rel.includes('\0')||rel.split('/').some(p=>!p||['.','..','.git'].includes(p)))throw Error('prebuild_workspace_changed');
+          if(readGit(['--literal-pathspecs','ls-files','-z','--',rel],ws.worktreePath))throw Error('prebuild_workspace_changed');
+          let at=ws.worktreePath;for(const part of rel.split('/')){at=path.join(at,part);try{if(fs.lstatSync(at).isSymbolicLink())throw Error('prebuild_workspace_changed');}catch(e){if(e.code!=='ENOENT')throw e;}}
+        }
+        const changed=readGit(['status','--porcelain=v1','-z','--untracked-files=all'],ws.worktreePath).split('\0').filter(Boolean);
+        if(changed.some(row=>!row.startsWith('?? ')||!outputs.some(rel=>row.slice(3)===rel||row.slice(3).startsWith(rel+'/')))||readGit(['rev-parse','HEAD'],ws.worktreePath)!==run.base_commit)throw Error('prebuild_workspace_changed');
+      }
+    }
+  }
+  const record=prior?.record || {
+    schema:'specflow.improve.decision/v1',run_id:run.run_id,decision:'INCONCLUSIVE',
+    disposition:'abandoned_before_build',implementation_attempted:false,request_sha256:requestSha256,
+    reasons:[reason],decided_at:now(),contract:{version:gov.entry.version,sha256:gov.entry.contract_sha256,ignored_later_versions:gov.ignoredLaterVersions},
+    baseline,
+    builder_claim:'not_attempted',divergence:null,base,criteria:evaluateCriteria(gov.contract,[],gov.entry.version),
+    gains:[],gates:[],gates_failed:[],gates_missing:[],preexisting_gate_failures:[],regressions:[],binding_errors:[],holdout_exposed:[],scope:scopeCheck(gov.contract,[]),evidence_ids:readEvidence(runDir).filter(e=>e.phase==='baseline'&&e.contract_version===gov.entry.version).map(e=>e.id),
+    baseline_blocker:baseline.event==='baseline_recorded'?null:'Baseline '+baseline.event+' before implementation; no product result inferred',
+    workspace:{branch:workspaceFor(run,'improve').branch,files:[],patch_sha256:sha256(''),verified_git:null}
+  };
+  if(!prior)append(runDir,'prebuild_abandonment_started',{request_sha256:requestSha256,record});
+  const decisionPath=runPaths(runDir).decisionPath;
+  if(fs.existsSync(decisionPath)){
+    if(canonical(readJson(decisionPath))!==canonical(record))throw Error('prebuild_decision_changed');
+  }else writeJson(decisionPath,record);
+  const patchPath=path.join(runDir,'workspace.patch');
+  if(fs.existsSync(patchPath)&&fs.readFileSync(patchPath).length)throw Error('prebuild_workspace_changed');
+  if(!fs.existsSync(patchPath))fs.writeFileSync(patchPath,'',{flag:'wx'});
+  if(!lastEvent(events(runDir),'decision_made'))append(runDir,'decision_made',{decision:'INCONCLUSIVE',reasons:record.reasons,decision_sha256:fileSha(decisionPath),workspace_patch_sha256:sha256(''),builder_claim:'not_attempted',divergence:null});
+  if(!lastEvent(events(runDir),'decision_applied'))append(runDir,'decision_applied',{decision:'INCONCLUSIVE',disposition:'abandoned_before_build',patch_path:patchPath,patch_sha256:sha256(''),branch:record.workspace.branch,commit:null,branch_retained:false,base});
+  writeReport(runDir);
+  for(const name of ['ledger.jsonl','decision.json','workspace.patch','report.md']){
+    const fd=fs.openSync(path.join(runDir,name),fs.constants.O_RDONLY|fs.constants.O_NOFOLLOW);
+    try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
+  }
+  const directory=fs.openSync(runDir,fs.constants.O_RDONLY|fs.constants.O_DIRECTORY|fs.constants.O_NOFOLLOW);
+  try{fs.fsyncSync(directory);}finally{fs.closeSync(directory);}
+  return record;
+}
+
 function finalize(runDir,{backendCapability}={}) {
+  requireOpenRun(runDir);
   const run = loadRun(runDir);
   const evs = events(runDir);
   const made = lastEvent(evs, 'decision_made');
@@ -1876,6 +2012,7 @@ function writeReport(runDir) {
     return items.find(e => e.result === 'fail') || items.at(-1);
   };
   const headline = !decision ? 'No decision yet.'
+    : decision.disposition === 'abandoned_before_build' ? 'Abandoned before implementation. No product improvement was evaluated; the original evidence is retained.'
     : decision.decision === 'KEEP' ? `Improvement established: ${gov.contract.hypothesis}`
       : decision.decision === 'REVERT' ? 'Change reverted: it failed, regressed or broke the run boundary. Product unchanged.'
         : 'Improvement not established: the evidence cannot show the change is better. Product unchanged.';
@@ -1886,7 +2023,7 @@ function writeReport(runDir) {
     '',
     decision ? `**Why:** ${decision.reasons.join('; ')}` : '',
     '',
-    decision ? `**What the evidence established:** ${['satisfied', 'failed', 'missing'].map((st) => `${st}: ${decision.criteria.filter((c) => c.status === st).map((c) => c.id).join(', ') || 'none'}`).join('; ')}. Partial gains are not retained; they inform the next contract.` : '',
+    decision?.disposition==='abandoned_before_build' ? '**What the evidence established:** Baseline evidence is retained. No implementation or deciding holdout ran; no product improvement was evaluated.' : decision ? `**What the evidence established:** ${['satisfied', 'failed', 'missing'].map((st) => `${st}: ${decision.criteria.filter((c) => c.status === st).map((c) => c.id).join(', ') || 'none'}`).join('; ')}. Partial gains are not retained; they inform the next contract.` : '',
     '',
     '## Declared gains',
     '',
@@ -1898,6 +2035,7 @@ function writeReport(runDir) {
     '## Human next decision',
     '',
     !decision ? `- ${status(runDir).next_action}`
+      : decision.disposition==='abandoned_before_build' ? '- Review the retained baseline failure. A fresh run requires separate authorisation and fresh relevant evidence; this abandoned cycle cannot resume product work.'
       : decision.decision === 'KEEP' ? (applied?.branch && applied?.commit
         ? `- Review branch \`${applied.branch}\` (commit \`${applied.commit}\`) and decide whether to push/open a PR. Specflow never pushes or merges.`
         : '- Finalize this verified KEEP to retain the tested branch before requesting its review. Specflow never pushes or merges.')
@@ -1934,7 +2072,7 @@ function writeReport(runDir) {
     '',
     '## Safety and change',
     '',
-    `- Base \`${run.base_ref}\` recorded ${run.base_commit.slice(0, 12)}; now ${(applied?.base || baseUnchanged(run)).current?.slice(0, 12)} — ${(applied?.base || baseUnchanged(run)).unchanged ? 'unchanged' : '**MOVED**'}`,
+    `- Base \`${run.base_ref}\` recorded ${run.base_commit.slice(0, 12)}; ${decision?.disposition === 'abandoned_before_build' ? 'at disposition' : 'now'} ${(applied?.base || baseUnchanged(run)).current?.slice(0, 12)} — ${(applied?.base || baseUnchanged(run)).unchanged ? 'unchanged' : '**MOVED**'}`,
     `- Prohibited side effects blocked before execution: ${evs.filter((e) => e.event === 'side_effect_blocked').length}; attempted by builder: ${evs.filter((e) => e.event === 'side_effect_attempted').length}`,
     decision ? `- Files changed: ${decision.workspace.files.join(', ') || 'none'}; outside scope: ${decision.scope.outside_scope.join(', ') || 'none'}; protected: ${decision.scope.protected_touched.join(', ') || 'none'}` : '',
     applied ? `- Applied: ${applied.branch_retained ? `retained on \`${applied.branch}\` @ \`${applied.commit}\`` : 'no product change retained'}; patch preserved (${applied.patch_sha256.slice(0, 16)}…)` : '',
@@ -1982,6 +2120,7 @@ function writeReport(runDir) {
 // Host-session roles (scout, UX critic, contract writer) are recorded with
 // honest provenance; unknown cost stays unknown.
 function recordRole(runDir, role) {
+  requireOpenRun(runDir);
   loadRun(runDir);
   for (const f of ['role', 'executor']) if (!nonempty(role?.[f])) throw new Error(`role.${f} is required`);
   return append(runDir, 'role_recorded', {
@@ -2102,6 +2241,10 @@ module.exports = {
   decide,
   evaluate,
   finalize,
+  abandonBeforeBuild,
+  prebuildBaseline,
+  prebuildHostQuiescence,
+  prebuildRuntimeHistory,
   status,
   writeReport,
   verifyLedger,
