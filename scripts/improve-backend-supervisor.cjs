@@ -157,7 +157,7 @@ async function dockerRead(kind, target, timeoutMs) {
   let stdout='',stderr='',bytes=0,limit=false;
   // A forced removal can outlast a read-only inspection under host load.
   // Both remain inside the journal's original, finite cleanup lease.
-  const operationLimit=kind==='remove'?6000:2000;
+  const operationLimit=kind==='remove'?20000:2000;
   const timer=setTimeout(()=>{limit=true;child.kill('SIGKILL');},Math.max(1,Math.min(operationLimit,timeoutMs)));
   for(const [stream,name] of [[child.stdout,'stdout'],[child.stderr,'stderr']])stream.on('data',b=>{bytes+=b.length;if(bytes>262144){limit=true;child.kill('SIGKILL');return;}if(name==='stdout')stdout+=b;else stderr+=b;});
   child.on('error',()=>{clearTimeout(timer);reject(Error('backend_readiness_failed'));});

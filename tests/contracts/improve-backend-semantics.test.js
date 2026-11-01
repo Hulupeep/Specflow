@@ -46,11 +46,12 @@ describe('credential-only backend semantic equivalence (#293)',()=>{
  test('even signed extra claims or wrong server roles fail',()=>{
   for(const extra of [{role:'anon'},{extra:'unexpected'},{generation:'other'}]){const raw=gateway(a);raw.consumers[1].keyauth_credentials[0].key=signed(a,extra);expect(()=>semantics.gateway(raw,a,a)).toThrow('backend_identity_mismatch');}
  });
- test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2'])('journey token lifetime is bounded, signed and semantically stable under deadline clipping (%s)',id=>{
+ test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'])('journey token lifetime is bounded, signed and semantically stable under deadline clipping (%s)',id=>{
   const now=Math.floor(Date.now()/1000),request={...a,resourceProfile:id};
   const raw=seconds=>{const r=gateway(a);r.consumers[1].keyauth_credentials[0].key=signed(a,{iat:now,exp:now+seconds});return r;};
-  expect(semantics.gateway(raw(880),a,request)).toEqual(semantics.gateway(raw(800),a,request));
-  for(const seconds of [0,881])expect(()=>semantics.gateway(raw(seconds),a,request)).toThrow('backend_identity_mismatch');
+  const max=require('../../scripts/improve-backend-profiles.cjs').workerLimits(id,'app').phaseMilliseconds/1000;
+  expect(semantics.gateway(raw(max),a,request)).toEqual(semantics.gateway(raw(800),a,request));
+  for(const seconds of [0,max+1])expect(()=>semantics.gateway(raw(seconds),a,request)).toThrow('backend_identity_mismatch');
   expect(()=>semantics.gateway(raw(880),a,a)).toThrow('backend_identity_mismatch');
  });
  test('unrelated gateway configuration is retained',()=>{

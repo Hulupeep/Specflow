@@ -24,19 +24,19 @@ describe('closed server credential envelope (#293)',()=>{
  test.each([['stale',v=>v.issued=now-30001],['future',v=>v.issued=now+1001],['expired',v=>v.expires=now],['long-lived',v=>v.expires=now+600001],['extra-field',v=>v.extra=true]])('rejects %s envelope',(_,change)=>{
   change(value);expected.envelopeSha256=hash(JSON.stringify(value));expect(write().status).toBe(0);expect(consume).toThrow(/^backend_envelope_/);
  });
- test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2'])('journey profile envelope accepts its closed app lifetime (%s)',id=>{
+ test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'])('journey profile envelope accepts its closed app lifetime (%s)',id=>{
   expected.backendProfile=id;
-  value.expires=now+880000;expected.envelopeSha256=hash(JSON.stringify(value));
+  value.expires=now+require('../../scripts/improve-backend-profiles.cjs').workerLimits(id,'app').phaseMilliseconds;expected.envelopeSha256=hash(JSON.stringify(value));
   expect(write().status).toBe(0);expect(consume()).toEqual(value);
  });
  test.each(['unknown','heystax-backend-v1'])('does not accept an unrecognised envelope profile extension: %s',id=>{
   expected.backendProfile=id;expect(write().status).toBe(0);expect(consume).toThrow('backend_envelope_binding');
  });
- test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2'])('journey profile cannot exceed its closed lifetime (%s)',id=>{
-  expected.backendProfile=id;value.expires=now+880001;
+ test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'])('journey profile cannot exceed its closed lifetime (%s)',id=>{
+  expected.backendProfile=id;value.expires=now+require('../../scripts/improve-backend-profiles.cjs').workerLimits(id,'app').phaseMilliseconds+1;
   expected.envelopeSha256=hash(JSON.stringify(value));expect(write().status).toBe(0);expect(consume).toThrow('backend_envelope_expired');
  });
- test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2'])('serialized reader works without host modules and agrees with the admitted app lifetime (%s)',id=>{
+ test.each(['heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'])('serialized reader works without host modules and agrees with the admitted app lifetime (%s)',id=>{
   const vm=require('vm'), profiles=require('../../scripts/improve-backend-profiles.cjs');
   expected.backendProfile=id;
   value.expires=now+profiles.workerLimits(expected.backendProfile,'app').phaseMilliseconds;

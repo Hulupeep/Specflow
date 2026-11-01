@@ -128,3 +128,43 @@ describe('owned runtime envelope and interrupted finalization',()=>{
  test('stopped owner with interrupted mutation gets a named operator condition without unlock',async()=>{const f=fixture();try{expect((await childBegin(f.root,true)).code).toBe(0);const area=path.join(f.root,'backend-attempts');const locks=fs.readdirSync(area).filter(n=>n.startsWith('mutation-'));expect(locks).toHaveLength(1);const result=attempts.reconcileStopped(f.store,'job');expect(result.state).toBe('operator_required');expect(result.ownerState).toBe('dead');expect(fs.statSync(path.join(area,locks[0])).isDirectory()).toBe(true);const marker=JSON.parse(fs.readFileSync(path.join(area,'operator-'+result.attempt.attemptId+'.json')));expect(marker.value.state).toBe('operator_required');expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');}finally{f.close();}});
  test('reconciliation does not stop a live owner',()=>{const f=fixture();try{const ref=attempts.begin(f.store,input());expect(attempts.reconcileStopped(f.store,'job')).toEqual({state:'active',attempt:ref});expect(fs.existsSync(path.join(f.root,'backend-attempts','operator-'+ref.attemptId+'.json'))).toBe(false);}finally{f.close();}});
 });
+
+describe('operator recovery of failed isolated cleanup',()=>{
+ function stoppedFixture(f){
+  const program=`const {DurableStore}=require('./scripts/improve-worker.cjs'),a=require('./scripts/improve-backend-attempt.cjs'),p=require('./scripts/improve-process-identity.cjs');
+   const s=new DurableStore({root:process.argv[1],sourceRoot:process.argv[1]});
+   const ref=a.begin(s,{jobId:'job',runId:'run',phase:'baseline',contractSha256:'a'.repeat(64),constructionSha256:'b'.repeat(64),authoritySha256:'c'.repeat(64),deadlineAtMs:Date.now()+60000});
+   a.envelope(s,ref);const self=p.identity();a.intent(s,ref,{slot:'build',expectedConfigSha256:'d'.repeat(64),creator:self,supervisor:self});
+   a.resourceEvent(s,ref,'build',{state:'dispatching',id:null,inspectionSha256:null});
+   a.resourceEvent(s,ref,'build',{state:'created',id:'e'.repeat(64),inspectionSha256:'f'.repeat(64)});
+   a.seal(s,ref);a.operatorRequired(s,ref);process.stdout.write(JSON.stringify(ref));`;
+  const child=cp.spawnSync(process.execPath,['-e',program,f.root],{cwd:path.resolve(__dirname,'../..'),encoding:'utf8',timeout:10000});
+  expect(child.status).toBe(0);return JSON.parse(child.stdout);
+ }
+ function dockerResult(code){
+  const events=require('events');return jest.spyOn(cp,'spawn').mockImplementation(()=>{
+   const child=new events.EventEmitter();child.stdout=new events.EventEmitter();child.stderr=new events.EventEmitter();child.kill=jest.fn();
+   setImmediate(()=>{if(code===1)child.stderr.emit('data',Buffer.from('Error: No such container'));child.emit('close',code);});
+   return child;
+  });
+ }
+ test('signed failed attempt releases only after two absent ID/name passes and stays INCONCLUSIVE',async()=>{
+  const f=fixture();let spy;try{
+   const ref=stoppedFixture(f);spy=dockerResult(1);
+   const terminal=await attempts.resolveOperator(f.store,ref);
+   expect(spy).toHaveBeenCalledTimes(4);expect(terminal).toMatchObject({state:'operator_resolved',cause:'backend_cleanup_failed',credentialEnvelopeRemoved:true});
+   expect(terminal.resources[0].status).toBe('absent_after_operator');
+   expect(attempts.verifyClosedHistory(f.store,'run','a'.repeat(64),[ref])[0].disposition).toBe('operator_resolved');
+   expect(()=>attempts.begin(f.store,input())).not.toThrow();
+   expect(fs.existsSync(path.join(f.root,'backend-attempts','operator-'+ref.attemptId+'.json'))).toBe(true);
+  }finally{spy?.mockRestore();f.close();}
+ });
+ test('a surviving resource leaves the operator fence and active claim intact',async()=>{
+  const f=fixture();let spy;try{
+   const ref=stoppedFixture(f);spy=dockerResult(0);
+   await expect(attempts.resolveOperator(f.store,ref)).rejects.toThrow('backend_cleanup_unconfirmed');
+   expect(()=>attempts.begin(f.store,input())).toThrow('backend_attempt_active');
+   expect(()=>attempts.verifyClosedHistory(f.store,'run','a'.repeat(64),[ref])).toThrow('backend_cleanup_unconfirmed');
+  }finally{spy?.mockRestore();f.close();}
+ });
+});

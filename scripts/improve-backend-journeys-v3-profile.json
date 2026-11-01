@@ -1,0 +1,102 @@
+{
+  "id": "heystax-backend-journeys-v3",
+  "slots": {
+    "app": {
+      "memoryBytes": 2147483648,
+      "memorySwapBytes": 2147483648,
+      "cpus": 1,
+      "pids": 128,
+      "tmpfsBytes": 134217728,
+      "maxInstances": 1
+    },
+    "checker": {
+      "memoryBytes": 805306368,
+      "memorySwapBytes": 805306368,
+      "cpus": 1,
+      "pids": 256,
+      "tmpfsBytes": 201326592,
+      "maxInstances": 1
+    },
+    "database": {
+      "memoryBytes": 268435456,
+      "memorySwapBytes": 268435456,
+      "cpus": 1,
+      "pids": 64,
+      "tmpfsBytes": 268435456,
+      "maxInstances": 1
+    },
+    "authMigration": {
+      "memoryBytes": 268435456,
+      "memorySwapBytes": 268435456,
+      "cpus": 1,
+      "pids": 64,
+      "tmpfsBytes": 0,
+      "maxInstances": 1
+    },
+    "auth": {
+      "memoryBytes": 268435456,
+      "memorySwapBytes": 268435456,
+      "cpus": 1,
+      "pids": 64,
+      "tmpfsBytes": 0,
+      "maxInstances": 1
+    },
+    "rest": {
+      "memoryBytes": 268435456,
+      "memorySwapBytes": 268435456,
+      "cpus": 1,
+      "pids": 64,
+      "tmpfsBytes": 0,
+      "maxInstances": 1
+    },
+    "gateway": {
+      "memoryBytes": 268435456,
+      "memorySwapBytes": 268435456,
+      "cpus": 1,
+      "pids": 64,
+      "tmpfsBytes": 50331648,
+      "maxInstances": 1
+    },
+    "seed": {
+      "memoryBytes": 268435456,
+      "memorySwapBytes": 268435456,
+      "cpus": 1,
+      "pids": 64,
+      "tmpfsBytes": 16777216,
+      "maxInstances": 1
+    }
+  },
+  "aggregate": {
+    "memoryBytes": 4563402752,
+    "memorySwapBytes": 4563402752,
+    "cpus": 8,
+    "pids": 768,
+    "tmpfsBytes": 671088640,
+    "maxInstances": 8
+  },
+  "time": {
+    "totalMilliseconds": 820000,
+    "bootstrapMilliseconds": 90000,
+    "readinessMilliseconds": 60000,
+    "measurementMilliseconds": 10000,
+    "executionMilliseconds": 600000,
+    "cleanupMilliseconds": 60000,
+    "pollMilliseconds": 100
+  },
+  "output": {
+    "perServiceBytes": 1048576,
+    "aggregateBytes": 8388608,
+    "captureBytes": 67108864,
+    "maxFileBytes": 16777216,
+    "maxEntries": 4096,
+    "maxDepth": 32
+  },
+  "notes": [
+    "Limits are ceilings, not measured peak use. All slots count even when phases do not overlap.",
+    "tmpfs is charged within each slot memory limit, never added as extra memory.",
+    "Existing production build occurs before backend startup and retains its separate qualified profile.",
+    "Total deadline includes cleanup, is fixed at admission, and is never refreshed by restart or polling.",
+    "No automatic limit growth. Capacity failure remains a named failure requiring an explicitly reviewed profile change.",
+    "Explicit multi-journey profile. Required invocation inventory is admitted before resources; running generations never grow their limits."
+  ]
+}
