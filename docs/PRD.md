@@ -142,9 +142,9 @@ This section describes source capabilities, not the contents of every published 
 | Host-aware installation and source native adapters | `docs/onboarding.md`, `docs/native-plugin.md` |
 | Repo-local Improve/controller/service interfaces | `docs/ops/improve-service.md` |
 
-Selected source/native and synthetic corpus journeys have engineering evidence. This does not establish released marketplace startup, universal host behavior, real-product benefit or customer validation. Required skips, missing current evidence and exceptions cannot become passing acceptance.
+Selected source/native and synthetic corpus journeys have engineering evidence. Version 0.12.1 also has qualified public npm and registered marketplace installations on the tested host. This does not establish universal host behavior, real-product benefit or customer validation. Required skips, missing current evidence and exceptions cannot become passing acceptance.
 
-Remaining qualification includes final versioned npm/plugin publication and registered released installs, real-product single/multi-cycle Improve outcomes, and the complete unattended operational handoff. HeyStax is the target control plane; existing interfaces do not prove that whole target delivered. Recurring schedules remain off unless separately authorized.
+Remaining qualification includes real-product single/multi-cycle Improve outcomes and the complete unattended operational handoff. #219/#215 qualified an owner-local, separately authorised fixture draft PR, one configured HeyStax action update and an external one-shot timer; this does not prove a production product handoff. HeyStax is the target control plane. Recurring schedules remain off unless separately authorized.
 
 ---
 

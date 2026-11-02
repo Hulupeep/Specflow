@@ -81,5 +81,12 @@ an active job.
 The fixed Node/Docker qualification driver under `evidence/improve-service/` is a
 recipe test, not a generic repository runner. Its records distinguish protocol
 fixtures, native execution, actual backend checks, operator recovery and optional
-delivery. No live recurring schedule, draft-PR publication or HeyStax delivery is
-enabled by this service slice; those release gates are owned by #219/#215.
+delivery. The earlier #218 service slice did not enable publication or HeyStax
+delivery. #219 and parent #215 have since closed: a separately granted publisher
+created and recovered one controlled fixture draft PR, and the configured HeyStax
+adapter updated and reconciled one progress action. Starting the service alone
+grants neither effect. See [#219 operations](../specs/improve-integration/OPERATIONS.md)
+and [runtime evidence](../specs/improve-integration/RESULTS.md). An owner-host
+one-shot timer was qualified; recurring schedule activation remains off. These
+proofs do not establish arbitrary-repo recipes, a production product handoff,
+autonomous merge/deploy or real-product benefit.
