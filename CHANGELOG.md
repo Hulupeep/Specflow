@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.12.1 (release candidate; not yet published)
+## 0.12.1 (2026-11-02)
 
 - Managed role calls use the verified original controller deadline instead of a
   hidden four-minute transport cutoff. Direct calls require an explicit deadline;
@@ -17,9 +17,13 @@
   verified patch identity while reducing presentation overhead.
 - Host scout/contract-writer provenance and native CLI terminal usage are recorded
   without inventing model identity or treating subscription estimates as invoices.
-- Package and full native-plugin versions advance together. Installed/native
-  qualification and the remaining real-product repeated proof are still pending;
-  this candidate is not a completion claim for #171 or #172.
+- Package and full native-plugin versions advance together. The public npm
+  tarball and fresh install matched all 416 qualified files. The registered
+  candidate and merged GitHub marketplace routes passed `/specflow:about` and
+  four owning-hook journeys. Two isolated HeyStax product cycles ended KEEP with
+  independent evidence; their qualification-specific UX presentation adapter
+  does not prove default adapter capacity or a production deployment. See
+  [release PR #308](https://github.com/Hulupeep/Specflow/pull/308).
 
 ## 0.12.0 (2026-10-29)
 

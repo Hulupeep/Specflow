@@ -96,10 +96,22 @@ release source; native command execution and four owning-hook scenarios passed.
 The registry integrity is
 `sha512-6a0YBrR0bNc5+I3V9imBpY1ZU6lJh8fi9ZKko6AY+zyorbOf0RVyV9Jk9KED+XBSQcygSwuvsf7D+0/MUHcqCQ==`.
 
-The current source includes later runtime fixes. A local package still labelled
-0.12.0 does not identify those bytes as the published release. Publish them under
-a distinct version, then repeat package parity and installed qualification before
-advancing the catalog pin. Never point the catalog at an unavailable version.
+Version 0.12.1 was published on 2026-11-02 after two isolated HeyStax KEEP
+cycles and current-head canonical CI (3,529 tests). Its public registry tarball
+was byte-for-byte equal to the qualified candidate; a fresh npm install and the
+registered candidate and default GitHub plugin caches matched all 416 files.
+The registered plugin passed `/specflow:about` and four owning-hook journeys on
+both routes. The GitHub catalog resolved to merged commit `dbc6cf144ee3428014cbd1236cb4b452dbf806f0`,
+whose tree matched the qualified source. Its registry integrity is
+`sha512-z/V1rdGBgNwdleeSsFHtO0d6DXzPF/zFrRRxQcHLkcRSq7SSnp7f9juMl2igb3RLzZK9BH5TF6PyyCOkW0UwsA==`.
+The native hook fixtures needed explicit marketplace registration in each new
+project; copying project settings alone failed and the failed attempts remain
+in the [release evidence](https://github.com/Hulupeep/Specflow/pull/308).
+The UX judge used a qualification-specific frame-pairing adapter; this release
+proof does not establish the default adapter's frame capacity or customer use.
+
+Keep the catalog pin on a published, qualified version. A future runtime change
+requires a distinct version, package parity and installed qualification.
 The npm payload omits lockfiles and bundles its required runtime dependencies;
 this avoids relying on a host dependency install to supply the verifier runtime.
 Claude's [npm plugin source contract](https://code.claude.com/docs/en/plugins/marketplace-reference#npm-plugin-source)

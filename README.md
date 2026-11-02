@@ -64,9 +64,12 @@ caller for a configured Improve service. The full plugin uses the same versioned
 npm payload as the source kit, including the canonical scripts, agents, skills,
 commands and hooks.
 
-Release status: **0.12.0 is published and qualified through the registered marketplace**.
-The 0.12.1 source is an unpublished candidate containing later runtime fixes;
-those fixes require separate release and installed qualification.
+Release status: **0.12.1 is published and qualified through public npm and the
+registered GitHub marketplace**. The published tarball and fresh npm install
+matched all 416 qualified files. The installed plugin passed `/specflow:about`
+and four owning-hook journeys from the merged catalog. These installation checks
+do not establish customer outcomes or qualify the default UX evidence adapter's
+frame capacity; see the [release evidence](https://github.com/Hulupeep/Specflow/pull/308).
 
 ```text
 /plugin marketplace add Hulupeep/Specflow
