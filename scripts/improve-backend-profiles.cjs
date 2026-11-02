@@ -9,7 +9,8 @@ function freeze(v){if(v&&typeof v==='object'){Object.values(v).forEach(freeze);O
 const registry=new Map([
  ['heystax-backend-v1','./improve-backend-profile.json'],
  ['heystax-backend-journeys-v1','./improve-backend-journeys-profile.json'],
- ['heystax-backend-journeys-v2','./improve-backend-journeys-v2-profile.json']
+ ['heystax-backend-journeys-v2','./improve-backend-journeys-v2-profile.json'],
+ ['heystax-backend-journeys-v3','./improve-backend-journeys-v3-profile.json']
 ].map(([id,file])=>{const bytes=fs.readFileSync(require.resolve(file));return[id,{bytes,profile:freeze(JSON.parse(bytes))}];}));
 function entry(id){if(!registry.has(id))throw Error('backend_profile_invalid');return registry.get(id);}
 function profileFor(id){return entry(id).profile;}
@@ -64,7 +65,7 @@ function planPhase({phase,contract,profileId,deadlineAtMs,nowMs=Date.now()}){
 // clock starts and the managed worker's ten-second cleanup reserve. Generic
 // production build timing is not enlarged by this consumer/checker profile.
 function workerLimits(id,slot){
- if(!['heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(id)||!['app','checker'].includes(slot))throw Error('backend_profile_invalid');
+ if(!['heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'].includes(id)||!['app','checker'].includes(slot))throw Error('backend_profile_invalid');
  const p=profileFor(id);
  return freeze({binding:{id,sha256:hash(entry(id).bytes),slot},memory:p.slots[slot].memoryBytes,pids:p.slots[slot].pids,
   tmpfs:slot==='checker'?[{path:'/output',bytes:67108864}]:[],

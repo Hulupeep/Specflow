@@ -41,7 +41,7 @@ function requestData(raw, managed) {
   const r=parsed(raw);
   exact(r,['schema','jobId','phase','recipeId','generation','expectedBackendIdentity','productBuildReceipt','inputManifest','resourceProfile',
     ...(managed?['attempt','constructionSha256']:[])]);
-  need(r.schema===(managed?'specflow.backend-request/v2':'specflow.backend-request/v1') && r.recipeId===RECIPE.id && (managed?['heystax-backend-v1','heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(r.resourceProfile):r.resourceProfile===PROFILE.id) &&
+  need(r.schema===(managed?'specflow.backend-request/v2':'specflow.backend-request/v1') && r.recipeId===RECIPE.id && (managed?['heystax-backend-v1','heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'].includes(r.resourceProfile):r.resourceProfile===PROFILE.id) &&
     idValid(r.jobId) && idValid(r.generation) && (managed?validPhase(r.phase):['baseline','after'].includes(r.phase)) && digestValid(r.expectedBackendIdentity));
   reference(r.productBuildReceipt); reference(r.inputManifest);
   if(managed){reference(r.attempt);need(digestValid(r.constructionSha256));}

@@ -111,14 +111,23 @@ test('v2 changes only checker task capacity; old profile and all deadlines stay 
 });
 
 
-test.each([undefined,'heystax-backend-journeys-v1','heystax-backend-journeys-v2','unlimited','heystax-backend-v1'])('qualification CLI admits only closed journey profile before inputs or Docker: %s',id=>{
+test.each([undefined,'heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3','unlimited','heystax-backend-v1'])('qualification CLI admits only closed journey profile before inputs or Docker: %s',id=>{
  const cp=require('child_process'),path=require('path');
  const args=[path.resolve(__dirname,'../qualification/improve-backend-journeys-prepare.cjs'),'/missing-specflow-315-input','/missing-specflow-315-descriptor','1',...(id===undefined?[]:[id])];
  const r=cp.spawnSync(process.execPath,args,{cwd:path.resolve(__dirname,'../..'),encoding:'utf8',timeout:10000});
  expect(r.status).toBe(1);
  const error=JSON.parse(r.stderr.trim());
- expect(error.cause).toBe(id===undefined||['heystax-backend-journeys-v1','heystax-backend-journeys-v2'].includes(id)?'ENOENT':'backend_profile_invalid');
+ expect(error.cause).toBe(id===undefined||['heystax-backend-journeys-v1','heystax-backend-journeys-v2','heystax-backend-journeys-v3'].includes(id)?'ENOENT':'backend_profile_invalid');
 });
-test.each([old,journeys,'heystax-backend-journeys-v2'])('aggregate task declaration sums the per-slot ceilings: %s',id=>{
+test.each([old,journeys,'heystax-backend-journeys-v2','heystax-backend-journeys-v3'])('aggregate task declaration sums the per-slot ceilings: %s',id=>{
  const p=profiles.profileFor(id);expect(p.aggregate.pids).toBe(Object.values(p.slots).reduce((sum,s)=>sum+s.pids*s.maxInstances,0));
+});
+test('v3 extends only isolated journey cleanup and preserves the v2 profile identity',()=>{
+ const previous=profiles.profileFor('heystax-backend-journeys-v2'),next=profiles.profileFor('heystax-backend-journeys-v3');
+ expect(hash(profiles.profileBytes('heystax-backend-journeys-v2'))).toBe('0bcde64357203af07e5678e28984f991f5c3be977b7f989fa4ba871c228618c9');
+ const expected=JSON.parse(JSON.stringify(previous));expected.id='heystax-backend-journeys-v3';
+ expected.time.totalMilliseconds=820000;expected.time.cleanupMilliseconds=60000;
+ expect(next).toEqual(expected);
+ expect(profiles.workerLimits('heystax-backend-journeys-v3','app').phaseMilliseconds)
+  .toBe(profiles.workerLimits('heystax-backend-journeys-v2','app').phaseMilliseconds+40000);
 });

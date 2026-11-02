@@ -1,6 +1,6 @@
 {
   "name": "@colmbyrne/specflow",
-  "version": "0.12.0",
+  "version": "0.12.1",
   "description": "Specs that enforce themselves. Contract tests, journey hooks, and agent orchestration for LLM-driven development.",
   "license": "MIT",
   "repository": {
@@ -43,14 +43,15 @@
     "docs/native-plugin.md",
     "docs/contracts/feature_native_commands.yml",
     "docs/contracts/feature_native_hooks.yml",
-    "docs/contracts/feature_pr_handoff.yml"
+    "docs/contracts/feature_pr_handoff.yml",
+    "docs/improve-prebuild-recovery.md"
   ],
   "scripts": {
     "prepack": "node scripts/native-plugin.cjs --check && node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
     "prepublishOnly": "node scripts/native-plugin.cjs --check && node scripts/vendor-runtime.cjs --check && node scripts/sync-loop-templates.cjs --check && node scripts/normalize-eol.cjs",
     "sync:loops": "node scripts/sync-loop-templates.cjs",
     "normalize": "node scripts/normalize-eol.cjs",
-    "postinstall": "echo '' && echo '\u2554\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2557' && echo '\u2551  @colmbyrne/specflow installed                       \u2551' && echo '\u2560\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2563' && echo '\u2551                                                       \u2551' && echo '\u2551  Run in EACH project you want to enforce:             \u2551' && echo '\u2551                                                       \u2551' && echo '\u2551    npx @colmbyrne/specflow init . --runtime auto      \u2551' && echo '\u2551                                                       \u2551' && echo '\u2551  This creates hooks, contracts, agents, tests, and    \u2551' && echo '\u2551  CLAUDE.md (or appends rules to your existing one).   \u2551' && echo '\u2551  Then fill in the Project Context in CLAUDE.md.       \u2551' && echo '\u2551                                                       \u2551' && echo '\u255a\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u2550\u255d' && echo ''",
+    "postinstall": "echo '' && echo '╔═══════════════════════════════════════════════════════╗' && echo '║  @colmbyrne/specflow installed                       ║' && echo '╠═══════════════════════════════════════════════════════╣' && echo '║                                                       ║' && echo '║  Run in EACH project you want to enforce:             ║' && echo '║                                                       ║' && echo '║    npx @colmbyrne/specflow init . --runtime auto      ║' && echo '║                                                       ║' && echo '║  This creates hooks, contracts, agents, tests, and    ║' && echo '║  CLAUDE.md (or appends rules to your existing one).   ║' && echo '║  Then fill in the Project Context in CLAUDE.md.       ║' && echo '║                                                       ║' && echo '╚═══════════════════════════════════════════════════════╝' && echo ''",
     "test": "jest --no-coverage",
     "test:contracts": "jest tests/contracts/ --no-coverage",
     "test:hooks": "jest tests/hooks/ --no-coverage",

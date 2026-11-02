@@ -1,0 +1,76 @@
+{
+  "scope": "Read-only reconciliation of retained real product cycle; no test or consumed holdout replay",
+  "coreRun": "today-unavailable-431cd81c-f54e-46fe-b501-7245c9055dc3",
+  "ledger": {
+    "ok": true,
+    "entries": 40,
+    "improve_entries": 37,
+    "head_sha256": "361924d829c8e3f6fecac77f0b5481a9e94660864126bca34f58432d33829d2b",
+    "errors": []
+  },
+  "archiveFiles": 320,
+  "archiveMismatches": [],
+  "archiveManifest": "d60c90dd8f1d77c45615bb0c6237ced081d8188384685670b3e9c0bc9374f2b9",
+  "established": true,
+  "decision": "KEEP",
+  "retainedCommit": "76dc946dc58f0444d6cf9258ed6403d1812f94b2",
+  "criteria": [
+    {
+      "id": "AC-AVAILABILITY",
+      "status": "satisfied"
+    },
+    {
+      "id": "AC-PRESERVATION",
+      "status": "satisfied"
+    },
+    {
+      "id": "AC-UX",
+      "status": "satisfied"
+    }
+  ],
+  "gains": [
+    {
+      "criterion": "AC-AVAILABILITY",
+      "established": true,
+      "baseline_evidence": "ev-1",
+      "after_evidence": "ev-5",
+      "baseline": "fail",
+      "after": "pass",
+      "reason": "declared binary gain changed from fail to pass"
+    }
+  ],
+  "roles": [
+    {
+      "role": "scout",
+      "executor": "codex-host-delegate",
+      "provider": "host-session",
+      "observed_model": "unknown"
+    },
+    {
+      "role": "contract-writer",
+      "executor": "codex-host-delegate",
+      "provider": "host-session",
+      "observed_model": "unknown"
+    }
+  ],
+  "order": {
+    "frozen": 9,
+    "implementation": 19,
+    "decidingHoldouts": 1
+  },
+  "artifacts": {
+    "ledger.jsonl": "84b72b35c5d7ce6dd5d2813ec0384157e2e75ec7edf1972b168e7e5468f9043d",
+    "improvement-contract.v1.json": "7c44d306d6677a05f00a7d98077d80910d575afd3de7c97e8bfdbc5b0b574980",
+    "decision.json": "270907a954e86225063c4d8daaf160961387e306c40e301092305a8d04216b5b",
+    "report.md": "864a8bdb8d98c222c1a8d184a5fa28d7a3d37a5f9c12b73a06e2de9ba9e9fefe",
+    "retained.bundle": "aa3150c9dbe5508ac16ecf7ca4ca7f763c4fcb7d4ddd7c0848ff7f0b807b869d"
+  },
+  "controllerReportSha256": "d0d8804e296d29f7bc918c21ffcd0ee9d43f8a6e146ee3a71004624bc42201c7",
+  "runtimeSource": "62ef979097bc35a345a0524caf46d76ba61d9d60",
+  "installedPackage": {
+    "version": "0.12.1",
+    "files": 412,
+    "integrity": "sha512-2cebV6xDUGjlG/OzfsIeeoy3uLddVFh10hIozHrerwSuiful5FVQSeEtOke9lQAZ8bbuwUqc06VJgtbWn8sitQ==",
+    "scope": "Local tarball installation, not public registry or registered marketplace"
+  }
+}

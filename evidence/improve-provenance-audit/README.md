@@ -20,9 +20,16 @@ The audit does not claim recovery of missing historical demo-run records. Earlie
 
 `unavailable-route.json` records an actual installed subscription-CLI invocation with an intentionally unavailable model identifier. The native CLI reported `model_not_found` with an error result; Specflow returned `role_unavailable`. Exactly one provider request was retained. No alternate model, paid API fallback, product mutation or acceptance replay occurred. No served model is claimed for the failed request. Private request/raw/error/result hashes are retained for audit.
 
+## Later installed availability cycle
+
+[availability-reconstruction.json](availability-reconstruction.json) records a read-only reconciliation of the subsequent real Today availability cycle. The locally installed 0.12.1 candidate came from `62ef979097bc35a345a0524caf46d76ba61d9d60`; all 412 packaged files matched that source. This is distinct from published 0.12.0 and from later release candidates.
+
+The original runtime validated the 40-entry ledger chain. All 320 archived files still match their recorded hashes. Contract freeze preceded implementation; the ledger records one deciding holdout consumption. The controller's stored report establishes KEEP: the availability criterion changed from fail to pass, with preservation and independent UX criteria satisfied. The retained commit is `76dc946dc58f0444d6cf9258ed6403d1812f94b2`. [Product PR235](https://github.com/Hulupeep/tabstax-webapps/pull/235) remains a draft; no production merge or deployment is implied.
+
+Unlike the earlier quick-add cycle, this run recorded the host scout and contract-writer contemporaneously. Their model is explicitly unknown. Native builder and reviewers used subscription CLI routes; same-vendor model separation is not cross-family Duo. Failed attempts, including the first UX invocation, remain in the archive. This reconciliation did not run tests again, rewrite historical receipts, or replay a consumed holdout.
+
 ## Remaining acceptance
 
-- #177 remains open: the real-product run has distinct native critique/oracle/builder/peer/evaluator provenance, but no contemporaneous host scout/contract-writer records. Record them in the next real cycle; never fabricate historical provenance.
-- #179's reconstruction checks are evidenced here. Merge and reconcile its acceptance after the #305 verifier changes pass review and CI.
-- #172 still requires an actual bounded real-product run with later work influenced by earlier evidence. Fixture outcomes are not a substitute.
-- Public npm0.12.0 predates these changes. A distinct release and fresh installed/native qualification remain required.
+- #177's later contemporaneous role evidence and #179's reconstruction/reporting evidence are reconciled in their closed issues. Earlier missing provenance remains missing; it was not fabricated retrospectively.
+- #172 still requires a completed bounded real-product sequence with later work influenced by earlier evidence. The availability cycle is one completed cycle. Subsequent selection and failed oracle authoring do not establish the repeat, even though the tracker is closed.
+- #171 still requires the distinct release and fresh registered/native installation qualification. Public npm0.12.0 predates these fixes; local 0.12.1 tarballs are not published-release evidence.

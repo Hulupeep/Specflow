@@ -138,8 +138,10 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
       const old=outcome(rows(s,r),req.outcome_id);m.need(m.text(req.source_revision,120),'invalid_memory_observation');
       const o=req.observation;let evidence=[];
       if(o?.kind==='proposal'){
+        m.need(old.data.disposition!=='abandoned_before_build','memory_proposal_not_attempted');
         m.shape(o,['kind','state']);m.need(['pending_delivery','open','merged','closed_unmerged','unknown'].includes(o.state)&&Array.isArray(req.evidence)&&req.evidence.length===0,'invalid_memory_observation');
       }else{
+        m.need(old.data.disposition!=='abandoned_before_build','memory_experiment_not_attempted');
         m.shape(o,['kind','verdict','criteria_revision','rationale']);
         m.need(o.kind==='experiment'&&['proven','disproven','needs-change'].includes(o.verdict)&&actor.role!=='builder'&&m.text(o.rationale)&&
           o.criteria_revision===old.data.task.criteria_revision,'invalid_memory_verdict');
@@ -168,10 +170,11 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
   function terminal(s,r,c,proof,ctx) {
     if(!r.memory_required)return;
     const selection=c.memory_selection;m.need(selection&&proof.base_commit===selection.base_commit&&proof.candidate_digest===selection.candidate_digest,'memory_terminal_selection_mismatch');
-    const valid=!proof.core_diagnosis.baseline_blocker&&!proof.core_diagnosis.holdout_exposed&&!proof.core_diagnosis.binding_errors.length;
+    const valid=proof.core_diagnosis.disposition!=='abandoned_before_build'&&!proof.core_diagnosis.baseline_blocker&&!proof.core_diagnosis.holdout_exposed&&!proof.core_diagnosis.binding_errors.length;
     m.append(s,r.canonical_repo,r.id,who(ctx),'outcome',{...selection,cycle_id:c.id,core_run_id:c.binding.core_run_id,
       manifest_sha256:proof.manifest_sha256,decision:proof.decision,base_commit:proof.base_commit,retained_commit:proof.retained_commit,
-      contract_revision:proof.contract_revision,verification:{valid,category:valid?'none':'verification'},experiment_verdict:'needs-change',
+      ...(proof.core_diagnosis.disposition==='abandoned_before_build'?{disposition:'abandoned_before_build',implementation_attempted:false}:{}),
+      contract_revision:proof.contract_revision,verification:{valid,category:proof.core_diagnosis.disposition==='abandoned_before_build'?'abandoned_before_build':valid?'none':'verification'},experiment_verdict:proof.core_diagnosis.disposition==='abandoned_before_build'?'not-attempted':'needs-change',
       evidence:[{id:c.binding.job_id,sha256:proof.manifest_sha256}]},now());
     r.memory_selection=null;
   }
@@ -195,7 +198,8 @@ function attach({store,access,ownerPrincipal,now,memory,guardWrite=()=>{}}) {
     const all=rows(s,r),outcomes=all.filter(e=>e.run_id===r.id&&e.kind==='outcome');
     return {version:1,support:'structural_family_guard_and_cited_selection',revision:m.revision(s,r.canonical_repo),
       outcomes:outcomes.map(e=>({id:e.hash,code_decision:e.data.decision,verification:e.data.verification,
-        experiment_verdict:all.filter(x=>x.data.outcome_id===e.hash&&x.data.observation?.kind==='experiment').at(-1)?.data.observation.verdict||e.data.experiment_verdict,proposal:all.filter(x=>x.kind==='proposal_observation'&&x.data.outcome_id===e.hash).at(-1)?.data.observation||null})),
+        ...(e.data.disposition==='abandoned_before_build'?{disposition:e.data.disposition,implementation_attempted:false}:{}),
+        experiment_verdict:e.data.disposition==='abandoned_before_build'?'not-attempted':all.filter(x=>x.data.outcome_id===e.hash&&x.data.observation?.kind==='experiment').at(-1)?.data.observation.verdict||e.data.experiment_verdict,proposal:all.filter(x=>x.kind==='proposal_observation'&&x.data.outcome_id===e.hash).at(-1)?.data.observation||null})),
       limitations:['advisory_untrusted','no_general_semantic_similarity_or_autonomous_learning_claim','KEEP_is_not_demand_or_revenue_proof']};
   }
   return {public:{decisionPack,selectMemory,resolveMemory,observeMemory,validateMemoryStage},beforeCycle,bindCycle,beforeStage,terminal,summary};

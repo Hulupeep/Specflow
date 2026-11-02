@@ -364,4 +364,166 @@ function reconcileStopped(store, jobId) {
     return { state: 'operator_required', cause: 'backend_cleanup_unconfirmed', attempt: ref, ownerState };
   } finally { fs.closeSync(fd); }
 }
-module.exports = { begin, read, seal, envelope, finish, terminal, reconcileStopped, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents };
+// Explicit operator recovery of a failed cleanup. A stopped owner and sealed
+// attempt are necessary, but never sufficient: every acknowledged Docker ID
+// and its reserved name must be absent twice. The original failure and
+// operator fence remain signed and visible after release.
+async function resolveOperator(store, ref) {
+  validateReference(ref);
+  const fd=area(store); let observed, markerSha256;
+  try {
+    const attempt=current(store,fd,ref);
+    need(processIdentity.state(attempt.owner)==='dead','backend_attempt_owner_unavailable');
+    const marker=readSigned(store,fd,`operator-${ref.attemptId}.json`);
+    need(marker.attemptId===ref.attemptId&&marker.attemptSha256===ref.attemptSha256&&marker.state==='operator_required','backend_cleanup_unconfirmed');
+    markerSha256=hash(canonical(marker));
+    const sealed=readSigned(store,fd,`sealed-${ref.attemptId}.json`);
+    need(sealed.attemptId===ref.attemptId&&sealed.attemptSha256===ref.attemptSha256,'backend_cleanup_unconfirmed');
+    observed=intents(store,ref).map(({value:i,sha256})=>{
+      need(processIdentity.state(i.creator)==='dead'&&processIdentity.state(i.supervisor)==='dead','backend_attempt_owner_unavailable');
+      const events=resourceEvents(store,ref,i.slot),by=state=>events.find(e=>e.state===state);
+      need(!by('unconfirmed')&&!by('foreign'),'backend_cleanup_unconfirmed');
+      if(by('not_dispatched')){
+        need(events.length===1,'backend_cleanup_unconfirmed');
+        return {slot:i.slot,intentSha256:sha256,id:null,name:i.name,status:'absent'};
+      }
+      const created=by('created');
+      need(by('dispatching')&&created&&digest(created.id)&&digest(created.inspectionSha256)&&
+        i.name===`specflow-${ref.attemptId}-${i.slot}`,'backend_cleanup_unconfirmed');
+      for(const event of events.filter(e=>['started','removed'].includes(e.state)))
+        need(event.id===created.id&&event.inspectionSha256===created.inspectionSha256,'backend_cleanup_unconfirmed');
+      return {slot:i.slot,intentSha256:sha256,id:created.id,name:i.name,status:'absent_after_operator'};
+    });
+    need(!present(fd,`mutation-${ref.attemptId}`),'backend_attempt_mutation_busy');
+  } finally {fs.closeSync(fd);}
+  const {spawn}=require('child_process');
+  const absent=target=>new Promise((resolve,reject)=>{
+    const child=spawn('/usr/bin/docker',['--host','unix:///var/run/docker.sock','container','inspect','--format','{{.Id}}',target],
+      {env:{PATH:'/usr/bin:/bin',HOME:'/nonexistent',DOCKER_CONFIG:'/nonexistent',LC_ALL:'C'},stdio:['ignore','pipe','pipe']});
+    let error='',bytes=0,limited=false;
+    const timer=setTimeout(()=>{limited=true;child.kill('SIGKILL');},5000);
+    for(const stream of [child.stdout,child.stderr])stream.on('data',chunk=>{
+      bytes+=chunk.length;if(bytes>4096){limited=true;child.kill('SIGKILL');return;}
+      if(stream===child.stderr)error+=chunk;
+    });
+    child.on('error',()=>{clearTimeout(timer);reject(Error('backend_cleanup_unconfirmed'));});
+    child.on('close',code=>{clearTimeout(timer);
+      if(limited)return reject(Error('backend_cleanup_unconfirmed'));
+      if(code===1&&/No such (container|object)/i.test(error))return resolve(true);
+      reject(Error('backend_cleanup_unconfirmed'));
+    });
+  });
+  const targets=observed.filter(r=>r.id).flatMap(r=>[r.id,r.name]);
+  for(let pass=0;pass<2;pass++){
+    await Promise.all(targets.map(absent));
+    if(pass===0)await new Promise(resolve=>setTimeout(resolve,1000));
+  }
+  const final=area(store);
+  try {return mutate(store,final,ref,()=>{
+    const attempt=current(store,final,ref);
+    need(processIdentity.state(attempt.owner)==='dead','backend_attempt_owner_unavailable');
+    need(hash(canonical(readSigned(store,final,`operator-${ref.attemptId}.json`)))===markerSha256,'backend_cleanup_unconfirmed');
+    need(canonical(intents(store,ref).map(({value:i,sha256})=>{
+      const events=resourceEvents(store,ref,i.slot),created=events.find(e=>e.state==='created');
+      return {slot:i.slot,intentSha256:sha256,id:created?.id??null,name:i.name,
+        status:created?'absent_after_operator':'absent'};
+    }))===canonical(observed),'backend_cleanup_unconfirmed');
+    const observation={schema:'specflow.backend-operator-observation/v1',attemptId:ref.attemptId,
+      attemptSha256:ref.attemptSha256,markerSha256,atMs:Date.now(),passes:2,resources:observed};
+    const name=`operator-${ref.attemptId}.observed.json`;
+    if(present(final,name)){
+      const prior=readSigned(store,final,name);
+      need(prior.attemptSha256===ref.attemptSha256&&prior.markerSha256===markerSha256&&prior.passes===2&&
+        canonical(prior.resources)===canonical(observed),'backend_cleanup_unconfirmed');
+    }
+    else writeExclusive(store,final,name,observation);
+    const saved=readSigned(store,final,name);
+    const envelopeName=`envelope-${ref.attemptId}`;
+    if(present(final,envelopeName))removeEnvelope(store,final,ref);
+    else need(present(final,`${envelopeName}.json`)&&present(final,`${envelopeName}-intent.json`),'backend_cleanup_unconfirmed');
+    const terminalName=`terminal-${ref.attemptId}.json`;
+    const value={schema:'specflow.backend-attempt-terminal/v1',attemptId:ref.attemptId,
+      attemptSha256:ref.attemptSha256,phase:attempt.phase,finishedAtMs:Date.now(),
+      state:'operator_resolved',cause:'backend_cleanup_failed',backendTerminalSha256:null,
+      productReceiptSha256:null,resources:observed,credentialEnvelopeRemoved:true,
+      operatorSha256:markerSha256,observationSha256:hash(canonical(saved))};
+    if(present(final,terminalName))need(canonical(readSigned(store,final,terminalName).resources)===canonical(observed),'backend_cleanup_unconfirmed');
+    else writeExclusive(store,final,terminalName,value);
+    const terminalValue=readSigned(store,final,terminalName),releaseName=`release-${ref.attemptId}.json`;
+    need(terminalValue.state==='operator_resolved'&&terminalValue.cause==='backend_cleanup_failed'&&
+      terminalValue.operatorSha256===markerSha256&&terminalValue.observationSha256===hash(canonical(saved))&&
+      terminalValue.credentialEnvelopeRemoved===true,'backend_cleanup_unconfirmed');
+    if(!present(final,releaseName))writeExclusive(store,final,releaseName,
+      {attemptSha256:ref.attemptSha256,terminalSha256:hash(canonical(terminalValue))});
+    need(readSigned(store,final,releaseName).terminalSha256===hash(canonical(terminalValue)),'backend_release_incomplete');
+    fs.unlinkSync(`/proc/self/fd/${final}/${activeName(ref.jobId)}`);fs.fsyncSync(final);
+    return terminalValue;
+  });}finally{fs.closeSync(final);}
+}
+// Evidence-only history check; a retained operator fence is accepted only
+// with the signed two-pass resolution and release chain.
+function verifyClosedHistory(store, runId, contractSha256, expectedAttempts = []) {
+  need(id(runId)&&digest(contractSha256)&&Array.isArray(expectedAttempts),'backend_input_invalid');
+  for(const ref of expectedAttempts){validateReference(ref);need(ref.runId===runId,'backend_attempt_proof_missing');}
+  const fd=area(store),proofs=[];let currentContract=false;
+  try {
+    const names=fs.readdirSync(`/proc/self/fd/${fd}`);need(names.length<=100000,'backend_cleanup_unconfirmed');
+    const presentNames=new Set(names),related=new Map();
+    const orphan=name=>{const error=Error('backend_attempt_record_orphan');error.record=name;throw error;};
+    for(const name of names){
+      if(name.startsWith('active-')){
+        let ref;try{ref=readSigned(store,fd,name);validateReference(ref);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
+        if(!presentNames.has(attemptName(ref.attemptId)))orphan(name);
+      }else if(/^(intent|resource|mutation|operator|sealed|terminal|release|envelope)-/.test(name)){
+        const match=/^[a-z]+-([a-f0-9-]{36})(?:[-.]|$)/.exec(name);
+        if(!match||!presentNames.has(attemptName(match[1])))orphan(name);
+        const rows=related.get(match[1])||[];rows.push(name);related.set(match[1],rows);
+      }else if(!/^attempt-[a-f0-9-]{36}\.json$/.test(name)){const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
+    }
+
+    for(const name of names.filter(n=>/^attempt-[a-f0-9-]+\.json$/.test(n))){
+      let signed;try{signed=readSigned(store,fd,name);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
+      if(signed?.runId!==runId)continue;
+      let a;try{a=validateAttempt(signed);}catch{const error=Error('backend_attempt_record_unreadable');error.record=name;throw error;}
+      currentContract||=a.contractSha256===contractSha256;
+      need(processIdentity.state(a.owner)==='dead','backend_cleanup_unconfirmed');
+      const hasOperator=present(fd,`operator-${a.attemptId}.json`);
+      const ref=reference(a),active=present(fd,activeName(a.jobId))?readSigned(store,fd,activeName(a.jobId)):null;
+      if(active)validateReference(active);
+      const ownsClaim=active&&canonical(active)===canonical(ref);
+      if(!present(fd,`terminal-${a.attemptId}.json`)){
+        need(!hasOperator,'backend_cleanup_unconfirmed');
+        // begin persists its immutable attempt before competing for the claim.
+        // No action can have been issued through this attempt without a claim
+        // and a durable mutation/intent/envelope record. Keep all records intact.
+        const otherRecords=related.get(a.attemptId)||[];
+        need(!ownsClaim&&otherRecords.length===0,'backend_attempt_inert_unproven');
+        proofs.push({attempt:ref,disposition:'never_claimed',terminalSha256:null});continue;
+      }
+      let t;try{t=terminal(store,ref);}catch{throw Error('backend_cleanup_unconfirmed');}
+      if(t.state==='operator_resolved'){
+        need(hasOperator&&t.cause==='backend_cleanup_failed'&&t.credentialEnvelopeRemoved===true&&
+          t.resources.every(r=>['absent_after_operator','absent'].includes(r.status)),'backend_cleanup_unconfirmed');
+        const marker=readSigned(store,fd,`operator-${a.attemptId}.json`);
+        const observation=readSigned(store,fd,`operator-${a.attemptId}.observed.json`);
+        need(t.operatorSha256===hash(canonical(marker))&&t.observationSha256===hash(canonical(observation))&&
+          observation.attemptSha256===ref.attemptSha256&&observation.markerSha256===t.operatorSha256&&
+          observation.passes===2&&
+          canonical(observation.resources)===canonical(t.resources),'backend_cleanup_unconfirmed');
+        const release=readSigned(store,fd,`release-${a.attemptId}.json`);
+        need(release.attemptSha256===ref.attemptSha256&&
+          release.terminalSha256===hash(canonical(t)),'backend_release_incomplete');
+      }else need(!hasOperator&&t.state==='cleaned'&&t.credentialEnvelopeRemoved===true&&
+        t.resources.every(r=>['removed','absent'].includes(r.status)),'backend_cleanup_unconfirmed');
+      if(ownsClaim){
+        let release;try{release=readSigned(store,fd,`release-${a.attemptId}.json`);}catch{throw Error('backend_release_incomplete');}
+        need(release.attemptSha256===ref.attemptSha256&&release.terminalSha256===hash(canonical(t)),'backend_release_incomplete');
+      }
+      proofs.push({attempt:ref,disposition:t.state,terminalSha256:hash(canonical(t))});
+    }
+    need(expectedAttempts.every(ref=>proofs.some(p=>canonical(p.attempt)===canonical(ref))),'backend_attempt_proof_missing');
+    need(proofs.length>0,'backend_attempt_not_admitted');
+    need(currentContract,'backend_cleanup_unconfirmed');return proofs;
+  } finally {fs.closeSync(fd);}
+}
+module.exports = { begin, read, seal, envelope, finish, terminal, reconcileStopped, resolveOperator, intent, intents, operatorRequired, validateAttempt, SLOTS, resourceEvent, resourceEvents, verifyClosedHistory };
