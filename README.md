@@ -95,7 +95,7 @@ These controls cover supported scoped execution paths; they are not a general OS
 
 ## Direction and current scope
 
-The goal is useful, explainable intent-to-evidence development with replaceable research, build and review roles. HeyStax is the intended operational control plane. Repo-local Improve code, controller interfaces and qualified source adapters exist; real-product benefit, final released installs and unattended end-to-end operation each need their own evidence. No recurring schedule is activated by this documentation.
+The goal is useful, explainable intent-to-evidence development with replaceable research, build and review roles. HeyStax is the intended operational control plane. Repo-local Improve code and controller interfaces exist, and the 0.12.1 npm and registered marketplace installation routes have been qualified. The #219/#215 owner-local release demonstrated a separately granted fixture draft PR and one configured HeyStax action update. Real-product benefit and unattended recurring operation still need their own evidence. No recurring schedule is activated by this documentation.
 
 The intended commercial wedge is an evidence packet an agency or product team can review with a client: accepted scope, current checks, actual outcomes, unresolved findings and authorization. Customer acquisition and measurable benefit are not established by producing more tickets or green checks.
 
