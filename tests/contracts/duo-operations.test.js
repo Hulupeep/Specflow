@@ -662,3 +662,46 @@ describe('CITATION-REPAIR (#341): a citation technicality downgrades one row, ne
   expect(readRun(unread.id).criteria['AC-1'].status).toBe('verified');
  });
 });
+
+describe('EARLY-STOP (#343): an unfinished peer review is a protocol failure, not a verdict',()=>{
+ const roots=['request.json','goal.md','manifest.json','diff.patch','index.patch','commits.txt'];
+ // Shape of tabstax#1071 S2 run 1793906963365-dc3a18b7 round 002 (synthetic content): the Codex peer
+ // read only the root artifacts, verified nothing, said every row "was not inspected", and raised a
+ // criterion-less coverage finding against its own review.
+ const stopEarly=(r,req)=>{
+  r.outcome='blocked';r.summary='The frozen review was not completed. The submitted evidence has not been independently inspected.';
+  r.inspected=[...roots];
+  r.assessments=req.batch.criteria.map(id=>({id,status:'unverified',evidence:[],reason:`The ${id} behaviour and its execution evidence were not inspected.`}));
+  r.findings=[{id:'REVIEW-COVERAGE-001',criterion:null,kind:'risk',basis:'The required independent review must cover the task, implementation and raw evidence.',evidence:'The task file and raw execution evidence were not inspected.',action:'Complete the frozen review.',verification:'Every required read inspected'}];
+  r.resolutions=req.open_findings.map(f=>({id:f.id,status:'open',evidence:[],reason:'Not inspected.'}));r.diagnostics=[];
+ };
+ test('a peer that reads only the root artifacts and verifies nothing is a protocol failure with the retry path',()=>{
+  const run=start('claude-code');
+  const out=review(run,batch(),peer({outcome:'blocked',change:stopEarly}));
+  const round=out.history.at(-1);
+  expect(out.outcome).toBe('blocked');
+  expect(round.stage).toBe('peer_review');expect(round.attempted).toBe(true);
+  expect(round.summary).toMatch(/^Peer stopped before completing the review: it read 6 of \d+ required artifacts \(unread: tree\/task\.md, tree\/raw\.txt.*verified or closed nothing/);
+  const state=readRun(run.id);
+  expect(state.peerFailures).toBe(1);
+  expect(state.reviewControl.protocolFailures).toBe(1);expect(state.reviewControl.stagnant).toBe(0);
+  expect(state.findings['REVIEW-COVERAGE-001']).toBeUndefined();
+  // The retry with a complete review is accepted.
+  expect(review(run,batch(),peer()).outcome).toBe('accepted');
+ });
+ test('a complete read that verifies nothing with specific reasons is still a verdict',()=>{
+  const run=start('claude-code');
+  const out=review(run,batch(),peer({outcome:'changes_required',change:r=>{r.assessments.forEach(a=>{a.status='unverified';a.reason=`${a.id}: the observed value 41 differs from the required 42.`;});}}));
+  expect(out.outcome).toBe('changes_required');expect(out.history.at(-1).stage).toBe('validated');
+  expect(readRun(run.id).reviewControl.protocolFailures).toBe(0);
+ });
+ test('the reading plan names every required read and says an early answer is rejected',()=>{
+  const run=start('claude-code');
+  expect(review(run,batch(),peer()).outcome).toBe('accepted');
+  const prompt=fs.readFileSync(path.join(root,'.specflow/duo',run.id,'round-001/prompt.txt'),'utf8'),request=JSON.parse(fs.readFileSync(path.join(root,'.specflow/duo',run.id,'round-001/request.json'),'utf8'));
+  const commands=[...prompt.matchAll(/^ {4}((?:cat|sed) .+)$/gm)].map(m=>require('../../scripts/duo-review-receipts.cjs').commandRead(m[1]).files[0]);
+  for(const file of request.requiredReads)expect(commands).toContain(file);
+  expect(prompt).toContain(`This plan covers all ${request.requiredReads.length} required reads. Run every one of them, one per step, before you write your response; do not answer early.`);
+  expect(prompt).toContain('A response that skips required reads and verifies nothing is rejected by the helper as a protocol failure');
+ });
+});
