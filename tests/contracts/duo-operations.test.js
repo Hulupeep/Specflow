@@ -598,3 +598,67 @@ describe('CI-DIGEST and ASSESSMENT-PROTOCOL (#339)',()=>{
   expect(prompt).toContain("is a protocol failure, not a verdict: the helper rejects the whole response");
  });
 });
+
+describe('CITATION-REPAIR (#341): a citation technicality downgrades one row, never the whole response',()=>{
+ // Mutate the peer's final response after the fixture's direction/instruction feedback.
+ const after=(base,mutate)=>(exe,args,opts)=>{const out=base(exe,args,opts);const file=opts?.cwd&&path.join(opts.cwd,'response.json');if(exe==='codex'&&args[0]==='exec'&&file&&fs.existsSync(file)){const r=JSON.parse(fs.readFileSync(file,'utf8'));mutate(r);fs.writeFileSync(file,JSON.stringify(r));}return out;};
+ test('a verified row without an evidence citation is downgraded; the rest of the response stands and a repair review may reuse the evidence',()=>{
+  const run=start('claude-code');
+  const out=review(run,batch(),after(peer(),r=>{r.assessments.find(a=>a.id==='AC-1').evidence=[];}));
+  expect(out.outcome).toBe('blocked');
+  const round=out.history.at(-1);
+  expect(round.stage).toBe('validated');
+  expect(round.citationRepairs).toEqual([expect.objectContaining({kind:'assessment',id:'AC-1',repair:'downgraded',from:'verified',to:'unverified'})]);
+  const state=readRun(run.id);
+  expect(state.criteria['AC-1'].status).toBe('unverified');
+  expect(state.criteria['AC-1'].reason).toMatch(/^\[helper citation repair: verified without a batch\.evidence citation\]/);
+  expect(state.criteria['AC-2'].status).toBe('verified');expect(state.criteria['GATE-TESTS'].status).toBe('verified');
+  expect(state.next).toMatch(/^Citation repair: the helper downgraded assessment AC-1/);
+  expect(round.review.direction.assessment).not.toBe('complete');
+  // Same evidence, no source change: the repair review is permitted and can now accept.
+  const repaired=review(run,batch(),peer());
+  expect(repaired.outcome).toBe('accepted');
+  expect(readRun(run.id).criteria['AC-1'].status).toBe('verified');
+ });
+ test('another spelling of a read batch.evidence path is normalized, not voided',()=>{
+  const run=start('claude-code');
+  const out=review(run,batch(),after(peer(),r=>{r.assessments.find(a=>a.id==='AC-1').evidence=['tree/raw.txt'];r.assessments.find(a=>a.id==='AC-2').evidence=['raw.txt:1'];}));
+  expect(out.outcome).toBe('accepted');
+  expect(out.history.at(-1).citationRepairs.map(r=>[r.id,r.repair])).toEqual([['AC-1','normalized'],['AC-2','normalized']]);
+  expect(readRun(run.id).criteria['AC-1'].evidence.map(e=>e.path)).toEqual(['raw.txt']);
+ });
+ test('a citation of an unsubmitted or unread file never verifies',()=>{
+  const run=start('claude-code');
+  const out=review(run,batch(),after(peer(),r=>{r.assessments.find(a=>a.id==='AC-1').evidence=['invented.txt'];}));
+  expect(out.outcome).toBe('blocked');expect(readRun(run.id).criteria['AC-1'].status).toBe('unverified');
+  expect(out.history.at(-1).citationRepairs[0]).toMatchObject({id:'AC-1',repair:'downgraded',issue:'cites invented.txt, not a read batch.evidence path'});
+ });
+ test('instruction rows: a missing tree/ prefix is normalized; an unread artifact downgrades only that row to unproven',()=>{
+  const request={batch:{evidence:['raw.txt']},instruction_review:{artifactHashes:{'tree/raw.txt':'h','tree/PRDs/spec.md':'h','tree/unread.md':'h'}}};
+  const result={inspected:['tree/raw.txt','tree/PRDs/spec.md'],instruction_assessments:[
+   {instructionId:'I-1',outcome:'satisfied',reason:'done',inspected:['PRDs/spec.md'],evidence:['raw.txt']},
+   {instructionId:'I-2',outcome:'replaced_with_justification',replacementId:'I-9',reason:'replaced',inspected:['tree/unread.md'],evidence:['raw.txt']}]};
+  const repairs=duo.instructionCitationRepair(result,request);
+  expect(result.instruction_assessments[0]).toMatchObject({outcome:'satisfied',inspected:['tree/PRDs/spec.md']});
+  expect(result.instruction_assessments[1]).toMatchObject({outcome:'unproven',inspected:[]});
+  expect(result.instruction_assessments[1].replacementId).toBeUndefined();
+  expect(repairs.map(r=>[r.id,r.repair])).toEqual([['I-1','normalized'],['I-2','downgraded']]);
+ });
+ test('an otherwise accepting response with one bad instruction citation is kept, not voided',()=>{
+  const run=start('claude-code');
+  expect(review(run,batch(),peer({outcome:'changes_required'})).outcome).toBe('changes_required');
+  expect(Object.keys(readRun(run.id).instructions||{}).length).toBeGreaterThan(0);
+  put('code.cjs','module.exports = 42;');put('raw.txt','Observed correct value and explanation; tests passed.');
+  const out=review(run,batch({resolutions:[{id:'F1',change:'fixed value',evidence:['raw.txt']}]}),after(peer(),r=>{for(const row of r.instruction_assessments)row.inspected=['raw.txt'];}));
+  expect(out.outcome).toBe('accepted');
+  expect(out.history.at(-1).citationRepairs.every(r=>r.kind==='instruction'&&r.repair==='normalized')).toBe(true);
+  const unread=start('claude-code');
+  expect(review(unread,batch(),peer({outcome:'changes_required'})).outcome).toBe('changes_required');
+  put('raw.txt','Observed correct value and explanation; tests passed again.');
+  const kept=review(unread,batch({resolutions:[{id:'F1',change:'fixed value',evidence:['raw.txt']}]}),after(peer(),r=>{for(const row of r.instruction_assessments)row.inspected=['tree/never-read.md'];}));
+  expect(kept.history.at(-1).stage).toBe('validated');expect(kept.outcome).toBe('blocked');
+  expect(kept.history.at(-1).citationRepairs.some(r=>r.kind==='instruction'&&r.repair==='downgraded')).toBe(true);
+  expect(Object.values(readRun(unread.id).instructions).some(i=>i.state==='outstanding')).toBe(true);
+  expect(readRun(unread.id).criteria['AC-1'].status).toBe('verified');
+ });
+});

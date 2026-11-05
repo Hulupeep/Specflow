@@ -79,7 +79,7 @@ function begin(root, record, tier, builder, {criteria = [], ownerRun = null, evi
     const previous = previousReview(rounds), scope = policy.inputHash(record);
     if (rounds.at(-1)?.status === 'pending') throw Error('Prior scoped review is unfinished; retain it and record the failure before continuing');
     if (previous?.outcome === 'escalated') throw Error('Repair-induced findings require escalation, not another automatic review');
-    if (previous?.scope === scope && (!evidenceFingerprint || previous.evidenceFingerprint === evidenceFingerprint) && rounds.at(-1)?.status !== 'protocol_failed' && !continuation.pending(c).length) throw Error('No new evidence or scope change since the last review; stop instead of repeating it');
+    if (previous?.scope === scope && (!evidenceFingerprint || previous.evidenceFingerprint === evidenceFingerprint) && rounds.at(-1)?.status !== 'protocol_failed' && !rounds.at(-1)?.citationRepair?.length && !continuation.pending(c).length) throw Error('No new evidence or scope change since the last review; stop instead of repeating it');
     const reservation = { id: crypto.randomUUID(), tier, number: record.issue.number, scope, builder, criteria, ownerRun, evidenceFingerprint, findings:structuredClone(previous?.findings || []), gateIds:(record.profile?.gates || []).map(g=>g.id), at: new Date().toISOString(), status: 'pending' };
     if(reviewAssignment){reservation.reviewAssignment=reviewAssignment;reservation.reviewMethod='fresh-native';reservation.reviewPurpose='preparation';}
     continuation.beforeCall(c,refs=>validateRecovery(root,refs));
@@ -162,7 +162,7 @@ function complete(root, reservation, report) {
     const protocol = provenanceErrors.length > 0 || result.protocolErrors.length > 0;
     const progressDiscarded = report.nativeOutcome === 'accepted' && report.readinessComplete === true && !['passed','passed_with_warnings'].includes(result.outcome);
     if (!protocol) for (const r of result.reattachments) state.events.push({ kind: 'finding-reattached', tier: reservation.tier, round: reservation.id, ...r, at: new Date().toISOString() });
-    Object.assign(round, result, { progressDiscarded, status: protocol ? 'protocol_failed' : 'complete', verifiedCriteria:protocol||progressDiscarded?[]:(report.verifiedCriteria || []), evidence: report.evidence || [], atEnd: new Date().toISOString() });
+    Object.assign(round, result, { citationRepair: Array.isArray(report.citationRepair) ? report.citationRepair : [], progressDiscarded, status: protocol ? 'protocol_failed' : 'complete', verifiedCriteria:protocol||progressDiscarded?[]:(report.verifiedCriteria || []), evidence: report.evidence || [], atEnd: new Date().toISOString() });
     if (protocol) round.findings = structuredClone(previousReview(rounds.slice(0,-1))?.findings || []);
     continuation.observe(c,{protocol,achievements:protocol?[]:achievements(round)});
     return structuredClone(round);

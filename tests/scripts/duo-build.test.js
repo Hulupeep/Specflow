@@ -100,13 +100,17 @@ test('preparation can correct two rejected peer protocols and then obtain a scop
   const badPromotion = fakePeer('accepted', (opts, result) => {
     result.direction = { assessment: 'on_track', goal_connection: 'Preparation accepted', preserve: [], next_steps: [{ criterion: 'AC-1', owner: 'builder', action: 'Run specification promote', done_when: 'Tier promoted' }] };
   });
-  expect(reviewOwned(root, run.id, batch(), badEvidence).outcome).toBe('blocked');
+  // #341: an uncited verification is a per-row citation repair, not a voided response.
+  const repaired = reviewOwned(root, run.id, batch(), badEvidence);
+  expect(repaired.outcome).toBe('blocked');
+  expect(repaired.history[0]).toMatchObject({ stage: 'validated', citationRepairs: [expect.objectContaining({ kind: 'assessment', id: 'AC-1', repair: 'downgraded' })] });
+  expect(repaired.criteria['AC-1'].status).not.toBe('verified');
   expect(reviewOwned(root, run.id, batch(), badPromotion).outcome).toBe('blocked');
   const accepted = reviewOwned(root, run.id, batch(), fakePeer());
   expect(accepted.outcome).toBe('accepted');
-  expect(accepted.history.map(r => r.stage)).toEqual(['peer_review', 'peer_review', 'validated']);
+  expect(accepted.history.map(r => r.stage)).toEqual(['validated', 'peer_review', 'validated']);
   const reviews = require('../../scripts/specflow-reviews.cjs');
-  expect(reviews.status(root, record, 'contracted')).toMatchObject({ attempts: 1, protocolFailures: 0, passed: false });
+  expect(reviews.status(root, record, 'contracted')).toMatchObject({ attempts: 2, protocolFailures: 0, passed: false });
   expect(fs.readFileSync(path.join(root, '.specflow/duo', run.id, 'round-003/prompt.txt'), 'utf8')).toContain('Promotion is a subsequent builder action');
 });
 test('#228: scoped P2 evidence uses submitted batch paths and a rejected response retains the retry', () => {
