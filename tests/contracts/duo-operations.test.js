@@ -514,7 +514,7 @@ describe('REMOTE-RELEVANCE (#337): CI evidence only where it can bear on a crite
   expect(request.remote_ci.changedPaths).toBeGreaterThanOrEqual(3);
   const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8');
   expect(prompt).toContain('when request.remote_ci.required is false, remote CI runs and job logs cannot verify or block any criterion of this review');
-  expect(prompt).toContain('a complete multi-megabyte log is never required');
+  expect(prompt).toContain('never demand or read a raw log larger than the read budget');
   expect(prompt).toContain("A closed or merged pull request's head is historical: never compare against it or block on it.");
   expect(prompt).toContain('An unmet, unavailable or not-applicable gate, a remote fact you cannot observe, or one open finding blocks only the criteria it concerns');
   expect(prompt).not.toContain('checks and raw job logs yourself');
@@ -541,5 +541,60 @@ describe('REMOTE-RELEVANCE (#337): CI evidence only where it can bear on a crite
    gitIn('checkout','-q','--detach');
    expect(duo.remoteBranch(root)).toMatchObject({branch:null,remote_head:null});
   }finally{fs.rmSync(bare,{recursive:true,force:true});}
+ });
+});
+
+describe('CI-DIGEST and ASSESSMENT-PROTOCOL (#339)',()=>{
+ const roundFile=(run,name)=>path.join(root,'.specflow/duo',run.id,'round-001',name);
+ const raw=['2026-11-05T10:00:00Z Run npm test','  PASS tests/a.test.js','  FAIL tests/b.test.js','##[error]Process completed with exit code 1.',...Array.from({length:3000},(_,i)=>`noise line ${i} ${'n'.repeat(60)}`),'Tests:       1 failed, 41 passed, 42 total'].join('\n')+'\n';
+ const withGh=(base,calls=[])=>(exe,args,opts)=>{if(exe==='gh'&&args[0]==='run'){calls.push(args.join(' '));return raw;}return base(exe,args,opts);};
+ const github=()=>execFileSync('git',['remote','add','origin','https://github.com/owner/repository.git'],{cwd:root});
+ test('a digest is bounded, verbatim and verifiable against the raw log',()=>{
+  const digest=duo.ciLogDigest({repository:'owner/repository',run:7,job:9,raw});
+  expect(digest.rawLog).toEqual({bytes:Buffer.byteLength(raw),lines:raw.split('\n').length,sha256:require('crypto').createHash('sha256').update(raw).digest('hex')});
+  expect(digest.excerpts.map(e=>e.line)).toEqual([3,4,3005]);
+  expect(Buffer.byteLength(JSON.stringify(digest))).toBeLessThan(Buffer.byteLength(raw)/50);
+  expect(duo.verifyCiLogDigest(digest,raw)).toEqual([]);
+  expect(duo.verifyCiLogDigest({...digest,excerpts:[{line:3,text:'  PASS tests/b.test.js'}]},raw)).toEqual(['excerpt at line 3 is not verbatim']);
+  expect(duo.verifyCiLogDigest(digest,raw+'x')).toEqual(expect.arrayContaining(['raw log SHA-256 differs','raw log byte count differs']));
+  const created=duo.createCiDigest('owner/repository',7,9,(exe,args)=>args.includes('--log')?raw:JSON.stringify({jobs:[{databaseId:9,name:'verify',conclusion:'failure',steps:[{number:1,name:'test',conclusion:'failure'}]}]}));
+  expect(created).toMatchObject({jobName:'verify',jobConclusion:'failure',steps:[{number:1,name:'test',conclusion:'failure'}]});
+  expect(()=>duo.createCiDigest('owner/repository','x',9)).toThrow(/ci-digest --repo/);
+ });
+ test('a submitted digest is re-verified by the helper and offered to the peer as satisfying log inspection',()=>{
+  github();put('ci-digest.json',JSON.stringify(duo.ciLogDigest({repository:'owner/repository',run:7,job:9,raw})));
+  const run=start('claude-code'),calls=[];let request;
+  expect(review(run,batch({evidence:['raw.txt','ci-digest.json']}),withGh(peer({change:(_r,req)=>{request=req;}}),calls)).outcome).toBe('accepted');
+  expect(calls).toEqual(['run view 7 --repo owner/repository --job 9 --log']);
+  expect(request.ci_log_digests).toEqual([expect.objectContaining({path:'ci-digest.json',run:7,job:9,excerpts:3,verified:true})]);
+  const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8');
+  expect(prompt).toContain('A digest listed in request.ci_log_digests with verified true satisfies raw job-log inspection for its job');
+  expect(prompt).toContain('never demand or read a raw log larger than the read budget');
+ });
+ test('a tampered or foreign digest fails fast before the peer call',()=>{
+  github();const digest=duo.ciLogDigest({repository:'owner/repository',run:7,job:9,raw});
+  put('ci-digest.json',JSON.stringify({...digest,excerpts:[{line:4,text:'##[error]nothing failed'}]}));
+  const run=start('claude-code'),invoked=[];
+  const out=review(run,batch({evidence:['raw.txt','ci-digest.json']}),withGh(peer({invokeLog:invoked})));
+  expect(out.outcome).toBe('blocked');expect(out.blocker).toMatch(/does not match the re-fetched raw log.*no review allowance was consumed/);
+  expect(invoked).toEqual([]);expect(out.history.at(-1).attempted).not.toBe(true);
+  put('ci-digest.json',JSON.stringify({...digest,repository:'someone/else'}));
+  const foreign=review(run,batch({evidence:['raw.txt','ci-digest.json']}),withGh(peer({invokeLog:invoked})));
+  expect(foreign.blocker).toMatch(/is for someone\/else, not owner\/repository/);expect(invoked).toEqual([]);
+ });
+ test('generic "review incomplete" rows are a protocol failure, not a verdict',()=>{
+  const run=start('claude-code');
+  const out=review(run,batch(),peer({outcome:'changes_required',change:r=>{r.assessments.forEach(a=>{a.status='unverified';a.reason='Independent review incomplete.';});}}));
+  expect(out.outcome).toBe('blocked');
+  expect(out.blocker).toMatch(/Peer did not assess 3 criterion row\(s\) \(AC-1, AC-2, GATE-TESTS\): "Independent review incomplete\." is not a verdict/);
+  expect(out.history.at(-1).attempted).toBe(true);
+  expect(Object.values(readRun(run.id).criteria).every(c=>c.status!=='verified')).toBe(true);
+  expect(()=>duo.validateAssessmentReasons({assessments:[{id:'A',status:'unverified',reason:'Full independent comparison was not completed.'}]})).toThrow(/is not a verdict/);
+  expect(()=>duo.validateAssessmentReasons({assessments:[
+   {id:'A',status:'unverified',reason:'Rotation oracle remains open.'},
+   {id:'B',status:'blocked',reason:'The lock-order comparison remains incomplete because hop 7.3 omits the class order for worker rows and the rotation path.'},
+   {id:'C',status:'verified',reason:'Independent review incomplete.'}]})).not.toThrow();
+  const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8');
+  expect(prompt).toContain("is a protocol failure, not a verdict: the helper rejects the whole response");
  });
 });
