@@ -9,10 +9,18 @@ test.each(['claude-code','codex'])('J-DUO-ACTION-ASSESS %s: omitted response plu
  const corrected=f.review(f.batch(evidence,{resolutions:[{id:'TOTAL',change:'Corrected total after reviewer direction',evidence:[evidence]}]}));
  expect(corrected.history.at(-1).stage).toBe('validated');expect(corrected.instructions['I-R1-S1'].state).toBe('satisfied');expect(corrected.criteria['AC-TOTAL'].status).toBe('verified');
 });
-test.each(['missing','duplicate','unknown','stale','uninspected','no proof','cycle'])('reject %s assessment atomically and preserve previous repair count',kind=>{
+test.each(['missing','duplicate','unknown','stale','no proof','cycle'])('reject %s assessment atomically and preserve previous repair count',kind=>{
  let evidence=f.capture();f.review(f.batch(evidence));const before=f.state();evidence=f.capture('unrelated.cjs');
  const result=f.review(f.batch(evidence),f.peer((r)=>{const a=r.instruction_assessments[0];if(kind==='missing')r.instruction_assessments=[];if(kind==='duplicate')r.instruction_assessments.push(a);if(kind==='unknown')a.instructionId='UNKNOWN';if(kind==='stale')a.snapshotHash='stale';if(kind==='uninspected')a.inspected=['tree/absent'];if(kind==='no proof'){a.outcome='satisfied';a.evidence=[];}if(kind==='cycle'){a.outcome='replaced_with_justification';a.replacementId=a.instructionId;}}));
  expect(result.history.at(-1).stage).toBe('peer_review');expect(result.instructions).toEqual(before.instructions);expect(result.repairCycle).toEqual(before.repairCycle);expect(result.peerFailures).toBe(1);
+});
+test('#341: an uninspected instruction citation downgrades only that row to unproven; the response stands',()=>{
+ let evidence=f.capture();f.review(f.batch(evidence));evidence=f.capture('unrelated.cjs');
+ const result=f.review(f.batch(evidence),f.peer(r=>{r.instruction_assessments[0].inspected=['tree/absent'];}));
+ expect(result.history.at(-1).stage).toBe('validated');
+ expect(result.history.at(-1).citationRepairs).toEqual([expect.objectContaining({kind:'instruction',id:'I-R1-S1',repair:expect.stringMatching(/^(downgraded|dropped)$/)})]);
+ expect(result.instructions['I-R1-S1'].state).toBe('outstanding');expect(result.instructions['I-R1-S1'].lastAssessment.outcome).toBe('unproven');
+ expect(result.instructions['I-R1-S1'].lastAssessment.inspected).not.toContain('tree/absent');
 });
 test('satisfaction requires actual evidence; source change reopens historical satisfaction',()=>{
  let evidence=f.capture();f.review(f.batch(evidence));f.put('display.cjs','console.log(42)');evidence=f.capture();
@@ -53,5 +61,6 @@ test.each([true,false])('per-instruction raw citation requires actual top-level 
   if(!inspected)r.inspected=r.inspected.filter(p=>p!==`tree/${evidence}`);
  }));
  if(inspected){expect(result.history.at(-1).stage).toBe('validated');expect(result.instructions['I-R1-S1'].lastAssessment.outcome).toBe('not_attempted');expect(result.instructions['I-R1-S1'].state).toBe('outstanding');}
- else{expect(result.history.at(-1).stage).toBe('peer_review');expect(result.blocker).toContain(`listed as tree/${evidence} in top-level inspected`);expect(result.instructions).toEqual(before.instructions);expect(result.repairCycle).toEqual(before.repairCycle);}
+ // #341: an unread raw citation downgrades the row to unproven; it never counts as a disposition.
+ else{expect(result.history.at(-1).stage).toBe('validated');expect(result.history.at(-1).citationRepairs).toEqual([expect.objectContaining({kind:'instruction',id:'I-R1-S1',repair:'downgraded',from:'not_attempted',to:'unproven'})]);expect(result.instructions['I-R1-S1'].lastAssessment.outcome).toBe('unproven');expect(result.instructions['I-R1-S1'].state).toBe('outstanding');}
 });
