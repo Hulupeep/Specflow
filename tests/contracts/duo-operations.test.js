@@ -498,3 +498,48 @@ describe('ORPHAN-FINDINGS (#335): an inherited criterion-less finding never void
   expect(out.outcome).toBe('blocked');expect(out.blocker).toMatch(/Only concrete material risks may lack a criterion ID/);
  });
 });
+
+describe('REMOTE-RELEVANCE (#337): CI evidence only where it can bear on a criterion',()=>{
+ const roundFile=(run,name)=>path.join(root,'.specflow/duo',run.id,'round-001',name);
+ const gitIn=(...args)=>execFileSync('git',args,{cwd:root,stdio:'pipe'}).toString();
+ const commitAll=message=>{gitIn('add','.');gitIn('commit','-m',message);};
+ let request;
+ const capture=()=>peer({change:(_r,req)=>{request=req;}});
+ test('a preparation branch that changes only specification and evidence paths marks remote CI not applicable',()=>{
+  gitIn('update-ref','refs/remotes/origin/main','HEAD');
+  put('PRDs/feature.md','# Amended spec\n');put('evidence/probe.cjs','console.log(1)\n');put('.specflow/runs/feature/task.md','AC\n');commitAll('spec only');
+  const run=start('claude-code');
+  expect(review(run,batch(),capture()).outcome).toBe('accepted');
+  expect(request.remote_ci).toMatchObject({required:false,base:'origin/main',codePaths:[],codePathCount:0});
+  expect(request.remote_ci.changedPaths).toBeGreaterThanOrEqual(3);
+  const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8');
+  expect(prompt).toContain('when request.remote_ci.required is false, remote CI runs and job logs cannot verify or block any criterion of this review');
+  expect(prompt).toContain('a complete multi-megabyte log is never required');
+  expect(prompt).toContain("A closed or merged pull request's head is historical: never compare against it or block on it.");
+  expect(prompt).toContain('An unmet, unavailable or not-applicable gate, a remote fact you cannot observe, or one open finding blocks only the criteria it concerns');
+  expect(prompt).not.toContain('checks and raw job logs yourself');
+ });
+ test('a code change, implementation work, or an unknown base keeps remote CI required',()=>{
+  gitIn('update-ref','refs/remotes/origin/main','HEAD');
+  put('PRDs/feature.md','# Amended spec\n');put('src/app.cjs','module.exports = 1;\n');commitAll('spec and code');
+  expect(duo.remoteCi(root,'preparation')).toMatchObject({required:true,codePaths:['src/app.cjs'],codePathCount:1});
+  put('scratch.cjs','untracked code\n');
+  expect(duo.remoteCi(root,'preparation').codePaths).toEqual(['scratch.cjs','src/app.cjs']);
+  expect(duo.remoteCi(root,'implementation').required).toBe(true);
+  gitIn('update-ref','-d','refs/remotes/origin/main');
+  expect(duo.remoteCi(root,'preparation')).toMatchObject({required:true,reason:expect.stringMatching(/relevance is unknown/)});
+ });
+ test('the helper observes the pushed branch head, not a closed pull request head',()=>{
+  const bare=fs.mkdtempSync(path.join(os.tmpdir(),'duo-origin-'));
+  try{
+   execFileSync('git',['init','--bare','-q',bare]);
+   gitIn('remote','add','origin',bare);gitIn('checkout','-q','-b','spec/feature');gitIn('push','-q','origin','spec/feature');
+   const pushed=gitIn('rev-parse','HEAD').trim();
+   put('PRDs/later.md','unpushed\n');commitAll('local only');
+   expect(duo.remoteBranch(root)).toMatchObject({branch:'spec/feature',remote_head:pushed});
+   expect(gitIn('rev-parse','HEAD').trim()).not.toBe(pushed);
+   gitIn('checkout','-q','--detach');
+   expect(duo.remoteBranch(root)).toMatchObject({branch:null,remote_head:null});
+  }finally{fs.rmSync(bare,{recursive:true,force:true});}
+ });
+});
