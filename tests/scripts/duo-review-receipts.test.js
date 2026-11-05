@@ -46,6 +46,21 @@ test('bounded native read of a large manifest earns partial, not full, coverage'
  events[1].message.content[0].is_error=true;
  expect(access.collect(events,dir,['manifest.json'],{coverage:true}).inspected).toEqual([]);
 });
+test('Codex bounded sed ranges of large root artifacts earn partial, never full, coverage (#332)',()=>{
+ const lines=Array.from({length:12000},(_,i)=>`entry ${i} ${'x'.repeat(60)}`);
+ fs.writeFileSync(path.join(dir,'manifest.json'),lines.join('\n')+'\n');
+ fs.writeFileSync(path.join(dir,'request.json'),lines.slice(0,500).join('\n')+'\n');
+ const first=codex(`/bin/bash -lc "sed -n '1,100p' -- manifest.json"`,lines.slice(0,100).join('\n')+'\n');
+ const result=access.collect(first,dir,['manifest.json'],{coverage:true});
+ expect(result.inspected).toEqual(['manifest.json']);expect(result.receipts[0]).toMatchObject({tool:'sed',extent:'partial'});
+ expect(result.coverage['manifest.json']).toEqual({totalLines:12000,linesRead:100,complete:false});
+ const request=codex(`/bin/bash -lc "sed -n '1,250p' -- request.json"`,lines.slice(0,250).join('\n')+'\n');request[0].item.id='cmd-2';
+ expect(access.collect([...first,...request],dir,['manifest.json','request.json'],{coverage:true}).complete).toEqual([]);
+ // A combined read whose native output stops inside manifest.json earns no manifest receipt.
+ const combined=fs.readFileSync(path.join(dir,'request.json'),'utf8')+fs.readFileSync(path.join(dir,'proof.txt'),'utf8')+fs.readFileSync(path.join(dir,'manifest.json'),'utf8');
+ const cut=codex('cat -- request.json proof.txt manifest.json',combined.slice(0,combined.length-1000));
+ expect(access.collect(cut,dir,['request.json','proof.txt','manifest.json']).inspected).toEqual(['proof.txt','request.json']);
+});
 test('invented citation is rejected even if another file was really read',()=>{
  expect(()=>access.apply({inspected:['manifest.json']},access.collect(claude(),dir,['proof.txt']))).toThrow(/receipt/);
 });

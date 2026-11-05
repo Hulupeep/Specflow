@@ -333,3 +333,89 @@ describe('REVIEW-PREFLIGHT (#269)',()=>{
 test('REVIEW-PREFLIGHT diagnostic root-name collisions keep the native schema enum valid',()=>{
  put('diff.patch','Existing repository execution evidence, distinct from root review patch.');const run=start();const out=review(run,batch({evidence:['raw.txt','diff.patch']}));expect(out.outcome).toBe('accepted');const schema=JSON.parse(fs.readFileSync(path.join(root,'.specflow/duo',run.id,'round-001/schema.json')));const values=schema.properties.diagnostics.items.properties.evidence.items.enum;expect(new Set(values).size).toBe(values.length);
 });
+
+describe('REVIEW-READS (#332): peers reach scoped files past oversized root artifacts',()=>{
+ const receipts=require('../../scripts/duo-review-receipts.cjs');
+ const BUDGET=24000;
+ const large=()=>{
+  for(let i=0;i<700;i++)put(`src/generated/module-${String(i).padStart(4,'0')}-fixture-with-a-long-descriptive-name.js`,`module.exports=${i};\n`);
+  execFileSync('git',['add','.'],{cwd:root});execFileSync('git',['commit','-m','large'],{cwd:root,stdio:'pipe'});
+ };
+ const roundFile=(run,name)=>path.join(root,'.specflow/duo',run.id,'round-001',name);
+ const planned=prompt=>[...prompt.matchAll(/^ {2}\$ (.+)$/gm)].map(m=>m[1]);
+ const linesOf=text=>text.match(/[^\n]*\n|[^\n]+$/g)||[];
+ const output=(cwd,command)=>{const read=receipts.commandRead(command),text=fs.readFileSync(path.join(cwd,read.files[0]),'utf8');return read.tool==='cat'?text:linesOf(text).slice(read.start-1,read.end).join('');};
+ // A Codex peer that runs only the commands it was given, then cats the remaining required reads.
+ function codexPeer({combined=false}={}) {
+  return (exe,args,opts)=>{
+   if(args[0]==='--version') return 'fixture-version';
+   if(args[0]==='auth') return '{"loggedIn":true}';
+   if(args[0]==='login') return 'Logged in using ChatGPT';
+   const request=JSON.parse(fs.readFileSync(path.join(opts.cwd,'request.json')));
+   const roots=['request.json','goal.md','manifest.json','diff.patch','index.patch','commits.txt'];
+   let commands=combined?[`cat -- ${roots.join(' ')}`]:planned(opts.input);
+   const named=new Set(commands.flatMap(c=>receipts.commandRead(c).files));
+   commands=[...commands,...request.requiredReads.filter(f=>!named.has(f)&&!roots.includes(f)).map(f=>`cat -- '${f}'`)];
+   const events=commands.map((command,i)=>{
+    let out=combined&&i===0?roots.map(f=>fs.readFileSync(path.join(opts.cwd,f),'utf8')).join(''):output(opts.cwd,command);
+    if(combined&&i===0)out=out.slice(0,['request.json','goal.md'].reduce((n,f)=>n+fs.readFileSync(path.join(opts.cwd,f),'utf8').length,0)+500); // native output cap cuts manifest.json
+    return {type:'item.completed',item:{id:`cmd-${i}`,type:'command_execution',command:`/bin/bash -lc "${command}"`,aggregated_output:out,status:'completed',exit_code:0}};
+   });
+   const result={outcome:'accepted',summary:'accepted',inspected:[],index_complete:true,findings:[],unrelated:[],
+    assessments:request.batch.criteria.map(id=>({id,status:'verified',evidence:[...request.batch.evidence],reason:'fixture evidence inspected'})),
+    resolutions:[],diagnostics:[]};
+   directionFixture.feedback(request,result);
+   fs.writeFileSync(path.join(opts.cwd,'response.json'),JSON.stringify(result));
+   return [...events,{type:'result',structured_output:result}].map(e=>JSON.stringify(e)).join('\n');
+  };
+ }
+ test('Codex peer gets a per-file bounded reading plan first and following it earns every required receipt',()=>{
+  large();
+  const run=start('claude-code');
+  expect(review(run,batch(),codexPeer()).outcome).toBe('accepted');
+  const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8');
+  const requestText=fs.readFileSync(roundFile(run,'request.json'),'utf8'),manifestText=fs.readFileSync(roundFile(run,'manifest.json'),'utf8');
+  expect(Buffer.byteLength(requestText)).toBeGreaterThan(BUDGET);expect(Buffer.byteLength(manifestText)).toBeGreaterThan(BUDGET);
+  expect(prompt.indexOf('Reading plan')).toBe(0);
+  expect(prompt.indexOf('Reading plan')).toBeLessThan(prompt.indexOf('Required-read checklist'));
+  expect(prompt).toContain('never read request.json and manifest.json in the same command');
+  const commands=planned(prompt);
+  for(const command of commands)expect(receipts.commandRead(command).files).toHaveLength(1);
+  expect(commands).not.toContain('cat -- request.json');expect(commands).not.toContain('cat -- manifest.json');
+  expect(commands.filter(c=>/manifest\.json$/.test(c))).toEqual(["sed -n '1,100p' -- manifest.json"]);
+  expect(commands[0]).toBe('cat -- goal.md');
+  // The hash listing is written last; the plan reads the review content before it, in bounded ranges.
+  const parsed=JSON.parse(requestText);
+  expect(Object.keys(parsed).at(-1)).toBe('instruction_review');expect(Object.keys(parsed.instruction_review).at(-1)).toBe('artifactHashes');
+  const lines=linesOf(requestText),hashLine=lines.findIndex(l=>/^ {4}"artifactHashes": \{/.test(l))+1;
+  expect(hashLine).toBeGreaterThan(1);
+  const ranges=commands.filter(c=>/request\.json$/.test(c)).map(c=>receipts.commandRead(c));
+  expect(ranges.length).toBeGreaterThan(0);
+  expect(ranges[0].start).toBe(1);expect(ranges.at(-1).end).toBe(hashLine-1);
+  ranges.forEach((r,i)=>{if(i)expect(r.start).toBe(ranges[i-1].end+1);expect(Buffer.byteLength(lines.slice(r.start-1,r.end).join(''))).toBeLessThanOrEqual(BUDGET);});
+  expect(prompt).toContain(`request.json lines ${hashLine}-${lines.length} hold instruction_review.artifactHashes`);
+  // Verification is unchanged: bounded reads are receipted as partial and never as full coverage.
+  const access=JSON.parse(fs.readFileSync(roundFile(run,'access-receipts.json'),'utf8'));
+  expect(access.inspected).toEqual(expect.arrayContaining(['request.json','manifest.json','goal.md','tree/task.md','tree/raw.txt']));
+  expect(access.receipts.filter(r=>r.path==='manifest.json').map(r=>r.extent)).toEqual(['partial']);
+  const events=fs.readFileSync(roundFile(run,'stdout.txt'),'utf8').trim().split('\n').map(l=>JSON.parse(l));
+  const coverage=receipts.collect(events,path.dirname(roundFile(run,'x')),['manifest.json','request.json'],{coverage:true}).coverage;
+  expect(coverage['manifest.json'].complete).toBe(false);expect(coverage['request.json'].complete).toBe(false);
+ });
+ test('a truncated combined first read of request.json and manifest.json still earns no manifest receipt',()=>{
+  large();
+  const run=start('claude-code'),result=review(run,batch(),codexPeer({combined:true}));
+  expect(result.outcome).toBe('blocked');expect(result.blocker).toMatch(/did not inspect required artifact: manifest\.json/);
+ });
+ test('Claude peer keeps bounded manifest guidance and also gets bounded request.json ranges',()=>{
+  large();
+  const run=start('codex');
+  expect(review(run,batch()).outcome).toBe('accepted');
+  const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8');
+  expect(prompt.indexOf('Reading plan')).toBe(0);
+  expect(prompt).toContain('offset: 1 and limit: 100');
+  expect(prompt).toContain('A failed read or a partial read never proves full coverage');
+  expect(prompt).toMatch(/Read request\.json with offset: 1 and limit: \d+/);
+  expect(prompt).not.toMatch(/^ {2}\$ /m);
+ });
+});
