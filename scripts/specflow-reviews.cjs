@@ -94,7 +94,7 @@ function checkedRefs(root, refs, label) {
 }
 function classify(root, previous, findings, gates, identity) {
   const errors = [], protocolErrors = [], merged = new Map((previous?.findings || []).map(f => [f.id, f]));
-  const ids = new Set(), newMaterial = [];
+  const ids = new Set(), newMaterial = [], reattachments = [];
   for (let finding of findings || []) {
     if (!nonempty(finding.id) || ids.has(finding.id)) throw Error('Review findings require unique stable IDs');
     ids.add(finding.id);
@@ -112,8 +112,12 @@ function classify(root, previous, findings, gates, identity) {
     const prior = merged.get(finding.id);
     if (!prior && finding.status === 'resolved' && finding.severity !== 'P2') protocolErrors.push(`${finding.id}: cannot close an unknown finding`);
     if (prior && prior.severity !== 'P2' && finding.severity === 'P2') protocolErrors.push(`${finding.id}: cannot downgrade a material finding to optional`);
-    if (prior && prior.criterion !== finding.criterion) protocolErrors.push(`${finding.id}: cannot repurpose an existing finding ID`);
-    merged.set(finding.id, prior ? { ...finding, basis:prior.basis, latestBasis:finding.basis } : finding);
+    // #335: a prior open finding with no criterion may be attached to one once.
+    const reattach = prior && prior.status === 'open' && (prior.criterion ?? null) === null && (finding.criterion ?? null) !== null;
+    if (prior && !reattach && (prior.criterion ?? null) !== (finding.criterion ?? null)) protocolErrors.push(`${finding.id}: cannot repurpose an existing finding ID`);
+    if (reattach) reattachments.push({ id: finding.id, from: null, to: finding.criterion });
+    merged.set(finding.id, prior ? { ...finding, basis:prior.basis, latestBasis:finding.basis,
+      ...(reattach ? { reattached: { from: null, to: finding.criterion } } : prior.reattached ? { reattached: prior.reattached } : {}) } : finding);
   }
   for (const [id,finding] of merged) if (finding.status === 'deferred') {
     const stale = checkedRefs(root,finding.deferral?.evidence,`${id} deferral`);
@@ -131,7 +135,7 @@ function classify(root, previous, findings, gates, identity) {
   errors.push(...protocolErrors);
   const open = all.filter(f => f.status === 'open' && f.severity !== 'P2');
   const outcome = newMaterial.length && repairInduced / newMaterial.length > 0.5 ? 'escalated' : errors.length || open.length ? 'blocked' : all.some(f => f.severity === 'P2' && f.status === 'open') ? 'passed_with_warnings' : 'passed';
-  return { outcome, errors, protocolErrors, findings: all, counts, identity, gates: gates || [] };
+  return { outcome, errors, protocolErrors, findings: all, counts, identity, gates: gates || [], reattachments };
 }
 function complete(root, reservation, report) {
   return change(root, reservation.number, state => {
@@ -157,6 +161,7 @@ function complete(root, reservation, report) {
     const provenanceErrors = [...evidenceErrors,...(report.gates || []).flatMap(g=>checkedRefs(root,g.evidence,`Gate ${g.id}`)),...(report.findings || []).flatMap(f=>checkedRefs(root,f.evidence,f.id))];
     const protocol = provenanceErrors.length > 0 || result.protocolErrors.length > 0;
     const progressDiscarded = report.nativeOutcome === 'accepted' && report.readinessComplete === true && !['passed','passed_with_warnings'].includes(result.outcome);
+    if (!protocol) for (const r of result.reattachments) state.events.push({ kind: 'finding-reattached', tier: reservation.tier, round: reservation.id, ...r, at: new Date().toISOString() });
     Object.assign(round, result, { progressDiscarded, status: protocol ? 'protocol_failed' : 'complete', verifiedCriteria:protocol||progressDiscarded?[]:(report.verifiedCriteria || []), evidence: report.evidence || [], atEnd: new Date().toISOString() });
     if (protocol) round.findings = structuredClone(previousReview(rounds.slice(0,-1))?.findings || []);
     continuation.observe(c,{protocol,achievements:protocol?[]:achievements(round)});

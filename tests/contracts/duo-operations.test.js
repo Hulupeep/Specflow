@@ -419,3 +419,82 @@ describe('REVIEW-READS (#332): peers reach scoped files past oversized root arti
   expect(prompt).not.toMatch(/^ {4}(?:cat|sed) /m);
  });
 });
+
+describe('REVIEW-BUDGET (#334): one read per step and a hard read budget',()=>{
+ const roundFile=(run,name)=>path.join(root,'.specflow/duo',run.id,'round-001',name);
+ afterEach(()=>{delete process.env.SPECFLOW_DUO_READ_BUDGET_BYTES;});
+ test('the plan requires one read per step and keeps every planned range within 16,000 bytes',()=>{
+  for(let i=0;i<700;i++)put(`src/generated/module-${String(i).padStart(4,'0')}-fixture-with-a-long-descriptive-name.js`,`module.exports=${i};\n`);
+  put('evidence-large.md',Array.from({length:900},(_,i)=>`line ${i} ${'z'.repeat(70)}`).join('\n')+'\n');
+  execFileSync('git',['add','.'],{cwd:root});execFileSync('git',['commit','-m','large'],{cwd:root,stdio:'pipe'});
+  const run=start('claude-code');
+  expect(review(run,batch({evidence:['raw.txt','evidence-large.md']})).outcome).toBe('accepted');
+  const prompt=fs.readFileSync(roundFile(run,'prompt.txt'),'utf8'),receipts=require('../../scripts/duo-review-receipts.cjs');
+  expect(prompt).toContain('Issue exactly one read per step and wait for its output before issuing the next: never batch or parallelize reads');
+  const commands=[...prompt.matchAll(/^ {4}((?:cat|sed) .+)$/gm)].map(m=>m[1]);
+  expect(commands.some(c=>/evidence-large\.md$/.test(c))).toBe(true);
+  for(const command of commands.filter(c=>c.startsWith('sed'))){
+   const read=receipts.commandRead(command),text=fs.readFileSync(roundFile(run,read.files[0]),'utf8').match(/[^\n]*\n|[^\n]+$/g);
+   expect(Buffer.byteLength(text.slice(read.start-1,read.end).join(''))).toBeLessThanOrEqual(16000);
+  }
+ });
+ test('an over-budget read set fails fast before the peer call and consumes no allowance',()=>{
+  process.env.SPECFLOW_DUO_READ_BUDGET_BYTES='2000';
+  put('raw.txt','Observed 41, expected 42.\n'+'detail '.repeat(600));
+  const run=start('claude-code'),calls=[];
+  const result=review(run,batch(),peer({invokeLog:calls}));
+  expect(result.outcome).toBe('blocked');
+  expect(result.blocker).toMatch(/over the 2000-byte review read budget.*no review allowance was consumed/);
+  expect(calls).toEqual([]);
+  expect(result.history.at(-1).attempted).not.toBe(true);
+  expect(result.peerFailures||0).toBe(0);
+  const budget=JSON.parse(fs.readFileSync(roundFile(run,'read-budget.json'),'utf8'));
+  expect(budget.budgetBytes).toBe(2000);expect(budget.plannedBytes).toBeGreaterThan(2000);
+  expect(budget.largest.map(r=>r.file)).toContain('tree/raw.txt');
+  delete process.env.SPECFLOW_DUO_READ_BUDGET_BYTES;
+  expect(review(run,batch(),peer({invokeLog:calls})).outcome).toBe('accepted');
+  expect(calls).toEqual(['codex']);
+ });
+ test('an invalid budget override is rejected',()=>{
+  expect(()=>duo.readBudget({SPECFLOW_DUO_READ_BUDGET_BYTES:'lots'})).toThrow(/positive integer/);
+  expect(duo.readBudget({})).toBe(480000);
+ });
+});
+
+describe('ORPHAN-FINDINGS (#335): an inherited criterion-less finding never voids a valid response',()=>{
+ const roundFile=(run,n,name)=>path.join(root,'.specflow/duo',run.id,`round-00${n}`,name);
+ const orphan=()=>({id:'REVIEW-002',criterion:null,kind:'risk',basis:'Raw CI job log was not inspected',evidence:'tree/raw.txt',action:'Inspect the raw job log',verification:'Raw job log inspected'});
+ function withOrphan(run){
+  // Seed the open orphan through a real review round.
+  expect(review(run,batch(),peer({outcome:'changes_required',change:r=>{r.findings=[orphan()];}})).outcome).toBe('changes_required');
+  expect(readRun(run.id).findings['REVIEW-002']).toMatchObject({criterion:null,status:'open'});
+ }
+ test('attaching the orphan to a criterion is accepted once and recorded',()=>{
+  const run=start();withOrphan(run);
+  put('raw.txt','Observed 41, expected 42. More evidence.');
+  const out=review(run,batch(),peer({outcome:'changes_required',change:r=>{r.findings=[{...orphan(),criterion:'GATE-TESTS',kind:'gate'}];r.assessments.forEach(a=>{a.status='unverified';});}}));
+  expect(out.outcome).toBe('changes_required');
+  const f=readRun(run.id).findings['REVIEW-002'];
+  expect(f).toMatchObject({criterion:'GATE-TESTS',kind:'gate',status:'open',reattached:{from:null,to:'GATE-TESTS'}});
+  expect(readRun(run.id).criteria['GATE-TESTS'].status).toBe('blocked');
+  // Once attached, the normal repurpose rule applies.
+  const progress=require('../../scripts/duo-progress.cjs'),state=structuredClone(readRun(run.id));
+  const again={outcome:'changes_required',index_complete:true,diagnostics:[],
+   assessments:batch().criteria.map(id=>({id,status:'unverified',evidence:[],reason:'not yet'})),
+   resolutions:[{id:'REVIEW-002',status:'open',evidence:[],reason:'still open'}],
+   findings:[{...orphan(),criterion:'AC-1',kind:'acceptance'}]};
+  expect(()=>progress.applyReview(state,batch(),again,{},'source')).toThrow(/Cannot repurpose a finding ID/);
+ });
+ test('re-raising the orphan without a criterion under another kind keeps it open as a risk',()=>{
+  const run=start();withOrphan(run);
+  put('raw.txt','Observed 41, expected 42. More evidence.');
+  const out=review(run,batch(),peer({outcome:'changes_required',change:r=>{r.findings=[{...orphan(),kind:'gate'}];r.assessments.forEach(a=>{a.status='unverified';});}}));
+  expect(out.outcome).toBe('changes_required');
+  expect(readRun(run.id).findings['REVIEW-002']).toMatchObject({criterion:null,kind:'risk',reportedKind:'gate',status:'open'});
+ });
+ test('a new criterion-less non-risk finding is still rejected',()=>{
+  const run=start();
+  const out=review(run,batch(),peer({outcome:'changes_required',change:r=>{r.findings=[{...orphan(),id:'NEW-1',kind:'gate'}];r.assessments.forEach(a=>{a.status='unverified';});}}));
+  expect(out.outcome).toBe('blocked');expect(out.blocker).toMatch(/Only concrete material risks may lack a criterion ID/);
+ });
+});
