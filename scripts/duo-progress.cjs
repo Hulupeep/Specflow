@@ -128,10 +128,22 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
   for (const f of result.findings) {
     if (!nonempty(f.id) || ['__proto__', 'constructor', 'prototype'].includes(f.id) || !['acceptance', 'gate', 'risk'].includes(f.kind) || !nonempty(f.verification)) throw Error('Finding needs a stable ID, basis kind and closure verification');
     if (f.criterion !== null && !Object.hasOwn(state.criteria, f.criterion)) throw Error('Finding cites unknown criterion');
-    if (f.criterion === null && f.kind !== 'risk') throw Error('Only concrete material risks may lack a criterion ID');
-    if (candidate[f.id] && !candidate[f.id].legacy && candidate[f.id].criterion !== f.criterion) throw Error('Cannot repurpose a finding ID');
+    const existing = candidate[f.id], orphan = existing && !existing.legacy && existing.status === 'open' && (existing.criterion ?? null) === null;
+    let carried = {};
+    if (orphan && f.criterion !== null) {
+      // #335: an inherited/earlier finding with no criterion may be attached to a
+      // known criterion exactly once; afterwards the repurpose rule applies.
+      carried = { reattached: { from: null, to: f.criterion, at: new Date().toISOString() } };
+    } else if (orphan && f.kind !== 'risk') {
+      // Re-raising an existing orphan keeps its recorded classification; the peer's
+      // label is retained, and the finding stays open and blocking.
+      carried = { kind: existing.kind || 'risk', reportedKind: f.kind };
+    } else {
+      if (f.criterion === null && f.kind !== 'risk') throw Error('Only concrete material risks may lack a criterion ID');
+      if (existing && !existing.legacy && existing.criterion !== f.criterion) throw Error('Cannot repurpose a finding ID');
+    }
     if (result.assessments.some(a => a.id === f.criterion && a.status === 'verified')) throw Error('Criterion cannot be verified while it has an open blocking finding');
-    candidate[f.id] = { ...f, status: 'open' };
+    candidate[f.id] = { ...f, ...(existing?.reattached ? { reattached: existing.reattached } : {}), ...(existing?.inherited ? { inherited: existing.inherited } : {}), ...carried, status: 'open' };
   }
   const remaining = Object.values(candidate).filter(f => f.status === 'open');
   // Existing findings may remain open outside a scoped batch even when the
