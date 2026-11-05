@@ -128,7 +128,7 @@ function applyReview(state, batch, result, hashes, source, sourceHashes = {}) {
   for (const f of result.findings) {
     if (!nonempty(f.id) || ['__proto__', 'constructor', 'prototype'].includes(f.id) || !['acceptance', 'gate', 'risk'].includes(f.kind) || !nonempty(f.verification)) throw Error('Finding needs a stable ID, basis kind and closure verification');
     if (f.criterion !== null && !Object.hasOwn(state.criteria, f.criterion)) throw Error('Finding cites unknown criterion');
-    const existing = candidate[f.id], orphan = existing && !existing.legacy && existing.status === 'open' && (existing.criterion ?? null) === null;
+    const existing = candidate[f.id], orphan = existing && !existing.legacy && existing.status === 'open' && (existing.criterion ?? null) === null && (existing.inherited?.originalCriterion ?? null) === null;
     let carried = {};
     if (orphan && f.criterion !== null) {
       // #335: an inherited/earlier finding with no criterion may be attached to a
