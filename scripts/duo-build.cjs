@@ -538,9 +538,10 @@ function readingPlan(round, requiredReads, transportBuilder, plan = planReads(ro
       }
       continue;
     }
-    if (!ROOT_ARTIFACTS.includes(file) && !entry.ranges) continue; // listed in the checklist
+    // #343: every required read is an explicit command, so the plan is the complete
+    // read list; a peer that answers after only the root artifacts has skipped part of it.
+    if (file.includes("'")) { out.push(`${label}: read it${entry.ranges ? ` in ranges of at most ${READ_CHUNK_BYTES} bytes` : ''} with its own ${codexPeer ? 'command' : 'Read'}.`); continue; }
     if (!entry.ranges) { out.push(`${label}:`, whole(file)); continue; }
-    if (file.includes("'")) { out.push(`${label}: read it in ranges of at most ${READ_CHUNK_BYTES} bytes.`); continue; }
     if (file === 'request.json' && entry.onDemand.length) {
       out.push(`${label}. Read the review request in these ranges:`, ...ranges(file, entry.ranges, lines.length),
         ...entry.onDemand.map(({ span: [from, to], note }) => `  request.json lines ${from}-${to} hold ${note}`));
@@ -548,8 +549,18 @@ function readingPlan(round, requiredReads, transportBuilder, plan = planReads(ro
     }
     out.push(`${label}:`, ...ranges(file, entry.ranges, lines.length));
   }
-  out.push(`Then open every other Required-read checklist file with its own ${codexPeer ? 'command' : 'Read'}, one per step. A failed, truncated or partial read never proves full coverage.`);
+  out.push(`This plan covers all ${plan.entries.length} required reads. Run every one of them, one per step, before you write your response; do not answer early. A response that skips required reads and verifies nothing is rejected by the helper as a protocol failure, not recorded as a verdict. A failed, truncated or partial read never proves full coverage.`);
   return out.join('\n') + '\n';
+}
+// #343: a peer that stops before reading the required artifacts and verifies or
+// closes nothing has not reviewed; its "blocked: review not completed" response
+// is a protocol failure (retry/recovery path), never a stagnant verdict.
+function validateReviewCoverage(result, request, access) {
+  const missing = request.requiredReads.filter(file => !access.inspected.includes(file));
+  if (!missing.length) return;
+  const progressed = (result.assessments || []).some(a => a.status === 'verified') || (result.resolutions || []).some(r => r.status === 'closed');
+  if (progressed || result.outcome === 'accepted') return; // acceptance is enforced by validateReview; real progress stands
+  throw Error(`Peer stopped before completing the review: it read ${request.requiredReads.length - missing.length} of ${request.requiredReads.length} required artifacts (unread: ${missing.slice(0, 6).join(', ')}${missing.length > 6 ? `, and ${missing.length - 6} more` : ''}) and verified or closed nothing. An unfinished review is a protocol failure, not a verdict`);
 }
 function validateReview(result, request) {
   if (!result || !['accepted', 'changes_required', 'blocked'].includes(result.outcome) || !result.summary?.trim() || !Array.isArray(result.findings) || !Array.isArray(result.unrelated) || !Array.isArray(result.inspected)) throw Error('Malformed peer outcome');
@@ -993,6 +1004,7 @@ function reviewLocked(root, dir, state, batch, invoke) {
     citationRepairDirection(result, citationRepairs);
     if (citationRepairs.length) record.citationRepairs = citationRepairs;
     validateAssessmentReasons(result);
+    validateReviewCoverage(result, request, access);
     typesafe.validate(result, request, round);
     record.review = validateReview(result, request);
 
@@ -1133,5 +1145,5 @@ function cli(args, root = process.cwd(), facade = 'duo') {
     return ['review', 'resume'].includes(action) ? (state.outcome === 'accepted' ? 0 : state.outcome === 'changes_required' ? 1 : 2) : 0;
   } catch (e) { console.error(`Outcome advanced: blocked\nCurrent blocker: ${e.message}\nNext action: inspect eligibility and retained evidence; diagnose the concrete cause before retrying; preserve history and explicit owner ceilings`); return 2; }
 }
-module.exports = { citationRepair, instructionCitationRepair, ciLogDigest, verifyCiLogDigest, createCiDigest, validateAssessmentReasons, remoteCi, remoteBranch, readingPlan, planReads, requestText, readBudget, providerSchema, migrateReview, recordScopedInterruption, recoverReview, beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, applicableInstructions, fingerprint, load, cli, schema };
+module.exports = { validateReviewCoverage, citationRepair, instructionCitationRepair, ciLogDigest, verifyCiLogDigest, createCiDigest, validateAssessmentReasons, remoteCi, remoteBranch, readingPlan, planReads, requestText, readBudget, providerSchema, migrateReview, recordScopedInterruption, recoverReview, beginRouting, cease, eligibility, configureTypesafe, inspect, resume, release, indexGoal, finish, capture, status, start, review, check, invocation, validateReview, manifest, applicableInstructions, fingerprint, load, cli, schema };
 if (require.main === module) process.exitCode = cli(process.argv.slice(2));

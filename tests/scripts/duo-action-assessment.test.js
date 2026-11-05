@@ -61,6 +61,7 @@ test.each([true,false])('per-instruction raw citation requires actual top-level 
   if(!inspected)r.inspected=r.inspected.filter(p=>p!==`tree/${evidence}`);
  }));
  if(inspected){expect(result.history.at(-1).stage).toBe('validated');expect(result.instructions['I-R1-S1'].lastAssessment.outcome).toBe('not_attempted');expect(result.instructions['I-R1-S1'].state).toBe('outstanding');}
- // #341: an unread raw citation downgrades the row to unproven; it never counts as a disposition.
- else{expect(result.history.at(-1).stage).toBe('validated');expect(result.history.at(-1).citationRepairs).toEqual([expect.objectContaining({kind:'instruction',id:'I-R1-S1',repair:'downgraded',from:'not_attempted',to:'unproven'})]);expect(result.instructions['I-R1-S1'].lastAssessment.outcome).toBe('unproven');expect(result.instructions['I-R1-S1'].state).toBe('outstanding');}
+ // #343: skipping a required read (the submitted raw evidence) while verifying nothing is an
+ // unfinished review: a protocol failure that leaves instructions and repair counts untouched.
+ else{expect(result.history.at(-1).stage).toBe('peer_review');expect(result.blocker).toMatch(/Peer stopped before completing the review/);expect(result.instructions).toEqual(before.instructions);expect(result.repairCycle).toEqual(before.repairCycle);}
 });
