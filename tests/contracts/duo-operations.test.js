@@ -342,7 +342,7 @@ describe('REVIEW-READS (#332): peers reach scoped files past oversized root arti
   execFileSync('git',['add','.'],{cwd:root});execFileSync('git',['commit','-m','large'],{cwd:root,stdio:'pipe'});
  };
  const roundFile=(run,name)=>path.join(root,'.specflow/duo',run.id,'round-001',name);
- const planned=prompt=>[...prompt.matchAll(/^ {2}\$ (.+)$/gm)].map(m=>m[1]);
+ const planned=prompt=>[...prompt.matchAll(/^ {4}((?:cat|sed) .+)$/gm)].map(m=>m[1]);
  const linesOf=text=>text.match(/[^\n]*\n|[^\n]+$/g)||[];
  const output=(cwd,command)=>{const read=receipts.commandRead(command),text=fs.readFileSync(path.join(cwd,read.files[0]),'utf8');return read.tool==='cat'?text:linesOf(text).slice(read.start-1,read.end).join('');};
  // A Codex peer that runs only the commands it was given, then cats the remaining required reads.
@@ -416,6 +416,6 @@ describe('REVIEW-READS (#332): peers reach scoped files past oversized root arti
   expect(prompt).toContain('offset: 1 and limit: 100');
   expect(prompt).toContain('A failed read or a partial read never proves full coverage');
   expect(prompt).toMatch(/Read request\.json with offset: 1 and limit: \d+/);
-  expect(prompt).not.toMatch(/^ {2}\$ /m);
+  expect(prompt).not.toMatch(/^ {4}(?:cat|sed) /m);
  });
 });
