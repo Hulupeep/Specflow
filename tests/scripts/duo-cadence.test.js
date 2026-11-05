@@ -117,7 +117,7 @@ test.each(['codex','claude-code'])('J-DUO-GITHUB AC-5: %s peer gets GitHub conte
   expect(result.outcome).toBe('accepted');
   expect(invoke.mock.calls).toContainEqual(['gh',['auth','status','--hostname','github.com'],{combineOutput:true}]);
   const round=path.join(root,'.specflow/duo',run.id,'round-001');
-  expect(JSON.parse(fs.readFileSync(path.join(round,'request.json'))).github).toEqual({repository:'owner/repository',head:git('rev-parse','HEAD').toString().trim()});
+  expect(JSON.parse(fs.readFileSync(path.join(round,'request.json'))).github).toEqual({repository:'owner/repository',head:git('rev-parse','HEAD').toString().trim(),branch:git('rev-parse','--abbrev-ref','HEAD').toString().trim(),remote_head:null});
   const spec=JSON.parse(fs.readFileSync(path.join(round,'invocation.json')));
   expect(spec.env.XDG_CACHE_HOME).toBe(path.join(round,'gh-cache'));
   expect(fs.existsSync(path.join(spec.env.XDG_CACHE_HOME,'gh'))).toBe(true);
