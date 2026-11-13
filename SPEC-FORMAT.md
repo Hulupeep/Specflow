@@ -71,6 +71,15 @@ Breakpoints:
 Outcome:
 - [does this feature help this persona or not]
 
+### Persona: Busy reader (MUST when the story changes what a person reads)
+On a phone, reads one line, asks "is this mine? what must I do?". Walked on **real samples** (the
+real-sample gate): the last N (>= 10) stored items through the new code, one row each:
+
+| # | Producer shape | First line the reader sees | Pinged? | What must I do? | Pass |
+|---|---|---|---|---|---|
+
+Committed fixtures are redacted or synthetic. The table goes in the PR.
+
 ## Simulation Verdict
 - [overall conclusion]
 - [what must be true for the feature to work]

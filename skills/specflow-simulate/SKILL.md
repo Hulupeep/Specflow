@@ -31,6 +31,16 @@ explicitly using the shared policy; do not claim they passed.
 
 Run a story through realistic usage — multiple personas, multiple routes — to find the gaps and edges a single happy-path reading misses. The output is not commentary; it is a set of concrete, proposed additions that make the story sharper before any code is written.
 
+<!-- specflow-real-sample-gate:start -->
+## Reader-facing stories (MUST)
+
+When the story changes what a person reads (notices, digests, receipts, asks, card text, email, chat), add the
+**busy reader** persona and run the **real-sample gate**: the last N (>= 10) real stored items through the new code,
+one table row each (first line seen, pinged?, what must I do?, pass). The table goes in the PR; committed fixtures are
+redacted or synthetic. Also walk the divergent route "the producer writes in another shape". Details:
+`references/simulation-method.md`, "Reader-facing stories".
+<!-- specflow-real-sample-gate:end -->
+
 ## When to run
 
 Trigger on: "simulate this story", "simulate usage end to end", "find gaps / edges", "run personas through this", "stress-test this story", or `/specflow-simulate <file-or-issue>`.

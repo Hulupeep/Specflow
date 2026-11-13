@@ -141,6 +141,13 @@ requires simulation evidence. Do not set `simulation_required: false`, relabel a
 ticket or call a required artifact N/A to evade that gate. Report a conflict
 between a lightweight recommendation and an existing requirement explicitly.
 
+<!-- specflow-real-sample-gate:start -->
+**Message and notification wording routes through simulate first.** Work that changes what a person reads
+(notices, digests, receipts, asks, card text, email, chat) runs `specflow-simulate` with the busy reader persona and
+the real-sample gate before any build, even when it is a Tweak. The gate's table is the evidence; a formatting unit
+test is not (tabstax#1221).
+<!-- specflow-real-sample-gate:end -->
+
 If no loop or formal specification work is needed, execute the selected checks
 and stop here; no tier record or run contract is needed. Otherwise use the depth
 policy below, and emit a run contract only if a loop is selected.
