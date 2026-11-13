@@ -52,6 +52,18 @@
       "previousHashes": {
         "skills/specflow-loop-selector/SKILL.md": "2b969de0980713611b6fbe290b385e09547a1669b530742b34c3cf36eb3f5f06"
       }
+    },
+    {
+      "issue": "tabstax#1221",
+      "reason": "Add the busy reader persona, the real-sample gate and simulate-first routing for reader-facing work, inside specflow-real-sample-gate markers; original text retained.",
+      "files": [
+        "skills/specflow-simulate/SKILL.md",
+        "skills/specflow-loop-selector/SKILL.md"
+      ],
+      "previousHashes": {
+        "skills/specflow-simulate/SKILL.md": "a58e60f2870c0b6f3c33bfd574d933c46acca28b023590937334177d3cceeea2",
+        "skills/specflow-loop-selector/SKILL.md": "fe446a171c473f0bedac51253bde51e04d3a630aa4b61bbcd7f0f205e9f9b635"
+      }
     }
   ]
 }

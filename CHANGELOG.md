@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Reader-facing stories get the **busy reader** persona and a **real-sample gate**: `specflow-simulate` runs the
+  last N (>= 10) real stored items through the new code and records a table (first line seen, pinged?, what must I
+  do?, pass) for the PR, with redacted or synthetic committed fixtures. The loop selector routes message and
+  notification wording through simulate first, even as a Tweak. SPEC-FORMAT carries the persona and table.
+  (tabstax#1221)
+
 ## 0.12.1 (2026-11-02)
 
 - Managed role calls use the verified original controller deadline instead of a

@@ -27,6 +27,7 @@ actually stress *this* story. A useful starting set:
 | Interrupted / returning | mid-flow reload, tab switch, stale data, resume after days |
 | Cross-surface | starts on one surface (e.g. CLI/extension), finishes on another (web) |
 | Collaborator / multi-actor | two people acting on the same object; ordering and races |
+| **Busy reader** (MUST for reader-facing stories) | on a phone, reads one line and asks "is this mine? what must I do?"; never scrolls, never opens a link to find out |
 
 For each chosen persona, state in one line *why it stresses this story* — if it
 doesn't, drop it.
@@ -38,6 +39,26 @@ For every persona, walk the story's flow twice:
 - **≥1 divergent route** — the realistic place this persona deviates: an empty/error/permission state, an unanticipated branch, a decision the story is silent on, a back-out/cancel, a concurrent action, a retry.
 
 At each step ask: *Does the story say what happens here? Is the success state observable? What does this persona expect that the story doesn't deliver?*
+
+### Reader-facing stories: the real-sample gate (MUST)
+
+A story that changes what a person reads (a notice, digest, receipt, ask, card text, email, chat message) is
+reader-facing. For it:
+
+1. **Busy reader is mandatory** among the personas, and is walked on real samples, never hand-written ideal input.
+2. **Divergent route: "the producer writes in another shape."** Run the new code on what producers really send:
+   one line, different headings, no headings, a pasted log, an empty body. Hand-written ideal input hides exactly
+   these (tabstax#1221: three PRs for one Telegram format, because every check used ideal input).
+3. **Real-sample gate:** an acceptance criterion runs the last N real stored items (N >= 10, e.g. the newest
+   `next_actions.agent_state_note` rows) through the new code and records a table, one row per sample:
+
+   | # | Producer shape | First line the reader sees | Pinged? | What must I do? | Pass |
+   |---|---|---|---|---|---|
+
+   A sample passes only when the first line alone answers "is this mine?" and "what must I do?" (or says
+   "nothing for you"). The table goes in the PR. **Committed fixtures are redacted or synthetic;** real people's
+   data is read for the check and never committed.
+4. A missing table is a P1 gap: propose the AC, never mark the story ready without it.
 
 ## Step 3 — collect gaps, map each to a story edit
 
@@ -51,6 +72,7 @@ A gap with no proposed edit is incomplete. Map every gap to one of:
 | Ambiguous wording | a clarifying REQ edit or an open question |
 | Cross-surface/ordering/race | an explicit REQ + an invariant `I-<DOMAIN>-NNN` candidate |
 | Product decision needed | an **open question** (do NOT invent the answer) |
+| Reader can't tell from line one (reader-facing) | a **real-sample gate** AC (table above) + a REQ on the first line |
 
 ## Step 4 — output as a proposed block (do not silently rewrite)
 
